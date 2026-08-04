@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: zera-erp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-zera}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-zera_dev_password}
+      POSTGRES_DB: ${DB_NAME:-zera_erp}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - zera_erp_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  zera_erp_postgres_data:

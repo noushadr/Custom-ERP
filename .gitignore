@@ -1,0 +1,42 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Backend (Node/NestJS)
+backend/node_modules/
+backend/dist/
+backend/coverage/
+backend/*.log
+
+# Frontend (Flutter/Dart)
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/.pub-cache/
+frontend/.pub/
+frontend/*.iml
+frontend/android/.gradle
+frontend/android/local.properties
+frontend/ios/Pods/
+frontend/ios/.symlinks/
+frontend/windows/flutter/ephemeral/
+frontend/macos/Flutter/ephemeral/
+frontend/linux/flutter/ephemeral/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid

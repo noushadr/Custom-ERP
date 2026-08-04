@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flutter-web",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'C:\\Users\\Zera\\Desktop\\Zera ERP\\frontend'; flutter run -d web-server --web-port 5050"
+      ],
+      "port": 5050
+    }
+  ]
+}
