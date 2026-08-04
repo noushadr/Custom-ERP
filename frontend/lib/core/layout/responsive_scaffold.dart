@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/app_footer.dart';
 import '../../shared/widgets/zera_logo.dart';
 import 'app_nav_destination.dart';
 import 'breakpoints.dart';
@@ -93,7 +94,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
             destinations: _railDestinations,
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: widget.body),
+          Expanded(child: _contentWithFooter(widget.body)),
         ],
       ),
     );
@@ -122,7 +123,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
             destinations: _railDestinations,
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: widget.body),
+          Expanded(child: _contentWithFooter(widget.body)),
         ],
       ),
     );
@@ -134,7 +135,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
         title: _TitleWithLogo(title: widget.title),
         actions: widget.actions,
       ),
-      body: widget.body,
+      body: _contentWithFooter(widget.body),
       bottomNavigationBar: NavigationBar(
         selectedIndex: widget.selectedIndex,
         onDestinationSelected: widget.onDestinationSelected,
@@ -147,6 +148,16 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _contentWithFooter(Widget body) {
+    return Column(
+      children: [
+        Expanded(child: body),
+        const Divider(height: 1),
+        const AppFooter(),
+      ],
     );
   }
 }

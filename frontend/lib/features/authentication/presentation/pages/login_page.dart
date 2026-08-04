@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_footer.dart';
 import '../../../../shared/widgets/zera_logo.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
@@ -45,91 +46,113 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         : null;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Center(child: ZeraLogo(height: 48)),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Zera Creative',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sign in to your account',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  if (errorMessage != null) ...[
-                    _ErrorBanner(message: errorMessage),
-                    const SizedBox(height: 16),
-                  ],
-                  TextFormField(
-                    key: const Key('loginEmailField'),
-                    controller: _emailController,
-                    enabled: !isLoading,
-                    autofillHints: const [AutofillHints.email],
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'Company email',
-                      hintText: 'firstname.lastname@zeracreative.com',
-                    ),
-                    validator: _validateEmail,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    key: const Key('loginPasswordField'),
-                    controller: _passwordController,
-                    enabled: !isLoading,
-                    obscureText: _obscurePassword,
-                    autofillHints: const [AutofillHints.password],
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
+      backgroundColor: AppColors.sidebarBackground,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Center(child: ZeraLogo(height: 48)),
+                              const SizedBox(height: 20),
+                              Text(
+                                'Zera Creative',
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Sign in to your account',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: AppColors.textSecondary),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 32),
+                              if (errorMessage != null) ...[
+                                _ErrorBanner(message: errorMessage),
+                                const SizedBox(height: 16),
+                              ],
+                              TextFormField(
+                                key: const Key('loginEmailField'),
+                                controller: _emailController,
+                                enabled: !isLoading,
+                                autofillHints: const [AutofillHints.email],
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: 'Company email',
+                                  hintText:
+                                      'firstname.lastname@zeracreative.com',
+                                ),
+                                validator: _validateEmail,
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                key: const Key('loginPasswordField'),
+                                controller: _passwordController,
+                                enabled: !isLoading,
+                                obscureText: _obscurePassword,
+                                autofillHints: const [AutofillHints.password],
+                                textInputAction: TextInputAction.done,
+                                decoration: InputDecoration(
+                                  labelText: 'Password',
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscurePassword
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                    ),
+                                    onPressed: () => setState(
+                                      () =>
+                                          _obscurePassword = !_obscurePassword,
+                                    ),
+                                  ),
+                                ),
+                                validator: _validatePassword,
+                                onFieldSubmitted: (_) => _submit(isLoading),
+                              ),
+                              const SizedBox(height: 24),
+                              ElevatedButton(
+                                key: const Key('loginSubmitButton'),
+                                onPressed: () => _submit(isLoading),
+                                child: isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation(
+                                            Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : const Text('Sign in'),
+                              ),
+                            ],
+                          ),
                         ),
-                        onPressed: () =>
-                            setState(() => _obscurePassword = !_obscurePassword),
                       ),
                     ),
-                    validator: _validatePassword,
-                    onFieldSubmitted: (_) => _submit(isLoading),
                   ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    key: const Key('loginSubmitButton'),
-                    onPressed: () => _submit(isLoading),
-                    child: isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
-                            ),
-                          )
-                        : const Text('Sign in'),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+            const AppFooter(),
+          ],
         ),
       ),
     );

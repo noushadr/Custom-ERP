@@ -14,7 +14,7 @@ export interface EmployeeResponse {
   designation: string | null;
   department: { id: string; name: string } | null;
   team: { id: string; name: string } | null;
-  reportingManagerId: string | null;
+  reportingManager: { id: string; name: string } | null;
   employmentType: EmploymentType;
   employmentStatus: EmploymentStatus;
   joiningDate: string;
