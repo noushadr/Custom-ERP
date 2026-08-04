@@ -1,3 +1,4 @@
+import '../../../../core/config/app_config.dart';
 import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/employee.dart';
 
@@ -15,7 +16,7 @@ class EmployeeModel extends Employee {
     required super.designation,
     required super.department,
     required super.team,
-    required super.reportingManagerId,
+    required super.reportingManager,
     required super.employmentType,
     required super.employmentStatus,
     required super.joiningDate,
@@ -39,7 +40,7 @@ class EmployeeModel extends Employee {
     firstName: json['firstName'] as String,
     lastName: json['lastName'] as String,
     fullName: json['fullName'] as String,
-    profilePhotoUrl: json['profilePhotoUrl'] as String?,
+    profilePhotoUrl: _resolvePhotoUrl(json['profilePhotoUrl'] as String?),
     designation: json['designation'] as String?,
     department: json['department'] == null
         ? null
@@ -47,7 +48,9 @@ class EmployeeModel extends Employee {
     team: json['team'] == null
         ? null
         : NamedRef.fromJson(json['team'] as Map<String, dynamic>),
-    reportingManagerId: json['reportingManagerId'] as String?,
+    reportingManager: json['reportingManager'] == null
+        ? null
+        : NamedRef.fromJson(json['reportingManager'] as Map<String, dynamic>),
     employmentType: json['employmentType'] as String,
     employmentStatus: json['employmentStatus'] as String,
     joiningDate: json['joiningDate'] as String,
@@ -61,4 +64,13 @@ class EmployeeModel extends Employee {
     certifications: (json['certifications'] as List).cast<String>(),
     profileCompletionPercentage: json['profileCompletionPercentage'] as int,
   );
+
+  /// The backend returns photo paths relative to itself (e.g.
+  /// `/uploads/avatars/ZC-00001.jpg`) so the API response stays portable
+  /// across environments; resolve it against our known API base here.
+  static String? _resolvePhotoUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return '${AppConfig.apiBaseUrl}$url';
+  }
 }

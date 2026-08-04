@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/employee_providers.dart';
@@ -43,9 +44,7 @@ class EmployeeDirectoryPage extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           Expanded(
-            child: canRead
-                ? const _EmployeeList()
-                : const _NoDirectoryAccess(),
+            child: canRead ? const _EmployeeList() : const _NoDirectoryAccess(),
           ),
         ],
       ),
@@ -73,32 +72,48 @@ class _EmployeeList extends ConsumerWidget {
           return const Center(child: Text('No employees yet.'));
         }
 
-        return ListView.separated(
-          itemCount: employees.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final employee = employees[index];
-            return ListTile(
-              leading: EmployeeAvatar(
-                fullName: employee.fullName,
-                photoUrl: employee.profilePhotoUrl,
-              ),
-              title: Text(employee.fullName),
-              subtitle: Text(
-                [
-                  employee.designation,
-                  employee.department?.name,
-                ].where((v) => v != null && v.isNotEmpty).join(' • '),
-              ),
-              trailing: Text(employee.employeeCode),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      EmployeeProfilePage(employeeId: employee.id),
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: ListView.separated(
+            padding: EdgeInsets.zero,
+            itemCount: employees.length,
+            separatorBuilder: (_, _) =>
+                const Divider(height: 1, color: AppColors.borderSubtle),
+            itemBuilder: (context, index) {
+              final employee = employees[index];
+              return ListTile(
+                shape: const RoundedRectangleBorder(),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
                 ),
-              ),
-            );
-          },
+                leading: EmployeeAvatar(
+                  fullName: employee.fullName,
+                  photoUrl: employee.profilePhotoUrl,
+                ),
+                title: Text(
+                  employee.fullName,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                subtitle: Text(
+                  [
+                    employee.designation,
+                    employee.department?.name,
+                  ].where((v) => v != null && v.isNotEmpty).join(' • '),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                trailing: _EmployeeCodeBadge(code: employee.employeeCode),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        EmployeeProfilePage(employeeId: employee.id),
+                  ),
+                ),
+              );
+            },
+          ),
         );
       },
     );
@@ -127,6 +142,29 @@ class _NoDirectoryAccess extends StatelessWidget {
             child: const Text('View my profile'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EmployeeCodeBadge extends StatelessWidget {
+  const _EmployeeCodeBadge({required this.code});
+
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.fieldFill,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        code,
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/employee_providers.dart';
@@ -24,9 +25,8 @@ class EmployeeProfilePage extends ConsumerWidget {
       appBar: AppBar(title: const Text('Employee Profile')),
       body: employeeAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => const Center(
-          child: Text('Could not load this profile.'),
-        ),
+        error: (error, _) =>
+            const Center(child: Text('Could not load this profile.')),
         data: (employee) => _ProfileBody(employee: employee),
       ),
     );
@@ -42,7 +42,8 @@ class _ProfileBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
     final isOwnProfile =
-        authState is AuthAuthenticated && authState.user.email == employee.email;
+        authState is AuthAuthenticated &&
+        authState.user.email == employee.email;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -51,56 +52,74 @@ class _ProfileBody extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                EmployeeAvatar(
-                  fullName: employee.fullName,
-                  photoUrl: employee.profilePhotoUrl,
-                  radius: 32,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        employee.fullName,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      Text(
-                        employee.designation ?? employee.role,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                if (isOwnProfile)
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => EditMyProfilePage(employee: employee),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        EmployeeAvatar(
+                          fullName: employee.fullName,
+                          photoUrl: employee.profilePhotoUrl,
+                          radius: 32,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                employee.fullName,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              Text(
+                                employee.designation ?? employee.role,
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isOwnProfile)
+                          OutlinedButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    EditMyProfilePage(employee: employee),
+                              ),
+                            ),
+                            child: const Text('Edit'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: employee.profileCompletionPercentage / 100,
+                        minHeight: 6,
+                        backgroundColor: AppColors.borderSubtle,
                       ),
                     ),
-                    child: const Text('Edit'),
-                  ),
-              ],
+                    const SizedBox(height: 6),
+                    Text(
+                      'Profile ${employee.profileCompletionPercentage}% complete',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
-            LinearProgressIndicator(
-              value: employee.profileCompletionPercentage / 100,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Profile ${employee.profileCompletionPercentage}% complete',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _Section(
               title: 'Work',
               rows: {
                 'Employee ID': employee.employeeCode,
                 'Department': employee.department?.name ?? '—',
                 'Team': employee.team?.name ?? '—',
+                'Reporting Manager': employee.reportingManager?.name ?? '—',
                 'Employment type': employee.employmentType,
                 'Employment status': employee.employmentStatus,
                 'Joining date': employee.joiningDate,
@@ -147,28 +166,38 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        for (final entry in rows.entries)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 160,
-                  child: Text(
-                    entry.key,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            for (final entry in rows.entries)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 160,
+                      child: Text(
+                        entry.key,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        entry.value,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(child: Text(entry.value)),
-              ],
-            ),
-          ),
-      ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -181,20 +210,32 @@ class _ChipsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        if (values.isEmpty)
-          const Text('—')
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [for (final value in values) Chip(label: Text(value))],
-          ),
-      ],
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            if (values.isEmpty)
+              Text(
+                '—',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final value in values) Chip(label: Text(value)),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

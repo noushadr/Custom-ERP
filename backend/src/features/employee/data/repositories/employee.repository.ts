@@ -12,15 +12,24 @@ export class TypeOrmEmployeeRepository implements EmployeeRepository {
   ) {}
 
   findAll(): Promise<Employee[]> {
-    return this.repository.find({ order: { createdAt: 'ASC' } });
+    return this.repository.find({
+      order: { createdAt: 'ASC' },
+      relations: { reportingManager: true },
+    });
   }
 
   findById(id: string): Promise<Employee | null> {
-    return this.repository.findOne({ where: { id } });
+    return this.repository.findOne({
+      where: { id },
+      relations: { reportingManager: true },
+    });
   }
 
   findByUserId(userId: string): Promise<Employee | null> {
-    return this.repository.findOne({ where: { userId } });
+    return this.repository.findOne({
+      where: { userId },
+      relations: { reportingManager: true },
+    });
   }
 
   count(): Promise<number> {

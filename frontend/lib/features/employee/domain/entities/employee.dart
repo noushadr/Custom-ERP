@@ -14,7 +14,7 @@ class Employee {
     required this.designation,
     required this.department,
     required this.team,
-    required this.reportingManagerId,
+    required this.reportingManager,
     required this.employmentType,
     required this.employmentStatus,
     required this.joiningDate,
@@ -41,7 +41,7 @@ class Employee {
   final String? designation;
   final NamedRef? department;
   final NamedRef? team;
-  final String? reportingManagerId;
+  final NamedRef? reportingManager;
   final String employmentType;
   final String employmentStatus;
   final String joiningDate;

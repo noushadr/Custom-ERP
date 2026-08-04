@@ -28,7 +28,7 @@ Employee buildTestEmployee({
     designation: designation,
     department: department,
     team: null,
-    reportingManagerId: null,
+    reportingManager: null,
     employmentType: 'full_time',
     employmentStatus: 'active',
     joiningDate: '2026-01-01',
