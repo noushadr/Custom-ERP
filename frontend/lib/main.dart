@@ -58,6 +58,7 @@ const _destinations = [
     label: 'Dashboard',
     icon: Icons.dashboard_outlined,
     selectedIcon: Icons.dashboard,
+    comingSoon: true,
   ),
   AppNavDestination(
     label: 'Directory',
@@ -68,16 +69,19 @@ const _destinations = [
     label: 'Requests',
     icon: Icons.assignment_outlined,
     selectedIcon: Icons.assignment,
+    comingSoon: true,
   ),
   AppNavDestination(
     label: 'Notifications',
     icon: Icons.notifications_outlined,
     selectedIcon: Icons.notifications,
+    comingSoon: true,
   ),
   AppNavDestination(
     label: 'Settings',
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings,
+    comingSoon: true,
   ),
 ];
 
@@ -94,7 +98,6 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
   @override
   Widget build(BuildContext context) {
     return ResponsiveScaffold(
-      title: 'Zera Creative',
       destinations: _destinations,
       selectedIndex: _selectedIndex,
       onDestinationSelected: (index) => setState(() => _selectedIndex = index),

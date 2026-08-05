@@ -33,59 +33,59 @@ class _EmployeeDirectoryPageState
     final canManage = authUser?.hasPermission('employees.manage') ?? false;
 
     return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1040),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  'Employee Directory',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (canRead)
+                    SegmentedButton<_DirectoryViewMode>(
+                      segments: const [
+                        ButtonSegment(
+                          value: _DirectoryViewMode.list,
+                          icon: Icon(Icons.view_list_outlined, size: 18),
+                          label: Text('List'),
+                        ),
+                        ButtonSegment(
+                          value: _DirectoryViewMode.hierarchy,
+                          icon: Icon(Icons.account_tree_outlined, size: 18),
+                          label: Text('Hierarchy'),
+                        ),
+                      ],
+                      selected: {_viewMode},
+                      showSelectedIcon: false,
+                      onSelectionChanged: (selection) =>
+                          setState(() => _viewMode = selection.first),
+                    ),
+                  if (canManage)
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const InviteEmployeePage(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.person_add_outlined, size: 18),
+                      label: const Text('Invite Employee'),
+                    ),
+                ],
               ),
-              if (canRead) ...[
-                SegmentedButton<_DirectoryViewMode>(
-                  segments: const [
-                    ButtonSegment(
-                      value: _DirectoryViewMode.list,
-                      icon: Icon(Icons.view_list_outlined, size: 18),
-                      label: Text('List'),
-                    ),
-                    ButtonSegment(
-                      value: _DirectoryViewMode.hierarchy,
-                      icon: Icon(Icons.account_tree_outlined, size: 18),
-                      label: Text('Hierarchy'),
-                    ),
-                  ],
-                  selected: {_viewMode},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (selection) =>
-                      setState(() => _viewMode = selection.first),
-                ),
-                const SizedBox(width: 12),
-              ],
-              if (canManage)
-                ElevatedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const InviteEmployeePage(),
-                    ),
-                  ),
-                  icon: const Icon(Icons.person_add_outlined, size: 18),
-                  label: const Text('Invite Employee'),
-                ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: canRead
+                    ? _DirectoryBody(viewMode: _viewMode)
+                    : const _NoDirectoryAccess(),
+              ),
             ],
           ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: canRead
-                ? _DirectoryBody(viewMode: _viewMode)
-                : const _NoDirectoryAccess(),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -134,7 +134,7 @@ class _EmployeeList extends StatelessWidget {
     return ListView.separated(
       padding: EdgeInsets.zero,
       itemCount: employees.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 14),
       itemBuilder: (context, index) => _EmployeeCard(employee: employees[index]),
     );
   }
@@ -156,7 +156,7 @@ class _EmployeeCard extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -168,7 +168,7 @@ class _EmployeeCard extends StatelessWidget {
                     photoUrl: employee.profilePhotoUrl,
                     radius: 24,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,10 +188,10 @@ class _EmployeeCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Wrap(
                 spacing: 16,
-                runSpacing: 8,
+                runSpacing: 10,
                 children: [
                   _EmploymentStatusBadge(status: employee.employmentStatus),
                   _WorkModeBadge(workMode: employee.workMode),

@@ -71,10 +71,14 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Invite Employee')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Form(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -196,6 +200,9 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
                       : const Text('Send invite'),
                 ),
               ],
+            ),
+                ),
+              ),
             ),
           ),
         ),

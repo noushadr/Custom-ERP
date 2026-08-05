@@ -11,7 +11,6 @@ import 'breakpoints.dart';
 class ResponsiveScaffold extends StatefulWidget {
   const ResponsiveScaffold({
     super.key,
-    required this.title,
     required this.destinations,
     required this.selectedIndex,
     required this.onDestinationSelected,
@@ -19,7 +18,6 @@ class ResponsiveScaffold extends StatefulWidget {
     this.actions,
   });
 
-  final String title;
   final List<AppNavDestination> destinations;
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
@@ -40,11 +38,30 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   List<NavigationRailDestination> get _railDestinations => [
     for (final d in widget.destinations)
       NavigationRailDestination(
-        icon: Icon(d.icon),
-        selectedIcon: Icon(d.selectedIcon),
-        label: Text(d.label),
+        icon: _railIcon(d),
+        selectedIcon: _railIcon(d, selected: true),
+        label: d.comingSoon
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(d.label),
+                  const _ComingSoonTag(),
+                ],
+              )
+            : Text(d.label),
       ),
   ];
+
+  Widget _railIcon(AppNavDestination d, {bool selected = false}) {
+    final icon = Icon(selected ? d.selectedIcon : d.icon);
+    if (!d.comingSoon) return icon;
+    return Badge(
+      backgroundColor: AppColors.error,
+      smallSize: 8,
+      child: icon,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,18 +84,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const ZeraLogo(height: 28),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
-                ),
+                child: const ZeraLogo(height: 28),
               ),
             ),
             destinations: _railDestinations,
@@ -142,9 +148,9 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
         destinations: [
           for (final d in widget.destinations)
             NavigationDestination(
-              icon: Icon(d.icon),
-              selectedIcon: Icon(d.selectedIcon),
-              label: d.label,
+              icon: _railIcon(d),
+              selectedIcon: _railIcon(d, selected: true),
+              label: d.comingSoon ? '${d.label} (soon)' : d.label,
             ),
         ],
       ),
@@ -207,6 +213,22 @@ class _TitleWithLogo extends StatelessWidget {
         const SizedBox(width: 8),
         Text(title),
       ],
+    );
+  }
+}
+
+class _ComingSoonTag extends StatelessWidget {
+  const _ComingSoonTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Coming soon',
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        color: AppColors.error,
+        fontWeight: FontWeight.w600,
+        fontSize: 10,
+      ),
     );
   }
 }
