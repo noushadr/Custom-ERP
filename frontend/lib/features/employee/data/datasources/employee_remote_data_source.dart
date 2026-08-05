@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/invite_employee_input.dart';
+import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../models/employee_model.dart';
 
@@ -31,6 +32,17 @@ class EmployeeRemoteDataSource {
   Future<EmployeeModel> updateMe(UpdateMyProfileInput input) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/employees/me',
+      data: input.toJson(),
+    );
+    return EmployeeModel.fromJson(response.data!);
+  }
+
+  Future<EmployeeModel> updateEmployee(
+    String id,
+    UpdateEmployeeInput input,
+  ) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/employees/$id',
       data: input.toJson(),
     );
     return EmployeeModel.fromJson(response.data!);

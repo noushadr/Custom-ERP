@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import '../../../../shared/models/named_ref.dart';
 import '../entities/employee.dart';
 import '../entities/invite_employee_input.dart';
+import '../entities/update_employee_input.dart';
 import '../entities/update_my_profile_input.dart';
 
 abstract interface class EmployeeRepository {
@@ -13,6 +14,9 @@ abstract interface class EmployeeRepository {
   Future<Employee> getMe();
 
   Future<Employee> updateMe(UpdateMyProfileInput input);
+
+  /// Requires `employees.manage`.
+  Future<Employee> updateEmployee(String id, UpdateEmployeeInput input);
 
   Future<Employee> uploadMyPhoto(Uint8List bytes, String fileName);
 

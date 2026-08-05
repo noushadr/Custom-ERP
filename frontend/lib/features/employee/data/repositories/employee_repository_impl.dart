@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/invite_employee_input.dart';
+import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../../domain/exceptions/employee_exception.dart';
 import '../../domain/repositories/employee_repository.dart';
@@ -27,6 +28,10 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   @override
   Future<Employee> updateMe(UpdateMyProfileInput input) =>
       _guard(() => _remoteDataSource.updateMe(input));
+
+  @override
+  Future<Employee> updateEmployee(String id, UpdateEmployeeInput input) =>
+      _guard(() => _remoteDataSource.updateEmployee(id, input));
 
   @override
   Future<Employee> uploadMyPhoto(Uint8List bytes, String fileName) =>

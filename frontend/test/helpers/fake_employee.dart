@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/invite_employee_input.dart';
+import 'package:zera_erp/features/employee/domain/entities/update_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_my_profile_input.dart';
 import 'package:zera_erp/features/employee/domain/repositories/employee_repository.dart';
 import 'package:zera_erp/shared/models/named_ref.dart';
@@ -59,6 +60,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.inviteError,
     this.updateMeResult,
     this.updateMeError,
+    this.updateEmployeeResult,
+    this.updateEmployeeError,
     this.uploadMyPhotoResult,
     this.uploadMyPhotoError,
   }) : me = me ?? buildTestEmployee();
@@ -71,6 +74,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final Object? inviteError;
   final Employee? updateMeResult;
   final Object? updateMeError;
+  final Employee? updateEmployeeResult;
+  final Object? updateEmployeeError;
   final Employee? uploadMyPhotoResult;
   final Object? uploadMyPhotoError;
 
@@ -88,6 +93,12 @@ class FakeEmployeeRepository implements EmployeeRepository {
   Future<Employee> updateMe(UpdateMyProfileInput input) async {
     if (updateMeError != null) throw updateMeError!;
     return updateMeResult ?? me;
+  }
+
+  @override
+  Future<Employee> updateEmployee(String id, UpdateEmployeeInput input) async {
+    if (updateEmployeeError != null) throw updateEmployeeError!;
+    return updateEmployeeResult ?? me;
   }
 
   @override

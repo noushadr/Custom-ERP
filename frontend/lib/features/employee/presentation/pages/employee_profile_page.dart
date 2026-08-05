@@ -7,6 +7,7 @@ import '../../../../shared/utils/date_format.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/employee_avatar.dart';
+import 'edit_employee_page.dart';
 import 'edit_my_profile_page.dart';
 
 /// Shows an employee's profile. Pass null for [employeeId] to view the
@@ -45,6 +46,9 @@ class _ProfileBody extends ConsumerWidget {
     final isOwnProfile =
         authState is AuthAuthenticated &&
         authState.user.email == employee.email;
+    final canManage =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('employees.manage');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -89,6 +93,16 @@ class _ProfileBody extends ConsumerWidget {
                               MaterialPageRoute(
                                 builder: (_) =>
                                     EditMyProfilePage(employee: employee),
+                              ),
+                            ),
+                            child: const Text('Edit'),
+                          )
+                        else if (canManage)
+                          OutlinedButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    EditEmployeePage(employee: employee),
                               ),
                             ),
                             child: const Text('Edit'),
