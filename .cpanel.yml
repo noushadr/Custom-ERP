@@ -1,0 +1,14 @@
+---
+deployment:
+  tasks:
+    # --- Edit these two lines once, then leave them alone. ---
+    # APP_ROOT: where cPanel's Git Version Control checks this repo out to,
+    # plus /backend. NODE_ENV_ACTIVATE: the exact "source ..." line shown on
+    # the backend app's Setup Node.js App page. See DEPLOYMENT.md step 4.
+    - export APP_ROOT=$HOME/repositories/Custom-ERP/backend
+    - export NODE_ENV_ACTIVATE=$HOME/nodevenv/repositories/Custom-ERP/backend/24/bin/activate
+    # -----------------------------------------------------------
+
+    - /bin/mkdir -p $APP_ROOT/tmp
+    - /bin/bash -lc "source $NODE_ENV_ACTIVATE && cd $APP_ROOT && npm ci && npm run build && npm run migration:run"
+    - /bin/touch $APP_ROOT/tmp/restart.txt
