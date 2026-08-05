@@ -18,8 +18,16 @@ class FakeAuthRepository implements AuthRepository {
   final AuthUser? loginResult;
   final Object? loginError;
 
+  /// The `rememberMe` value passed to the most recent [login] call.
+  bool? lastRememberMe;
+
   @override
-  Future<AuthUser> login(String email, String password) async {
+  Future<AuthUser> login(
+    String email,
+    String password, {
+    bool rememberMe = true,
+  }) async {
+    lastRememberMe = rememberMe;
     if (loginError != null) throw loginError!;
     return loginResult ?? testAuthUser;
   }

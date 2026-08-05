@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/employee.dart';
@@ -26,6 +27,10 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   @override
   Future<Employee> updateMe(UpdateMyProfileInput input) =>
       _guard(() => _remoteDataSource.updateMe(input));
+
+  @override
+  Future<Employee> uploadMyPhoto(Uint8List bytes, String fileName) =>
+      _guard(() => _remoteDataSource.uploadMyPhoto(bytes, fileName));
 
   @override
   Future<({Employee employee, String temporaryPassword})> invite(

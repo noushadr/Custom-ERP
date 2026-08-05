@@ -1,26 +1,49 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+/// Holds the current session's tokens in memory for the lifetime of the app,
+/// and mirrors them to persistent secure storage only when the session
+/// should survive a restart (`rememberMe`). This way a "not remembered"
+/// session still works normally (API calls, silent refresh) until the app
+/// closes, but a fresh launch afterwards finds nothing to restore.
 class TokenStorage {
-  const TokenStorage(this._storage);
+  TokenStorage(this._storage);
 
   final FlutterSecureStorage _storage;
 
   static const _accessTokenKey = 'auth_access_token';
   static const _refreshTokenKey = 'auth_refresh_token';
 
+  String? _inMemoryAccessToken;
+  String? _inMemoryRefreshToken;
+  bool _rememberMe = true;
+
   Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
+    bool? rememberMe,
   }) async {
-    await _storage.write(key: _accessTokenKey, value: accessToken);
-    await _storage.write(key: _refreshTokenKey, value: refreshToken);
+    if (rememberMe != null) _rememberMe = rememberMe;
+    _inMemoryAccessToken = accessToken;
+    _inMemoryRefreshToken = refreshToken;
+
+    if (_rememberMe) {
+      await _storage.write(key: _accessTokenKey, value: accessToken);
+      await _storage.write(key: _refreshTokenKey, value: refreshToken);
+    } else {
+      await _storage.delete(key: _accessTokenKey);
+      await _storage.delete(key: _refreshTokenKey);
+    }
   }
 
-  Future<String?> get accessToken => _storage.read(key: _accessTokenKey);
+  Future<String?> get accessToken async =>
+      _inMemoryAccessToken ?? await _storage.read(key: _accessTokenKey);
 
-  Future<String?> get refreshToken => _storage.read(key: _refreshTokenKey);
+  Future<String?> get refreshToken async =>
+      _inMemoryRefreshToken ?? await _storage.read(key: _refreshTokenKey);
 
   Future<void> clear() async {
+    _inMemoryAccessToken = null;
+    _inMemoryRefreshToken = null;
     await _storage.delete(key: _accessTokenKey);
     await _storage.delete(key: _refreshTokenKey);
   }

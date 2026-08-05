@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/invite_employee_input.dart';
@@ -31,6 +32,16 @@ class EmployeeRemoteDataSource {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/employees/me',
       data: input.toJson(),
+    );
+    return EmployeeModel.fromJson(response.data!);
+  }
+
+  Future<EmployeeModel> uploadMyPhoto(Uint8List bytes, String fileName) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/employees/me/photo',
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: fileName),
+      }),
     );
     return EmployeeModel.fromJson(response.data!);
   }

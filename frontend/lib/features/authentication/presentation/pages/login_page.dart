@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -17,9 +18,17 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  // Prefilled in debug builds only, so the seeded admin account doesn't need
+  // retyping on every hot restart while the app is still under development.
+  // kDebugMode is false in release builds, so this never ships.
+  final _emailController = TextEditingController(
+    text: kDebugMode ? 'noushad@zeracreative.com' : null,
+  );
+  final _passwordController = TextEditingController(
+    text: kDebugMode ? 'change_me_immediately' : null,
+  );
   bool _obscurePassword = true;
+  bool _rememberMe = true;
 
   @override
   void dispose() {
@@ -33,7 +42,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     if (_formKey.currentState!.validate()) {
       ref
           .read(authControllerProvider.notifier)
-          .login(_emailController.text.trim(), _passwordController.text);
+          .login(
+            _emailController.text.trim(),
+            _passwordController.text,
+            rememberMe: _rememberMe,
+          );
     }
   }
 
@@ -46,7 +59,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         : null;
 
     return Scaffold(
-      backgroundColor: AppColors.sidebarBackground,
+      backgroundColor: AppColors.canvasBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -125,7 +138,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 validator: _validatePassword,
                                 onFieldSubmitted: (_) => _submit(isLoading),
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 4),
+                              CheckboxListTile(
+                                key: const Key('rememberMeCheckbox'),
+                                value: _rememberMe,
+                                onChanged: isLoading
+                                    ? null
+                                    : (value) => setState(
+                                        () => _rememberMe = value ?? true,
+                                      ),
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: const Text('Remember me'),
+                              ),
+                              const SizedBox(height: 8),
                               ElevatedButton(
                                 key: const Key('loginSubmitButton'),
                                 onPressed: () => _submit(isLoading),

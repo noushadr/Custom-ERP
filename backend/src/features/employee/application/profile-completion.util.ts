@@ -8,6 +8,7 @@ const TRACKED_FIELDS: Array<(employee: Employee) => boolean> = [
   (e) => !!e.reportingManagerId,
   (e) => !!e.personalEmail,
   (e) => !!e.phoneNumber,
+  (e) => !!e.dateOfBirth,
   (e) => !!e.emergencyContactName,
   (e) => !!e.emergencyContactPhone,
   (e) => !!e.address,

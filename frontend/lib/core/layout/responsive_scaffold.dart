@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../shared/widgets/app_footer.dart';
 import '../../shared/widgets/zera_logo.dart';
+import '../theme/app_colors.dart';
 import 'app_nav_destination.dart';
 import 'breakpoints.dart';
 
 /// Adaptive app shell: permanent sidebar on desktop, collapsible sidebar on
-/// tablet, bottom navigation on mobile.
+/// tablet, bottom navigation on mobile. Every breakpoint gets a consistent
+/// top bar showing the current section and account menu.
 class ResponsiveScaffold extends StatefulWidget {
   const ResponsiveScaffold({
     super.key,
@@ -23,7 +25,7 @@ class ResponsiveScaffold extends StatefulWidget {
   final ValueChanged<int> onDestinationSelected;
   final Widget body;
 
-  /// Shown as AppBar actions on tablet/mobile, and below the rail on desktop.
+  /// Shown at the right edge of the top bar (e.g. an account menu).
   final List<Widget>? actions;
 
   @override
@@ -32,6 +34,8 @@ class ResponsiveScaffold extends StatefulWidget {
 
 class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   bool _railExpanded = false;
+
+  String get _currentLabel => widget.destinations[widget.selectedIndex].label;
 
   List<NavigationRailDestination> get _railDestinations => [
     for (final d in widget.destinations)
@@ -77,24 +81,20 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
                 ),
               ),
             ),
-            trailing: widget.actions == null
-                ? null
-                : Expanded(
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: widget.actions!,
-                        ),
-                      ),
-                    ),
-                  ),
             destinations: _railDestinations,
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: _contentWithFooter(widget.body)),
+          Expanded(
+            child: Column(
+              children: [
+                _TopBar(title: _currentLabel, actions: widget.actions),
+                const Divider(height: 1),
+                Expanded(child: _canvas(widget.body)),
+                const Divider(height: 1),
+                const AppFooter(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -103,7 +103,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   Widget _buildTablet() {
     return Scaffold(
       appBar: AppBar(
-        title: _TitleWithLogo(title: widget.title),
+        title: _TitleWithLogo(title: _currentLabel),
         leading: IconButton(
           icon: const Icon(Icons.menu),
           tooltip: _railExpanded ? 'Collapse menu' : 'Expand menu',
@@ -132,7 +132,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   Widget _buildMobile() {
     return Scaffold(
       appBar: AppBar(
-        title: _TitleWithLogo(title: widget.title),
+        title: _TitleWithLogo(title: _currentLabel),
         actions: widget.actions,
       ),
       body: _contentWithFooter(widget.body),
@@ -154,10 +154,41 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   Widget _contentWithFooter(Widget body) {
     return Column(
       children: [
-        Expanded(child: body),
+        Expanded(child: _canvas(body)),
         const Divider(height: 1),
         const AppFooter(),
       ],
+    );
+  }
+
+  Widget _canvas(Widget body) {
+    return ColoredBox(color: AppColors.canvasBackground, child: body);
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.title, required this.actions});
+
+  final String title;
+  final List<Widget>? actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      color: AppColors.background,
+      child: Row(
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          const Spacer(),
+          if (actions != null)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: actions!,
+            ),
+        ],
+      ),
     );
   }
 }

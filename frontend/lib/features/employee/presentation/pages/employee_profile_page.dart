@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
+import '../../../../shared/utils/date_format.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/employee_avatar.dart';
@@ -122,7 +123,10 @@ class _ProfileBody extends ConsumerWidget {
                 'Reporting Manager': employee.reportingManager?.name ?? '—',
                 'Employment type': employee.employmentType,
                 'Employment status': employee.employmentStatus,
-                'Joining date': employee.joiningDate,
+                'Joining date': formatDisplayDate(employee.joiningDate),
+                'Date of leaving': employee.dateOfLeaving == null
+                    ? '—'
+                    : formatDisplayDate(employee.dateOfLeaving!),
               },
             ),
             const SizedBox(height: 24),
@@ -132,6 +136,9 @@ class _ProfileBody extends ConsumerWidget {
                 'Company email': employee.email,
                 'Personal email': employee.personalEmail ?? '—',
                 'Phone': employee.phoneNumber ?? '—',
+                'Date of birth': employee.dateOfBirth == null
+                    ? '—'
+                    : formatDisplayDate(employee.dateOfBirth!),
                 'Address': employee.address ?? '—',
               },
             ),

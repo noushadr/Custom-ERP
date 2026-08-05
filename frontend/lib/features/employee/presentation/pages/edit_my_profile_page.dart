@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/employee_providers.dart';
@@ -5,6 +6,9 @@ import '../../application/update_profile_controller.dart';
 import '../../application/update_profile_state.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/update_my_profile_input.dart';
+import '../../domain/exceptions/employee_exception.dart';
+import '../widgets/employee_avatar.dart';
+import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/tag_input.dart';
 
 class EditMyProfilePage extends ConsumerStatefulWidget {
@@ -26,11 +30,18 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
   late final TextEditingController _addressController;
   late List<String> _skills;
   late List<String> _certifications;
+  late String? _photoUrl;
+  late DateTime? _dateOfBirth;
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
     super.initState();
     final e = widget.employee;
+    _photoUrl = e.profilePhotoUrl;
+    _dateOfBirth = e.dateOfBirth == null
+        ? null
+        : DateTime.tryParse(e.dateOfBirth!);
     _personalEmailController = TextEditingController(text: e.personalEmail);
     _phoneController = TextEditingController(text: e.phoneNumber);
     _emergencyNameController = TextEditingController(
@@ -58,6 +69,47 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
     super.dispose();
   }
 
+  Future<void> _pickAndUploadPhoto() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    final picked = result?.files.single;
+    if (picked?.bytes == null) return;
+
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final employee = await ref
+          .read(employeeRepositoryProvider)
+          .uploadMyPhoto(picked!.bytes!, picked.name);
+      ref.invalidate(myProfileProvider);
+      if (!mounted) return;
+      setState(() => _photoUrl = employee.profilePhotoUrl);
+    } on EmployeeException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  Future<void> _pickDateOfBirth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ?? DateTime(1990),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => _dateOfBirth = picked);
+  }
+
+  static String _isoDate(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
 
@@ -65,6 +117,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
         .read(updateProfileControllerProvider.notifier)
         .submit(
           UpdateMyProfileInput(
+            dateOfBirth: _dateOfBirth == null ? null : _isoDate(_dateOfBirth!),
             personalEmail: _personalEmailController.text.trim().isEmpty
                 ? null
                 : _personalEmailController.text.trim(),
@@ -121,6 +174,29 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Row(
+                  children: [
+                    EmployeeAvatar(
+                      fullName: widget.employee.fullName,
+                      photoUrl: _photoUrl,
+                      radius: 32,
+                    ),
+                    const SizedBox(width: 16),
+                    TextButton(
+                      onPressed: (isSubmitting || _isUploadingPhoto)
+                          ? null
+                          : _pickAndUploadPhoto,
+                      child: _isUploadingPhoto
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Change photo'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
                 TextFormField(
                   controller: _personalEmailController,
                   enabled: !isSubmitting,
@@ -140,6 +216,20 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                   enabled: !isSubmitting,
                   decoration: const InputDecoration(labelText: 'Phone number'),
                   keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: isSubmitting ? null : _pickDateOfBirth,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Date of birth',
+                    ),
+                    child: Text(
+                      _dateOfBirth == null
+                          ? '—'
+                          : formatDisplayDate(_isoDate(_dateOfBirth!)),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

@@ -12,12 +12,17 @@ class AuthRepositoryImpl implements AuthRepository {
   final TokenStorage _tokenStorage;
 
   @override
-  Future<AuthUser> login(String email, String password) async {
+  Future<AuthUser> login(
+    String email,
+    String password, {
+    bool rememberMe = true,
+  }) async {
     try {
       final result = await _remoteDataSource.login(email, password);
       await _tokenStorage.saveTokens(
         accessToken: result.tokens.accessToken,
         refreshToken: result.tokens.refreshToken,
+        rememberMe: rememberMe,
       );
       return result.user;
     } on DioException catch (error) {

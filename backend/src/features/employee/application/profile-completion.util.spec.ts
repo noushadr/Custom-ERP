@@ -23,6 +23,7 @@ describe('calculateProfileCompletion', () => {
       reportingManagerId: 'manager-1',
       personalEmail: 'jane@example.com',
       phoneNumber: '+1234567890',
+      dateOfBirth: '1996-07-27',
       emergencyContactName: 'John Doe',
       emergencyContactPhone: '+1234567891',
       address: '123 Main St',

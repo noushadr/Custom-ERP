@@ -7,6 +7,7 @@ import {
 } from 'class-validator';
 import { EmploymentStatus } from '../../domain/enums/employment-status.enum';
 import { EmploymentType } from '../../domain/enums/employment-type.enum';
+import { WorkMode } from '../../domain/enums/work-mode.enum';
 import { UpdateMyProfileDto } from './update-my-profile.dto';
 
 /** Fields an HR/Admin can change, in addition to everything an employee can edit on their own profile. */
@@ -44,6 +45,14 @@ export class UpdateEmployeeDto extends UpdateMyProfileDto {
   employmentStatus?: EmploymentStatus;
 
   @IsOptional()
+  @IsEnum(WorkMode)
+  workMode?: WorkMode;
+
+  @IsOptional()
   @IsDateString()
   joiningDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateOfLeaving?: string;
 }

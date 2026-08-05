@@ -17,7 +17,10 @@ class Employee {
     required this.reportingManager,
     required this.employmentType,
     required this.employmentStatus,
+    required this.workMode,
     required this.joiningDate,
+    required this.dateOfLeaving,
+    required this.dateOfBirth,
     required this.personalEmail,
     required this.phoneNumber,
     required this.emergencyContactName,
@@ -44,7 +47,10 @@ class Employee {
   final NamedRef? reportingManager;
   final String employmentType;
   final String employmentStatus;
+  final String workMode;
   final String joiningDate;
+  final String? dateOfLeaving;
+  final String? dateOfBirth;
   final String? personalEmail;
   final String? phoneNumber;
   final String? emergencyContactName;

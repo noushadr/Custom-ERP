@@ -17,7 +17,11 @@ class _DelayedAuthRepository extends FakeAuthRepository {
   final Completer<AuthUser> completer;
 
   @override
-  Future<AuthUser> login(String email, String password) => completer.future;
+  Future<AuthUser> login(
+    String email,
+    String password, {
+    bool rememberMe = true,
+  }) => completer.future;
 }
 
 Widget _appWith(FakeAuthRepository repository) {
@@ -41,6 +45,10 @@ void main() {
     await tester.pumpWidget(_appWith(FakeAuthRepository()));
     await tester.pumpAndSettle();
 
+    // Fields are prefilled in debug builds (see LoginPage); clear them to
+    // exercise the empty-field validation this test targets.
+    await tester.enterText(find.byKey(const Key('loginEmailField')), '');
+    await tester.enterText(find.byKey(const Key('loginPasswordField')), '');
     await tester.tap(find.byKey(const Key('loginSubmitButton')));
     await tester.pump();
 
@@ -108,5 +116,33 @@ void main() {
 
     expect(find.byType(LoginPage), findsNothing);
     expect(find.text('Dashboard — coming soon'), findsOneWidget);
+  });
+
+  testWidgets('remembers the session by default', (tester) async {
+    final repository = FakeAuthRepository(loginResult: testAuthUser);
+    await tester.pumpWidget(_appWith(repository));
+    await tester.pumpAndSettle();
+
+    await _enterCredentials(tester);
+    await tester.tap(find.byKey(const Key('loginSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastRememberMe, isTrue);
+  });
+
+  testWidgets('unchecking "Remember me" logs in without persisting', (
+    tester,
+  ) async {
+    final repository = FakeAuthRepository(loginResult: testAuthUser);
+    await tester.pumpWidget(_appWith(repository));
+    await tester.pumpAndSettle();
+
+    await _enterCredentials(tester);
+    await tester.tap(find.byKey(const Key('rememberMeCheckbox')));
+    await tester.tap(find.byKey(const Key('loginSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastRememberMe, isFalse);
+    expect(find.byType(LoginPage), findsNothing);
   });
 }

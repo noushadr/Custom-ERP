@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import '../../../../shared/models/named_ref.dart';
 import '../entities/employee.dart';
 import '../entities/invite_employee_input.dart';
@@ -12,6 +13,8 @@ abstract interface class EmployeeRepository {
   Future<Employee> getMe();
 
   Future<Employee> updateMe(UpdateMyProfileInput input);
+
+  Future<Employee> uploadMyPhoto(Uint8List bytes, String fileName);
 
   Future<({Employee employee, String temporaryPassword})> invite(
     InviteEmployeeInput input,

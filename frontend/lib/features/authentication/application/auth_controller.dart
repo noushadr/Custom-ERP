@@ -16,10 +16,18 @@ class AuthController extends StateNotifier<AuthState> {
         : const AuthUnauthenticated();
   }
 
-  Future<void> login(String email, String password) async {
+  Future<void> login(
+    String email,
+    String password, {
+    bool rememberMe = true,
+  }) async {
     state = const AuthLoading();
     try {
-      final user = await _repository.login(email, password);
+      final user = await _repository.login(
+        email,
+        password,
+        rememberMe: rememberMe,
+      );
       state = AuthAuthenticated(user);
     } on AuthException catch (error) {
       state = AuthUnauthenticated(errorMessage: error.message);

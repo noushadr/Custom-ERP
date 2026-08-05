@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/invite_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_my_profile_input.dart';
@@ -12,6 +13,7 @@ Employee buildTestEmployee({
   String fullName = 'Jane Doe',
   String? designation = 'Software Engineer',
   NamedRef? department,
+  NamedRef? reportingManager,
   int profileCompletionPercentage = 25,
 }) {
   final parts = fullName.split(' ');
@@ -28,10 +30,13 @@ Employee buildTestEmployee({
     designation: designation,
     department: department,
     team: null,
-    reportingManager: null,
+    reportingManager: reportingManager,
     employmentType: 'full_time',
     employmentStatus: 'active',
+    workMode: 'on_site',
     joiningDate: '2026-01-01',
+    dateOfLeaving: null,
+    dateOfBirth: null,
     personalEmail: null,
     phoneNumber: null,
     emergencyContactName: null,
@@ -54,6 +59,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.inviteError,
     this.updateMeResult,
     this.updateMeError,
+    this.uploadMyPhotoResult,
+    this.uploadMyPhotoError,
   }) : me = me ?? buildTestEmployee();
 
   final List<Employee> employees;
@@ -64,6 +71,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final Object? inviteError;
   final Employee? updateMeResult;
   final Object? updateMeError;
+  final Employee? uploadMyPhotoResult;
+  final Object? uploadMyPhotoError;
 
   @override
   Future<List<Employee>> getAll() async => employees;
@@ -79,6 +88,12 @@ class FakeEmployeeRepository implements EmployeeRepository {
   Future<Employee> updateMe(UpdateMyProfileInput input) async {
     if (updateMeError != null) throw updateMeError!;
     return updateMeResult ?? me;
+  }
+
+  @override
+  Future<Employee> uploadMyPhoto(Uint8List bytes, String fileName) async {
+    if (uploadMyPhotoError != null) throw uploadMyPhotoError!;
+    return uploadMyPhotoResult ?? me;
   }
 
   @override
