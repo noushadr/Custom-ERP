@@ -1,9 +1,20 @@
-import { IsArray, IsEmail, IsOptional, IsString, IsUrl } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsUrl,
+} from 'class-validator';
 
 export class UpdateMyProfileDto {
   @IsOptional()
   @IsUrl()
   profilePhotoUrl?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
 
   @IsOptional()
   @IsEmail()

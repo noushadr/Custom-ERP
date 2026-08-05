@@ -20,7 +20,7 @@ abstract final class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: AppColors.canvasBackground,
       textTheme: textTheme,
       splashFactory: InkSparkle.splashFactory,
       visualDensity: VisualDensity.standard,
@@ -122,7 +122,7 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: AppColors.sidebarBackground,
+        backgroundColor: AppColors.canvasBackground,
         indicatorColor: AppColors.primarySoft,
         indicatorShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
@@ -176,6 +176,16 @@ abstract final class AppTheme {
         backgroundColor: AppColors.textPrimary,
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        textStyle: textTheme.bodyMedium,
       ),
     );
   }

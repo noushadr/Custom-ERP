@@ -1,5 +1,6 @@
 import { EmploymentStatus } from '../domain/enums/employment-status.enum';
 import { EmploymentType } from '../domain/enums/employment-type.enum';
+import { WorkMode } from '../domain/enums/work-mode.enum';
 
 export interface EmployeeResponse {
   id: string;
@@ -17,7 +18,10 @@ export interface EmployeeResponse {
   reportingManager: { id: string; name: string } | null;
   employmentType: EmploymentType;
   employmentStatus: EmploymentStatus;
+  workMode: WorkMode;
   joiningDate: string;
+  dateOfLeaving: string | null;
+  dateOfBirth: string | null;
   personalEmail: string | null;
   phoneNumber: string | null;
   emergencyContactName: string | null;

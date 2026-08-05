@@ -7,7 +7,7 @@
       "runtimeArgs": [
         "-NoProfile",
         "-Command",
-        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'C:\\Users\\Zera\\Desktop\\Zera ERP\\frontend'; flutter run -d web-server --web-port 5050"
+        "cd 'C:\\Users\\noush\\OneDrive\\Desktop\\Zera ERP\\frontend'; & 'C:\\flutter\\bin\\flutter.bat' run -d web-server --web-port 5050 --release"
       ],
       "port": 5050
     }

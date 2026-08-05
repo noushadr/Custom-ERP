@@ -5,6 +5,7 @@ import { Department } from '../../../departments/domain/entities/department.enti
 import { Team } from '../../../teams/domain/entities/team.entity';
 import { EmploymentStatus } from '../enums/employment-status.enum';
 import { EmploymentType } from '../enums/employment-type.enum';
+import { WorkMode } from '../enums/work-mode.enum';
 
 @Entity('employees')
 export class Employee extends BaseEntity {
@@ -65,8 +66,21 @@ export class Employee extends BaseEntity {
   })
   employmentStatus: EmploymentStatus;
 
+  @Column({
+    type: 'enum',
+    enum: WorkMode,
+    default: WorkMode.ON_SITE,
+  })
+  workMode: WorkMode;
+
   @Column({ type: 'date' })
   joiningDate: string;
+
+  @Column({ type: 'date', nullable: true })
+  dateOfLeaving?: string;
+
+  @Column({ type: 'date', nullable: true })
+  dateOfBirth?: string;
 
   @Column({ nullable: true })
   personalEmail?: string;

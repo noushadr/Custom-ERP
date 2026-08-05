@@ -1,3 +1,5 @@
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import {
   ConflictException,
   Inject,
@@ -117,6 +119,27 @@ export class EmployeesService {
 
     Object.assign(employee, dto);
     const saved = await this.employeeRepository.save(employee);
+    const reloaded = await this.employeeRepository.findById(saved.id);
+    return toEmployeeResponse(reloaded!);
+  }
+
+  async updateMyPhoto(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<EmployeeResponse> {
+    const employee = await this.employeeRepository.findByUserId(userId);
+    if (!employee) throw new NotFoundException('Employee profile not found');
+
+    const previousPhotoUrl = employee.profilePhotoUrl;
+    employee.profilePhotoUrl = `/uploads/avatars/${file.filename}`;
+    const saved = await this.employeeRepository.save(employee);
+
+    if (previousPhotoUrl) {
+      await fs
+        .unlink(join(process.cwd(), previousPhotoUrl))
+        .catch(() => undefined);
+    }
+
     const reloaded = await this.employeeRepository.findById(saved.id);
     return toEmployeeResponse(reloaded!);
   }

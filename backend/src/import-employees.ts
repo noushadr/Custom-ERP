@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, copyFileSync, readFileSync } from 'fs';
+import { mkdirSync, copyFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { NestFactory } from '@nestjs/core';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -66,10 +66,7 @@ function buildEmailAssignments(rows: SourceRow[]): Map<string, string> {
     const first = tokens[0].toLowerCase();
     let candidate = `${first}.${tokens[tokens.length - 1].toLowerCase()}`;
     if (used.has(candidate) && tokens.length > 2) {
-      candidate = `${first}.${tokens
-        .slice(1)
-        .join('')
-        .toLowerCase()}`;
+      candidate = `${first}.${tokens.slice(1).join('').toLowerCase()}`;
     }
     used.add(candidate);
     emails.set(row.name, `${candidate}@zeracreative.com`);
@@ -78,9 +75,9 @@ function buildEmailAssignments(rows: SourceRow[]): Map<string, string> {
 }
 
 async function run() {
-  const rows: SourceRow[] = JSON.parse(
+  const rows = JSON.parse(
     readFileSync(join(SOURCE_DIR, 'summary.json'), 'utf-8'),
-  );
+  ) as SourceRow[];
 
   const app = await NestFactory.createApplicationContext(AppModule);
 
@@ -115,7 +112,9 @@ async function run() {
   // --- Departments ---
   const departmentNames = [
     ...new Set(
-      rows.map((r) => (r.department === 'Managment' ? 'Management' : r.department)),
+      rows.map((r) =>
+        r.department === 'Managment' ? 'Management' : r.department,
+      ),
     ),
   ];
   const departmentsByName = new Map<string, Department>();
@@ -140,7 +139,12 @@ async function run() {
 
   const employeesByName = new Map<
     string,
-    { employee: Employee; email: string; temporaryPassword: string; role: string }
+    {
+      employee: Employee;
+      email: string;
+      temporaryPassword: string;
+      role: string;
+    }
   >();
 
   let sequence = await employeeRepo.count();
@@ -167,7 +171,11 @@ async function run() {
     const employeeCode = `ZC-${String(sequence).padStart(5, '0')}`;
 
     let profilePhotoUrl: string | undefined;
-    if (row.hasAvatar && row.imageFile && row.imageBytes >= MIN_REAL_PHOTO_BYTES) {
+    if (
+      row.hasAvatar &&
+      row.imageFile &&
+      row.imageBytes >= MIN_REAL_PHOTO_BYTES
+    ) {
       const ext = row.imageFile.split('.').pop();
       const destName = `${employeeCode}.${ext}`;
       copyFileSync(

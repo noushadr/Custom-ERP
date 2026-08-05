@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../shared/widgets/app_footer.dart';
 import '../../shared/widgets/zera_logo.dart';
+import '../theme/app_colors.dart';
 import 'app_nav_destination.dart';
 import 'breakpoints.dart';
 
 /// Adaptive app shell: permanent sidebar on desktop, collapsible sidebar on
-/// tablet, bottom navigation on mobile.
+/// tablet, bottom navigation on mobile. Every breakpoint gets a consistent
+/// top bar showing the current section and account menu.
 class ResponsiveScaffold extends StatefulWidget {
   const ResponsiveScaffold({
     super.key,
-    required this.title,
     required this.destinations,
     required this.selectedIndex,
     required this.onDestinationSelected,
@@ -17,13 +18,12 @@ class ResponsiveScaffold extends StatefulWidget {
     this.actions,
   });
 
-  final String title;
   final List<AppNavDestination> destinations;
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final Widget body;
 
-  /// Shown as AppBar actions on tablet/mobile, and below the rail on desktop.
+  /// Shown at the right edge of the top bar (e.g. an account menu).
   final List<Widget>? actions;
 
   @override
@@ -33,14 +33,35 @@ class ResponsiveScaffold extends StatefulWidget {
 class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   bool _railExpanded = false;
 
+  String get _currentLabel => widget.destinations[widget.selectedIndex].label;
+
   List<NavigationRailDestination> get _railDestinations => [
     for (final d in widget.destinations)
       NavigationRailDestination(
-        icon: Icon(d.icon),
-        selectedIcon: Icon(d.selectedIcon),
-        label: Text(d.label),
+        icon: _railIcon(d),
+        selectedIcon: _railIcon(d, selected: true),
+        label: d.comingSoon
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(d.label),
+                  const _ComingSoonTag(),
+                ],
+              )
+            : Text(d.label),
       ),
   ];
+
+  Widget _railIcon(AppNavDestination d, {bool selected = false}) {
+    final icon = Icon(selected ? d.selectedIcon : d.icon);
+    if (!d.comingSoon) return icon;
+    return Badge(
+      backgroundColor: AppColors.error,
+      smallSize: 8,
+      child: icon,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,38 +84,23 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const ZeraLogo(height: 28),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
-                ),
+                child: const ZeraLogo(height: 28),
               ),
             ),
-            trailing: widget.actions == null
-                ? null
-                : Expanded(
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: widget.actions!,
-                        ),
-                      ),
-                    ),
-                  ),
             destinations: _railDestinations,
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: _contentWithFooter(widget.body)),
+          Expanded(
+            child: Column(
+              children: [
+                _TopBar(title: _currentLabel, actions: widget.actions),
+                const Divider(height: 1),
+                Expanded(child: _canvas(widget.body)),
+                const Divider(height: 1),
+                const AppFooter(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -103,7 +109,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   Widget _buildTablet() {
     return Scaffold(
       appBar: AppBar(
-        title: _TitleWithLogo(title: widget.title),
+        title: _TitleWithLogo(title: _currentLabel),
         leading: IconButton(
           icon: const Icon(Icons.menu),
           tooltip: _railExpanded ? 'Collapse menu' : 'Expand menu',
@@ -132,7 +138,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   Widget _buildMobile() {
     return Scaffold(
       appBar: AppBar(
-        title: _TitleWithLogo(title: widget.title),
+        title: _TitleWithLogo(title: _currentLabel),
         actions: widget.actions,
       ),
       body: _contentWithFooter(widget.body),
@@ -142,9 +148,9 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
         destinations: [
           for (final d in widget.destinations)
             NavigationDestination(
-              icon: Icon(d.icon),
-              selectedIcon: Icon(d.selectedIcon),
-              label: d.label,
+              icon: _railIcon(d),
+              selectedIcon: _railIcon(d, selected: true),
+              label: d.comingSoon ? '${d.label} (soon)' : d.label,
             ),
         ],
       ),
@@ -154,10 +160,41 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   Widget _contentWithFooter(Widget body) {
     return Column(
       children: [
-        Expanded(child: body),
+        Expanded(child: _canvas(body)),
         const Divider(height: 1),
         const AppFooter(),
       ],
+    );
+  }
+
+  Widget _canvas(Widget body) {
+    return ColoredBox(color: AppColors.canvasBackground, child: body);
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.title, required this.actions});
+
+  final String title;
+  final List<Widget>? actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      color: AppColors.background,
+      child: Row(
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          const Spacer(),
+          if (actions != null)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: actions!,
+            ),
+        ],
+      ),
     );
   }
 }
@@ -176,6 +213,22 @@ class _TitleWithLogo extends StatelessWidget {
         const SizedBox(width: 8),
         Text(title),
       ],
+    );
+  }
+}
+
+class _ComingSoonTag extends StatelessWidget {
+  const _ComingSoonTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Coming soon',
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        color: AppColors.error,
+        fontWeight: FontWeight.w600,
+        fontSize: 10,
+      ),
     );
   }
 }

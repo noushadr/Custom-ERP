@@ -2,12 +2,14 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # Backend (Node/NestJS)
 backend/node_modules/
 backend/dist/
 backend/coverage/
 backend/*.log
+backend/uploads/*
 
 # Frontend (Flutter/Dart)
 frontend/.dart_tool/
@@ -33,6 +35,7 @@ frontend/linux/flutter/ephemeral/
 
 # Claude Code local settings
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # OS
 .DS_Store

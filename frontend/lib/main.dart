@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/layout/app_nav_destination.dart';
 import 'core/layout/responsive_scaffold.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'features/authentication/application/auth_providers.dart';
 import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
+import 'features/authentication/presentation/widgets/user_menu.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
 
@@ -56,6 +58,7 @@ const _destinations = [
     label: 'Dashboard',
     icon: Icons.dashboard_outlined,
     selectedIcon: Icons.dashboard,
+    comingSoon: true,
   ),
   AppNavDestination(
     label: 'Directory',
@@ -66,16 +69,19 @@ const _destinations = [
     label: 'Requests',
     icon: Icons.assignment_outlined,
     selectedIcon: Icons.assignment,
+    comingSoon: true,
   ),
   AppNavDestination(
     label: 'Notifications',
     icon: Icons.notifications_outlined,
     selectedIcon: Icons.notifications,
+    comingSoon: true,
   ),
   AppNavDestination(
     label: 'Settings',
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings,
+    comingSoon: true,
   ),
 ];
 
@@ -92,38 +98,71 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
   @override
   Widget build(BuildContext context) {
     return ResponsiveScaffold(
-      title: 'Zera Creative',
       destinations: _destinations,
       selectedIndex: _selectedIndex,
       onDestinationSelected: (index) => setState(() => _selectedIndex = index),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.account_circle_outlined),
-          tooltip: 'My profile',
-          onPressed: () => Navigator.of(context).push(
+        UserMenu(
+          onProfileTap: () => Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => const EmployeeProfilePage(employeeId: null),
             ),
           ),
+          onSignOut: () => ref.read(authControllerProvider.notifier).logout(),
         ),
-        IconButton(
-          icon: const Icon(Icons.logout),
-          tooltip: 'Sign out',
-          onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-        ),
+        const SizedBox(width: 8),
       ],
-      body: _bodyFor(_destinations[_selectedIndex].label, context),
+      body: _bodyFor(_destinations[_selectedIndex], context),
     );
   }
 
-  Widget _bodyFor(String destinationLabel, BuildContext context) {
-    if (destinationLabel == 'Directory') {
+  Widget _bodyFor(AppNavDestination destination, BuildContext context) {
+    if (destination.label == 'Directory') {
       return const EmployeeDirectoryPage();
     }
+    return _ComingSoon(destination: destination);
+  }
+}
+
+class _ComingSoon extends StatelessWidget {
+  const _ComingSoon({required this.destination});
+
+  final AppNavDestination destination;
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
-      child: Text(
-        '$destinationLabel — coming soon',
-        style: Theme.of(context).textTheme.headlineSmall,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.primarySoft,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                destination.selectedIcon,
+                size: 32,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              '${destination.label} — coming soon',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "This section is on the roadmap and isn't built yet.",
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

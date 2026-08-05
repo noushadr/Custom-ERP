@@ -1,6 +1,7 @@
 class UpdateMyProfileInput {
   const UpdateMyProfileInput({
     this.profilePhotoUrl,
+    this.dateOfBirth,
     this.personalEmail,
     this.phoneNumber,
     this.emergencyContactName,
@@ -12,6 +13,7 @@ class UpdateMyProfileInput {
   });
 
   final String? profilePhotoUrl;
+  final String? dateOfBirth;
   final String? personalEmail;
   final String? phoneNumber;
   final String? emergencyContactName;
@@ -23,6 +25,7 @@ class UpdateMyProfileInput {
 
   Map<String, dynamic> toJson() => {
     if (profilePhotoUrl != null) 'profilePhotoUrl': profilePhotoUrl,
+    if (dateOfBirth != null) 'dateOfBirth': dateOfBirth,
     if (personalEmail != null) 'personalEmail': personalEmail,
     if (phoneNumber != null) 'phoneNumber': phoneNumber,
     if (emergencyContactName != null)

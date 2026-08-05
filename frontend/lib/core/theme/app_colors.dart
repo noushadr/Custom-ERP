@@ -4,7 +4,7 @@ abstract final class AppColors {
   // Surfaces
   static const Color background = Color(0xFFFFFFFF);
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color sidebarBackground = Color(0xFFFAFAFB);
+  static const Color canvasBackground = Color(0xFFFAFAFB);
   static const Color fieldFill = Color(0xFFF5F6F8);
 
   // Brand
