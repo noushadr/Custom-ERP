@@ -131,11 +131,31 @@ class _EmployeeList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: EdgeInsets.zero,
-      itemCount: employees.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, index) => _EmployeeCard(employee: employees[index]),
+    const spacing = 16.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Two per row once there's comfortable room for it; one per row
+        // (the old behavior) on narrower screens.
+        final columns = constraints.maxWidth >= 700 ? 2 : 1;
+        final cardWidth = columns == 1
+            ? constraints.maxWidth
+            : (constraints.maxWidth - spacing) / 2;
+
+        return SingleChildScrollView(
+          child: Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: [
+              for (final employee in employees)
+                SizedBox(
+                  width: cardWidth,
+                  child: _EmployeeCard(employee: employee),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -189,29 +209,43 @@ class _EmployeeCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 16,
-                runSpacing: 10,
-                children: [
-                  _EmploymentStatusBadge(status: employee.employmentStatus),
-                  _WorkModeBadge(workMode: employee.workMode),
-                  _InfoChip(icon: Icons.badge_outlined, label: employee.employeeCode),
-                  _InfoChip(icon: Icons.email_outlined, label: employee.email),
-                  _InfoChip(
-                    icon: Icons.phone_outlined,
-                    label: employee.phoneNumber ?? '—',
-                  ),
-                  _InfoChip(
-                    icon: Icons.event_outlined,
-                    label: 'Joined ${formatDisplayDate(employee.joiningDate)}',
-                  ),
-                  _InfoChip(
-                    icon: Icons.cake_outlined,
-                    label: employee.dateOfBirth == null
-                        ? '—'
-                        : formatDisplayDate(employee.dateOfBirth!),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) => Wrap(
+                  spacing: 16,
+                  runSpacing: 10,
+                  children: [
+                    _EmploymentStatusBadge(status: employee.employmentStatus),
+                    _WorkModeBadge(workMode: employee.workMode),
+                    _InfoChip(
+                      icon: Icons.badge_outlined,
+                      label: employee.employeeCode,
+                      maxWidth: constraints.maxWidth,
+                    ),
+                    _InfoChip(
+                      icon: Icons.email_outlined,
+                      label: employee.email,
+                      maxWidth: constraints.maxWidth,
+                    ),
+                    _InfoChip(
+                      icon: Icons.phone_outlined,
+                      label: employee.phoneNumber ?? '—',
+                      maxWidth: constraints.maxWidth,
+                    ),
+                    _InfoChip(
+                      icon: Icons.event_outlined,
+                      label:
+                          'Joined ${formatDisplayDate(employee.joiningDate)}',
+                      maxWidth: constraints.maxWidth,
+                    ),
+                    _InfoChip(
+                      icon: Icons.cake_outlined,
+                      label: employee.dateOfBirth == null
+                          ? '—'
+                          : formatDisplayDate(employee.dateOfBirth!),
+                      maxWidth: constraints.maxWidth,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -222,25 +256,32 @@ class _EmployeeCard extends StatelessWidget {
 }
 
 class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label});
+  const _InfoChip({required this.icon, required this.label, this.maxWidth});
 
   final IconData icon;
   final String label;
+  final double? maxWidth;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: AppColors.textSecondary),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-        ),
-      ],
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth ?? double.infinity),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppColors.textSecondary),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

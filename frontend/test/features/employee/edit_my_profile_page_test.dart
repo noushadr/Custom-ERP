@@ -8,7 +8,7 @@ import 'package:zera_erp/features/employee/presentation/pages/edit_my_profile_pa
 import '../../helpers/fake_employee.dart';
 
 Future<void> _useTallSurface(WidgetTester tester) async {
-  tester.view.physicalSize = const Size(800, 1400);
+  tester.view.physicalSize = const Size(800, 1800);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);

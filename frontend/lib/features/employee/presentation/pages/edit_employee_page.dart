@@ -5,7 +5,9 @@ import '../../application/edit_employee_state.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/update_employee_input.dart';
+import '../widgets/employee_documents_section.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/tag_input.dart';
 
 const _employmentTypes = {
@@ -215,7 +217,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _FormSection(
+                  FormSection(
                     title: 'Identity',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -253,7 +255,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _FormSection(
+                  FormSection(
                     title: 'Organization',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -464,7 +466,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _FormSection(
+                  FormSection(
                     title: 'Contact',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -530,7 +532,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _FormSection(
+                  FormSection(
                     title: 'Emergency contact',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -563,7 +565,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _FormSection(
+                  FormSection(
                     child: TagInput(
                       label: 'Skills',
                       values: _skills,
@@ -572,7 +574,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _FormSection(
+                  FormSection(
                     child: TagInput(
                       label: 'Certifications',
                       values: _certifications,
@@ -581,6 +583,8 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                           setState(() => _certifications = values),
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  EmployeeDocumentsSection(employeeId: widget.employee.id),
                   const SizedBox(height: 28),
                   ElevatedButton(
                     onPressed: isSubmitting ? null : _submit,
@@ -596,32 +600,6 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FormSection extends StatelessWidget {
-  const _FormSection({this.title, required this.child});
-
-  final String? title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (title != null) ...[
-              Text(title!, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 16),
-            ],
-            child,
-          ],
         ),
       ),
     );

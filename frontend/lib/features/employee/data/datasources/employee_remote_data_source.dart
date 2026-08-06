@@ -4,6 +4,7 @@ import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
+import '../models/employee_document_model.dart';
 import '../models/employee_model.dart';
 
 class EmployeeRemoteDataSource {
@@ -91,5 +92,58 @@ class EmployeeRemoteDataSource {
         .cast<Map<String, dynamic>>()
         .map(NamedRef.fromJson)
         .toList();
+  }
+
+  Future<List<EmployeeDocumentModel>> getMyDocuments() async {
+    final response = await _dio.get<List<dynamic>>('/employees/me/documents');
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(EmployeeDocumentModel.fromJson)
+        .toList();
+  }
+
+  Future<EmployeeDocumentModel> uploadMyDocument(
+    Uint8List bytes,
+    String fileName,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/employees/me/documents',
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: fileName),
+      }),
+    );
+    return EmployeeDocumentModel.fromJson(response.data!);
+  }
+
+  Future<void> deleteMyDocument(String documentId) async {
+    await _dio.delete('/employees/me/documents/$documentId');
+  }
+
+  Future<List<EmployeeDocumentModel>> getDocuments(String employeeId) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/employees/$employeeId/documents',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(EmployeeDocumentModel.fromJson)
+        .toList();
+  }
+
+  Future<EmployeeDocumentModel> uploadDocument(
+    String employeeId,
+    Uint8List bytes,
+    String fileName,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/employees/$employeeId/documents',
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: fileName),
+      }),
+    );
+    return EmployeeDocumentModel.fromJson(response.data!);
+  }
+
+  Future<void> deleteDocument(String employeeId, String documentId) async {
+    await _dio.delete('/employees/$employeeId/documents/$documentId');
   }
 }

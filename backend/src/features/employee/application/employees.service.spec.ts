@@ -12,6 +12,7 @@ import type { UserRepository } from '../../authentication/domain/repositories/us
 import { Employee } from '../domain/entities/employee.entity';
 import { EmploymentStatus } from '../domain/enums/employment-status.enum';
 import { EmploymentType } from '../domain/enums/employment-type.enum';
+import type { DocumentRepository } from '../domain/repositories/document-repository.interface';
 import type { EmployeeRepository } from '../domain/repositories/employee-repository.interface';
 import { EmployeesService } from './employees.service';
 
@@ -55,6 +56,7 @@ describe('EmployeesService', () => {
   let employeeRepository: jest.Mocked<EmployeeRepository>;
   let userRepository: jest.Mocked<UserRepository>;
   let roleRepository: jest.Mocked<RoleRepository>;
+  let documentRepository: jest.Mocked<DocumentRepository>;
 
   beforeEach(() => {
     employeeRepository = {
@@ -73,11 +75,18 @@ describe('EmployeesService', () => {
     roleRepository = {
       findByName: jest.fn(),
     };
+    documentRepository = {
+      findByEmployeeId: jest.fn(),
+      findById: jest.fn(),
+      save: jest.fn(),
+      remove: jest.fn(),
+    };
 
     service = new EmployeesService(
       employeeRepository,
       userRepository,
       roleRepository,
+      documentRepository,
     );
 
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-temp-password');

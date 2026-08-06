@@ -19,10 +19,17 @@ import {
   type UserRepository,
 } from '../../authentication/domain/repositories/user-repository.interface';
 import { Employee } from '../domain/entities/employee.entity';
+import { EmployeeDocument } from '../domain/entities/employee-document.entity';
 import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../domain/repositories/employee-repository.interface';
+import {
+  DOCUMENT_REPOSITORY,
+  type DocumentRepository,
+} from '../domain/repositories/document-repository.interface';
+import { DocumentResponse } from './document-response.interface';
+import { toDocumentResponse } from './document.mapper';
 import { EmployeeResponse } from './employee-response.interface';
 import { toEmployeeResponse } from './employee.mapper';
 import { generateTemporaryPassword } from './generate-temporary-password.util';
@@ -39,6 +46,8 @@ export class EmployeesService {
     private readonly employeeRepository: EmployeeRepository,
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
     @Inject(ROLE_REPOSITORY) private readonly roleRepository: RoleRepository,
+    @Inject(DOCUMENT_REPOSITORY)
+    private readonly documentRepository: DocumentRepository,
   ) {}
 
   async invite(
@@ -152,6 +161,67 @@ export class EmployeesService {
     const saved = await this.employeeRepository.save(employee);
     const reloaded = await this.employeeRepository.findById(saved.id);
     return toEmployeeResponse(reloaded!);
+  }
+
+  async listMyDocuments(userId: string): Promise<DocumentResponse[]> {
+    const employee = await this.employeeRepository.findByUserId(userId);
+    if (!employee) throw new NotFoundException('Employee profile not found');
+    return this.listDocuments(employee.id);
+  }
+
+  async listDocuments(employeeId: string): Promise<DocumentResponse[]> {
+    await this.ensureEmployeeExists(employeeId);
+    const documents =
+      await this.documentRepository.findByEmployeeId(employeeId);
+    return documents.map(toDocumentResponse);
+  }
+
+  async uploadMyDocument(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<DocumentResponse> {
+    const employee = await this.employeeRepository.findByUserId(userId);
+    if (!employee) throw new NotFoundException('Employee profile not found');
+    return this.uploadDocument(employee.id, file);
+  }
+
+  async uploadDocument(
+    employeeId: string,
+    file: Express.Multer.File,
+  ): Promise<DocumentResponse> {
+    await this.ensureEmployeeExists(employeeId);
+
+    const document = new EmployeeDocument();
+    document.employeeId = employeeId;
+    document.fileName = file.originalname;
+    document.filePath = `/uploads/documents/${file.filename}`;
+    document.fileSize = file.size;
+
+    const saved = await this.documentRepository.save(document);
+    return toDocumentResponse(saved);
+  }
+
+  async deleteMyDocument(userId: string, documentId: string): Promise<void> {
+    const employee = await this.employeeRepository.findByUserId(userId);
+    if (!employee) throw new NotFoundException('Employee profile not found');
+    return this.deleteDocument(employee.id, documentId);
+  }
+
+  async deleteDocument(employeeId: string, documentId: string): Promise<void> {
+    const document = await this.documentRepository.findById(documentId);
+    if (!document || document.employeeId !== employeeId) {
+      throw new NotFoundException('Document not found');
+    }
+
+    await this.documentRepository.remove(document);
+    await fs
+      .unlink(join(process.cwd(), document.filePath))
+      .catch(() => undefined);
+  }
+
+  private async ensureEmployeeExists(employeeId: string): Promise<void> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    if (!employee) throw new NotFoundException('Employee not found');
   }
 
   private async generateEmployeeCode(): Promise<string> {

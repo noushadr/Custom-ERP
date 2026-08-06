@@ -8,7 +8,9 @@ import '../../domain/entities/employee.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../../domain/exceptions/employee_exception.dart';
 import '../widgets/employee_avatar.dart';
+import '../widgets/employee_documents_section.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/tag_input.dart';
 
 class EditMyProfilePage extends ConsumerStatefulWidget {
@@ -175,7 +177,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _FormSection(
+                  FormSection(
                     child: Row(
                       children: [
                         EmployeeAvatar(
@@ -202,7 +204,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _FormSection(
+                  FormSection(
                     title: 'Contact',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -262,7 +264,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _FormSection(
+                  FormSection(
                     title: 'Emergency contact',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -295,7 +297,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _FormSection(
+                  FormSection(
                     child: TagInput(
                       label: 'Skills',
                       values: _skills,
@@ -304,7 +306,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _FormSection(
+                  FormSection(
                     child: TagInput(
                       label: 'Certifications',
                       values: _certifications,
@@ -313,6 +315,8 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                           setState(() => _certifications = values),
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  const EmployeeDocumentsSection(),
                   const SizedBox(height: 28),
                   ElevatedButton(
                     onPressed: isSubmitting ? null : _submit,
@@ -328,32 +332,6 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FormSection extends StatelessWidget {
-  const _FormSection({this.title, required this.child});
-
-  final String? title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (title != null) ...[
-              Text(title!, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 16),
-            ],
-            child,
-          ],
         ),
       ),
     );

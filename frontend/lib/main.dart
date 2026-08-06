@@ -61,7 +61,7 @@ const _destinations = [
     comingSoon: true,
   ),
   AppNavDestination(
-    label: 'Directory',
+    label: 'Employees',
     icon: Icons.people_outline,
     selectedIcon: Icons.people,
   ),
@@ -95,6 +95,20 @@ class _HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<_HomeShell> {
   int _selectedIndex = 0;
 
+  // One Navigator per section, so pushing a sub-page (profile, edit, invite)
+  // only replaces that section's content — the sidebar, top bar, and footer
+  // stay mounted. Keys must be created once and stay stable across rebuilds.
+  late final List<GlobalKey<NavigatorState>> _sectionNavigatorKeys = [
+    for (var i = 0; i < _destinations.length; i++) GlobalKey<NavigatorState>(),
+  ];
+
+  Widget _sectionRootFor(AppNavDestination destination) {
+    if (destination.label == 'Employees') {
+      return const EmployeeDirectoryPage();
+    }
+    return _ComingSoon(destination: destination);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ResponsiveScaffold(
@@ -103,24 +117,30 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
       onDestinationSelected: (index) => setState(() => _selectedIndex = index),
       actions: [
         UserMenu(
-          onProfileTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const EmployeeProfilePage(employeeId: null),
-            ),
-          ),
+          onProfileTap: () => _sectionNavigatorKeys[_selectedIndex]
+              .currentState!
+              .push(
+                MaterialPageRoute(
+                  builder: (_) => const EmployeeProfilePage(employeeId: null),
+                ),
+              ),
           onSignOut: () => ref.read(authControllerProvider.notifier).logout(),
         ),
         const SizedBox(width: 8),
       ],
-      body: _bodyFor(_destinations[_selectedIndex], context),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          for (var i = 0; i < _destinations.length; i++)
+            Navigator(
+              key: _sectionNavigatorKeys[i],
+              onGenerateRoute: (settings) => MaterialPageRoute(
+                builder: (_) => _sectionRootFor(_destinations[i]),
+              ),
+            ),
+        ],
+      ),
     );
-  }
-
-  Widget _bodyFor(AppNavDestination destination, BuildContext context) {
-    if (destination.label == 'Directory') {
-      return const EmployeeDirectoryPage();
-    }
-    return _ComingSoon(destination: destination);
   }
 }
 

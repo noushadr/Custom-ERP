@@ -100,7 +100,7 @@ void main() {
     // The report is nested under the manager, not shown as a root.
     expect(find.text('Mona Manager'), findsOneWidget);
     expect(find.text('Ravi Report'), findsOneWidget);
-    expect(find.textContaining('1 report'), findsOneWidget);
+    expect(find.textContaining('1 person'), findsOneWidget);
   });
 
   testWidgets('shows a restricted message without employees.read', (

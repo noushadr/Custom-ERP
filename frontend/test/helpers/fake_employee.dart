@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
+import 'package:zera_erp/features/employee/domain/entities/employee_document.dart';
 import 'package:zera_erp/features/employee/domain/entities/invite_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_my_profile_input.dart';
@@ -64,6 +65,7 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.updateEmployeeError,
     this.uploadMyPhotoResult,
     this.uploadMyPhotoError,
+    this.documents = const [],
   }) : me = me ?? buildTestEmployee();
 
   final List<Employee> employees;
@@ -78,6 +80,7 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final Object? updateEmployeeError;
   final Employee? uploadMyPhotoResult;
   final Object? uploadMyPhotoError;
+  final List<EmployeeDocument> documents;
 
   @override
   Future<List<Employee>> getAll() async => employees;
@@ -120,4 +123,30 @@ class FakeEmployeeRepository implements EmployeeRepository {
 
   @override
   Future<List<NamedRef>> getTeams({String? departmentId}) async => teams;
+
+  @override
+  Future<List<EmployeeDocument>> getMyDocuments() async => documents;
+
+  @override
+  Future<EmployeeDocument> uploadMyDocument(
+    Uint8List bytes,
+    String fileName,
+  ) async => documents.first;
+
+  @override
+  Future<void> deleteMyDocument(String documentId) async {}
+
+  @override
+  Future<List<EmployeeDocument>> getDocuments(String employeeId) async =>
+      documents;
+
+  @override
+  Future<EmployeeDocument> uploadDocument(
+    String employeeId,
+    Uint8List bytes,
+    String fileName,
+  ) async => documents.first;
+
+  @override
+  Future<void> deleteDocument(String employeeId, String documentId) async {}
 }

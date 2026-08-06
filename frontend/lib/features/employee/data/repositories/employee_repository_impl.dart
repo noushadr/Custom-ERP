@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/employee.dart';
+import '../../domain/entities/employee_document.dart';
 import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
@@ -49,6 +50,37 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   @override
   Future<List<NamedRef>> getTeams({String? departmentId}) =>
       _guard(() => _remoteDataSource.getTeams(departmentId: departmentId));
+
+  @override
+  Future<List<EmployeeDocument>> getMyDocuments() =>
+      _guard(() => _remoteDataSource.getMyDocuments());
+
+  @override
+  Future<EmployeeDocument> uploadMyDocument(
+    Uint8List bytes,
+    String fileName,
+  ) => _guard(() => _remoteDataSource.uploadMyDocument(bytes, fileName));
+
+  @override
+  Future<void> deleteMyDocument(String documentId) =>
+      _guard(() => _remoteDataSource.deleteMyDocument(documentId));
+
+  @override
+  Future<List<EmployeeDocument>> getDocuments(String employeeId) =>
+      _guard(() => _remoteDataSource.getDocuments(employeeId));
+
+  @override
+  Future<EmployeeDocument> uploadDocument(
+    String employeeId,
+    Uint8List bytes,
+    String fileName,
+  ) => _guard(
+    () => _remoteDataSource.uploadDocument(employeeId, bytes, fileName),
+  );
+
+  @override
+  Future<void> deleteDocument(String employeeId, String documentId) =>
+      _guard(() => _remoteDataSource.deleteDocument(employeeId, documentId));
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
