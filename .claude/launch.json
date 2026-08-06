@@ -7,7 +7,7 @@
       "runtimeArgs": [
         "-NoProfile",
         "-Command",
-        "cd 'C:\\Users\\noush\\OneDrive\\Desktop\\Zera ERP\\frontend'; & 'C:\\flutter\\bin\\flutter.bat' run -d web-server --web-port 5050 --release"
+        "cd 'C:\\Users\\noush\\OneDrive\\Desktop\\Zera ERP\\frontend'; & 'C:\\flutter\\bin\\flutter.bat' run -d web-server --web-port 5050 --release --no-pub"
       ],
       "port": 5050
     }

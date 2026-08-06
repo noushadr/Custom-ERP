@@ -41,6 +41,17 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <script>
+    // This preview server restarts often during development; without this,
+    // a stale service worker can keep serving an old build's assets
+    // alongside the new page, rendering two overlapping app instances.
+    // This app doesn't need offline support, so just drop any registration.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) registration.unregister();
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

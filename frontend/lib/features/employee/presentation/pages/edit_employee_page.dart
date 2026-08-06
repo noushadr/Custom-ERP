@@ -25,7 +25,11 @@ const _employmentStatuses = {
   'terminated': 'Terminated',
 };
 
-const _workModes = {'on_site': 'On-site', 'remote': 'Remote'};
+const _workModes = {
+  'on_site': 'On-site',
+  'remote': 'Remote',
+  'hybrid': 'Hybrid',
+};
 
 /// HR/Admin-facing edit form — reachable when the viewer has
 /// `employees.manage` and is editing someone other than themselves.
