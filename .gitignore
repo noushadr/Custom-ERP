@@ -10,6 +10,7 @@ backend/dist/
 backend/coverage/
 backend/*.log
 backend/uploads/*
+backend/tmp/
 
 # Frontend (Flutter/Dart)
 frontend/.dart_tool/

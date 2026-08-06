@@ -10,5 +10,5 @@ deployment:
     # -----------------------------------------------------------
 
     - /bin/mkdir -p $APP_ROOT/tmp
-    - /bin/bash -lc "source $NODE_ENV_ACTIVATE && cd $APP_ROOT && npm ci && npm run build && npm run migration:run"
+    - /bin/bash -lc "source $NODE_ENV_ACTIVATE && cd $APP_ROOT && npm ci --include=dev && npm run build && npm run migration:run"
     - /bin/touch $APP_ROOT/tmp/restart.txt
