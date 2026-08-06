@@ -183,9 +183,11 @@ class _NodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final workModeIcon = employee.workMode == 'remote'
-        ? Icons.home_outlined
-        : Icons.apartment_outlined;
+    final workModeIcon = switch (employee.workMode) {
+      'remote' => Icons.home_outlined,
+      'hybrid' => Icons.sync_alt_outlined,
+      _ => Icons.apartment_outlined,
+    };
 
     return Container(
       width: _cardWidth,

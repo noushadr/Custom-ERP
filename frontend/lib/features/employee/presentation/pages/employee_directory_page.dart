@@ -24,6 +24,14 @@ class EmployeeDirectoryPage extends ConsumerStatefulWidget {
 class _EmployeeDirectoryPageState
     extends ConsumerState<EmployeeDirectoryPage> {
   _DirectoryViewMode _viewMode = _DirectoryViewMode.list;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +48,8 @@ class _EmployeeDirectoryPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (canRead) const _EmployeeMetricsBar(),
+              if (canRead) const SizedBox(height: 20),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -65,6 +75,29 @@ class _EmployeeDirectoryPageState
                       onSelectionChanged: (selection) =>
                           setState(() => _viewMode = selection.first),
                     ),
+                  if (canRead && _viewMode == _DirectoryViewMode.list)
+                    SizedBox(
+                      width: 280,
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) =>
+                            setState(() => _searchQuery = value.trim()),
+                        decoration: InputDecoration(
+                          hintText: 'Search employees',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: _searchQuery.isEmpty
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.close, size: 18),
+                                  onPressed: () => setState(() {
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  }),
+                                ),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
                   if (canManage)
                     ElevatedButton.icon(
                       onPressed: () => Navigator.of(context).push(
@@ -80,7 +113,10 @@ class _EmployeeDirectoryPageState
               const SizedBox(height: 24),
               Expanded(
                 child: canRead
-                    ? _DirectoryBody(viewMode: _viewMode)
+                    ? _DirectoryBody(
+                        viewMode: _viewMode,
+                        searchQuery: _searchQuery,
+                      )
                     : const _NoDirectoryAccess(),
               ),
             ],
@@ -91,10 +127,110 @@ class _EmployeeDirectoryPageState
   }
 }
 
+class _EmployeeMetricsBar extends ConsumerWidget {
+  const _EmployeeMetricsBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final employeesAsync = ref.watch(employeeListProvider);
+
+    return employeesAsync.maybeWhen(
+      data: (employees) {
+        final active = employees
+            .where((e) => e.employmentStatus == 'active')
+            .length;
+        final resigned = employees
+            .where((e) => e.employmentStatus == 'resigned')
+            .length;
+        final onSite = employees.where((e) => e.workMode == 'on_site').length;
+        final remote = employees.where((e) => e.workMode == 'remote').length;
+        final hybrid = employees.where((e) => e.workMode == 'hybrid').length;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _MetricCard(
+              label: 'Total Employees',
+              value: employees.length,
+              color: AppColors.primary,
+            ),
+            _MetricCard(
+              label: 'Active',
+              value: active,
+              color: AppColors.success,
+            ),
+            _MetricCard(
+              label: 'Resigned',
+              value: resigned,
+              color: AppColors.error,
+            ),
+            _MetricCard(
+              label: 'On-site',
+              value: onSite,
+              color: AppColors.textSecondary,
+            ),
+            _MetricCard(
+              label: 'Remote',
+              value: remote,
+              color: AppColors.textSecondary,
+            ),
+            _MetricCard(
+              label: 'Hybrid',
+              value: hybrid,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 150,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$value',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(color: color),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
 class _DirectoryBody extends ConsumerWidget {
-  const _DirectoryBody({required this.viewMode});
+  const _DirectoryBody({required this.viewMode, required this.searchQuery});
 
   final _DirectoryViewMode viewMode;
+  final String searchQuery;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -113,14 +249,31 @@ class _DirectoryBody extends ConsumerWidget {
           return const Center(child: Text('No employees yet.'));
         }
 
-        return switch (viewMode) {
-          _DirectoryViewMode.list => _EmployeeList(employees: employees),
-          _DirectoryViewMode.hierarchy => EmployeeHierarchyView(
-            employees: employees,
-          ),
-        };
+        if (viewMode == _DirectoryViewMode.hierarchy) {
+          return EmployeeHierarchyView(employees: employees);
+        }
+
+        final filtered = _filterEmployees(employees, searchQuery);
+        if (filtered.isEmpty) {
+          return const Center(child: Text('No employees match your search.'));
+        }
+        return _EmployeeList(employees: filtered);
       },
     );
+  }
+
+  List<Employee> _filterEmployees(List<Employee> employees, String query) {
+    if (query.isEmpty) return employees;
+    final needle = query.toLowerCase();
+    return employees
+        .where(
+          (employee) =>
+              employee.fullName.toLowerCase().contains(needle) ||
+              employee.email.toLowerCase().contains(needle) ||
+              employee.employeeCode.toLowerCase().contains(needle) ||
+              (employee.designation ?? '').toLowerCase().contains(needle),
+        )
+        .toList();
   }
 }
 
@@ -135,23 +288,49 @@ class _EmployeeList extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Two per row once there's comfortable room for it; one per row
-        // (the old behavior) on narrower screens.
-        final columns = constraints.maxWidth >= 700 ? 2 : 1;
-        final cardWidth = columns == 1
-            ? constraints.maxWidth
-            : (constraints.maxWidth - spacing) / 2;
+        // Three per row once there's comfortable room for it, stepping down
+        // on narrower screens; one per row (the old behavior) on mobile.
+        final columns = constraints.maxWidth >= 1000
+            ? 3
+            : constraints.maxWidth >= 700
+            ? 2
+            : 1;
+        final cardWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+        final rows = <List<Employee>>[
+          for (var i = 0; i < employees.length; i += columns)
+            employees.sublist(
+              i,
+              i + columns > employees.length ? employees.length : i + columns,
+            ),
+        ];
 
         return SingleChildScrollView(
-          child: Wrap(
-            spacing: spacing,
-            runSpacing: spacing,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final employee in employees)
-                SizedBox(
-                  width: cardWidth,
-                  child: _EmployeeCard(employee: employee),
+              for (final row in rows) ...[
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < row.length; i++) ...[
+                        SizedBox(
+                          width: cardWidth,
+                          child: _EmployeeCard(
+                            employee: row[i],
+                            width: cardWidth,
+                          ),
+                        ),
+                        if (i != row.length - 1)
+                          const SizedBox(width: spacing),
+                      ],
+                    ],
+                  ),
                 ),
+                if (row != rows.last) const SizedBox(height: spacing),
+              ],
             ],
           ),
         );
@@ -161,12 +340,19 @@ class _EmployeeList extends StatelessWidget {
 }
 
 class _EmployeeCard extends StatelessWidget {
-  const _EmployeeCard({required this.employee});
+  const _EmployeeCard({required this.employee, required this.width});
 
   final Employee employee;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
+    // The Wrap's items need an explicit max width to know when to
+    // ellipsize; derive it from the card width instead of an inner
+    // LayoutBuilder, which doesn't play well with the IntrinsicHeight
+    // ancestor the grid uses to make every card in a row the same height.
+    final contentWidth = width - 40;
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -209,43 +395,41 @@ class _EmployeeCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              LayoutBuilder(
-                builder: (context, constraints) => Wrap(
-                  spacing: 16,
-                  runSpacing: 10,
-                  children: [
-                    _EmploymentStatusBadge(status: employee.employmentStatus),
-                    _WorkModeBadge(workMode: employee.workMode),
-                    _InfoChip(
-                      icon: Icons.badge_outlined,
-                      label: employee.employeeCode,
-                      maxWidth: constraints.maxWidth,
-                    ),
-                    _InfoChip(
-                      icon: Icons.email_outlined,
-                      label: employee.email,
-                      maxWidth: constraints.maxWidth,
-                    ),
-                    _InfoChip(
-                      icon: Icons.phone_outlined,
-                      label: employee.phoneNumber ?? '—',
-                      maxWidth: constraints.maxWidth,
-                    ),
-                    _InfoChip(
-                      icon: Icons.event_outlined,
-                      label:
-                          'Joined ${formatDisplayDate(employee.joiningDate)}',
-                      maxWidth: constraints.maxWidth,
-                    ),
-                    _InfoChip(
-                      icon: Icons.cake_outlined,
-                      label: employee.dateOfBirth == null
-                          ? '—'
-                          : formatDisplayDate(employee.dateOfBirth!),
-                      maxWidth: constraints.maxWidth,
-                    ),
-                  ],
-                ),
+              Wrap(
+                spacing: 16,
+                runSpacing: 10,
+                children: [
+                  _EmploymentStatusBadge(status: employee.employmentStatus),
+                  _WorkModeBadge(workMode: employee.workMode),
+                  _InfoChip(
+                    icon: Icons.badge_outlined,
+                    label: employee.employeeCode,
+                    maxWidth: contentWidth,
+                  ),
+                  _InfoChip(
+                    icon: Icons.email_outlined,
+                    label: employee.email,
+                    maxWidth: contentWidth,
+                  ),
+                  _InfoChip(
+                    icon: Icons.phone_outlined,
+                    label: employee.phoneNumber ?? '—',
+                    maxWidth: contentWidth,
+                  ),
+                  _InfoChip(
+                    icon: Icons.event_outlined,
+                    label:
+                        'Joined ${formatDisplayDate(employee.joiningDate)}',
+                    maxWidth: contentWidth,
+                  ),
+                  _InfoChip(
+                    icon: Icons.cake_outlined,
+                    label: employee.dateOfBirth == null
+                        ? '—'
+                        : formatDisplayDate(employee.dateOfBirth!),
+                    maxWidth: contentWidth,
+                  ),
+                ],
               ),
             ],
           ),
@@ -316,6 +500,7 @@ class _WorkModeBadge extends StatelessWidget {
     final (label, icon) = switch (workMode) {
       'remote' => ('Remote', Icons.home_outlined),
       'on_site' => ('On-site', Icons.apartment_outlined),
+      'hybrid' => ('Hybrid', Icons.sync_alt_outlined),
       _ => (workMode, Icons.apartment_outlined),
     };
 

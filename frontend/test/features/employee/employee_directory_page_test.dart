@@ -103,6 +103,36 @@ void main() {
     expect(find.textContaining('1 person'), findsOneWidget);
   });
 
+  testWidgets('filters the list by search query', (tester) async {
+    final jane = buildTestEmployee(id: 'employee-1', fullName: 'Jane Doe');
+    final ravi = buildTestEmployee(
+      id: 'employee-2',
+      fullName: 'Ravi Report',
+      email: 'ravi.report@zeracreative.com',
+      designation: 'Software Engineer',
+    );
+    final repository = FakeEmployeeRepository(employees: [jane, ravi]);
+
+    await tester.pumpWidget(
+      _app(permissions: ['employees.read'], repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Jane Doe'), findsOneWidget);
+    expect(find.text('Ravi Report'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'ravi');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Jane Doe'), findsNothing);
+    expect(find.text('Ravi Report'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'nobody matches this');
+    await tester.pumpAndSettle();
+
+    expect(find.text('No employees match your search.'), findsOneWidget);
+  });
+
   testWidgets('shows a restricted message without employees.read', (
     tester,
   ) async {
