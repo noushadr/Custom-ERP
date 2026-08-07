@@ -7,10 +7,12 @@ import 'core/theme/app_theme.dart';
 import 'features/authentication/application/auth_providers.dart';
 import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
+import 'features/authentication/presentation/widgets/impersonation_banner.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
-import 'features/employee/presentation/pages/dashboard_page.dart';
+import 'features/employee/presentation/pages/admin_dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
+import 'features/employee/presentation/pages/user_dashboard_page.dart';
 
 void main() {
   runApp(const ProviderScope(child: ZeraApp()));
@@ -54,11 +56,18 @@ class _SplashScreen extends StatelessWidget {
 }
 
 // Placeholder navigation until the corresponding feature modules exist.
-const _destinations = [
+// Stable, full set — never resized. Visibility per role is filtered at
+// render time in _HomeShellState.build, keyed off this list's indices.
+const _allDestinations = [
   AppNavDestination(
-    label: 'Dashboard',
+    label: 'Admin Dashboard',
     icon: Icons.dashboard_outlined,
     selectedIcon: Icons.dashboard,
+  ),
+  AppNavDestination(
+    label: 'User Dashboard',
+    icon: Icons.home_outlined,
+    selectedIcon: Icons.home,
   ),
   AppNavDestination(
     label: 'Employees',
@@ -85,6 +94,19 @@ const _destinations = [
   ),
 ];
 
+// Only Super Admin and HR/Manager see these in the nav. Everyone else works
+// entirely from User Dashboard, Employees, and Settings stay admin/HR-only.
+// Super Admin/HR-Manager can see both dashboards; everyone else sees only
+// User Dashboard.
+const _adminOnlyLabels = {'Admin Dashboard', 'Employees', 'Settings'};
+
+bool _isAdminOrHr(WidgetRef ref) {
+  final authState = ref.watch(authControllerProvider);
+  return authState is AuthAuthenticated &&
+      (authState.user.role == 'Super Admin' ||
+          authState.user.role == 'HR/Manager');
+}
+
 class _HomeShell extends ConsumerStatefulWidget {
   const _HomeShell();
 
@@ -93,19 +115,25 @@ class _HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<_HomeShell> {
+  // An index into _allDestinations — a stable identity independent of which
+  // destinations are currently visible in the nav.
   int _selectedIndex = 0;
 
-  // One Navigator per section, so pushing a sub-page (profile, edit, invite)
-  // only replaces that section's content — the sidebar, top bar, and footer
-  // stay mounted. Keys must be created once and stay stable across rebuilds.
+  // One Navigator per section (by _allDestinations index), so pushing a
+  // sub-page (profile, edit, invite) only replaces that section's content —
+  // the sidebar, top bar, and footer stay mounted. Keys must be created once
+  // and stay stable across rebuilds, so this is sized to the full fixed set
+  // rather than whatever subset is visible for the current role.
   late final List<GlobalKey<NavigatorState>> _sectionNavigatorKeys = [
-    for (var i = 0; i < _destinations.length; i++) GlobalKey<NavigatorState>(),
+    for (var i = 0; i < _allDestinations.length; i++) GlobalKey<NavigatorState>(),
   ];
 
   Widget _sectionRootFor(AppNavDestination destination) {
     switch (destination.label) {
-      case 'Dashboard':
-        return const DashboardPage();
+      case 'Admin Dashboard':
+        return const AdminDashboardPage();
+      case 'User Dashboard':
+        return const UserDashboardPage();
       case 'Employees':
         return const EmployeeDirectoryPage();
       default:
@@ -115,35 +143,63 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveScaffold(
-      destinations: _destinations,
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-      actions: [
-        UserMenu(
-          onProfileTap: () => _sectionNavigatorKeys[_selectedIndex]
-              .currentState!
-              .push(
-                MaterialPageRoute(
-                  builder: (_) => const EmployeeProfilePage(employeeId: null),
-                ),
-              ),
-          onSignOut: () => ref.read(authControllerProvider.notifier).logout(),
-        ),
-        const SizedBox(width: 8),
-      ],
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          for (var i = 0; i < _destinations.length; i++)
-            Navigator(
-              key: _sectionNavigatorKeys[i],
-              onGenerateRoute: (settings) => MaterialPageRoute(
-                builder: (_) => _sectionRootFor(_destinations[i]),
-              ),
+    final isAdminOrHr = _isAdminOrHr(ref);
+
+    final visibleOriginalIndices = [
+      for (var i = 0; i < _allDestinations.length; i++)
+        if (isAdminOrHr || !_adminOnlyLabels.contains(_allDestinations[i].label))
+          i,
+    ];
+    final visibleDestinations = [
+      for (final i in visibleOriginalIndices) _allDestinations[i],
+    ];
+    // Falls back to the first visible section if the previously-selected one
+    // just disappeared (e.g. role changed via impersonation while on Admin
+    // Dashboard/Employees/Settings — none of which the new role can see).
+    final effectiveIndex = visibleOriginalIndices.contains(_selectedIndex)
+        ? _selectedIndex
+        : visibleOriginalIndices.first;
+
+    return Column(
+      children: [
+        const ImpersonationBanner(),
+        Expanded(
+          child: ResponsiveScaffold(
+            destinations: visibleDestinations,
+            selectedIndex: visibleOriginalIndices.indexOf(effectiveIndex),
+            onDestinationSelected: (visiblePosition) => setState(
+              () => _selectedIndex = visibleOriginalIndices[visiblePosition],
             ),
-        ],
-      ),
+            actions: [
+              UserMenu(
+                onProfileTap: () => _sectionNavigatorKeys[effectiveIndex]
+                    .currentState!
+                    .push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const EmployeeProfilePage(employeeId: null),
+                      ),
+                    ),
+                onSignOut: () =>
+                    ref.read(authControllerProvider.notifier).logout(),
+              ),
+              const SizedBox(width: 8),
+            ],
+            body: IndexedStack(
+              index: effectiveIndex,
+              children: [
+                for (var i = 0; i < _allDestinations.length; i++)
+                  Navigator(
+                    key: _sectionNavigatorKeys[i],
+                    onGenerateRoute: (settings) => MaterialPageRoute(
+                      builder: (_) => _sectionRootFor(_allDestinations[i]),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -157,15 +213,15 @@ class _ComingSoon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppColors.primarySoft,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
                 destination.selectedIcon,
@@ -173,7 +229,7 @@ class _ComingSoon extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Text(
               '${destination.label} — coming soon',
               style: Theme.of(context).textTheme.titleLarge,

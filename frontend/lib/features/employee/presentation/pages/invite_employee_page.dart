@@ -71,13 +71,13 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Invite Employee')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(20),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
             child: Card(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 child: Form(
             key: _formKey,
             child: Column(
@@ -188,7 +188,7 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
                     },
                   ),
                 ],
-                const SizedBox(height: 32),
+                const SizedBox(height: 22),
                 ElevatedButton(
                   onPressed: isSubmitting ? null : _submit,
                   child: isSubmitting

@@ -97,10 +97,17 @@ void main() {
     await tester.tap(find.text('Hierarchy'));
     await tester.pumpAndSettle();
 
+    // Nodes start collapsed until the user opens them.
+    expect(find.text('Mona Manager'), findsOneWidget);
+    expect(find.text('Ravi Report'), findsNothing);
+    expect(find.textContaining('1 person'), findsOneWidget);
+
+    await tester.tap(find.textContaining('1 person'));
+    await tester.pumpAndSettle();
+
     // The report is nested under the manager, not shown as a root.
     expect(find.text('Mona Manager'), findsOneWidget);
     expect(find.text('Ravi Report'), findsOneWidget);
-    expect(find.textContaining('1 person'), findsOneWidget);
   });
 
   testWidgets('filters the list by search query', (tester) async {

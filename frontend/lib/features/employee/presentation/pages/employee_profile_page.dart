@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/layout/breakpoints.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
+import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
@@ -56,13 +58,21 @@ class _ProfileBody extends ConsumerWidget {
         authState is AuthAuthenticated &&
         authState.user.hasPermission('employees.manage');
     final showAuditLog = isOwnProfile || canManage;
+    final canImpersonate =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('users.impersonate') &&
+        !isOwnProfile &&
+        employee.accountStatus != 'disabled';
+    final canResetPassword =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('users.manage');
 
     final mainContent = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Card(
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -90,29 +100,52 @@ class _ProfileBody extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (isOwnProfile)
-                      OutlinedButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                EditMyProfilePage(employee: employee),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (canResetPassword) ...[
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                _resetPassword(context, ref, employee),
+                            icon: const Icon(Icons.password, size: 16),
+                            label: const Text('Reset password'),
                           ),
-                        ),
-                        child: const Text('Edit'),
-                      )
-                    else if (canManage)
-                      OutlinedButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                EditEmployeePage(employee: employee),
+                          const SizedBox(width: 8),
+                        ],
+                        if (canImpersonate) ...[
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                _loginAsUser(context, ref, employee),
+                            icon: const Icon(Icons.login, size: 16),
+                            label: const Text('Login as'),
                           ),
-                        ),
-                        child: const Text('Edit'),
-                      ),
+                          const SizedBox(width: 8),
+                        ],
+                        if (isOwnProfile)
+                          OutlinedButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    EditMyProfilePage(employee: employee),
+                              ),
+                            ),
+                            child: const Text('Edit'),
+                          )
+                        else if (canManage)
+                          OutlinedButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    EditEmployeePage(employee: employee),
+                              ),
+                            ),
+                            child: const Text('Edit'),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -125,7 +158,7 @@ class _ProfileBody extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
@@ -143,7 +176,7 @@ class _ProfileBody extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         _Section(
           title: 'Work',
           children: [
@@ -215,18 +248,18 @@ class _ProfileBody extends ConsumerWidget {
           ],
         ),
         if (showAuditLog) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           EmployeeSalaryHistorySection(
             employeeId: employee.id,
             isSelf: isOwnProfile,
             canManage: canManage,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           _DocumentStatusSection(
             employeeId: isOwnProfile ? null : employee.id,
           ),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         _Section(
           title: 'Contact',
           children: [
@@ -254,7 +287,7 @@ class _ProfileBody extends ConsumerWidget {
           ],
         ),
         if (showAuditLog) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           _Section(
             title: 'Bank Information',
             children: [
@@ -277,12 +310,12 @@ class _ProfileBody extends ConsumerWidget {
               _LabeledRow(label: 'IBAN', child: Text(employee.iban ?? '—')),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           EmployeeEducationSection(
             employeeId: isOwnProfile ? null : employee.id,
           ),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         _Section(
           title: 'Emergency contact',
           children: [
@@ -300,9 +333,9 @@ class _ProfileBody extends ConsumerWidget {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         _ChipsSection(title: 'Skills', values: employee.skills),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         _ChipsSection(
           title: 'Certifications',
           values: employee.certifications,
@@ -323,7 +356,7 @@ class _ProfileBody extends ConsumerWidget {
 
         if (isWide) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1040),
@@ -341,7 +374,7 @@ class _ProfileBody extends ConsumerWidget {
         }
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
@@ -350,7 +383,7 @@ class _ProfileBody extends ConsumerWidget {
                 children: [
                   mainContent,
                   if (auditPanel != null) ...[
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     auditPanel,
                   ],
                 ],
@@ -359,6 +392,131 @@ class _ProfileBody extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Switches the active session to [employee], then pops back to the section
+/// root so the viewer doesn't stay on a page that may not apply to them.
+Future<void> _loginAsUser(
+  BuildContext context,
+  WidgetRef ref,
+  Employee employee,
+) async {
+  try {
+    await ref
+        .read(authControllerProvider.notifier)
+        .impersonate(employee.userId);
+    if (!context.mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  } on AuthException catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error.message)));
+  }
+}
+
+/// Confirms, then resets [employee]'s password to a new temporary one and
+/// shows it once so the admin/HR can share it directly.
+Future<void> _resetPassword(
+  BuildContext context,
+  WidgetRef ref,
+  Employee employee,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Reset password?'),
+      content: Text(
+        '${employee.fullName} will need a new temporary password to log '
+        'in — this cannot be undone.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Reset password'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+
+  try {
+    final temporaryPassword = await ref
+        .read(authControllerProvider.notifier)
+        .resetPassword(employee.userId);
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _TemporaryPasswordDialog(password: temporaryPassword),
+    );
+  } on AuthException catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error.message)));
+  }
+}
+
+class _TemporaryPasswordDialog extends StatelessWidget {
+  const _TemporaryPasswordDialog({required this.password});
+
+  final String password;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New temporary password'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Share this with them directly — it will only be shown once.',
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SelectableText(
+                  password,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontFeatures: [const FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.copy_outlined, size: 18),
+                  tooltip: 'Copy',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: password));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Copied to clipboard')),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Done'),
+        ),
+      ],
     );
   }
 }
@@ -373,12 +531,12 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             ...children,
           ],
         ),
@@ -398,7 +556,7 @@ class _LabeledRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           SizedBox(
@@ -443,12 +601,12 @@ class _DocumentStatusSection extends ConsumerWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Documents', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             documentsAsync.when(
               loading: () => const LinearProgressIndicator(),
               error: (_, _) => const Text('Could not load documents.'),
@@ -460,7 +618,7 @@ class _DocumentStatusSection extends ConsumerWidget {
                   children: [
                     for (final slot in _requiredDocumentSlots)
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
                             SizedBox(
@@ -523,12 +681,12 @@ class _ChipsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             if (values.isEmpty)
               Text(
                 '—',

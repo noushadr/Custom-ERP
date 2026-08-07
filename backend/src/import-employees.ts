@@ -12,7 +12,7 @@ import { Department } from './features/departments/domain/entities/department.en
 import { Employee } from './features/employee/domain/entities/employee.entity';
 import { EmploymentStatus } from './features/employee/domain/enums/employment-status.enum';
 import { EmploymentType } from './features/employee/domain/enums/employment-type.enum';
-import { generateTemporaryPassword } from './features/employee/application/generate-temporary-password.util';
+import { generateTemporaryPassword } from './core/utils/generate-temporary-password.util';
 
 // Source data extracted from the Odoo "hr.employee" export
 // (Employee (hr.employee).xlsx, 26 rows, has Department/Manager columns).

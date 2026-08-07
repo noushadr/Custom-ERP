@@ -6,6 +6,7 @@ export interface EmployeeRepository {
   findAll(): Promise<Employee[]>;
   findById(id: string): Promise<Employee | null>;
   findByUserId(userId: string): Promise<Employee | null>;
+  findByReportingManagerId(managerId: string): Promise<Employee[]>;
   count(): Promise<number>;
   save(employee: Employee): Promise<Employee>;
 }

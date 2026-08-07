@@ -13,11 +13,13 @@ import { Team } from './features/teams/domain/entities/team.entity';
 
 const DEFAULT_PERMISSIONS = [
   'users.manage',
+  'users.impersonate',
   'employees.read',
   'employees.manage',
   'departments.manage',
   'teams.manage',
   'audit.viewAll',
+  'notices.manage',
 ];
 
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
@@ -30,6 +32,7 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'employees.manage',
       'departments.manage',
       'teams.manage',
+      'notices.manage',
     ],
   },
   { name: 'Team Lead', permissions: ['employees.read'] },

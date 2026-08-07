@@ -5,6 +5,7 @@ import { calculateProfileCompletion } from './profile-completion.util';
 export function toEmployeeResponse(employee: Employee): EmployeeResponse {
   return {
     id: employee.id,
+    userId: employee.userId,
     employeeCode: employee.employeeCode,
     email: employee.user.email,
     role: employee.user.role.name,

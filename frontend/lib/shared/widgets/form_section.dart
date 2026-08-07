@@ -11,13 +11,13 @@ class FormSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (title != null) ...[
               Text(title!, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
             ],
             child,
           ],

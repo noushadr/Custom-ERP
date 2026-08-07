@@ -200,7 +200,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Edit My Profile')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(24),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
@@ -235,7 +235,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     title: 'Contact',
                     child: Column(
@@ -295,7 +295,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     title: 'Bank Information',
                     child: Column(
@@ -343,7 +343,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     title: 'Emergency contact',
                     child: Column(
@@ -376,7 +376,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     child: TagInput(
                       label: 'Skills',
@@ -385,7 +385,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                       onChanged: (values) => setState(() => _skills = values),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     child: TagInput(
                       label: 'Certifications',
@@ -395,9 +395,9 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                           setState(() => _certifications = values),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   const EmployeeDocumentsSection(),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: isSubmitting ? null : _submit,
                     child: isSubmitting

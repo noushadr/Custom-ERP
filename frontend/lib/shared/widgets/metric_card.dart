@@ -19,10 +19,10 @@ class MetricCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(minWidth: 132),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(

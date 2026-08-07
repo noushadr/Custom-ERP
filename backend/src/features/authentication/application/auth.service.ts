@@ -1,4 +1,10 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -54,9 +60,12 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string): Promise<AuthTokens> {
-    let payload: { sub: string };
+    let payload: { sub: string; impersonatedBy?: string };
     try {
-      payload = this.jwtService.verify<{ sub: string }>(refreshToken, {
+      payload = this.jwtService.verify<{
+        sub: string;
+        impersonatedBy?: string;
+      }>(refreshToken, {
         secret: this.configService.get<string>('jwt.refreshSecret'),
       });
     } catch {
@@ -68,7 +77,47 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    return this.issueTokens(user);
+    return this.issueTokens(user, payload.impersonatedBy);
+  }
+
+  /** Issues a session for another user without their password. Restricted to
+   * `users.impersonate` (Super Admin only, see seed.ts) at the controller. */
+  async impersonate(
+    targetUserId: string,
+    actingAdminId: string,
+  ): Promise<AuthTokens & { user: AuthenticatedUser }> {
+    const target = await this.userRepository.findById(targetUserId);
+    if (!target) throw new NotFoundException('User not found');
+    if (target.status === UserStatus.DISABLED) {
+      throw new BadRequestException('This account is disabled');
+    }
+
+    return {
+      ...this.issueTokens(target, actingAdminId),
+      user: this.toAuthenticatedUser(target),
+    };
+  }
+
+  /** Self-service password change — requires knowing the current password,
+   * unlike the HR-initiated reset in UsersController which does not. */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    const passwordMatches = await bcrypt.compare(
+      currentPassword,
+      user.passwordHash,
+    );
+    if (!passwordMatches) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.userRepository.save(user);
   }
 
   toAuthenticatedUser(user: User): AuthenticatedUser {
@@ -80,12 +129,13 @@ export class AuthService {
     };
   }
 
-  private issueTokens(user: User): AuthTokens {
+  private issueTokens(user: User, impersonatedBy?: string): AuthTokens {
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role.name,
       permissions: user.role.permissions?.map((p) => p.key) ?? [],
+      ...(impersonatedBy ? { impersonatedBy } : {}),
     };
 
     const accessToken = this.jwtService.sign(payload, {
@@ -94,7 +144,7 @@ export class AuthService {
     });
 
     const refreshToken = this.jwtService.sign(
-      { sub: user.id },
+      { sub: user.id, ...(impersonatedBy ? { impersonatedBy } : {}) },
       {
         secret: this.configService.get<string>('jwt.refreshSecret'),
         expiresIn: this.configService.get<string>(

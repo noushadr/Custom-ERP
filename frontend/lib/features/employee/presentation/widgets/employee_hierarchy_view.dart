@@ -26,7 +26,9 @@ class EmployeeHierarchyView extends StatefulWidget {
 }
 
 class _EmployeeHierarchyViewState extends State<EmployeeHierarchyView> {
-  final Set<String> _collapsed = {};
+  // Ids of nodes the user has explicitly expanded — everything starts
+  // collapsed until opened.
+  final Set<String> _expanded = {};
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +45,7 @@ class _EmployeeHierarchyViewState extends State<EmployeeHierarchyView> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -62,7 +64,7 @@ class _EmployeeHierarchyViewState extends State<EmployeeHierarchyView> {
     Map<String?, List<Employee>> reportsByManagerId,
   ) {
     final reports = reportsByManagerId[employee.id] ?? [];
-    if (reports.isEmpty || _collapsed.contains(employee.id)) return 1;
+    if (reports.isEmpty || !_expanded.contains(employee.id)) return 1;
     return reports.fold(
       0,
       (sum, report) => sum + _leafCount(report, reportsByManagerId),
@@ -74,8 +76,8 @@ class _EmployeeHierarchyViewState extends State<EmployeeHierarchyView> {
     Map<String?, List<Employee>> reportsByManagerId,
   ) {
     final reports = reportsByManagerId[employee.id] ?? [];
-    final isCollapsed = _collapsed.contains(employee.id);
-    final showChildren = reports.isNotEmpty && !isCollapsed;
+    final isExpanded = _expanded.contains(employee.id);
+    final showChildren = reports.isNotEmpty && isExpanded;
     // Every node occupies a "slot" of leafCount * unitWidth, with its card
     // centered inside — that reserved half-unit of breathing room on each
     // side is what creates consistent spacing between sibling cards without
@@ -94,10 +96,10 @@ class _EmployeeHierarchyViewState extends State<EmployeeHierarchyView> {
               onToggle: reports.isEmpty
                   ? null
                   : () => setState(() {
-                      if (isCollapsed) {
-                        _collapsed.remove(employee.id);
+                      if (isExpanded) {
+                        _expanded.remove(employee.id);
                       } else {
-                        _collapsed.add(employee.id);
+                        _expanded.add(employee.id);
                       }
                     }),
             ),

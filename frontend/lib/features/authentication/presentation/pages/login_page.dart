@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_footer.dart';
 import '../../../../shared/widgets/zera_logo.dart';
@@ -18,30 +17,10 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  // Dev-only auto-login: active whenever credentials were supplied via
-  // --dart-define (see AppConfig.devAutoLoginEmail) rather than hardcoded
-  // here, so no real credentials ever end up in source/git. This is only
-  // ever set in this machine's local, uncommitted .claude/launch.json — the
-  // documented production build command never passes these defines, so
-  // release builds served in production are unaffected.
-  static bool get _devAutoLoginEnabled =>
-      AppConfig.devAutoLoginEmail.isNotEmpty;
-  late final _emailController = TextEditingController(
-    text: _devAutoLoginEnabled ? AppConfig.devAutoLoginEmail : null,
-  );
-  late final _passwordController = TextEditingController(
-    text: _devAutoLoginEnabled ? AppConfig.devAutoLoginPassword : null,
-  );
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _rememberMe = true;
-
-  @override
-  void initState() {
-    super.initState();
-    if (_devAutoLoginEnabled) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _submit(false));
-    }
-  }
 
   @override
   void dispose() {
@@ -79,20 +58,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             Expanded(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(20),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 420),
                     child: Card(
                       child: Padding(
-                        padding: const EdgeInsets.all(32),
+                        padding: const EdgeInsets.all(24),
                         child: Form(
                           key: _formKey,
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const Center(child: ZeraLogo(height: 48)),
-                              const SizedBox(height: 20),
+                              const Center(child: ZeraLogo(height: 44)),
+                              const SizedBox(height: 16),
                               Text(
                                 'Zera Creative',
                                 style: Theme.of(
@@ -107,7 +86,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     ?.copyWith(color: AppColors.textSecondary),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 22),
                               if (errorMessage != null) ...[
                                 _ErrorBanner(message: errorMessage),
                                 const SizedBox(height: 16),

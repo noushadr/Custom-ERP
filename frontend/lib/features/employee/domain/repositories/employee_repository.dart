@@ -17,6 +17,9 @@ abstract interface class EmployeeRepository {
 
   Future<Employee> getMe();
 
+  /// Employees who report to the current user, if any.
+  Future<List<Employee>> getMyDirectReports();
+
   Future<Employee> updateMe(UpdateMyProfileInput input);
 
   /// Requires `employees.manage`.

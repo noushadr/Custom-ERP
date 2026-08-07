@@ -3,6 +3,7 @@ import '../../../../shared/models/named_ref.dart';
 class Employee {
   const Employee({
     required this.id,
+    required this.userId,
     required this.employeeCode,
     required this.email,
     required this.role,
@@ -38,6 +39,7 @@ class Employee {
   });
 
   final String id;
+  final String userId;
   final String employeeCode;
   final String email;
   final String role;

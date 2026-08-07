@@ -9,6 +9,8 @@ import { AuthenticationModule } from './features/authentication/authentication.m
 import { DepartmentsModule } from './features/departments/departments.module';
 import { TeamsModule } from './features/teams/teams.module';
 import { EmployeeModule } from './features/employee/employee.module';
+import { NoticesModule } from './features/notices/notices.module';
+import { RequestsModule } from './features/requests/requests.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { EmployeeModule } from './features/employee/employee.module';
     DepartmentsModule,
     TeamsModule,
     EmployeeModule,
+    NoticesModule,
+    RequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

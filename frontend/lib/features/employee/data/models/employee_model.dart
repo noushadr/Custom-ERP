@@ -5,6 +5,7 @@ import '../../domain/entities/employee.dart';
 class EmployeeModel extends Employee {
   const EmployeeModel({
     required super.id,
+    required super.userId,
     required super.employeeCode,
     required super.email,
     required super.role,
@@ -41,6 +42,7 @@ class EmployeeModel extends Employee {
 
   factory EmployeeModel.fromJson(Map<String, dynamic> json) => EmployeeModel(
     id: json['id'] as String,
+    userId: json['userId'] as String,
     employeeCode: json['employeeCode'] as String,
     email: json['email'] as String,
     role: json['role'] as String,

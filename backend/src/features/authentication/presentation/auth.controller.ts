@@ -4,15 +4,18 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
 } from '@nestjs/common';
 import {
   AuthService,
   type AuthenticatedUser,
 } from '../application/auth.service';
+import { ChangePasswordDto } from '../application/dto/change-password.dto';
 import { LoginDto } from '../application/dto/login.dto';
 import { RefreshTokenDto } from '../application/dto/refresh-token.dto';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { Permissions } from './decorators/permissions.decorator';
 import { Public } from './decorators/public.decorator';
 import type { JwtPayload } from './strategies/jwt.strategy';
 
@@ -43,5 +46,28 @@ export class AuthController {
       role: user.role,
       permissions: user.permissions,
     };
+  }
+
+  @Permissions('users.impersonate')
+  @HttpCode(HttpStatus.OK)
+  @Post('impersonate/:userId')
+  impersonate(
+    @Param('userId') userId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.authService.impersonate(userId, user.sub);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('change-password')
+  changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.authService.changePassword(
+      user.sub,
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
 }

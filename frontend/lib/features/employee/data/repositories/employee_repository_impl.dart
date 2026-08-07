@@ -30,6 +30,10 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   Future<Employee> getMe() => _guard(() => _remoteDataSource.getMe());
 
   @override
+  Future<List<Employee>> getMyDirectReports() =>
+      _guard(() => _remoteDataSource.getMyDirectReports());
+
+  @override
   Future<Employee> updateMe(UpdateMyProfileInput input) =>
       _guard(() => _remoteDataSource.updateMe(input));
 

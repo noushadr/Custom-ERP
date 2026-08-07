@@ -40,16 +40,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
       NavigationRailDestination(
         icon: _railIcon(d),
         selectedIcon: _railIcon(d, selected: true),
-        label: d.comingSoon
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(d.label),
-                  const _ComingSoonTag(),
-                ],
-              )
-            : Text(d.label),
+        label: Text(d.label),
       ),
   ];
 
@@ -81,22 +72,20 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
             selectedIndex: widget.selectedIndex,
             onDestinationSelected: widget.onDestinationSelected,
             leading: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: const ZeraLogo(height: 28),
+                child: const ZeraLogo(height: 24),
               ),
             ),
             destinations: _railDestinations,
           ),
-          const VerticalDivider(width: 1),
           Expanded(
             child: Column(
               children: [
                 _TopBar(title: _currentLabel, actions: widget.actions),
                 const Divider(height: 1),
                 Expanded(child: _canvas(widget.body)),
-                const Divider(height: 1),
                 const AppFooter(),
               ],
             ),
@@ -128,7 +117,6 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
             onDestinationSelected: widget.onDestinationSelected,
             destinations: _railDestinations,
           ),
-          const VerticalDivider(width: 1),
           Expanded(child: _contentWithFooter(widget.body)),
         ],
       ),
@@ -150,7 +138,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
             NavigationDestination(
               icon: _railIcon(d),
               selectedIcon: _railIcon(d, selected: true),
-              label: d.comingSoon ? '${d.label} (soon)' : d.label,
+              label: d.label,
             ),
         ],
       ),
@@ -161,7 +149,6 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
     return Column(
       children: [
         Expanded(child: _canvas(body)),
-        const Divider(height: 1),
         const AppFooter(),
       ],
     );
@@ -181,12 +168,12 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       color: AppColors.background,
       child: Row(
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
           const Spacer(),
           if (actions != null)
             Row(
@@ -213,22 +200,6 @@ class _TitleWithLogo extends StatelessWidget {
         const SizedBox(width: 8),
         Text(title),
       ],
-    );
-  }
-}
-
-class _ComingSoonTag extends StatelessWidget {
-  const _ComingSoonTag();
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      'Coming soon',
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: AppColors.error,
-        fontWeight: FontWeight.w600,
-        fontSize: 10,
-      ),
     );
   }
 }

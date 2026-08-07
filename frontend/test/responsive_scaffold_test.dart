@@ -4,10 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/notices/application/notice_providers.dart';
+import 'package:zera_erp/features/requests/application/request_providers.dart';
 
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_employee.dart';
+import 'helpers/fake_notice.dart';
+import 'helpers/fake_request.dart';
 
 Future<void> _setSurfaceWidth(WidgetTester tester, double width) async {
   tester.view.physicalSize = Size(width, 900);
@@ -23,6 +27,8 @@ Widget _authenticatedApp() {
         (ref) => PresetAuthController(const AuthAuthenticated(testAuthUser)),
       ),
       employeeRepositoryProvider.overrideWithValue(FakeEmployeeRepository()),
+      noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
+      requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
     ],
     child: const ZeraApp(),
   );

@@ -50,7 +50,8 @@ import { DocumentResponse } from './document-response.interface';
 import { toDocumentResponse } from './document.mapper';
 import { EmployeeResponse } from './employee-response.interface';
 import { toEmployeeResponse } from './employee.mapper';
-import { generateTemporaryPassword } from './generate-temporary-password.util';
+import { generateTemporaryPassword } from '../../../core/utils/generate-temporary-password.util';
+import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import { AddEducationRecordDto } from './dto/add-education-record.dto';
 import { AddSalaryRecordDto } from './dto/add-salary-record.dto';
 import { InviteEmployeeDto } from './dto/invite-employee.dto';
@@ -193,6 +194,15 @@ export class EmployeesService {
     const employee = await this.employeeRepository.findByUserId(userId);
     if (!employee) throw new NotFoundException('Employee profile not found');
     return toEmployeeResponse(employee);
+  }
+
+  async getMyDirectReports(userId: string): Promise<EmployeeResponse[]> {
+    const employee = await this.employeeRepository.findByUserId(userId);
+    if (!employee) throw new NotFoundException('Employee profile not found');
+    const reports = await this.employeeRepository.findByReportingManagerId(
+      employee.id,
+    );
+    return reports.map(toEmployeeResponse);
   }
 
   async updateSelf(
@@ -564,12 +574,12 @@ export class EmployeesService {
     return `${employee.firstName} ${employee.lastName}`.trim();
   }
 
-  private async resolveActorName(actorUserId: string): Promise<string> {
-    const actorEmployee =
-      await this.employeeRepository.findByUserId(actorUserId);
-    if (actorEmployee) return this.fullName(actorEmployee);
-    const user = await this.userRepository.findById(actorUserId);
-    return user?.email ?? 'Unknown';
+  private resolveActorName(actorUserId: string): Promise<string> {
+    return resolveActorName(
+      this.employeeRepository,
+      this.userRepository,
+      actorUserId,
+    );
   }
 
   private async recordAuditEntries(

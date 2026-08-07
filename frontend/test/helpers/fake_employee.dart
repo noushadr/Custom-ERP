@@ -12,6 +12,7 @@ import 'package:zera_erp/shared/models/named_ref.dart';
 
 Employee buildTestEmployee({
   String id = 'employee-1',
+  String userId = 'user-1',
   String employeeCode = 'ZC-00001',
   String email = 'jane.doe@zeracreative.com',
   String role = 'Employee',
@@ -24,6 +25,7 @@ Employee buildTestEmployee({
   final parts = fullName.split(' ');
   return Employee(
     id: id,
+    userId: userId,
     employeeCode: employeeCode,
     email: email,
     role: role,
@@ -77,10 +79,13 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.auditLog = const [],
     this.salaryHistory = const [],
     this.educationHistory = const [],
+    this.directReports = const [],
+    this.getMeError,
   }) : me = me ?? buildTestEmployee();
 
   final List<Employee> employees;
   final Employee me;
+  final Object? getMeError;
   final List<NamedRef> departments;
   final List<NamedRef> teams;
   final ({Employee employee, String temporaryPassword})? inviteResult;
@@ -95,6 +100,7 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final List<AuditLogEntry> auditLog;
   final List<SalaryRecord> salaryHistory;
   final List<EducationRecord> educationHistory;
+  final List<Employee> directReports;
 
   @override
   Future<List<Employee>> getAll() async => employees;
@@ -104,7 +110,13 @@ class FakeEmployeeRepository implements EmployeeRepository {
       employees.firstWhere((e) => e.id == id, orElse: () => me);
 
   @override
-  Future<Employee> getMe() async => me;
+  Future<Employee> getMe() async {
+    if (getMeError != null) throw getMeError!;
+    return me;
+  }
+
+  @override
+  Future<List<Employee>> getMyDirectReports() async => directReports;
 
   @override
   Future<Employee> updateMe(UpdateMyProfileInput input) async {

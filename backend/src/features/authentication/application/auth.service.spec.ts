@@ -1,4 +1,8 @@
-import { UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -161,6 +165,106 @@ describe('AuthService', () => {
 
       expect(result.accessToken).toBe('signed-token');
       expect(result.refreshToken).toBe('signed-token');
+    });
+
+    it('carries the impersonatedBy claim forward on refresh', async () => {
+      const user = buildUser();
+      jwtService.verify.mockReturnValue({
+        sub: user.id,
+        impersonatedBy: 'admin-1',
+      });
+      userRepository.findById.mockResolvedValue(user);
+
+      await service.refresh('token');
+
+      expect(jwtService.sign).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ impersonatedBy: 'admin-1' }),
+        expect.anything(),
+      );
+      expect(jwtService.sign).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ impersonatedBy: 'admin-1' }),
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('impersonate', () => {
+    it('throws when the target user does not exist', async () => {
+      userRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.impersonate('missing-user', 'admin-1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws when the target user is disabled', async () => {
+      userRepository.findById.mockResolvedValue(
+        buildUser({ status: UserStatus.DISABLED }),
+      );
+
+      await expect(
+        service.impersonate('user-1', 'admin-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('issues tokens for the target user tagged with the acting admin', async () => {
+      const target = buildUser();
+      userRepository.findById.mockResolvedValue(target);
+
+      const result = await service.impersonate(target.id, 'admin-1');
+
+      expect(result.accessToken).toBe('signed-token');
+      expect(result.refreshToken).toBe('signed-token');
+      expect(result.user).toEqual({
+        id: target.id,
+        email: target.email,
+        role: target.role.name,
+        permissions: ['users.manage'],
+      });
+      expect(jwtService.sign).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ sub: target.id, impersonatedBy: 'admin-1' }),
+        expect.anything(),
+      );
+      expect(jwtService.sign).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ sub: target.id, impersonatedBy: 'admin-1' }),
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('changePassword', () => {
+    it('throws when the user does not exist', async () => {
+      userRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.changePassword('missing-user', 'old-password', 'new-password'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws when the current password is wrong', async () => {
+      userRepository.findById.mockResolvedValue(buildUser());
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.changePassword('user-1', 'wrong-password', 'new-password'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(userRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('hashes and saves the new password when the current one matches', async () => {
+      const user = buildUser();
+      userRepository.findById.mockResolvedValue(user);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hashed-password');
+
+      await service.changePassword('user-1', 'old-password', 'new-password');
+
+      expect(user.passwordHash).toBe('new-hashed-password');
+      expect(userRepository.save).toHaveBeenCalledWith(user);
     });
   });
 });

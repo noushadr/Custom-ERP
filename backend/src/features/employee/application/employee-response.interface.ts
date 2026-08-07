@@ -4,6 +4,7 @@ import { WorkMode } from '../domain/enums/work-mode.enum';
 
 export interface EmployeeResponse {
   id: string;
+  userId: string;
   employeeCode: string;
   email: string;
   role: string;

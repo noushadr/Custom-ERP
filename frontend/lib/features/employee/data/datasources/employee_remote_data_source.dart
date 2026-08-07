@@ -34,6 +34,16 @@ class EmployeeRemoteDataSource {
     return EmployeeModel.fromJson(response.data!);
   }
 
+  Future<List<EmployeeModel>> getMyDirectReports() async {
+    final response = await _dio.get<List<dynamic>>(
+      '/employees/me/direct-reports',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(EmployeeModel.fromJson)
+        .toList();
+  }
+
   Future<EmployeeModel> updateMe(UpdateMyProfileInput input) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/employees/me',

@@ -8,6 +8,9 @@ export interface JwtPayload {
   email: string;
   role: string;
   permissions: string[];
+  /** Present when this session was issued via impersonation — the id of the
+   * Super Admin who is logged in as this user. */
+  impersonatedBy?: string;
 }
 
 @Injectable()

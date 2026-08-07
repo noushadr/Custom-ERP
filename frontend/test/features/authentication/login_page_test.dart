@@ -8,10 +8,14 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/authentication/domain/exceptions/auth_exception.dart';
 import 'package:zera_erp/features/authentication/presentation/pages/login_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/notices/application/notice_providers.dart';
+import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/main.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_notice.dart';
+import '../../helpers/fake_request.dart';
 
 class _DelayedAuthRepository extends FakeAuthRepository {
   _DelayedAuthRepository(this.completer);
@@ -31,6 +35,8 @@ Widget _appWith(FakeAuthRepository repository) {
     overrides: [
       authRepositoryProvider.overrideWithValue(repository),
       employeeRepositoryProvider.overrideWithValue(FakeEmployeeRepository()),
+      noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
+      requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
     ],
     child: const ZeraApp(),
   );
@@ -118,7 +124,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginPage), findsNothing);
-    expect(find.text('Total Employees'), findsOneWidget);
+    expect(find.text('Company Notices'), findsOneWidget);
   });
 
   testWidgets('remembers the session by default', (tester) async {

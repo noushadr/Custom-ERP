@@ -14,9 +14,13 @@ class AuthLoading extends AuthState {
 }
 
 class AuthAuthenticated extends AuthState {
-  const AuthAuthenticated(this.user);
+  const AuthAuthenticated(this.user, {this.impersonatedBy});
 
   final AuthUser user;
+
+  /// The Super Admin who is logged in as [user], if this session was
+  /// started via "Login as". Null for a normal session.
+  final AuthUser? impersonatedBy;
 }
 
 class AuthUnauthenticated extends AuthState {

@@ -243,7 +243,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     return Scaffold(
       appBar: AppBar(title: Text('Edit ${widget.employee.fullName}')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(24),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
@@ -289,7 +289,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     title: 'Organization',
                     child: Column(
@@ -500,7 +500,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     title: 'Contact',
                     child: Column(
@@ -566,7 +566,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     title: 'Bank Information',
                     child: Column(
@@ -614,7 +614,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     title: 'Emergency contact',
                     child: Column(
@@ -647,7 +647,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     child: TagInput(
                       label: 'Skills',
@@ -656,7 +656,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                       onChanged: (values) => setState(() => _skills = values),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   FormSection(
                     child: TagInput(
                       label: 'Certifications',
@@ -666,9 +666,9 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                           setState(() => _certifications = values),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   EmployeeDocumentsSection(employeeId: widget.employee.id),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: isSubmitting ? null : _submit,
                     child: isSubmitting

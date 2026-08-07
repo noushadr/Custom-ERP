@@ -69,6 +69,7 @@ describe('EmployeesService', () => {
       findAll: jest.fn(),
       findById: jest.fn(),
       findByUserId: jest.fn(),
+      findByReportingManagerId: jest.fn(),
       count: jest.fn(),
       save: jest.fn(),
     };
@@ -193,6 +194,32 @@ describe('EmployeesService', () => {
 
       expect(result.fullName).toBe('Jane Doe');
       expect(result.email).toBe('jane.doe@zeracreative.com');
+    });
+  });
+
+  describe('getMyDirectReports', () => {
+    it('throws NotFoundException when the caller has no employee profile', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await expect(service.getMyDirectReports('user-1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('returns the mapped direct reports for the caller', async () => {
+      const manager = buildEmployee({ id: 'manager-1' });
+      employeeRepository.findByUserId.mockResolvedValue(manager);
+      employeeRepository.findByReportingManagerId.mockResolvedValue([
+        buildEmployee({ id: 'report-1', firstName: 'Ravi' }),
+      ]);
+
+      const result = await service.getMyDirectReports('user-1');
+
+      expect(employeeRepository.findByReportingManagerId).toHaveBeenCalledWith(
+        'manager-1',
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].fullName).toBe('Ravi Doe');
     });
   });
 

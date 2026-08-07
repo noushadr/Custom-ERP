@@ -32,6 +32,13 @@ export class TypeOrmEmployeeRepository implements EmployeeRepository {
     });
   }
 
+  findByReportingManagerId(managerId: string): Promise<Employee[]> {
+    return this.repository.find({
+      where: { reportingManagerId: managerId },
+      order: { firstName: 'ASC' },
+    });
+  }
+
   count(): Promise<number> {
     return this.repository.count();
   }

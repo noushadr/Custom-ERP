@@ -18,72 +18,111 @@ final employeeRepositoryProvider = Provider<EmployeeRepository>(
   (ref) => EmployeeRepositoryImpl(ref.watch(employeeRemoteDataSourceProvider)),
 );
 
-final employeeListProvider = FutureProvider.autoDispose<List<Employee>>(
-  (ref) => ref.watch(employeeRepositoryProvider).getAll(),
-);
+// Every provider below re-watches authControllerProvider purely to create a
+// dependency edge: none of these auto-invalidate on their own when identity
+// changes (impersonate/returnToAdmin/logout), since the underlying Dio client
+// reads the current token per-request rather than being reconstructed. If
+// this were skipped, one identity's fetched-and-cached data (or NotFound
+// error) would silently keep showing after switching to another, since
+// nothing else in the dependency graph would prompt Riverpod to refetch.
 
-final myProfileProvider = FutureProvider.autoDispose<Employee>(
-  (ref) => ref.watch(employeeRepositoryProvider).getMe(),
-);
+final employeeListProvider = FutureProvider.autoDispose<List<Employee>>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getAll();
+});
 
-final employeeDetailProvider = FutureProvider.autoDispose.family<Employee, String>(
-  (ref, id) => ref.watch(employeeRepositoryProvider).getById(id),
-);
+final myProfileProvider = FutureProvider.autoDispose<Employee>((ref) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getMe();
+});
 
-final departmentsProvider = FutureProvider.autoDispose<List<NamedRef>>(
-  (ref) => ref.watch(employeeRepositoryProvider).getDepartments(),
-);
+final myDirectReportsProvider = FutureProvider.autoDispose<List<Employee>>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getMyDirectReports();
+});
+
+final employeeDetailProvider = FutureProvider.autoDispose
+    .family<Employee, String>((ref, id) {
+      ref.watch(authControllerProvider);
+      return ref.watch(employeeRepositoryProvider).getById(id);
+    });
+
+final departmentsProvider = FutureProvider.autoDispose<List<NamedRef>>((ref) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getDepartments();
+});
 
 final teamsProvider = FutureProvider.autoDispose.family<List<NamedRef>, String?>(
-  (ref, departmentId) =>
-      ref.watch(employeeRepositoryProvider).getTeams(departmentId: departmentId),
+  (ref, departmentId) {
+    ref.watch(authControllerProvider);
+    return ref
+        .watch(employeeRepositoryProvider)
+        .getTeams(departmentId: departmentId);
+  },
 );
 
-final myDocumentsProvider =
-    FutureProvider.autoDispose<List<EmployeeDocument>>(
-      (ref) => ref.watch(employeeRepositoryProvider).getMyDocuments(),
-    );
+final myDocumentsProvider = FutureProvider.autoDispose<List<EmployeeDocument>>(
+  (ref) {
+    ref.watch(authControllerProvider);
+    return ref.watch(employeeRepositoryProvider).getMyDocuments();
+  },
+);
 
 final employeeDocumentsProvider = FutureProvider.autoDispose
-    .family<List<EmployeeDocument>, String>(
-      (ref, employeeId) =>
-          ref.watch(employeeRepositoryProvider).getDocuments(employeeId),
-    );
+    .family<List<EmployeeDocument>, String>((ref, employeeId) {
+      ref.watch(authControllerProvider);
+      return ref.watch(employeeRepositoryProvider).getDocuments(employeeId);
+    });
 
-final myAuditLogProvider = FutureProvider.autoDispose<List<AuditLogEntry>>(
-  (ref) => ref.watch(employeeRepositoryProvider).getMyAuditLog(),
-);
+final myAuditLogProvider = FutureProvider.autoDispose<List<AuditLogEntry>>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getMyAuditLog();
+});
 
 final employeeAuditLogProvider = FutureProvider.autoDispose
-    .family<List<AuditLogEntry>, String>(
-      (ref, employeeId) =>
-          ref.watch(employeeRepositoryProvider).getAuditLog(employeeId),
-    );
+    .family<List<AuditLogEntry>, String>((ref, employeeId) {
+      ref.watch(authControllerProvider);
+      return ref.watch(employeeRepositoryProvider).getAuditLog(employeeId);
+    });
 
-final companyAuditLogProvider =
-    FutureProvider.autoDispose<List<AuditLogEntry>>(
-      (ref) => ref.watch(employeeRepositoryProvider).getCompanyAuditLog(),
-    );
+final companyAuditLogProvider = FutureProvider.autoDispose<List<AuditLogEntry>>(
+  (ref) {
+    ref.watch(authControllerProvider);
+    return ref.watch(employeeRepositoryProvider).getCompanyAuditLog();
+  },
+);
 
-final mySalaryHistoryProvider =
-    FutureProvider.autoDispose<List<SalaryRecord>>(
-      (ref) => ref.watch(employeeRepositoryProvider).getMySalaryHistory(),
-    );
+final mySalaryHistoryProvider = FutureProvider.autoDispose<List<SalaryRecord>>(
+  (ref) {
+    ref.watch(authControllerProvider);
+    return ref.watch(employeeRepositoryProvider).getMySalaryHistory();
+  },
+);
 
 final employeeSalaryHistoryProvider = FutureProvider.autoDispose
-    .family<List<SalaryRecord>, String>(
-      (ref, employeeId) =>
-          ref.watch(employeeRepositoryProvider).getSalaryHistory(employeeId),
-    );
+    .family<List<SalaryRecord>, String>((ref, employeeId) {
+      ref.watch(authControllerProvider);
+      return ref
+          .watch(employeeRepositoryProvider)
+          .getSalaryHistory(employeeId);
+    });
 
 final myEducationHistoryProvider =
-    FutureProvider.autoDispose<List<EducationRecord>>(
-      (ref) => ref.watch(employeeRepositoryProvider).getMyEducationHistory(),
-    );
+    FutureProvider.autoDispose<List<EducationRecord>>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(employeeRepositoryProvider).getMyEducationHistory();
+    });
 
 final employeeEducationHistoryProvider = FutureProvider.autoDispose
-    .family<List<EducationRecord>, String>(
-      (ref, employeeId) => ref
+    .family<List<EducationRecord>, String>((ref, employeeId) {
+      ref.watch(authControllerProvider);
+      return ref
           .watch(employeeRepositoryProvider)
-          .getEducationHistory(employeeId),
-    );
+          .getEducationHistory(employeeId);
+    });

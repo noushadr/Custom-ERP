@@ -42,7 +42,7 @@ class _EmployeeDirectoryPageState
     final canManage = authUser?.hasPermission('employees.manage') ?? false;
 
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(20),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1040),
@@ -109,7 +109,7 @@ class _EmployeeDirectoryPageState
                     ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               Expanded(
                 child: canRead
                     ? _DirectoryBody(
@@ -184,7 +184,7 @@ class _EmployeeList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const spacing = 16.0;
+    const spacing = 12.0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -262,7 +262,7 @@ class _EmployeeCard extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -272,9 +272,9 @@ class _EmployeeCard extends StatelessWidget {
                   EmployeeAvatar(
                     fullName: employee.fullName,
                     photoUrl: employee.profilePhotoUrl,
-                    radius: 24,
+                    radius: 22,
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,10 +300,10 @@ class _EmployeeCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Wrap(
-                spacing: 16,
-                runSpacing: 10,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   EmploymentStatusBadge(status: employee.employmentStatus),
                   WorkModeBadge(workMode: employee.workMode),

@@ -7,7 +7,7 @@
       "runtimeArgs": [
         "-NoProfile",
         "-Command",
-        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'C:\\Users\\Zera\\Desktop\\Zera ERP\\frontend'; flutter run -d web-server --web-port 5050 --release --dart-define-from-file=dev-auto-login.local.json"
+        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'C:\\Users\\Zera\\Desktop\\Zera ERP\\frontend'; flutter run -d web-server --web-port 5050 --release"
       ],
       "port": 5050
     }

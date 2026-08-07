@@ -17,6 +17,37 @@ class TokenStorage {
   String? _inMemoryRefreshToken;
   bool _rememberMe = true;
 
+  // Holds the admin's own session while impersonating another user, so
+  // "Return to admin" can restore it without asking them to log in again.
+  // In-memory only — deliberately doesn't survive an app restart, so a
+  // killed impersonation session always requires a fresh, explicit login.
+  String? _stashedAccessToken;
+  String? _stashedRefreshToken;
+  bool? _stashedRememberMe;
+
+  bool get hasStashedSession => _stashedAccessToken != null;
+
+  void stashCurrentSession() {
+    _stashedAccessToken = _inMemoryAccessToken;
+    _stashedRefreshToken = _inMemoryRefreshToken;
+    _stashedRememberMe = _rememberMe;
+  }
+
+  Future<void> restoreStashedSession() async {
+    final accessToken = _stashedAccessToken;
+    final refreshToken = _stashedRefreshToken;
+    final rememberMe = _stashedRememberMe;
+    _stashedAccessToken = null;
+    _stashedRefreshToken = null;
+    _stashedRememberMe = null;
+    if (accessToken == null || refreshToken == null) return;
+    await saveTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      rememberMe: rememberMe,
+    );
+  }
+
   Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
