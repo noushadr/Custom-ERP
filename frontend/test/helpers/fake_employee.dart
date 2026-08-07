@@ -1,7 +1,10 @@
 import 'dart:typed_data';
+import 'package:zera_erp/features/employee/domain/entities/audit_log_entry.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee_document.dart';
+import 'package:zera_erp/features/employee/domain/entities/education_record.dart';
 import 'package:zera_erp/features/employee/domain/entities/invite_employee_input.dart';
+import 'package:zera_erp/features/employee/domain/entities/salary_record.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_my_profile_input.dart';
 import 'package:zera_erp/features/employee/domain/repositories/employee_repository.dart';
@@ -45,6 +48,11 @@ Employee buildTestEmployee({
     emergencyContactPhone: null,
     emergencyContactRelation: null,
     address: null,
+    bankName: null,
+    accountTitle: null,
+    accountNumber: null,
+    branchCode: null,
+    iban: null,
     skills: const [],
     certifications: const [],
     profileCompletionPercentage: profileCompletionPercentage,
@@ -66,6 +74,9 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.uploadMyPhotoResult,
     this.uploadMyPhotoError,
     this.documents = const [],
+    this.auditLog = const [],
+    this.salaryHistory = const [],
+    this.educationHistory = const [],
   }) : me = me ?? buildTestEmployee();
 
   final List<Employee> employees;
@@ -81,6 +92,9 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final Employee? uploadMyPhotoResult;
   final Object? uploadMyPhotoError;
   final List<EmployeeDocument> documents;
+  final List<AuditLogEntry> auditLog;
+  final List<SalaryRecord> salaryHistory;
+  final List<EducationRecord> educationHistory;
 
   @override
   Future<List<Employee>> getAll() async => employees;
@@ -130,8 +144,9 @@ class FakeEmployeeRepository implements EmployeeRepository {
   @override
   Future<EmployeeDocument> uploadMyDocument(
     Uint8List bytes,
-    String fileName,
-  ) async => documents.first;
+    String fileName, {
+    DocumentType documentType = DocumentType.other,
+  }) async => documents.first;
 
   @override
   Future<void> deleteMyDocument(String documentId) async {}
@@ -144,9 +159,94 @@ class FakeEmployeeRepository implements EmployeeRepository {
   Future<EmployeeDocument> uploadDocument(
     String employeeId,
     Uint8List bytes,
-    String fileName,
-  ) async => documents.first;
+    String fileName, {
+    DocumentType documentType = DocumentType.other,
+  }) async => documents.first;
 
   @override
   Future<void> deleteDocument(String employeeId, String documentId) async {}
+
+  @override
+  Future<List<AuditLogEntry>> getMyAuditLog() async => auditLog;
+
+  @override
+  Future<List<AuditLogEntry>> getAuditLog(String employeeId) async =>
+      auditLog;
+
+  @override
+  Future<List<AuditLogEntry>> getCompanyAuditLog() async => auditLog;
+
+  @override
+  Future<List<SalaryRecord>> getMySalaryHistory() async => salaryHistory;
+
+  @override
+  Future<List<SalaryRecord>> getSalaryHistory(String employeeId) async =>
+      salaryHistory;
+
+  @override
+  Future<SalaryRecord> addSalaryRecord(
+    String employeeId, {
+    required double amount,
+    required String effectiveDate,
+    String? note,
+  }) async => salaryHistory.isNotEmpty
+      ? salaryHistory.last
+      : SalaryRecord(
+          id: 'salary-1',
+          amount: amount,
+          effectiveDate: effectiveDate,
+          note: note,
+          createdAt: DateTime(2026, 1, 1),
+        );
+
+  @override
+  Future<void> deleteSalaryRecord(String employeeId, String recordId) async {}
+
+  @override
+  Future<List<EducationRecord>> getMyEducationHistory() async =>
+      educationHistory;
+
+  @override
+  Future<List<EducationRecord>> getEducationHistory(String employeeId) async =>
+      educationHistory;
+
+  @override
+  Future<EducationRecord> addMyEducationRecord({
+    required String degree,
+    required String institution,
+    required int yearCompleted,
+  }) async => educationHistory.isNotEmpty
+      ? educationHistory.last
+      : EducationRecord(
+          id: 'education-1',
+          degree: degree,
+          institution: institution,
+          yearCompleted: yearCompleted,
+          createdAt: DateTime(2026, 1, 1),
+        );
+
+  @override
+  Future<EducationRecord> addEducationRecord(
+    String employeeId, {
+    required String degree,
+    required String institution,
+    required int yearCompleted,
+  }) async => educationHistory.isNotEmpty
+      ? educationHistory.last
+      : EducationRecord(
+          id: 'education-1',
+          degree: degree,
+          institution: institution,
+          yearCompleted: yearCompleted,
+          createdAt: DateTime(2026, 1, 1),
+        );
+
+  @override
+  Future<void> deleteMyEducationRecord(String recordId) async {}
+
+  @override
+  Future<void> deleteEducationRecord(
+    String employeeId,
+    String recordId,
+  ) async {}
 }

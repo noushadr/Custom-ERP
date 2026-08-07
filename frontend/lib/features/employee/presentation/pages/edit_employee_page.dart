@@ -55,6 +55,11 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
   late final TextEditingController _emergencyNameController;
   late final TextEditingController _emergencyPhoneController;
   late final TextEditingController _emergencyRelationController;
+  late final TextEditingController _bankNameController;
+  late final TextEditingController _accountTitleController;
+  late final TextEditingController _accountNumberController;
+  late final TextEditingController _branchCodeController;
+  late final TextEditingController _ibanController;
   String? _departmentId;
   String? _teamId;
   String? _reportingManagerId;
@@ -86,6 +91,11 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     _emergencyRelationController = TextEditingController(
       text: e.emergencyContactRelation,
     );
+    _bankNameController = TextEditingController(text: e.bankName);
+    _accountTitleController = TextEditingController(text: e.accountTitle);
+    _accountNumberController = TextEditingController(text: e.accountNumber);
+    _branchCodeController = TextEditingController(text: e.branchCode);
+    _ibanController = TextEditingController(text: e.iban);
     _departmentId = e.department?.id;
     _teamId = e.team?.id;
     _reportingManagerId = e.reportingManager?.id;
@@ -114,6 +124,11 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     _emergencyNameController.dispose();
     _emergencyPhoneController.dispose();
     _emergencyRelationController.dispose();
+    _bankNameController.dispose();
+    _accountTitleController.dispose();
+    _accountNumberController.dispose();
+    _branchCodeController.dispose();
+    _ibanController.dispose();
     super.dispose();
   }
 
@@ -181,6 +196,21 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
             address: _addressController.text.trim().isEmpty
                 ? null
                 : _addressController.text.trim(),
+            bankName: _bankNameController.text.trim().isEmpty
+                ? null
+                : _bankNameController.text.trim(),
+            accountTitle: _accountTitleController.text.trim().isEmpty
+                ? null
+                : _accountTitleController.text.trim(),
+            accountNumber: _accountNumberController.text.trim().isEmpty
+                ? null
+                : _accountNumberController.text.trim(),
+            branchCode: _branchCodeController.text.trim().isEmpty
+                ? null
+                : _branchCodeController.text.trim(),
+            iban: _ibanController.text.trim().isEmpty
+                ? null
+                : _ibanController.text.trim(),
             skills: _skills,
             certifications: _certifications,
           ),
@@ -196,6 +226,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
       if (next is EditEmployeeSuccess) {
         ref.invalidate(employeeListProvider);
         ref.invalidate(employeeDetailProvider(widget.employee.id));
+        ref.invalidate(employeeAuditLogProvider(widget.employee.id));
         Navigator.of(context).pop();
       } else if (next is EditEmployeeError) {
         ScaffoldMessenger.of(
@@ -531,6 +562,54 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                             labelText: 'Address',
                           ),
                           maxLines: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  FormSection(
+                    title: 'Bank Information',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          controller: _bankNameController,
+                          enabled: !isSubmitting,
+                          decoration: const InputDecoration(
+                            labelText: 'Bank name',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _accountTitleController,
+                          enabled: !isSubmitting,
+                          decoration: const InputDecoration(
+                            labelText: 'Account title',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _accountNumberController,
+                          enabled: !isSubmitting,
+                          decoration: const InputDecoration(
+                            labelText: 'Account number',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _branchCodeController,
+                          enabled: !isSubmitting,
+                          decoration: const InputDecoration(
+                            labelText: 'Branch code',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _ibanController,
+                          enabled: !isSubmitting,
+                          decoration: const InputDecoration(
+                            labelText: 'IBAN',
+                          ),
                         ),
                       ],
                     ),

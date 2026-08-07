@@ -12,8 +12,11 @@ import type { UserRepository } from '../../authentication/domain/repositories/us
 import { Employee } from '../domain/entities/employee.entity';
 import { EmploymentStatus } from '../domain/enums/employment-status.enum';
 import { EmploymentType } from '../domain/enums/employment-type.enum';
+import type { AuditLogRepository } from '../domain/repositories/audit-log-repository.interface';
 import type { DocumentRepository } from '../domain/repositories/document-repository.interface';
 import type { EmployeeRepository } from '../domain/repositories/employee-repository.interface';
+import type { EducationRecordRepository } from '../domain/repositories/education-record-repository.interface';
+import type { SalaryRecordRepository } from '../domain/repositories/salary-record-repository.interface';
 import { EmployeesService } from './employees.service';
 
 jest.mock('bcryptjs');
@@ -57,6 +60,9 @@ describe('EmployeesService', () => {
   let userRepository: jest.Mocked<UserRepository>;
   let roleRepository: jest.Mocked<RoleRepository>;
   let documentRepository: jest.Mocked<DocumentRepository>;
+  let auditLogRepository: jest.Mocked<AuditLogRepository>;
+  let salaryRecordRepository: jest.Mocked<SalaryRecordRepository>;
+  let educationRecordRepository: jest.Mocked<EducationRecordRepository>;
 
   beforeEach(() => {
     employeeRepository = {
@@ -81,12 +87,32 @@ describe('EmployeesService', () => {
       save: jest.fn(),
       remove: jest.fn(),
     };
+    auditLogRepository = {
+      findByEmployeeId: jest.fn(),
+      findAll: jest.fn(),
+      saveMany: jest.fn().mockResolvedValue([]),
+    };
+    salaryRecordRepository = {
+      findByEmployeeId: jest.fn().mockResolvedValue([]),
+      findById: jest.fn(),
+      save: jest.fn(),
+      remove: jest.fn(),
+    };
+    educationRecordRepository = {
+      findByEmployeeId: jest.fn().mockResolvedValue([]),
+      findById: jest.fn(),
+      save: jest.fn(),
+      remove: jest.fn(),
+    };
 
     service = new EmployeesService(
       employeeRepository,
       userRepository,
       roleRepository,
       documentRepository,
+      auditLogRepository,
+      salaryRecordRepository,
+      educationRecordRepository,
     );
 
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-temp-password');

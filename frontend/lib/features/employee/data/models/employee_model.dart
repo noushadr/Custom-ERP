@@ -29,6 +29,11 @@ class EmployeeModel extends Employee {
     required super.emergencyContactPhone,
     required super.emergencyContactRelation,
     required super.address,
+    required super.bankName,
+    required super.accountTitle,
+    required super.accountNumber,
+    required super.branchCode,
+    required super.iban,
     required super.skills,
     required super.certifications,
     required super.profileCompletionPercentage,
@@ -51,9 +56,9 @@ class EmployeeModel extends Employee {
     team: json['team'] == null
         ? null
         : NamedRef.fromJson(json['team'] as Map<String, dynamic>),
-    reportingManager: json['reportingManager'] == null
-        ? null
-        : NamedRef.fromJson(json['reportingManager'] as Map<String, dynamic>),
+    reportingManager: _resolveReportingManager(
+      json['reportingManager'] as Map<String, dynamic>?,
+    ),
     employmentType: json['employmentType'] as String,
     employmentStatus: json['employmentStatus'] as String,
     workMode: json['workMode'] as String,
@@ -66,6 +71,11 @@ class EmployeeModel extends Employee {
     emergencyContactPhone: json['emergencyContactPhone'] as String?,
     emergencyContactRelation: json['emergencyContactRelation'] as String?,
     address: json['address'] as String?,
+    bankName: json['bankName'] as String?,
+    accountTitle: json['accountTitle'] as String?,
+    accountNumber: json['accountNumber'] as String?,
+    branchCode: json['branchCode'] as String?,
+    iban: json['iban'] as String?,
     skills: (json['skills'] as List).cast<String>(),
     certifications: (json['certifications'] as List).cast<String>(),
     profileCompletionPercentage: json['profileCompletionPercentage'] as int,
@@ -78,5 +88,14 @@ class EmployeeModel extends Employee {
     if (url == null || url.isEmpty) return null;
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
     return '${AppConfig.apiBaseUrl}$url';
+  }
+
+  static NamedRef? _resolveReportingManager(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    return NamedRef(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      photoUrl: _resolvePhotoUrl(json['photoUrl'] as String?),
+    );
   }
 }

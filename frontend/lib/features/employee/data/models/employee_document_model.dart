@@ -4,6 +4,7 @@ import '../../domain/entities/employee_document.dart';
 class EmployeeDocumentModel extends EmployeeDocument {
   const EmployeeDocumentModel({
     required super.id,
+    required super.documentType,
     required super.fileName,
     required super.fileSize,
     required super.url,
@@ -13,6 +14,7 @@ class EmployeeDocumentModel extends EmployeeDocument {
   factory EmployeeDocumentModel.fromJson(Map<String, dynamic> json) =>
       EmployeeDocumentModel(
         id: json['id'] as String,
+        documentType: documentTypeFromJson(json['documentType'] as String),
         fileName: json['fileName'] as String,
         fileSize: json['fileSize'] as int,
         url: _resolveUrl(json['url'] as String),

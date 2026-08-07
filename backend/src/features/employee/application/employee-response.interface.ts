@@ -15,7 +15,11 @@ export interface EmployeeResponse {
   designation: string | null;
   department: { id: string; name: string } | null;
   team: { id: string; name: string } | null;
-  reportingManager: { id: string; name: string } | null;
+  reportingManager: {
+    id: string;
+    name: string;
+    photoUrl: string | null;
+  } | null;
   employmentType: EmploymentType;
   employmentStatus: EmploymentStatus;
   workMode: WorkMode;
@@ -28,6 +32,11 @@ export interface EmployeeResponse {
   emergencyContactPhone: string | null;
   emergencyContactRelation: string | null;
   address: string | null;
+  bankName: string | null;
+  accountTitle: string | null;
+  accountNumber: string | null;
+  branchCode: string | null;
+  iban: string | null;
   skills: string[];
   certifications: string[];
   profileCompletionPercentage: number;

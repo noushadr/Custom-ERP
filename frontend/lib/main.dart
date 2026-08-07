@@ -8,6 +8,7 @@ import 'features/authentication/application/auth_providers.dart';
 import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
+import 'features/employee/presentation/pages/dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
 
@@ -58,7 +59,6 @@ const _destinations = [
     label: 'Dashboard',
     icon: Icons.dashboard_outlined,
     selectedIcon: Icons.dashboard,
-    comingSoon: true,
   ),
   AppNavDestination(
     label: 'Employees',
@@ -103,10 +103,14 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
   ];
 
   Widget _sectionRootFor(AppNavDestination destination) {
-    if (destination.label == 'Employees') {
-      return const EmployeeDirectoryPage();
+    switch (destination.label) {
+      case 'Dashboard':
+        return const DashboardPage();
+      case 'Employees':
+        return const EmployeeDirectoryPage();
+      default:
+        return _ComingSoon(destination: destination);
     }
-    return _ComingSoon(destination: destination);
   }
 
   @override

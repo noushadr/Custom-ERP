@@ -28,6 +28,7 @@ frontend/ios/.symlinks/
 frontend/windows/flutter/ephemeral/
 frontend/macos/Flutter/ephemeral/
 frontend/linux/flutter/ephemeral/
+frontend/dev-auto-login.local.json
 
 # IDE
 .vscode/

@@ -6,6 +6,7 @@ export function toDocumentResponse(
 ): DocumentResponse {
   return {
     id: document.id,
+    documentType: document.documentType,
     fileName: document.fileName,
     fileSize: document.fileSize,
     url: document.filePath,

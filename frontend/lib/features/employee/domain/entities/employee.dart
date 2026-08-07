@@ -27,6 +27,11 @@ class Employee {
     required this.emergencyContactPhone,
     required this.emergencyContactRelation,
     required this.address,
+    required this.bankName,
+    required this.accountTitle,
+    required this.accountNumber,
+    required this.branchCode,
+    required this.iban,
     required this.skills,
     required this.certifications,
     required this.profileCompletionPercentage,
@@ -57,6 +62,11 @@ class Employee {
   final String? emergencyContactPhone;
   final String? emergencyContactRelation;
   final String? address;
+  final String? bankName;
+  final String? accountTitle;
+  final String? accountNumber;
+  final String? branchCode;
+  final String? iban;
   final List<String> skills;
   final List<String> certifications;
   final int profileCompletionPercentage;

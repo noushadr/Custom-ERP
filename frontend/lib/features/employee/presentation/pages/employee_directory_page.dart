@@ -8,6 +8,7 @@ import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_hierarchy_view.dart';
+import '../widgets/employee_status_badges.dart';
 import 'employee_profile_page.dart';
 import 'invite_employee_page.dart';
 
@@ -48,8 +49,6 @@ class _EmployeeDirectoryPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (canRead) const _EmployeeMetricsBar(),
-              if (canRead) const SizedBox(height: 20),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -122,105 +121,6 @@ class _EmployeeDirectoryPageState
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _EmployeeMetricsBar extends ConsumerWidget {
-  const _EmployeeMetricsBar();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final employeesAsync = ref.watch(employeeListProvider);
-
-    return employeesAsync.maybeWhen(
-      data: (employees) {
-        final active = employees
-            .where((e) => e.employmentStatus == 'active')
-            .length;
-        final resigned = employees
-            .where((e) => e.employmentStatus == 'resigned')
-            .length;
-        final onSite = employees.where((e) => e.workMode == 'on_site').length;
-        final remote = employees.where((e) => e.workMode == 'remote').length;
-        final hybrid = employees.where((e) => e.workMode == 'hybrid').length;
-
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _MetricCard(
-              label: 'Total Employees',
-              value: employees.length,
-              color: AppColors.primary,
-            ),
-            _MetricCard(
-              label: 'Active',
-              value: active,
-              color: AppColors.success,
-            ),
-            _MetricCard(
-              label: 'Resigned',
-              value: resigned,
-              color: AppColors.error,
-            ),
-            _MetricCard(
-              label: 'On-site',
-              value: onSite,
-              color: AppColors.textSecondary,
-            ),
-            _MetricCard(
-              label: 'Remote',
-              value: remote,
-              color: AppColors.textSecondary,
-            ),
-            _MetricCard(
-              label: 'Hybrid',
-              value: hybrid,
-              color: AppColors.textSecondary,
-            ),
-          ],
-        );
-      },
-      orElse: () => const SizedBox.shrink(),
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final int value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 150,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$value',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(color: color),
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-        ],
       ),
     );
   }
@@ -389,6 +289,12 @@ class _EmployeeCard extends StatelessWidget {
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: AppColors.textSecondary),
                           ),
+                        const SizedBox(height: 4),
+                        InfoChip(
+                          icon: Icons.badge_outlined,
+                          label: employee.employeeCode,
+                          maxWidth: contentWidth - 64,
+                        ),
                       ],
                     ),
                   ),
@@ -399,30 +305,25 @@ class _EmployeeCard extends StatelessWidget {
                 spacing: 16,
                 runSpacing: 10,
                 children: [
-                  _EmploymentStatusBadge(status: employee.employmentStatus),
-                  _WorkModeBadge(workMode: employee.workMode),
-                  _InfoChip(
-                    icon: Icons.badge_outlined,
-                    label: employee.employeeCode,
-                    maxWidth: contentWidth,
-                  ),
-                  _InfoChip(
+                  EmploymentStatusBadge(status: employee.employmentStatus),
+                  WorkModeBadge(workMode: employee.workMode),
+                  InfoChip(
                     icon: Icons.email_outlined,
                     label: employee.email,
                     maxWidth: contentWidth,
                   ),
-                  _InfoChip(
+                  InfoChip(
                     icon: Icons.phone_outlined,
                     label: employee.phoneNumber ?? '—',
                     maxWidth: contentWidth,
                   ),
-                  _InfoChip(
+                  InfoChip(
                     icon: Icons.event_outlined,
                     label:
                         'Joined ${formatDisplayDate(employee.joiningDate)}',
                     maxWidth: contentWidth,
                   ),
-                  _InfoChip(
+                  InfoChip(
                     icon: Icons.cake_outlined,
                     label: employee.dateOfBirth == null
                         ? '—'
@@ -434,109 +335,6 @@ class _EmployeeCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label, this.maxWidth});
-
-  final IconData icon;
-  final String label;
-  final double? maxWidth;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth ?? double.infinity),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: AppColors.textSecondary),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmploymentStatusBadge extends StatelessWidget {
-  const _EmploymentStatusBadge({required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (status) {
-      'active' => ('Active', AppColors.success),
-      'on_leave' => ('On Leave', AppColors.warning),
-      'notice_period' => ('Notice Period', AppColors.warning),
-      'resigned' => ('Resigned', AppColors.error),
-      'terminated' => ('Terminated', AppColors.error),
-      _ => (status, AppColors.textSecondary),
-    };
-
-    return _Badge(label: label, color: color);
-  }
-}
-
-class _WorkModeBadge extends StatelessWidget {
-  const _WorkModeBadge({required this.workMode});
-
-  final String workMode;
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, icon) = switch (workMode) {
-      'remote' => ('Remote', Icons.home_outlined),
-      'on_site' => ('On-site', Icons.apartment_outlined),
-      'hybrid' => ('Hybrid', Icons.sync_alt_outlined),
-      _ => (workMode, Icons.apartment_outlined),
-    };
-
-    return _Badge(label: label, color: AppColors.textSecondary, icon: icon);
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({required this.label, required this.color, this.icon});
-
-  final String label;
-  final Color color;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 13, color: color),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: color),
-          ),
-        ],
       ),
     );
   }

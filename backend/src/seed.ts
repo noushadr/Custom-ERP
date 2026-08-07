@@ -17,6 +17,7 @@ const DEFAULT_PERMISSIONS = [
   'employees.manage',
   'departments.manage',
   'teams.manage',
+  'audit.viewAll',
 ];
 
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [

@@ -24,6 +24,7 @@ export function toEmployeeResponse(employee: Employee): EmployeeResponse {
       ? {
           id: employee.reportingManager.id,
           name: `${employee.reportingManager.firstName} ${employee.reportingManager.lastName}`,
+          photoUrl: employee.reportingManager.profilePhotoUrl ?? null,
         }
       : null,
     employmentType: employee.employmentType,
@@ -38,6 +39,11 @@ export function toEmployeeResponse(employee: Employee): EmployeeResponse {
     emergencyContactPhone: employee.emergencyContactPhone ?? null,
     emergencyContactRelation: employee.emergencyContactRelation ?? null,
     address: employee.address ?? null,
+    bankName: employee.bankName ?? null,
+    accountTitle: employee.accountTitle ?? null,
+    accountNumber: employee.accountNumber ?? null,
+    branchCode: employee.branchCode ?? null,
+    iban: employee.iban ?? null,
     skills: employee.skills,
     certifications: employee.certifications,
     profileCompletionPercentage: calculateProfileCompletion(employee),

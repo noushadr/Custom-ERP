@@ -8,6 +8,12 @@ import '../../application/employee_providers.dart';
 import '../../domain/entities/employee_document.dart';
 import '../../domain/exceptions/employee_exception.dart';
 
+const _typedSlots = [
+  (type: DocumentType.contract, label: 'Contract'),
+  (type: DocumentType.resume, label: 'Resume'),
+  (type: DocumentType.cnic, label: 'CNIC / National ID'),
+];
+
 /// Lets the viewer attach files to an employee's record and lists what's
 /// already attached. Pass null for [employeeId] to manage the current
 /// user's own documents; pass an id (requires `employees.manage`) to manage
@@ -24,7 +30,7 @@ class EmployeeDocumentsSection extends ConsumerStatefulWidget {
 
 class _EmployeeDocumentsSectionState
     extends ConsumerState<EmployeeDocumentsSection> {
-  bool _isUploading = false;
+  DocumentType? _uploadingType;
   String? _deletingDocumentId;
 
   bool get _isSelf => widget.employeeId == null;
@@ -36,29 +42,36 @@ class _EmployeeDocumentsSectionState
     );
   }
 
-  Future<void> _pickAndUpload() async {
+  Future<void> _pickAndUpload(DocumentType documentType) async {
     final result = await FilePicker.platform.pickFiles(withData: true);
     final picked = result?.files.single;
     if (picked?.bytes == null) return;
 
-    setState(() => _isUploading = true);
+    setState(() => _uploadingType = documentType);
     try {
       final repository = ref.read(employeeRepositoryProvider);
       if (_isSelf) {
-        await repository.uploadMyDocument(picked!.bytes!, picked.name);
+        await repository.uploadMyDocument(
+          picked!.bytes!,
+          picked.name,
+          documentType: documentType,
+        );
         ref.invalidate(myDocumentsProvider);
+        ref.invalidate(myAuditLogProvider);
       } else {
         await repository.uploadDocument(
           widget.employeeId!,
           picked!.bytes!,
           picked.name,
+          documentType: documentType,
         );
         ref.invalidate(employeeDocumentsProvider(widget.employeeId!));
+        ref.invalidate(employeeAuditLogProvider(widget.employeeId!));
       }
     } on EmployeeException catch (error) {
       _showError(error.message);
     } finally {
-      if (mounted) setState(() => _isUploading = false);
+      if (mounted) setState(() => _uploadingType = null);
     }
   }
 
@@ -69,9 +82,11 @@ class _EmployeeDocumentsSectionState
       if (_isSelf) {
         await repository.deleteMyDocument(document.id);
         ref.invalidate(myDocumentsProvider);
+        ref.invalidate(myAuditLogProvider);
       } else {
         await repository.deleteDocument(widget.employeeId!, document.id);
         ref.invalidate(employeeDocumentsProvider(widget.employeeId!));
+        ref.invalidate(employeeAuditLogProvider(widget.employeeId!));
       }
     } on EmployeeException catch (error) {
       _showError(error.message);
@@ -94,50 +109,90 @@ class _EmployeeDocumentsSectionState
 
     return FormSection(
       title: 'Documents',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          documentsAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: LinearProgressIndicator(),
-            ),
-            error: (_, _) => const Text('Could not load documents.'),
-            data: (documents) => documents.isEmpty
-                ? Text(
-                    'No files attached yet.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  )
-                : Column(
-                    children: [
-                      for (final document in documents)
-                        _DocumentTile(
-                          document: document,
-                          isDeleting: _deletingDocumentId == document.id,
-                          onOpen: () => _open(document),
-                          onDelete: () => _delete(document),
-                        ),
-                    ],
+      child: documentsAsync.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: LinearProgressIndicator(),
+        ),
+        error: (_, _) => const Text('Could not load documents.'),
+        data: (documents) {
+          final byType = <DocumentType, EmployeeDocument>{};
+          final other = <EmployeeDocument>[];
+          for (final document in documents) {
+            if (document.documentType == DocumentType.other) {
+              other.add(document);
+            } else {
+              byType[document.documentType] = document;
+            }
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final slot in _typedSlots) ...[
+                _DocumentSlot(
+                  label: slot.label,
+                  document: byType[slot.type],
+                  isUploading: _uploadingType == slot.type,
+                  isDeleting:
+                      byType[slot.type] != null &&
+                      _deletingDocumentId == byType[slot.type]!.id,
+                  onOpen: byType[slot.type] == null
+                      ? null
+                      : () => _open(byType[slot.type]!),
+                  onUpload: () => _pickAndUpload(slot.type),
+                  onDelete: byType[slot.type] == null
+                      ? null
+                      : () => _delete(byType[slot.type]!),
+                ),
+                const SizedBox(height: 12),
+              ],
+              Text(
+                'Other documents',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (other.isEmpty)
+                Text(
+                  'No other files attached.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: _isUploading ? null : _pickAndUpload,
-              icon: _isUploading
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.attach_file, size: 18),
-              label: Text(_isUploading ? 'Uploading…' : 'Add file'),
-            ),
-          ),
-        ],
+                )
+              else
+                for (final document in other)
+                  _DocumentTile(
+                    document: document,
+                    isDeleting: _deletingDocumentId == document.id,
+                    onOpen: () => _open(document),
+                    onDelete: () => _delete(document),
+                  ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _uploadingType != null
+                      ? null
+                      : () => _pickAndUpload(DocumentType.other),
+                  icon: _uploadingType == DocumentType.other
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.attach_file, size: 18),
+                  label: Text(
+                    _uploadingType == DocumentType.other
+                        ? 'Uploading…'
+                        : 'Add file',
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -147,6 +202,95 @@ String _formatFileSize(int bytes) {
   if (bytes < 1024) return '$bytes B';
   if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+class _DocumentSlot extends StatelessWidget {
+  const _DocumentSlot({
+    required this.label,
+    required this.document,
+    required this.isUploading,
+    required this.isDeleting,
+    required this.onUpload,
+    this.onOpen,
+    this.onDelete,
+  });
+
+  final String label;
+  final EmployeeDocument? document;
+  final bool isUploading;
+  final bool isDeleting;
+  final VoidCallback onUpload;
+  final VoidCallback? onOpen;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.canvasBackground,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 2),
+                if (document == null)
+                  Text(
+                    'Not uploaded',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  )
+                else
+                  InkWell(
+                    onTap: onOpen,
+                    child: Text(
+                      '${document!.fileName} · ${_formatFileSize(document!.fileSize)}',
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (isUploading || isDeleting)
+            const Padding(
+              padding: EdgeInsets.all(8),
+              child: SizedBox(
+                height: 16,
+                width: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (document == null)
+            TextButton(onPressed: onUpload, child: const Text('Upload'))
+          else
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: onUpload,
+                  child: const Text('Replace'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Remove',
+                  onPressed: onDelete,
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DocumentTile extends StatelessWidget {

@@ -23,6 +23,11 @@ class UpdateEmployeeInput {
     this.emergencyContactPhone,
     this.emergencyContactRelation,
     this.address,
+    this.bankName,
+    this.accountTitle,
+    this.accountNumber,
+    this.branchCode,
+    this.iban,
     this.skills,
     this.certifications,
   });
@@ -45,6 +50,11 @@ class UpdateEmployeeInput {
   final String? emergencyContactPhone;
   final String? emergencyContactRelation;
   final String? address;
+  final String? bankName;
+  final String? accountTitle;
+  final String? accountNumber;
+  final String? branchCode;
+  final String? iban;
   final List<String>? skills;
   final List<String>? certifications;
 
@@ -67,6 +77,11 @@ class UpdateEmployeeInput {
     'emergencyContactPhone': emergencyContactPhone,
     'emergencyContactRelation': emergencyContactRelation,
     'address': address,
+    'bankName': bankName,
+    'accountTitle': accountTitle,
+    'accountNumber': accountNumber,
+    'branchCode': branchCode,
+    'iban': iban,
     'skills': skills,
     'certifications': certifications,
   };

@@ -100,6 +100,21 @@ export class Employee extends BaseEntity {
   @Column({ nullable: true })
   address?: string;
 
+  @Column({ nullable: true })
+  bankName?: string;
+
+  @Column({ nullable: true })
+  accountTitle?: string;
+
+  @Column({ nullable: true })
+  accountNumber?: string;
+
+  @Column({ nullable: true })
+  branchCode?: string;
+
+  @Column({ nullable: true })
+  iban?: string;
+
   @Column({ type: 'text', array: true, default: () => "'{}'" })
   skills: string[];
 

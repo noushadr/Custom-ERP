@@ -7,9 +7,11 @@ import 'package:zera_erp/features/authentication/application/auth_providers.dart
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/authentication/domain/exceptions/auth_exception.dart';
 import 'package:zera_erp/features/authentication/presentation/pages/login_page.dart';
+import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/main.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_employee.dart';
 
 class _DelayedAuthRepository extends FakeAuthRepository {
   _DelayedAuthRepository(this.completer);
@@ -26,7 +28,10 @@ class _DelayedAuthRepository extends FakeAuthRepository {
 
 Widget _appWith(FakeAuthRepository repository) {
   return ProviderScope(
-    overrides: [authRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      authRepositoryProvider.overrideWithValue(repository),
+      employeeRepositoryProvider.overrideWithValue(FakeEmployeeRepository()),
+    ],
     child: const ZeraApp(),
   );
 }
@@ -45,8 +50,6 @@ void main() {
     await tester.pumpWidget(_appWith(FakeAuthRepository()));
     await tester.pumpAndSettle();
 
-    // Fields are prefilled in debug builds (see LoginPage); clear them to
-    // exercise the empty-field validation this test targets.
     await tester.enterText(find.byKey(const Key('loginEmailField')), '');
     await tester.enterText(find.byKey(const Key('loginPasswordField')), '');
     await tester.tap(find.byKey(const Key('loginSubmitButton')));
@@ -115,7 +118,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginPage), findsNothing);
-    expect(find.text('Dashboard — coming soon'), findsOneWidget);
+    expect(find.text('Total Employees'), findsOneWidget);
   });
 
   testWidgets('remembers the session by default', (tester) async {

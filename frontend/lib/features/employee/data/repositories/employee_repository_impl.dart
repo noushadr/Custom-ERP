@@ -1,9 +1,12 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../../../shared/models/named_ref.dart';
+import '../../domain/entities/audit_log_entry.dart';
+import '../../domain/entities/education_record.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/employee_document.dart';
 import '../../domain/entities/invite_employee_input.dart';
+import '../../domain/entities/salary_record.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../../domain/exceptions/employee_exception.dart';
@@ -58,8 +61,15 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   @override
   Future<EmployeeDocument> uploadMyDocument(
     Uint8List bytes,
-    String fileName,
-  ) => _guard(() => _remoteDataSource.uploadMyDocument(bytes, fileName));
+    String fileName, {
+    DocumentType documentType = DocumentType.other,
+  }) => _guard(
+    () => _remoteDataSource.uploadMyDocument(
+      bytes,
+      fileName,
+      documentType: documentType,
+    ),
+  );
 
   @override
   Future<void> deleteMyDocument(String documentId) =>
@@ -73,14 +83,105 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   Future<EmployeeDocument> uploadDocument(
     String employeeId,
     Uint8List bytes,
-    String fileName,
-  ) => _guard(
-    () => _remoteDataSource.uploadDocument(employeeId, bytes, fileName),
+    String fileName, {
+    DocumentType documentType = DocumentType.other,
+  }) => _guard(
+    () => _remoteDataSource.uploadDocument(
+      employeeId,
+      bytes,
+      fileName,
+      documentType: documentType,
+    ),
   );
 
   @override
   Future<void> deleteDocument(String employeeId, String documentId) =>
       _guard(() => _remoteDataSource.deleteDocument(employeeId, documentId));
+
+  @override
+  Future<List<AuditLogEntry>> getMyAuditLog() =>
+      _guard(() => _remoteDataSource.getMyAuditLog());
+
+  @override
+  Future<List<AuditLogEntry>> getAuditLog(String employeeId) =>
+      _guard(() => _remoteDataSource.getAuditLog(employeeId));
+
+  @override
+  Future<List<AuditLogEntry>> getCompanyAuditLog() =>
+      _guard(() => _remoteDataSource.getCompanyAuditLog());
+
+  @override
+  Future<List<SalaryRecord>> getMySalaryHistory() =>
+      _guard(() => _remoteDataSource.getMySalaryHistory());
+
+  @override
+  Future<List<SalaryRecord>> getSalaryHistory(String employeeId) =>
+      _guard(() => _remoteDataSource.getSalaryHistory(employeeId));
+
+  @override
+  Future<SalaryRecord> addSalaryRecord(
+    String employeeId, {
+    required double amount,
+    required String effectiveDate,
+    String? note,
+  }) => _guard(
+    () => _remoteDataSource.addSalaryRecord(
+      employeeId,
+      amount: amount,
+      effectiveDate: effectiveDate,
+      note: note,
+    ),
+  );
+
+  @override
+  Future<void> deleteSalaryRecord(String employeeId, String recordId) =>
+      _guard(() => _remoteDataSource.deleteSalaryRecord(employeeId, recordId));
+
+  @override
+  Future<List<EducationRecord>> getMyEducationHistory() =>
+      _guard(() => _remoteDataSource.getMyEducationHistory());
+
+  @override
+  Future<List<EducationRecord>> getEducationHistory(String employeeId) =>
+      _guard(() => _remoteDataSource.getEducationHistory(employeeId));
+
+  @override
+  Future<EducationRecord> addMyEducationRecord({
+    required String degree,
+    required String institution,
+    required int yearCompleted,
+  }) => _guard(
+    () => _remoteDataSource.addMyEducationRecord(
+      degree: degree,
+      institution: institution,
+      yearCompleted: yearCompleted,
+    ),
+  );
+
+  @override
+  Future<EducationRecord> addEducationRecord(
+    String employeeId, {
+    required String degree,
+    required String institution,
+    required int yearCompleted,
+  }) => _guard(
+    () => _remoteDataSource.addEducationRecord(
+      employeeId,
+      degree: degree,
+      institution: institution,
+      yearCompleted: yearCompleted,
+    ),
+  );
+
+  @override
+  Future<void> deleteMyEducationRecord(String recordId) =>
+      _guard(() => _remoteDataSource.deleteMyEducationRecord(recordId));
+
+  @override
+  Future<void> deleteEducationRecord(String employeeId, String recordId) =>
+      _guard(
+        () => _remoteDataSource.deleteEducationRecord(employeeId, recordId),
+      );
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

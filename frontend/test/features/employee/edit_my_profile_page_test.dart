@@ -55,6 +55,7 @@ void main() {
       find.widgetWithText(TextFormField, 'Phone number'),
       '+15551234567',
     );
+    await tester.ensureVisible(find.text('Save changes'));
     await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 
@@ -79,6 +80,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Save changes'));
     await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 

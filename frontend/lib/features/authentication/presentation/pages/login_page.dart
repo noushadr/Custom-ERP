@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_footer.dart';
 import '../../../../shared/widgets/zera_logo.dart';
@@ -18,17 +18,30 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  // Prefilled in debug builds only, so the seeded admin account doesn't need
-  // retyping on every hot restart while the app is still under development.
-  // kDebugMode is false in release builds, so this never ships.
-  final _emailController = TextEditingController(
-    text: kDebugMode ? 'noushad@zeracreative.com' : null,
+  // Dev-only auto-login: active whenever credentials were supplied via
+  // --dart-define (see AppConfig.devAutoLoginEmail) rather than hardcoded
+  // here, so no real credentials ever end up in source/git. This is only
+  // ever set in this machine's local, uncommitted .claude/launch.json — the
+  // documented production build command never passes these defines, so
+  // release builds served in production are unaffected.
+  static bool get _devAutoLoginEnabled =>
+      AppConfig.devAutoLoginEmail.isNotEmpty;
+  late final _emailController = TextEditingController(
+    text: _devAutoLoginEnabled ? AppConfig.devAutoLoginEmail : null,
   );
-  final _passwordController = TextEditingController(
-    text: kDebugMode ? 'change_me_immediately' : null,
+  late final _passwordController = TextEditingController(
+    text: _devAutoLoginEnabled ? AppConfig.devAutoLoginPassword : null,
   );
   bool _obscurePassword = true;
   bool _rememberMe = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_devAutoLoginEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _submit(false));
+    }
+  }
 
   @override
   void dispose() {

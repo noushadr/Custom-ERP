@@ -41,6 +41,26 @@ export class UpdateMyProfileDto {
   address?: string;
 
   @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  accountTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  accountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  branchCode?: string;
+
+  @IsOptional()
+  @IsString()
+  iban?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   skills?: string[];

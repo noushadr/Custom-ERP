@@ -12,56 +12,34 @@ import { Department } from './features/departments/domain/entities/department.en
 import { Employee } from './features/employee/domain/entities/employee.entity';
 import { EmploymentStatus } from './features/employee/domain/enums/employment-status.enum';
 import { EmploymentType } from './features/employee/domain/enums/employment-type.enum';
-import { WorkMode } from './features/employee/domain/enums/work-mode.enum';
 import { generateTemporaryPassword } from './features/employee/application/generate-temporary-password.util';
 
-// Source data extracted from the Odoo "hr.employee" export the user provided
-// (Employee (hr.employee).xlsx, 27 rows, no Department/Manager columns).
-// See scratchpad xlsx-inspect/extract.js for how employees.json and
-// avatars/ were produced.
+// Source data extracted from the Odoo "hr.employee" export
+// (Employee (hr.employee).xlsx, 26 rows, has Department/Manager columns).
+// See scratchpad xlsx-inspect/inspect.js for how summary.json and images/
+// were produced.
 const SOURCE_DIR =
-  'C:\\Users\\noush\\AppData\\Local\\Temp\\claude\\C--Users-noush-OneDrive-Desktop-Zera-ERP\\386f88b2-6c7d-4e27-bc21-fd54e5c71039\\scratchpad\\xlsx-inspect';
+  'C:\\Users\\Zera\\AppData\\Local\\Temp\\claude\\C--Users-Zera-Desktop-Zera-ERP\\8d1aa31a-01f5-4952-aa7b-5444529e9984\\scratchpad\\xlsx-inspect';
 
 interface SourceRow {
   name: string;
+  phone: string | null;
+  department: string;
   jobTitle: string;
-  workEmail: string | null;
-  workPhone: string | null;
-  birthday: string | null;
-  contractStart: string | null;
-  tags: string;
-  workLocationName: string | null;
+  manager: string | null;
+  hasAvatar: boolean;
   imageFile: string | null;
+  imageBytes: number;
 }
 
-// The file has no joining date for the CEO; this is his known, real start
-// date (already on record before this import replaced the old data).
-const KNOWN_JOINING_DATES: Record<string, string> = {
-  'Noushad Ranani': '2016-06-02',
-};
+// Odoo's placeholder "no avatar" SVG icon is ~305 bytes; anything that small
+// isn't a real photo.
+const MIN_REAL_PHOTO_BYTES = 1000;
 
-function inferDepartment(jobTitle: string): string {
-  const title = jobTitle.toLowerCase();
-  if (title.includes('chief executive')) return 'Management';
-  if (title.includes('hr manager') || title.includes('hrbp')) return 'HR';
-  if (title.includes('seo')) return 'SEO';
-  if (title.includes('sales')) return 'Sales';
-  if (title.includes('web developer')) return 'Web Development';
-  if (title.includes('graphic designer')) return 'Design';
-  if (title.includes('content writer')) return 'Content';
-  if (
-    title.includes('digital marketing') ||
-    title.includes('social media marketing')
-  ) {
-    return 'Digital Marketing';
-  }
-  return 'General';
-}
-
-function inferRole(row: SourceRow): string {
-  if (row.tags === 'CEO') return 'Super Admin';
-  if (row.tags === 'HR') return 'HR/Manager';
-  if (/manager/i.test(row.jobTitle)) return 'Team Lead';
+function inferRole(row: SourceRow, managerNames: Set<string>): string {
+  if (/chief executive/i.test(row.jobTitle)) return 'Super Admin';
+  if (/hr manager/i.test(row.jobTitle)) return 'HR/Manager';
+  if (managerNames.has(row.name)) return 'Team Lead';
   return 'Employee';
 }
 
@@ -83,7 +61,7 @@ function buildEmailAssignments(names: string[]): Map<string, string> {
 
 async function run() {
   const rows = JSON.parse(
-    readFileSync(join(SOURCE_DIR, 'employees.json'), 'utf-8'),
+    readFileSync(join(SOURCE_DIR, 'summary.json'), 'utf-8'),
   ) as SourceRow[];
 
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -97,13 +75,11 @@ async function run() {
     getRepositoryToken(Employee),
   );
 
-  // --- Wipe the existing (stale/placeholder) employee roster ---
+  // --- Wipe the existing employee roster before re-importing ---
   const existingEmployees = await employeeRepo.find();
   if (existingEmployees.length > 0) {
     const userIds = existingEmployees.map((e) => e.userId);
     const existingIds = existingEmployees.map((e) => e.id);
-    // Clear self-referencing manager links first so the FK doesn't block
-    // deletion, then remove employees and their linked user accounts.
     await employeeRepo
       .createQueryBuilder()
       .update(Employee)
@@ -115,8 +91,14 @@ async function run() {
     console.log(`Removed ${existingEmployees.length} existing employees.`);
   }
 
-  // --- Departments, inferred from job title since the export has none ---
-  const departmentNames = [...new Set(rows.map((r) => inferDepartment(r.jobTitle)))];
+  // --- Departments ---
+  const departmentNames = [
+    ...new Set(
+      rows.map((r) =>
+        r.department === 'Managment' ? 'Management' : r.department,
+      ),
+    ),
+  ];
   const departmentsByName = new Map<string, Department>();
   for (const name of departmentNames) {
     let dept = await departmentRepo.findOne({ where: { name } });
@@ -125,7 +107,12 @@ async function run() {
   }
   console.log(`Departments ready: ${departmentNames.join(', ')}`);
 
-  const roleAssignments = new Map(rows.map((r) => [r.name, inferRole(r)]));
+  const managerNames = new Set(
+    rows.map((r) => r.manager).filter((m): m is string => !!m),
+  );
+  const roleAssignments = new Map(
+    rows.map((r) => [r.name, inferRole(r, managerNames)]),
+  );
   const emailAssignments = buildEmailAssignments(rows.map((r) => r.name));
 
   const rolesByName = new Map<string, Role>();
@@ -137,16 +124,19 @@ async function run() {
   const avatarsDir = join(__dirname, '..', 'uploads', 'avatars');
   mkdirSync(avatarsDir, { recursive: true });
 
-  const created: {
-    employeeCode: string;
-    name: string;
-    role: string;
-    email: string;
-    temporaryPassword: string;
-  }[] = [];
+  const employeesByName = new Map<
+    string,
+    {
+      employee: Employee;
+      email: string;
+      temporaryPassword: string;
+      role: string;
+    }
+  >();
 
   let sequence = 0;
 
+  // --- Pass 1: create User + Employee for every row (no manager link yet) ---
   for (const row of rows) {
     const email = emailAssignments.get(row.name)!;
     const roleName = roleAssignments.get(row.name)!;
@@ -168,50 +158,58 @@ async function run() {
     const employeeCode = `ZC-${String(sequence).padStart(5, '0')}`;
 
     let profilePhotoUrl: string | undefined;
-    if (row.imageFile) {
+    if (
+      row.hasAvatar &&
+      row.imageFile &&
+      row.imageBytes >= MIN_REAL_PHOTO_BYTES
+    ) {
       const ext = row.imageFile.split('.').pop();
       const destName = `${employeeCode}.${ext}`;
       copyFileSync(
-        join(SOURCE_DIR, 'avatars', row.imageFile),
+        join(SOURCE_DIR, 'images', row.imageFile),
         join(avatarsDir, destName),
       );
       profilePhotoUrl = `/uploads/avatars/${destName}`;
     }
 
-    const department = departmentsByName.get(inferDepartment(row.jobTitle))!;
-    const nameTokens = row.name.split(/\s+/);
+    const departmentName =
+      row.department === 'Managment' ? 'Management' : row.department;
+    const department = departmentsByName.get(departmentName)!;
 
-    await employeeRepo.save(
+    const employee = await employeeRepo.save(
       employeeRepo.create({
         userId: user.id,
         employeeCode,
-        firstName: nameTokens[0],
-        lastName: nameTokens.slice(1).join(' '),
+        firstName: row.name.split(/\s+/)[0],
+        lastName: row.name.split(/\s+/).slice(1).join(' '),
         designation: row.jobTitle,
         departmentId: department.id,
-        personalEmail: row.workEmail ?? undefined,
-        phoneNumber: row.workPhone ?? undefined,
-        dateOfBirth: row.birthday ?? undefined,
-        joiningDate:
-          row.contractStart ??
-          KNOWN_JOINING_DATES[row.name] ??
-          new Date().toISOString().slice(0, 10),
-        employmentType:
-          row.jobTitle === 'Intern'
-            ? EmploymentType.INTERN
-            : EmploymentType.FULL_TIME,
+        phoneNumber: row.phone ?? undefined,
+        joiningDate: new Date().toISOString().slice(0, 10),
+        employmentType: EmploymentType.FULL_TIME,
         employmentStatus: EmploymentStatus.ACTIVE,
-        workMode:
-          row.workLocationName === 'Remote'
-            ? WorkMode.REMOTE
-            : WorkMode.ON_SITE,
         profilePhotoUrl,
         skills: [],
         certifications: [],
       }),
     );
 
-    created.push({ employeeCode, name: row.name, role: roleName, email, temporaryPassword });
+    employeesByName.set(row.name, {
+      employee,
+      email,
+      temporaryPassword,
+      role: roleName,
+    });
+  }
+
+  // --- Pass 2: resolve "Manager" now that every employee exists ---
+  for (const row of rows) {
+    if (!row.manager) continue;
+    const managerEntry = employeesByName.get(row.manager);
+    const employeeEntry = employeesByName.get(row.name);
+    if (!managerEntry || !employeeEntry) continue;
+    employeeEntry.employee.reportingManagerId = managerEntry.employee.id;
+    await employeeRepo.save(employeeEntry.employee);
   }
 
   console.log('\nImport complete. Credentials (share securely, temporary):\n');
@@ -219,23 +217,19 @@ async function run() {
     'Employee Code'.padEnd(15) +
       'Name'.padEnd(24) +
       'Role'.padEnd(14) +
-      'Email'.padEnd(38) +
+      'Email'.padEnd(32) +
       'Temp Password',
   );
-  for (const entry of created) {
+  for (const row of rows) {
+    const entry = employeesByName.get(row.name)!;
     console.log(
-      entry.employeeCode.padEnd(15) +
-        entry.name.padEnd(24) +
+      entry.employee.employeeCode.padEnd(15) +
+        row.name.padEnd(24) +
         entry.role.padEnd(14) +
-        entry.email.padEnd(38) +
+        entry.email.padEnd(32) +
         entry.temporaryPassword,
     );
   }
-
-  console.log(
-    '\nNote: this export has no "reports to" data, so no manager relationships were set. ' +
-      'Assign reporting managers per person via Edit Employee.',
-  );
 
   await app.close();
 }
