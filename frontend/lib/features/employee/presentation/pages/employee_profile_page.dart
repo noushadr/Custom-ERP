@@ -9,12 +9,13 @@ import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
-import '../../domain/entities/employee_document.dart';
 import '../widgets/employee_audit_log_panel.dart';
 import '../widgets/employee_avatar.dart';
+import '../widgets/employee_documents_section.dart';
 import '../widgets/employee_education_section.dart';
 import '../widgets/employee_salary_history_section.dart';
 import '../widgets/employee_status_badges.dart';
+import '../widgets/employee_tags_section.dart';
 import 'edit_employee_page.dart';
 import 'edit_my_profile_page.dart';
 
@@ -255,7 +256,7 @@ class _ProfileBody extends ConsumerWidget {
             canManage: canManage,
           ),
           const SizedBox(height: 16),
-          _DocumentStatusSection(
+          EmployeeDocumentsSection(
             employeeId: isOwnProfile ? null : employee.id,
           ),
         ],
@@ -314,6 +315,20 @@ class _ProfileBody extends ConsumerWidget {
           EmployeeEducationSection(
             employeeId: isOwnProfile ? null : employee.id,
           ),
+          const SizedBox(height: 16),
+          EmployeeTagsSection(
+            title: 'Skills',
+            values: employee.skills,
+            field: EmployeeTagsField.skills,
+            employeeId: isOwnProfile ? null : employee.id,
+          ),
+          const SizedBox(height: 16),
+          EmployeeTagsSection(
+            title: 'Certifications',
+            values: employee.certifications,
+            field: EmployeeTagsField.certifications,
+            employeeId: isOwnProfile ? null : employee.id,
+          ),
         ],
         const SizedBox(height: 16),
         _Section(
@@ -332,13 +347,6 @@ class _ProfileBody extends ConsumerWidget {
               child: Text(employee.emergencyContactRelation ?? '—'),
             ),
           ],
-        ),
-        const SizedBox(height: 16),
-        _ChipsSection(title: 'Skills', values: employee.skills),
-        const SizedBox(height: 16),
-        _ChipsSection(
-          title: 'Certifications',
-          values: employee.certifications,
         ),
       ],
     );
@@ -578,133 +586,4 @@ class _LabeledRow extends StatelessWidget {
   }
 }
 
-const _requiredDocumentSlots = [
-  (type: DocumentType.contract, label: 'Contract'),
-  (type: DocumentType.resume, label: 'Resume'),
-  (type: DocumentType.cnic, label: 'CNIC / National ID'),
-];
 
-/// Shows Uploaded/Pending status for the Contract, Resume, and CNIC document
-/// slots. Pass null for [employeeId] to show the current user's own
-/// documents; pass an id (requires `employees.manage`) for another
-/// employee's.
-class _DocumentStatusSection extends ConsumerWidget {
-  const _DocumentStatusSection({this.employeeId});
-
-  final String? employeeId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final documentsAsync = employeeId == null
-        ? ref.watch(myDocumentsProvider)
-        : ref.watch(employeeDocumentsProvider(employeeId!));
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Documents', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 10),
-            documentsAsync.when(
-              loading: () => const LinearProgressIndicator(),
-              error: (_, _) => const Text('Could not load documents.'),
-              data: (documents) {
-                final uploadedTypes = documents
-                    .map((d) => d.documentType)
-                    .toSet();
-                return Column(
-                  children: [
-                    for (final slot in _requiredDocumentSlots)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 160,
-                              child: Text(
-                                slot.label,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ),
-                            Expanded(
-                              child: _DocumentStatusBadge(
-                                uploaded: uploadedTypes.contains(slot.type),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DocumentStatusBadge extends StatelessWidget {
-  const _DocumentStatusBadge({required this.uploaded});
-
-  final bool uploaded;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = uploaded ? AppColors.success : AppColors.warning;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        uploaded ? 'Uploaded' : 'Pending',
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}
-
-class _ChipsSection extends StatelessWidget {
-  const _ChipsSection({required this.title, required this.values});
-
-  final String title;
-  final List<String> values;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 10),
-            if (values.isEmpty)
-              Text(
-                '—',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final value in values) Chip(label: Text(value)),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

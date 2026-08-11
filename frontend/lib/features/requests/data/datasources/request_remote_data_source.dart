@@ -22,6 +22,27 @@ class RequestRemoteDataSource {
     return EmployeeRequestModel.fromJson(response.data!);
   }
 
+  Future<EmployeeRequestModel> submitItemRequest({
+    required String itemName,
+    required String purpose,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/requests/items',
+      data: {'itemName': itemName, 'purpose': purpose},
+    );
+    return EmployeeRequestModel.fromJson(response.data!);
+  }
+
+  Future<EmployeeRequestModel> submitProfileChangeRequest(
+    Map<String, dynamic> changes,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/requests/profile-changes',
+      data: changes,
+    );
+    return EmployeeRequestModel.fromJson(response.data!);
+  }
+
   Future<List<EmployeeRequestModel>> getMine() async {
     final response = await _dio.get<List<dynamic>>('/requests/mine');
     return response.data!

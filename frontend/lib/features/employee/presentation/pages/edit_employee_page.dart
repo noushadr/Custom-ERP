@@ -5,10 +5,8 @@ import '../../application/edit_employee_state.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/update_employee_input.dart';
-import '../widgets/employee_documents_section.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
-import '../../../../shared/widgets/tag_input.dart';
 
 const _employmentTypes = {
   'full_time': 'Full-time',
@@ -69,8 +67,6 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
   late DateTime _joiningDate;
   DateTime? _dateOfLeaving;
   DateTime? _dateOfBirth;
-  late List<String> _skills;
-  late List<String> _certifications;
 
   @override
   void initState() {
@@ -109,8 +105,6 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     _dateOfBirth = e.dateOfBirth == null
         ? null
         : DateTime.tryParse(e.dateOfBirth!);
-    _skills = List.of(e.skills);
-    _certifications = List.of(e.certifications);
   }
 
   @override
@@ -211,8 +205,6 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
             iban: _ibanController.text.trim().isEmpty
                 ? null
                 : _ibanController.text.trim(),
-            skills: _skills,
-            certifications: _certifications,
           ),
         );
   }
@@ -647,27 +639,6 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  FormSection(
-                    child: TagInput(
-                      label: 'Skills',
-                      values: _skills,
-                      enabled: !isSubmitting,
-                      onChanged: (values) => setState(() => _skills = values),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FormSection(
-                    child: TagInput(
-                      label: 'Certifications',
-                      values: _certifications,
-                      enabled: !isSubmitting,
-                      onChanged: (values) =>
-                          setState(() => _certifications = values),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  EmployeeDocumentsSection(employeeId: widget.employee.id),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: isSubmitting ? null : _submit,

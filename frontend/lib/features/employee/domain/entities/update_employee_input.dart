@@ -28,8 +28,6 @@ class UpdateEmployeeInput {
     this.accountNumber,
     this.branchCode,
     this.iban,
-    this.skills,
-    this.certifications,
   });
 
   final String? firstName;
@@ -55,8 +53,6 @@ class UpdateEmployeeInput {
   final String? accountNumber;
   final String? branchCode;
   final String? iban;
-  final List<String>? skills;
-  final List<String>? certifications;
 
   Map<String, dynamic> toJson() => {
     'firstName': firstName,
@@ -82,7 +78,5 @@ class UpdateEmployeeInput {
     'accountNumber': accountNumber,
     'branchCode': branchCode,
     'iban': iban,
-    'skills': skills,
-    'certifications': certifications,
   };
 }

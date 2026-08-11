@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { Employee } from '../../../employee/domain/entities/employee.entity';
+import { RequestKind } from '../enums/request-kind.enum';
 import { RequestStatus } from '../enums/request-status.enum';
 
 @Entity('employee_requests')
@@ -29,6 +30,21 @@ export class EmployeeRequest extends BaseEntity {
     default: RequestStatus.SUBMITTED,
   })
   status: RequestStatus;
+
+  /** GENERAL requests go through the reporting-manager step; PROFILE_CHANGE
+   * and ITEM requests skip it and are created directly as MANAGER_APPROVED. */
+  @Column({
+    type: 'enum',
+    enum: RequestKind,
+    default: RequestKind.GENERAL,
+  })
+  kind: RequestKind;
+
+  /** Kind-specific data needed to act on the request — currently only the
+   * proposed field values for a PROFILE_CHANGE, applied to the employee
+   * record when HR/Admin approves. Never exposed via the API response. */
+  @Column({ type: 'jsonb', nullable: true })
+  payload?: Record<string, unknown> | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   managerDecisionAt?: Date;

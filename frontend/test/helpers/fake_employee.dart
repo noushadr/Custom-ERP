@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:zera_erp/features/employee/domain/entities/audit_log_entry.dart';
+import 'package:zera_erp/features/employee/domain/entities/department.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee_document.dart';
 import 'package:zera_erp/features/employee/domain/entities/education_record.dart';
@@ -7,6 +8,7 @@ import 'package:zera_erp/features/employee/domain/entities/invite_employee_input
 import 'package:zera_erp/features/employee/domain/entities/salary_record.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_my_profile_input.dart';
+import 'package:zera_erp/features/employee/domain/entities/upcoming_birthday.dart';
 import 'package:zera_erp/features/employee/domain/repositories/employee_repository.dart';
 import 'package:zera_erp/shared/models/named_ref.dart';
 
@@ -21,6 +23,9 @@ Employee buildTestEmployee({
   NamedRef? department,
   NamedRef? reportingManager,
   int profileCompletionPercentage = 25,
+  List<String> skills = const [],
+  List<String> certifications = const [],
+  String joiningDate = '2026-01-01',
 }) {
   final parts = fullName.split(' ');
   return Employee(
@@ -41,7 +46,7 @@ Employee buildTestEmployee({
     employmentType: 'full_time',
     employmentStatus: 'active',
     workMode: 'on_site',
-    joiningDate: '2026-01-01',
+    joiningDate: joiningDate,
     dateOfLeaving: null,
     dateOfBirth: null,
     personalEmail: null,
@@ -55,8 +60,8 @@ Employee buildTestEmployee({
     accountNumber: null,
     branchCode: null,
     iban: null,
-    skills: const [],
-    certifications: const [],
+    skills: skills,
+    certifications: certifications,
     profileCompletionPercentage: profileCompletionPercentage,
   );
 }
@@ -81,12 +86,24 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.educationHistory = const [],
     this.directReports = const [],
     this.getMeError,
+    this.updateEmployeeTagsError,
+    this.createDepartmentResult,
+    this.createDepartmentError,
+    this.updateDepartmentResult,
+    this.updateDepartmentError,
+    this.setDepartmentArchivedResult,
+    this.setDepartmentArchivedError,
+    this.deleteDepartmentError,
+    this.upcomingBirthdays = const [],
+    this.getUpcomingBirthdaysError,
   }) : me = me ?? buildTestEmployee();
 
   final List<Employee> employees;
   final Employee me;
   final Object? getMeError;
-  final List<NamedRef> departments;
+  final List<UpcomingBirthday> upcomingBirthdays;
+  final Object? getUpcomingBirthdaysError;
+  final List<Department> departments;
   final List<NamedRef> teams;
   final ({Employee employee, String temporaryPassword})? inviteResult;
   final Object? inviteError;
@@ -94,6 +111,36 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final Object? updateMeError;
   final Employee? updateEmployeeResult;
   final Object? updateEmployeeError;
+  final Object? updateEmployeeTagsError;
+  final Department? createDepartmentResult;
+  final Object? createDepartmentError;
+  final Department? updateDepartmentResult;
+  final Object? updateDepartmentError;
+  final Department? setDepartmentArchivedResult;
+  final Object? setDepartmentArchivedError;
+  final Object? deleteDepartmentError;
+
+  /// The `id` passed to the most recent [updateEmployeeTags] call.
+  String? lastUpdateTagsId;
+  List<String>? lastUpdateTagsSkills;
+  List<String>? lastUpdateTagsCertifications;
+
+  /// The arguments passed to the most recent [createDepartment] call.
+  ({String name, String? description, String? headEmployeeId})?
+  lastCreateDepartmentInput;
+
+  /// The `id` and arguments passed to the most recent [updateDepartment] call.
+  ({String id, String name, String? description, String? headEmployeeId})?
+  lastUpdateDepartmentInput;
+
+  /// The arguments passed to the most recent [setDepartmentArchived] call.
+  ({String id, bool isArchived})? lastSetDepartmentArchivedInput;
+
+  /// The `id` passed to the most recent [deleteDepartment] call.
+  String? lastDeleteDepartmentId;
+
+  /// The input passed to the most recent [updateMe] call.
+  UpdateMyProfileInput? lastUpdateMeInput;
   final Employee? uploadMyPhotoResult;
   final Object? uploadMyPhotoError;
   final List<EmployeeDocument> documents;
@@ -116,10 +163,17 @@ class FakeEmployeeRepository implements EmployeeRepository {
   }
 
   @override
+  Future<List<UpcomingBirthday>> getUpcomingBirthdays() async {
+    if (getUpcomingBirthdaysError != null) throw getUpcomingBirthdaysError!;
+    return upcomingBirthdays;
+  }
+
+  @override
   Future<List<Employee>> getMyDirectReports() async => directReports;
 
   @override
   Future<Employee> updateMe(UpdateMyProfileInput input) async {
+    lastUpdateMeInput = input;
     if (updateMeError != null) throw updateMeError!;
     return updateMeResult ?? me;
   }
@@ -127,6 +181,19 @@ class FakeEmployeeRepository implements EmployeeRepository {
   @override
   Future<Employee> updateEmployee(String id, UpdateEmployeeInput input) async {
     if (updateEmployeeError != null) throw updateEmployeeError!;
+    return updateEmployeeResult ?? me;
+  }
+
+  @override
+  Future<Employee> updateEmployeeTags(
+    String id, {
+    List<String>? skills,
+    List<String>? certifications,
+  }) async {
+    lastUpdateTagsId = id;
+    lastUpdateTagsSkills = skills;
+    lastUpdateTagsCertifications = certifications;
+    if (updateEmployeeTagsError != null) throw updateEmployeeTagsError!;
     return updateEmployeeResult ?? me;
   }
 
@@ -145,7 +212,74 @@ class FakeEmployeeRepository implements EmployeeRepository {
   }
 
   @override
-  Future<List<NamedRef>> getDepartments() async => departments;
+  Future<List<Department>> getDepartments({
+    bool includeArchived = false,
+  }) async => includeArchived
+      ? departments
+      : departments.where((d) => !d.isArchived).toList();
+
+  @override
+  Future<Department> createDepartment({
+    required String name,
+    String? description,
+    String? headEmployeeId,
+  }) async {
+    lastCreateDepartmentInput = (
+      name: name,
+      description: description,
+      headEmployeeId: headEmployeeId,
+    );
+    if (createDepartmentError != null) throw createDepartmentError!;
+    return createDepartmentResult ??
+        Department(
+          id: 'department-1',
+          name: name,
+          description: description,
+          headEmployeeId: headEmployeeId,
+        );
+  }
+
+  @override
+  Future<Department> updateDepartment(
+    String id, {
+    required String name,
+    String? description,
+    String? headEmployeeId,
+  }) async {
+    lastUpdateDepartmentInput = (
+      id: id,
+      name: name,
+      description: description,
+      headEmployeeId: headEmployeeId,
+    );
+    if (updateDepartmentError != null) throw updateDepartmentError!;
+    return updateDepartmentResult ??
+        Department(
+          id: id,
+          name: name,
+          description: description,
+          headEmployeeId: headEmployeeId,
+        );
+  }
+
+  @override
+  Future<Department> setDepartmentArchived(
+    String id, {
+    required bool isArchived,
+  }) async {
+    lastSetDepartmentArchivedInput = (id: id, isArchived: isArchived);
+    if (setDepartmentArchivedError != null) {
+      throw setDepartmentArchivedError!;
+    }
+    return setDepartmentArchivedResult ??
+        Department(id: id, name: 'Department', isArchived: isArchived);
+  }
+
+  @override
+  Future<void> deleteDepartment(String id) async {
+    lastDeleteDepartmentId = id;
+    if (deleteDepartmentError != null) throw deleteDepartmentError!;
+  }
 
   @override
   Future<List<NamedRef>> getTeams({String? departmentId}) async => teams;

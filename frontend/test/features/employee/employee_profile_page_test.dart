@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/presentation/pages/employee_profile_page.dart';
+import 'package:zera_erp/shared/widgets/tag_input.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
@@ -370,6 +371,156 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(authRepository.lastResetPasswordUserId, isNull);
+    },
+  );
+
+  testWidgets(
+    'shows Skills and Certifications as inline editors on your own profile',
+    (tester) async {
+      final me = buildTestEmployee(skills: const ['Dart']);
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
+
+      await tester.pumpWidget(
+        _app(viewer: viewer, repository: FakeEmployeeRepository(me: me)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Skills'), findsOneWidget);
+      expect(find.text('Certifications'), findsOneWidget);
+      expect(find.text('Dart'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "hides Skills and Certifications for someone else's profile when the "
+    'viewer cannot manage employees',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'user-3',
+        email: 'coworker@zeracreative.com',
+        role: 'Employee',
+        permissions: const ['employees.read'],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Skills'), findsNothing);
+      expect(find.text('Certifications'), findsNothing);
+    },
+  );
+
+  testWidgets('adding a skill on your own profile saves via updateMe', (
+    tester,
+  ) async {
+    final me = buildTestEmployee();
+    final viewer = AuthUser(
+      id: 'user-1',
+      email: 'jane.doe@zeracreative.com',
+      role: 'Employee',
+      permissions: const [],
+    );
+    final repository = FakeEmployeeRepository(me: me);
+
+    await tester.pumpWidget(
+      _app(viewer: viewer, repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    final skillsInput = find.descendant(
+      of: find.byType(TagInput).at(0),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(skillsInput, 'Flutter');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUpdateMeInput?.skills, ['Flutter']);
+    expect(repository.lastUpdateMeInput?.certifications, isNull);
+  });
+
+  testWidgets(
+    'removing a skill on your own profile saves the remaining list via updateMe',
+    (tester) async {
+      final me = buildTestEmployee(skills: const ['Dart', 'Flutter']);
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
+      final repository = FakeEmployeeRepository(me: me);
+
+      await tester.pumpWidget(
+        _app(viewer: viewer, repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      final dartChipDelete = find.descendant(
+        of: find.widgetWithText(Chip, 'Dart'),
+        matching: find.byIcon(Icons.cancel),
+      );
+      await tester.ensureVisible(dartChipDelete);
+      await tester.tap(dartChipDelete);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdateMeInput?.skills, ['Flutter']);
+    },
+  );
+
+  testWidgets(
+    "adding a certification on someone else's profile only touches "
+    'certifications',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.read', 'employees.manage'],
+      );
+      final repository = FakeEmployeeRepository(employees: [other]);
+
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: repository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final certificationsInput = find.descendant(
+        of: find.byType(TagInput).at(1),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(certificationsInput, 'PMP');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdateTagsId, 'employee-2');
+      expect(repository.lastUpdateTagsCertifications, ['PMP']);
+      expect(repository.lastUpdateTagsSkills, isNull);
     },
   );
 }

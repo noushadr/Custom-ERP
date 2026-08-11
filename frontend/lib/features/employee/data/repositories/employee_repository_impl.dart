@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/audit_log_entry.dart';
+import '../../domain/entities/department.dart';
 import '../../domain/entities/education_record.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/employee_document.dart';
@@ -9,6 +10,7 @@ import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/salary_record.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
+import '../../domain/entities/upcoming_birthday.dart';
 import '../../domain/exceptions/employee_exception.dart';
 import '../../domain/repositories/employee_repository.dart';
 import '../datasources/employee_remote_data_source.dart';
@@ -30,6 +32,10 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   Future<Employee> getMe() => _guard(() => _remoteDataSource.getMe());
 
   @override
+  Future<List<UpcomingBirthday>> getUpcomingBirthdays() =>
+      _guard(() => _remoteDataSource.getUpcomingBirthdays());
+
+  @override
   Future<List<Employee>> getMyDirectReports() =>
       _guard(() => _remoteDataSource.getMyDirectReports());
 
@@ -42,6 +48,19 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(() => _remoteDataSource.updateEmployee(id, input));
 
   @override
+  Future<Employee> updateEmployeeTags(
+    String id, {
+    List<String>? skills,
+    List<String>? certifications,
+  }) => _guard(
+    () => _remoteDataSource.updateEmployeeTags(
+      id,
+      skills: skills,
+      certifications: certifications,
+    ),
+  );
+
+  @override
   Future<Employee> uploadMyPhoto(Uint8List bytes, String fileName) =>
       _guard(() => _remoteDataSource.uploadMyPhoto(bytes, fileName));
 
@@ -51,8 +70,51 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   ) => _guard(() => _remoteDataSource.invite(input));
 
   @override
-  Future<List<NamedRef>> getDepartments() =>
-      _guard(() => _remoteDataSource.getDepartments());
+  Future<List<Department>> getDepartments({bool includeArchived = false}) =>
+      _guard(
+        () =>
+            _remoteDataSource.getDepartments(includeArchived: includeArchived),
+      );
+
+  @override
+  Future<Department> createDepartment({
+    required String name,
+    String? description,
+    String? headEmployeeId,
+  }) => _guard(
+    () => _remoteDataSource.createDepartment(
+      name: name,
+      description: description,
+      headEmployeeId: headEmployeeId,
+    ),
+  );
+
+  @override
+  Future<Department> updateDepartment(
+    String id, {
+    required String name,
+    String? description,
+    String? headEmployeeId,
+  }) => _guard(
+    () => _remoteDataSource.updateDepartment(
+      id,
+      name: name,
+      description: description,
+      headEmployeeId: headEmployeeId,
+    ),
+  );
+
+  @override
+  Future<Department> setDepartmentArchived(
+    String id, {
+    required bool isArchived,
+  }) => _guard(
+    () => _remoteDataSource.setDepartmentArchived(id, isArchived: isArchived),
+  );
+
+  @override
+  Future<void> deleteDepartment(String id) =>
+      _guard(() => _remoteDataSource.deleteDepartment(id));
 
   @override
   Future<List<NamedRef>> getTeams({String? departmentId}) =>
@@ -209,7 +271,13 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
     }
     if (status == 403) return "You don't have permission to do that.";
     if (status == 404) return 'Not found.';
-    if (status == 409) return 'A user with this email already exists.';
+    if (status == 409) {
+      final data = error.response?.data;
+      if (data is Map && data['message'] is String) {
+        return data['message'] as String;
+      }
+      return 'This conflicts with existing data.';
+    }
     if (error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout) {
       return 'Could not reach the server. Check your connection.';

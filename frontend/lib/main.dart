@@ -13,6 +13,8 @@ import 'features/employee/presentation/pages/admin_dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
+import 'features/employee/presentation/widgets/notification_bell.dart';
+import 'features/requests/presentation/pages/requests_page.dart';
 
 void main() {
   runApp(const ProviderScope(child: ZeraApp()));
@@ -78,13 +80,6 @@ const _allDestinations = [
     label: 'Requests',
     icon: Icons.assignment_outlined,
     selectedIcon: Icons.assignment,
-    comingSoon: true,
-  ),
-  AppNavDestination(
-    label: 'Notifications',
-    icon: Icons.notifications_outlined,
-    selectedIcon: Icons.notifications,
-    comingSoon: true,
   ),
   AppNavDestination(
     label: 'Settings',
@@ -94,11 +89,14 @@ const _allDestinations = [
   ),
 ];
 
-// Only Super Admin and HR/Manager see these in the nav. Everyone else works
-// entirely from User Dashboard, Employees, and Settings stay admin/HR-only.
-// Super Admin/HR-Manager can see both dashboards; everyone else sees only
-// User Dashboard.
+// Only Super Admin and HR/Manager see these in the nav; everyone else works
+// entirely from User Dashboard and Requests. Notifications live in the top
+// bar (see NotificationBell), not the nav.
 const _adminOnlyLabels = {'Admin Dashboard', 'Employees', 'Settings'};
+
+// Hidden from Super Admin/HR/Manager — they use Admin Dashboard instead.
+// Visible to everyone else.
+const _nonAdminOnlyLabels = {'User Dashboard'};
 
 bool _isAdminOrHr(WidgetRef ref) {
   final authState = ref.watch(authControllerProvider);
@@ -136,9 +134,16 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const UserDashboardPage();
       case 'Employees':
         return const EmployeeDirectoryPage();
+      case 'Requests':
+        return const RequestsPage();
       default:
         return _ComingSoon(destination: destination);
     }
+  }
+
+  void _goToDestination(String label) {
+    final index = _allDestinations.indexWhere((d) => d.label == label);
+    if (index != -1) setState(() => _selectedIndex = index);
   }
 
   @override
@@ -147,7 +152,9 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
 
     final visibleOriginalIndices = [
       for (var i = 0; i < _allDestinations.length; i++)
-        if (isAdminOrHr || !_adminOnlyLabels.contains(_allDestinations[i].label))
+        if (isAdminOrHr
+            ? !_nonAdminOnlyLabels.contains(_allDestinations[i].label)
+            : !_adminOnlyLabels.contains(_allDestinations[i].label))
           i,
     ];
     final visibleDestinations = [
@@ -171,6 +178,13 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
               () => _selectedIndex = visibleOriginalIndices[visiblePosition],
             ),
             actions: [
+              NotificationBell(
+                onNavigate: (target) => _goToDestination(switch (target) {
+                  NotificationLinkTarget.adminDashboard => 'Admin Dashboard',
+                  NotificationLinkTarget.userDashboard => 'User Dashboard',
+                }),
+              ),
+              const SizedBox(width: 16),
               UserMenu(
                 onProfileTap: () => _sectionNavigatorKeys[effectiveIndex]
                     .currentState!

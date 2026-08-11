@@ -13,4 +13,7 @@ export class Department extends BaseEntity {
    * circular dependency with the employee feature; resolved by id when needed. */
   @Column({ nullable: true })
   headEmployeeId?: string;
+
+  @Column({ default: false })
+  isArchived: boolean;
 }

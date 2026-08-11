@@ -7,9 +7,20 @@
       "runtimeArgs": [
         "-NoProfile",
         "-Command",
-        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'C:\\Users\\Zera\\Desktop\\Zera ERP\\frontend'; flutter run -d web-server --web-port 5050 --release"
+        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'C:\\Users\\Zera\\Desktop\\Zera ERP\\frontend'; flutter run -d web-server --web-port $env:PORT --release"
       ],
-      "port": 5050
+      "port": 5050,
+      "autoPort": true
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'C:\\Users\\Zera\\Desktop\\Zera ERP\\backend'; npm.cmd run start:dev"
+      ],
+      "port": 3000
     }
   ]
 }

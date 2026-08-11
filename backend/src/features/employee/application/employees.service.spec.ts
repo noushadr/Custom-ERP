@@ -21,6 +21,16 @@ import { EmployeesService } from './employees.service';
 
 jest.mock('bcryptjs');
 
+/** ISO 'YYYY-MM-DD' with an arbitrary birth year but the month/day that
+ * falls [offsetDays] from today — the service only compares month/day. */
+function isoDobInDays(offsetDays: number): string {
+  const target = new Date();
+  target.setDate(target.getDate() + offsetDays);
+  const month = String(target.getMonth() + 1).padStart(2, '0');
+  const day = String(target.getDate()).padStart(2, '0');
+  return `1990-${month}-${day}`;
+}
+
 function buildRole(name = 'Employee'): Role {
   return { id: `role-${name}`, name, permissions: [] } as Role;
 }
@@ -223,6 +233,73 @@ describe('EmployeesService', () => {
     });
   });
 
+  describe('getUpcomingBirthdays', () => {
+    it('returns employees within the window, soonest first', async () => {
+      const soon = buildEmployee({
+        id: 'employee-soon',
+        firstName: 'Soon',
+        dateOfBirth: isoDobInDays(3),
+      });
+      const soonest = buildEmployee({
+        id: 'employee-soonest',
+        firstName: 'Soonest',
+        dateOfBirth: isoDobInDays(1),
+      });
+      const tooFarAway = buildEmployee({
+        id: 'employee-far',
+        firstName: 'Far',
+        dateOfBirth: isoDobInDays(30),
+      });
+      const noDob = buildEmployee({
+        id: 'employee-no-dob',
+        firstName: 'NoDob',
+        dateOfBirth: undefined,
+      });
+      employeeRepository.findAll.mockResolvedValue([
+        soon,
+        soonest,
+        tooFarAway,
+        noDob,
+      ]);
+
+      const result = await service.getUpcomingBirthdays(7);
+
+      expect(result.map((r) => r.employeeId)).toEqual([
+        'employee-soonest',
+        'employee-soon',
+      ]);
+      expect(result[0].daysUntil).toBe(1);
+      expect(result[1].daysUntil).toBe(3);
+    });
+
+    it('wraps a birthday that already passed this year to next year', async () => {
+      // "Passed a moment ago" (-1 day) should resolve to the occurrence
+      // ~364-366 days out next year, not a negative/near-zero count.
+      const employee = buildEmployee({
+        id: 'employee-passed',
+        dateOfBirth: isoDobInDays(-1),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+
+      const result = await service.getUpcomingBirthdays(7);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('includes a birthday that falls today', async () => {
+      const employee = buildEmployee({
+        id: 'employee-today',
+        dateOfBirth: isoDobInDays(0),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+
+      const result = await service.getUpcomingBirthdays(7);
+
+      expect(result.map((r) => r.employeeId)).toEqual(['employee-today']);
+      expect(result[0].daysUntil).toBe(0);
+    });
+  });
+
   describe('updateSelf', () => {
     it('throws NotFoundException when the caller has no employee profile', async () => {
       employeeRepository.findByUserId.mockResolvedValue(null);
@@ -248,6 +325,67 @@ describe('EmployeesService', () => {
         expect.objectContaining({ phoneNumber: '+1234567890' }),
       );
       expect(result.phoneNumber).toBe('+1234567890');
+    });
+  });
+
+  describe('previewProfileChanges', () => {
+    it('throws NotFoundException when the employee does not exist', async () => {
+      employeeRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.previewProfileChanges('employee-1', { phoneNumber: '123' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('diffs the proposed change without saving anything', async () => {
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ phoneNumber: '111' }),
+      );
+
+      const diffs = await service.previewProfileChanges('employee-1', {
+        phoneNumber: '222',
+      });
+
+      expect(diffs).toEqual([
+        { fieldLabel: 'Phone Number', oldValue: '111', newValue: '222' },
+      ]);
+      expect(employeeRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applyApprovedProfileChange', () => {
+    it('throws NotFoundException when the employee does not exist', async () => {
+      employeeRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.applyApprovedProfileChange('employee-1', {
+          phoneNumber: '123',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('applies the change and records an audit entry attributed to the employee', async () => {
+      const existing = buildEmployee();
+      employeeRepository.findById
+        .mockResolvedValueOnce(existing)
+        .mockResolvedValueOnce(buildEmployee({ phoneNumber: '+1234567890' }));
+      employeeRepository.save.mockResolvedValue(existing);
+
+      await service.applyApprovedProfileChange('employee-1', {
+        phoneNumber: '+1234567890',
+      });
+
+      expect(employeeRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ phoneNumber: '+1234567890' }),
+      );
+      expect(auditLogRepository.saveMany).toHaveBeenCalledWith([
+        expect.objectContaining({
+          actorUserId: 'user-1',
+          actorName: 'Jane Doe',
+          fieldLabel: 'Phone Number',
+          newValue: '+1234567890',
+        }),
+      ]);
     });
   });
 });

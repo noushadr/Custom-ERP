@@ -36,6 +36,9 @@ class FakeRequestRepository implements RequestRepository {
   final Object? decisionError;
 
   String? lastSubmittedSubject;
+  String? lastItemName;
+  String? lastItemPurpose;
+  Map<String, dynamic>? lastProfileChanges;
   String? lastDecidedRequestId;
   bool? lastDecisionApproved;
 
@@ -48,6 +51,32 @@ class FakeRequestRepository implements RequestRepository {
     lastSubmittedSubject = subject;
     if (submitError != null) throw submitError!;
     return buildTestRequest(subject: subject, description: description);
+  }
+
+  @override
+  Future<EmployeeRequest> submitItemRequest({
+    required String itemName,
+    required String purpose,
+  }) async {
+    lastItemName = itemName;
+    lastItemPurpose = purpose;
+    if (submitError != null) throw submitError!;
+    return buildTestRequest(
+      subject: 'Item request: $itemName',
+      description: purpose,
+    );
+  }
+
+  @override
+  Future<EmployeeRequest> submitProfileChangeRequest(
+    Map<String, dynamic> changes,
+  ) async {
+    lastProfileChanges = changes;
+    if (submitError != null) throw submitError!;
+    return buildTestRequest(
+      subject: 'Profile update request',
+      description: 'Pending changes',
+    );
   }
 
   @override

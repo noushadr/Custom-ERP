@@ -65,10 +65,10 @@ void main() {
   ) async {
     await tester.pumpWidget(_authenticatedApp());
 
-    await tester.tap(find.text('Notifications'));
+    await tester.tap(find.text('Requests'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Notifications — coming soon'), findsOneWidget);
+    expect(find.text('My Requests'), findsOneWidget);
   });
 
   testWidgets(
@@ -103,7 +103,7 @@ void main() {
   );
 
   testWidgets(
-    'a Super Admin sees both Admin Dashboard and User Dashboard, and can switch',
+    'a Super Admin sees only Admin Dashboard, never User Dashboard',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         _authenticatedApp(
@@ -118,15 +118,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Admin Dashboard'), findsWidgets);
-      expect(find.text('User Dashboard'), findsWidgets);
-      // Lands on Admin Dashboard by default.
+      expect(find.text('User Dashboard'), findsNothing);
       expect(find.text('Total Employees'), findsOneWidget);
-
-      await tester.tap(find.text('User Dashboard').first);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Company Notices'), findsOneWidget);
-      expect(find.text('Total Employees'), findsNothing);
     },
   );
 

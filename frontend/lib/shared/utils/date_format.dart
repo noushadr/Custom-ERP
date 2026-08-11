@@ -1,19 +1,19 @@
 const _monthNames = [
-  'January',
-  'February',
-  'March',
-  'April',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
   'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
-/// Formats an ISO 'YYYY-MM-DD' date string as e.g. "May 03, 2026".
+/// Formats an ISO 'YYYY-MM-DD' date string as e.g. "Oct 03, 2026".
 String formatDisplayDate(String isoDate) {
   final date = DateTime.parse(isoDate);
   final month = _monthNames[date.month - 1];
@@ -21,7 +21,7 @@ String formatDisplayDate(String isoDate) {
   return '$month $day, ${date.year}';
 }
 
-/// Formats a [DateTime] with time as e.g. "May 03, 2026, 3:41 PM".
+/// Formats a [DateTime] with time as e.g. "Oct 03, 2026, 3:41 PM".
 String formatDisplayDateTime(DateTime dateTime) {
   final local = dateTime.toLocal();
   final month = _monthNames[local.month - 1];

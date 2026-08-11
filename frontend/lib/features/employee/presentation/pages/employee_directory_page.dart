@@ -9,10 +9,20 @@ import '../../domain/entities/employee.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_hierarchy_view.dart';
 import '../widgets/employee_status_badges.dart';
+import 'departments_page.dart';
 import 'employee_profile_page.dart';
 import 'invite_employee_page.dart';
 
 enum _DirectoryViewMode { list, hierarchy }
+
+enum _SortOption {
+  joiningDate('Joining date'),
+  companyId('Company ID'),
+  department('Department');
+
+  const _SortOption(this.label);
+  final String label;
+}
 
 class EmployeeDirectoryPage extends ConsumerStatefulWidget {
   const EmployeeDirectoryPage({super.key});
@@ -27,6 +37,7 @@ class _EmployeeDirectoryPageState
   _DirectoryViewMode _viewMode = _DirectoryViewMode.list;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  _SortOption? _sortOption;
 
   @override
   void dispose() {
@@ -40,6 +51,8 @@ class _EmployeeDirectoryPageState
     final authUser = authState is AuthAuthenticated ? authState.user : null;
     final canRead = authUser?.hasPermission('employees.read') ?? false;
     final canManage = authUser?.hasPermission('employees.manage') ?? false;
+    final canManageDepartments =
+        authUser?.hasPermission('departments.manage') ?? false;
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -97,6 +110,56 @@ class _EmployeeDirectoryPageState
                         ),
                       ),
                     ),
+                  if (canRead && _viewMode == _DirectoryViewMode.list)
+                    PopupMenuButton<_SortOption?>(
+                      tooltip: 'Sort by',
+                      initialValue: _sortOption,
+                      onSelected: (value) =>
+                          setState(() => _sortOption = value),
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: null,
+                          child: Text('Default order'),
+                        ),
+                        for (final option in _SortOption.values)
+                          PopupMenuItem(value: option, child: Text(option.label)),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.sort, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              _sortOption == null
+                                  ? 'Sort'
+                                  : 'Sort: ${_sortOption!.label}',
+                            ),
+                            const Icon(Icons.arrow_drop_down, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (canManageDepartments)
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const DepartmentsPage(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.apartment_outlined, size: 18),
+                      label: const Text('Manage Departments'),
+                    ),
                   if (canManage)
                     ElevatedButton.icon(
                       onPressed: () => Navigator.of(context).push(
@@ -115,6 +178,7 @@ class _EmployeeDirectoryPageState
                     ? _DirectoryBody(
                         viewMode: _viewMode,
                         searchQuery: _searchQuery,
+                        sortOption: _sortOption,
                       )
                     : const _NoDirectoryAccess(),
               ),
@@ -127,10 +191,15 @@ class _EmployeeDirectoryPageState
 }
 
 class _DirectoryBody extends ConsumerWidget {
-  const _DirectoryBody({required this.viewMode, required this.searchQuery});
+  const _DirectoryBody({
+    required this.viewMode,
+    required this.searchQuery,
+    required this.sortOption,
+  });
 
   final _DirectoryViewMode viewMode;
   final String searchQuery;
+  final _SortOption? sortOption;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -153,7 +222,10 @@ class _DirectoryBody extends ConsumerWidget {
           return EmployeeHierarchyView(employees: employees);
         }
 
-        final filtered = _filterEmployees(employees, searchQuery);
+        final filtered = _sortEmployees(
+          _filterEmployees(employees, searchQuery),
+          sortOption,
+        );
         if (filtered.isEmpty) {
           return const Center(child: Text('No employees match your search.'));
         }
@@ -174,6 +246,27 @@ class _DirectoryBody extends ConsumerWidget {
               (employee.designation ?? '').toLowerCase().contains(needle),
         )
         .toList();
+  }
+
+  List<Employee> _sortEmployees(List<Employee> employees, _SortOption? sort) {
+    if (sort == null) return employees;
+    final sorted = [...employees];
+    switch (sort) {
+      case _SortOption.joiningDate:
+        sorted.sort((a, b) => a.joiningDate.compareTo(b.joiningDate));
+      case _SortOption.companyId:
+        sorted.sort((a, b) => a.employeeCode.compareTo(b.employeeCode));
+      case _SortOption.department:
+        sorted.sort((a, b) {
+          final aName = a.department?.name ?? '';
+          final bName = b.department?.name ?? '';
+          if (aName.isEmpty && bName.isEmpty) return 0;
+          if (aName.isEmpty) return 1;
+          if (bName.isEmpty) return -1;
+          return aName.compareTo(bName);
+        });
+    }
+    return sorted;
   }
 }
 
@@ -272,16 +365,36 @@ class _EmployeeCard extends StatelessWidget {
                   EmployeeAvatar(
                     fullName: employee.fullName,
                     photoUrl: employee.profilePhotoUrl,
-                    radius: 22,
+                    radius: 24.2,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          employee.fullName,
-                          style: Theme.of(context).textTheme.titleSmall,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                employee.fullName,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.badge_outlined,
+                              size: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              employee.employeeCode,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.textSecondary),
+                            ),
+                          ],
                         ),
                         if ((employee.designation ?? '').isNotEmpty)
                           Text(
@@ -289,12 +402,6 @@ class _EmployeeCard extends StatelessWidget {
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: AppColors.textSecondary),
                           ),
-                        const SizedBox(height: 4),
-                        InfoChip(
-                          icon: Icons.badge_outlined,
-                          label: employee.employeeCode,
-                          maxWidth: contentWidth - 64,
-                        ),
                       ],
                     ),
                   ),
@@ -307,6 +414,16 @@ class _EmployeeCard extends StatelessWidget {
                 children: [
                   EmploymentStatusBadge(status: employee.employmentStatus),
                   WorkModeBadge(workMode: employee.workMode),
+                  InfoChip(
+                    icon: Icons.apartment_outlined,
+                    label: employee.department?.name ?? 'No department',
+                    maxWidth: contentWidth,
+                  ),
+                  InfoChip(
+                    icon: Icons.supervisor_account_outlined,
+                    label: 'Reports to: ${employee.reportingManager?.name ?? '—'}',
+                    maxWidth: contentWidth,
+                  ),
                   InfoChip(
                     icon: Icons.email_outlined,
                     label: employee.email,

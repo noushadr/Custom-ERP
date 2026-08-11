@@ -8,11 +8,11 @@ void main() {
     });
 
     test('formats a double-digit day without extra padding', () {
-      expect(formatDisplayDate('2016-06-02'), 'June 02, 2016');
+      expect(formatDisplayDate('2016-06-02'), 'Jun 02, 2016');
     });
 
     test('formats December correctly', () {
-      expect(formatDisplayDate('1999-12-25'), 'December 25, 1999');
+      expect(formatDisplayDate('1999-12-25'), 'Dec 25, 1999');
     });
   });
 }

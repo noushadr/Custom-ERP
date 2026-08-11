@@ -45,6 +45,6 @@ import { EmployeesController } from './presentation/employees.controller';
       useClass: TypeOrmEducationRecordRepository,
     },
   ],
-  exports: [EMPLOYEE_REPOSITORY],
+  exports: [EMPLOYEE_REPOSITORY, EmployeesService],
 })
 export class EmployeeModule {}

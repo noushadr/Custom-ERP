@@ -4,10 +4,12 @@ import '../../authentication/application/auth_providers.dart';
 import '../data/datasources/employee_remote_data_source.dart';
 import '../data/repositories/employee_repository_impl.dart';
 import '../domain/entities/audit_log_entry.dart';
+import '../domain/entities/department.dart';
 import '../domain/entities/education_record.dart';
 import '../domain/entities/employee.dart';
 import '../domain/entities/employee_document.dart';
 import '../domain/entities/salary_record.dart';
+import '../domain/entities/upcoming_birthday.dart';
 import '../domain/repositories/employee_repository.dart';
 
 final employeeRemoteDataSourceProvider = Provider<EmployeeRemoteDataSource>(
@@ -38,6 +40,12 @@ final myProfileProvider = FutureProvider.autoDispose<Employee>((ref) {
   return ref.watch(employeeRepositoryProvider).getMe();
 });
 
+final upcomingBirthdaysProvider =
+    FutureProvider.autoDispose<List<UpcomingBirthday>>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(employeeRepositoryProvider).getUpcomingBirthdays();
+    });
+
 final myDirectReportsProvider = FutureProvider.autoDispose<List<Employee>>((
   ref,
 ) {
@@ -51,10 +59,24 @@ final employeeDetailProvider = FutureProvider.autoDispose
       return ref.watch(employeeRepositoryProvider).getById(id);
     });
 
-final departmentsProvider = FutureProvider.autoDispose<List<NamedRef>>((ref) {
+final departmentsProvider = FutureProvider.autoDispose<List<Department>>((
+  ref,
+) {
   ref.watch(authControllerProvider);
   return ref.watch(employeeRepositoryProvider).getDepartments();
 });
+
+/// Keyed by whether archived departments should be included — used by the
+/// departments management screen, which lets the viewer toggle that. Plain
+/// pickers elsewhere use [departmentsProvider] instead, which always
+/// excludes archived departments.
+final departmentsManagementProvider = FutureProvider.autoDispose
+    .family<List<Department>, bool>((ref, includeArchived) {
+      ref.watch(authControllerProvider);
+      return ref
+          .watch(employeeRepositoryProvider)
+          .getDepartments(includeArchived: includeArchived);
+    });
 
 final teamsProvider = FutureProvider.autoDispose.family<List<NamedRef>, String?>(
   (ref, departmentId) {

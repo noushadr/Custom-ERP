@@ -1,3 +1,5 @@
+import '../../../../shared/utils/date_format.dart';
+
 class AuditLogEntry {
   const AuditLogEntry({
     required this.id,
@@ -19,15 +21,26 @@ class AuditLogEntry {
   final DateTime createdAt;
 }
 
+const _dateFieldLabels = {'Joining Date', 'Date of Leaving', 'Date of Birth'};
+
 extension AuditLogEntryDescription on AuditLogEntry {
   /// A human-readable summary of the change, e.g. "Old → New", or just the
   /// one side that's set for additive/removal-only changes (uploads, deletes).
   String get describeChange {
-    final hasOld = oldValue != null && oldValue!.isNotEmpty;
-    final hasNew = newValue != null && newValue!.isNotEmpty;
-    if (hasOld && hasNew) return '$oldValue → $newValue';
-    if (hasNew) return newValue!;
-    if (hasOld) return oldValue!;
+    final old = _display(oldValue);
+    final current = _display(newValue);
+    final hasOld = old != null && old.isNotEmpty;
+    final hasNew = current != null && current.isNotEmpty;
+    if (hasOld && hasNew) return '$old → $current';
+    if (hasNew) return current;
+    if (hasOld) return old;
     return 'No details recorded.';
+  }
+
+  String? _display(String? value) {
+    if (value == null || value.isEmpty) return value;
+    if (!_dateFieldLabels.contains(fieldLabel)) return value;
+    if (DateTime.tryParse(value) == null) return value;
+    return formatDisplayDate(value);
   }
 }

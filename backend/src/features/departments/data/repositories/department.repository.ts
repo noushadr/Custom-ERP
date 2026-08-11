@@ -11,8 +11,11 @@ export class TypeOrmDepartmentRepository implements DepartmentRepository {
     private readonly repository: Repository<Department>,
   ) {}
 
-  findAll(): Promise<Department[]> {
-    return this.repository.find({ order: { name: 'ASC' } });
+  findAll(includeArchived = false): Promise<Department[]> {
+    return this.repository.find({
+      where: includeArchived ? {} : { isArchived: false },
+      order: { name: 'ASC' },
+    });
   }
 
   findById(id: string): Promise<Department | null> {
@@ -21,5 +24,9 @@ export class TypeOrmDepartmentRepository implements DepartmentRepository {
 
   save(department: Department): Promise<Department> {
     return this.repository.save(department);
+  }
+
+  async remove(department: Department): Promise<void> {
+    await this.repository.remove(department);
   }
 }

@@ -1,17 +1,17 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../authentication/application/auth_providers.dart';
+import '../../../authentication/application/auth_state.dart';
+import '../../../requests/application/request_providers.dart';
+import '../../../requests/domain/exceptions/request_exception.dart';
 import '../../application/employee_providers.dart';
-import '../../application/update_profile_controller.dart';
-import '../../application/update_profile_state.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../../domain/exceptions/employee_exception.dart';
 import '../widgets/employee_avatar.dart';
-import '../widgets/employee_documents_section.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
-import '../../../../shared/widgets/tag_input.dart';
 
 class EditMyProfilePage extends ConsumerStatefulWidget {
   const EditMyProfilePage({super.key, required this.employee});
@@ -35,11 +35,10 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
   late final TextEditingController _accountNumberController;
   late final TextEditingController _branchCodeController;
   late final TextEditingController _ibanController;
-  late List<String> _skills;
-  late List<String> _certifications;
   late String? _photoUrl;
   late DateTime? _dateOfBirth;
   bool _isUploadingPhoto = false;
+  bool _submitting = false;
 
   @override
   void initState() {
@@ -66,8 +65,6 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
     _accountNumberController = TextEditingController(text: e.accountNumber);
     _branchCodeController = TextEditingController(text: e.branchCode);
     _ibanController = TextEditingController(text: e.iban);
-    _skills = List.of(e.skills);
-    _certifications = List.of(e.certifications);
   }
 
   @override
@@ -128,74 +125,91 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    ref
-        .read(updateProfileControllerProvider.notifier)
-        .submit(
-          UpdateMyProfileInput(
-            dateOfBirth: _dateOfBirth == null ? null : _isoDate(_dateOfBirth!),
-            personalEmail: _personalEmailController.text.trim().isEmpty
-                ? null
-                : _personalEmailController.text.trim(),
-            phoneNumber: _phoneController.text.trim().isEmpty
-                ? null
-                : _phoneController.text.trim(),
-            emergencyContactName: _emergencyNameController.text.trim().isEmpty
-                ? null
-                : _emergencyNameController.text.trim(),
-            emergencyContactPhone:
-                _emergencyPhoneController.text.trim().isEmpty
-                ? null
-                : _emergencyPhoneController.text.trim(),
-            emergencyContactRelation:
-                _emergencyRelationController.text.trim().isEmpty
-                ? null
-                : _emergencyRelationController.text.trim(),
-            address: _addressController.text.trim().isEmpty
-                ? null
-                : _addressController.text.trim(),
-            bankName: _bankNameController.text.trim().isEmpty
-                ? null
-                : _bankNameController.text.trim(),
-            accountTitle: _accountTitleController.text.trim().isEmpty
-                ? null
-                : _accountTitleController.text.trim(),
-            accountNumber: _accountNumberController.text.trim().isEmpty
-                ? null
-                : _accountNumberController.text.trim(),
-            branchCode: _branchCodeController.text.trim().isEmpty
-                ? null
-                : _branchCodeController.text.trim(),
-            iban: _ibanController.text.trim().isEmpty
-                ? null
-                : _ibanController.text.trim(),
-            skills: _skills,
-            certifications: _certifications,
+    final input = UpdateMyProfileInput(
+      dateOfBirth: _dateOfBirth == null ? null : _isoDate(_dateOfBirth!),
+      personalEmail: _personalEmailController.text.trim().isEmpty
+          ? null
+          : _personalEmailController.text.trim(),
+      phoneNumber: _phoneController.text.trim().isEmpty
+          ? null
+          : _phoneController.text.trim(),
+      emergencyContactName: _emergencyNameController.text.trim().isEmpty
+          ? null
+          : _emergencyNameController.text.trim(),
+      emergencyContactPhone: _emergencyPhoneController.text.trim().isEmpty
+          ? null
+          : _emergencyPhoneController.text.trim(),
+      emergencyContactRelation:
+          _emergencyRelationController.text.trim().isEmpty
+          ? null
+          : _emergencyRelationController.text.trim(),
+      address: _addressController.text.trim().isEmpty
+          ? null
+          : _addressController.text.trim(),
+      bankName: _bankNameController.text.trim().isEmpty
+          ? null
+          : _bankNameController.text.trim(),
+      accountTitle: _accountTitleController.text.trim().isEmpty
+          ? null
+          : _accountTitleController.text.trim(),
+      accountNumber: _accountNumberController.text.trim().isEmpty
+          ? null
+          : _accountNumberController.text.trim(),
+      branchCode: _branchCodeController.text.trim().isEmpty
+          ? null
+          : _branchCodeController.text.trim(),
+      iban: _ibanController.text.trim().isEmpty
+          ? null
+          : _ibanController.text.trim(),
+    );
+
+    setState(() => _submitting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    final authState = ref.read(authControllerProvider);
+    final isSuperAdmin =
+        authState is AuthAuthenticated && authState.user.role == 'Super Admin';
+
+    try {
+      if (isSuperAdmin) {
+        // The top of the approval chain has nobody left to approve their
+        // request, so their own edits apply immediately.
+        await ref.read(employeeRepositoryProvider).updateMe(input);
+        ref.invalidate(myProfileProvider);
+        ref.invalidate(myAuditLogProvider);
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        messenger.showSnackBar(const SnackBar(content: Text('Profile updated.')));
+      } else {
+        await ref
+            .read(requestRepositoryProvider)
+            .submitProfileChangeRequest(input.toJson());
+        ref.invalidate(myRequestsProvider);
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Submitted for approval. Changes will apply once HR/Admin approves.',
+            ),
           ),
         );
+      }
+    } on EmployeeException catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    } on RequestException catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<UpdateProfileState>(updateProfileControllerProvider, (
-      previous,
-      next,
-    ) {
-      if (next is UpdateProfileSuccess) {
-        ref.invalidate(myProfileProvider);
-        ref.invalidate(myAuditLogProvider);
-        Navigator.of(context).pop();
-      } else if (next is UpdateProfileError) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(next.message)));
-      }
-    });
-
-    final state = ref.watch(updateProfileControllerProvider);
-    final isSubmitting = state is UpdateProfileSubmitting;
+    final isSubmitting = _submitting;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit My Profile')),
@@ -376,27 +390,6 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  FormSection(
-                    child: TagInput(
-                      label: 'Skills',
-                      values: _skills,
-                      enabled: !isSubmitting,
-                      onChanged: (values) => setState(() => _skills = values),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FormSection(
-                    child: TagInput(
-                      label: 'Certifications',
-                      values: _certifications,
-                      enabled: !isSubmitting,
-                      onChanged: (values) =>
-                          setState(() => _certifications = values),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const EmployeeDocumentsSection(),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: isSubmitting ? null : _submit,

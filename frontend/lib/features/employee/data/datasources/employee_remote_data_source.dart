@@ -6,10 +6,12 @@ import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../models/audit_log_entry_model.dart';
+import '../models/department_model.dart';
 import '../models/education_record_model.dart';
 import '../models/employee_document_model.dart';
 import '../models/employee_model.dart';
 import '../models/salary_record_model.dart';
+import '../models/upcoming_birthday_model.dart';
 
 class EmployeeRemoteDataSource {
   const EmployeeRemoteDataSource(this._dio);
@@ -32,6 +34,16 @@ class EmployeeRemoteDataSource {
   Future<EmployeeModel> getMe() async {
     final response = await _dio.get<Map<String, dynamic>>('/employees/me');
     return EmployeeModel.fromJson(response.data!);
+  }
+
+  Future<List<UpcomingBirthdayModel>> getUpcomingBirthdays() async {
+    final response = await _dio.get<List<dynamic>>(
+      '/employees/birthdays/upcoming',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(UpcomingBirthdayModel.fromJson)
+        .toList();
   }
 
   Future<List<EmployeeModel>> getMyDirectReports() async {
@@ -63,6 +75,20 @@ class EmployeeRemoteDataSource {
     return EmployeeModel.fromJson(response.data!);
   }
 
+  /// Sends only the given field(s) — unlike [updateEmployee], which always
+  /// sends the full field set (including nulls for cleared fields).
+  Future<EmployeeModel> updateEmployeeTags(
+    String id, {
+    List<String>? skills,
+    List<String>? certifications,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/employees/$id',
+      data: {'skills': ?skills, 'certifications': ?certifications},
+    );
+    return EmployeeModel.fromJson(response.data!);
+  }
+
   Future<EmployeeModel> uploadMyPhoto(Uint8List bytes, String fileName) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/employees/me/photo',
@@ -87,12 +113,65 @@ class EmployeeRemoteDataSource {
     );
   }
 
-  Future<List<NamedRef>> getDepartments() async {
-    final response = await _dio.get<List<dynamic>>('/departments');
+  Future<List<DepartmentModel>> getDepartments({
+    bool includeArchived = false,
+  }) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/departments',
+      queryParameters: {'includeArchived': includeArchived.toString()},
+    );
     return response.data!
         .cast<Map<String, dynamic>>()
-        .map(NamedRef.fromJson)
+        .map(DepartmentModel.fromJson)
         .toList();
+  }
+
+  Future<DepartmentModel> createDepartment({
+    required String name,
+    String? description,
+    String? headEmployeeId,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/departments',
+      data: {
+        'name': name,
+        'description': description,
+        'headEmployeeId': headEmployeeId,
+      },
+    );
+    return DepartmentModel.fromJson(response.data!);
+  }
+
+  Future<DepartmentModel> updateDepartment(
+    String id, {
+    required String name,
+    String? description,
+    String? headEmployeeId,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/departments/$id',
+      data: {
+        'name': name,
+        'description': description,
+        'headEmployeeId': headEmployeeId,
+      },
+    );
+    return DepartmentModel.fromJson(response.data!);
+  }
+
+  Future<DepartmentModel> setDepartmentArchived(
+    String id, {
+    required bool isArchived,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/departments/$id',
+      data: {'isArchived': isArchived},
+    );
+    return DepartmentModel.fromJson(response.data!);
+  }
+
+  Future<void> deleteDepartment(String id) async {
+    await _dio.delete('/departments/$id');
   }
 
   Future<List<NamedRef>> getTeams({String? departmentId}) async {

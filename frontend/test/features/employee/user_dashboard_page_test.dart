@@ -9,12 +9,10 @@ import 'package:zera_erp/features/employee/domain/exceptions/employee_exception.
 import 'package:zera_erp/features/employee/presentation/pages/user_dashboard_page.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notices/domain/entities/notice.dart';
-import 'package:zera_erp/features/requests/application/request_providers.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_notice.dart';
-import '../../helpers/fake_request.dart';
 
 const _viewer = AuthUser(
   id: 'user-1',
@@ -26,7 +24,6 @@ const _viewer = AuthUser(
 Widget _app({
   FakeEmployeeRepository? employeeRepository,
   FakeNoticeRepository? noticeRepository,
-  FakeRequestRepository? requestRepository,
   FakeAuthRepository? authRepository,
 }) {
   return ProviderScope(
@@ -42,9 +39,6 @@ Widget _app({
       ),
       noticeRepositoryProvider.overrideWithValue(
         noticeRepository ?? FakeNoticeRepository(),
-      ),
-      requestRepositoryProvider.overrideWithValue(
-        requestRepository ?? FakeRequestRepository(),
       ),
     ],
     child: const MaterialApp(home: Scaffold(body: UserDashboardPage())),
@@ -100,31 +94,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No company notices yet.'), findsOneWidget);
-  });
-
-  testWidgets('submitting a new request calls the repository', (
-    tester,
-  ) async {
-    final requestRepository = FakeRequestRepository();
-    await tester.pumpWidget(_app(requestRepository: requestRepository));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('New request'));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Subject'),
-      'Need a new chair',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Description'),
-      'Mine is broken.',
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
-    await tester.pumpAndSettle();
-
-    expect(requestRepository.lastSubmittedSubject, 'Need a new chair');
-    expect(find.byType(AlertDialog), findsNothing);
   });
 
   testWidgets('changing password calls the auth controller', (tester) async {
@@ -206,23 +175,5 @@ void main() {
       find.text('No team members are assigned to you yet.'),
       findsOneWidget,
     );
-  });
-
-  testWidgets('approving a pending request calls approveAsManager', (
-    tester,
-  ) async {
-    final requestRepository = FakeRequestRepository(
-      pendingManagerApproval: [
-        buildTestRequest(id: 'request-1', subject: 'Time off'),
-      ],
-    );
-    await tester.pumpWidget(_app(requestRepository: requestRepository));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Approve'));
-    await tester.pumpAndSettle();
-
-    expect(requestRepository.lastDecidedRequestId, 'request-1');
-    expect(requestRepository.lastDecisionApproved, isTrue);
   });
 }

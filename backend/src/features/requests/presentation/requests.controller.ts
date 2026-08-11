@@ -2,6 +2,8 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
+import { CreateItemRequestDto } from '../application/dto/create-item-request.dto';
+import { CreateProfileChangeRequestDto } from '../application/dto/create-profile-change-request.dto';
 import { CreateRequestDto } from '../application/dto/create-request.dto';
 import { RejectRequestDto } from '../application/dto/reject-request.dto';
 import { RequestsService } from '../application/requests.service';
@@ -13,6 +15,22 @@ export class RequestsController {
   @Post()
   submit(@Body() dto: CreateRequestDto, @CurrentUser() user: JwtPayload) {
     return this.requestsService.submit(user.sub, dto);
+  }
+
+  @Post('items')
+  submitItemRequest(
+    @Body() dto: CreateItemRequestDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.requestsService.submitItemRequest(user.sub, dto);
+  }
+
+  @Post('profile-changes')
+  submitProfileChangeRequest(
+    @Body() dto: CreateProfileChangeRequestDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.requestsService.submitProfileChangeRequest(user.sub, dto);
   }
 
   @Get('mine')

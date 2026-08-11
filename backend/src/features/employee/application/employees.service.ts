@@ -61,6 +61,7 @@ import { EducationRecordResponse } from './education-record-response.interface';
 import { toEducationRecordResponse } from './education-record.mapper';
 import { SalaryRecordResponse } from './salary-record-response.interface';
 import { toSalaryRecordResponse } from './salary-record.mapper';
+import { UpcomingBirthdayResponse } from './upcoming-birthday-response.interface';
 
 const DEFAULT_INVITE_ROLE = 'Employee';
 const COMPANY_AUDIT_LOG_LIMIT = 100;
@@ -72,10 +73,22 @@ const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   [DocumentType.OTHER]: 'Document',
 };
 
-interface FieldDiff {
+export interface FieldDiff {
   fieldLabel: string;
   oldValue: string | null;
   newValue: string | null;
+}
+
+/** Class-validator DTOs declare every optional field as a class property,
+ * which TypeScript (under `useDefineForClassFields`, default from ES2022+)
+ * initializes to an explicit `undefined` own-property on every instance —
+ * even fields absent from the request body. Spreading/assigning such a DTO
+ * directly would overwrite untouched entity fields (e.g. NOT NULL columns
+ * like `skills`) with `undefined`; this strips those out first. */
+function definedFieldsOnly<T extends object>(dto: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(dto).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
 }
 
 /** The subset of Employee fields diffed for the audit log — a plain snapshot
@@ -184,6 +197,43 @@ export class EmployeesService {
     return employees.map(toEmployeeResponse);
   }
 
+  /** Employees whose birthday falls within the next [withinDays] days. */
+  async getUpcomingBirthdays(
+    withinDays = 7,
+  ): Promise<UpcomingBirthdayResponse[]> {
+    const employees = await this.employeeRepository.findAll();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return employees
+      .filter((employee) => employee.dateOfBirth)
+      .map((employee) => ({
+        employee,
+        daysUntil: this.daysUntilNextBirthday(employee.dateOfBirth!, today),
+      }))
+      .filter(({ daysUntil }) => daysUntil <= withinDays)
+      .sort((a, b) => a.daysUntil - b.daysUntil)
+      .map(({ employee, daysUntil }) => ({
+        employeeId: employee.id,
+        fullName: this.fullName(employee),
+        profilePhotoUrl: employee.profilePhotoUrl ?? null,
+        dateOfBirth: employee.dateOfBirth!,
+        daysUntil,
+      }));
+  }
+
+  /** Days from [today] to this year's (or next year's, if already passed)
+   * occurrence of the month/day encoded in [dateOfBirth]. */
+  private daysUntilNextBirthday(dateOfBirth: string, today: Date): number {
+    const dob = new Date(dateOfBirth);
+    let next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+    if (next < today) {
+      next = new Date(today.getFullYear() + 1, dob.getMonth(), dob.getDate());
+    }
+    const msPerDay = 24 * 60 * 60 * 1000;
+    return Math.round((next.getTime() - today.getTime()) / msPerDay);
+  }
+
   async findById(id: string): Promise<EmployeeResponse> {
     const employee = await this.employeeRepository.findById(id);
     if (!employee) throw new NotFoundException('Employee not found');
@@ -213,7 +263,7 @@ export class EmployeesService {
     if (!employee) throw new NotFoundException('Employee profile not found');
 
     const before = { ...employee };
-    Object.assign(employee, dto);
+    Object.assign(employee, definedFieldsOnly(dto));
     const saved = await this.employeeRepository.save(employee);
     const reloaded = await this.employeeRepository.findById(saved.id);
 
@@ -228,6 +278,42 @@ export class EmployeesService {
     );
 
     return toEmployeeResponse(reloaded!);
+  }
+
+  /** The field-level diffs an [UpdateMyProfileDto] would produce, without
+   * saving anything — used to show a requester and their approver what a
+   * pending profile-change request actually contains. */
+  async previewProfileChanges(
+    employeeId: string,
+    dto: UpdateMyProfileDto,
+  ): Promise<FieldDiff[]> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    const after: EmployeeSnapshot = { ...employee, ...definedFieldsOnly(dto) };
+    return this.buildFieldDiffs(employee, after);
+  }
+
+  /** Applies an approved profile-change request's payload directly to the
+   * employee record, with the same diff/audit trail as a self-service edit. */
+  async applyApprovedProfileChange(
+    employeeId: string,
+    dto: UpdateMyProfileDto,
+  ): Promise<void> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    const before = { ...employee };
+    Object.assign(employee, definedFieldsOnly(dto));
+    const saved = await this.employeeRepository.save(employee);
+    const reloaded = await this.employeeRepository.findById(saved.id);
+
+    const diffs = await this.buildFieldDiffs(before, reloaded!);
+    await this.recordAuditEntries(
+      saved.id,
+      { userId: employee.userId, name: this.fullName(before) },
+      diffs,
+    );
   }
 
   async updateMyPhoto(
@@ -260,7 +346,7 @@ export class EmployeesService {
     if (!employee) throw new NotFoundException('Employee not found');
 
     const before = { ...employee };
-    Object.assign(employee, dto);
+    Object.assign(employee, definedFieldsOnly(dto));
     const saved = await this.employeeRepository.save(employee);
     const reloaded = await this.employeeRepository.findById(saved.id);
 

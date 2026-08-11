@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -45,8 +46,16 @@ export class EmployeesController {
     return this.employeesService.findByUserId(user.sub);
   }
 
+  // Super Admin is the top of the approval chain — nobody would be left to
+  // approve their own request — so their self-edits apply immediately.
+  // Everyone else must go through POST /requests/profile-changes instead.
   @Patch('me')
   updateMe(@CurrentUser() user: JwtPayload, @Body() dto: UpdateMyProfileDto) {
+    if (user.role !== 'Super Admin') {
+      throw new ForbiddenException(
+        'Submit a profile change request for HR/Admin approval instead.',
+      );
+    }
     return this.employeesService.updateSelf(user.sub, dto);
   }
 
@@ -130,6 +139,13 @@ export class EmployeesController {
   @Permissions('audit.viewAll')
   getCompanyAuditLog() {
     return this.employeesService.getCompanyAuditLog();
+  }
+
+  // Must come before @Get(':id') for the same reason as "audit-log" above.
+  @Get('birthdays/upcoming')
+  @Permissions('employees.manage')
+  getUpcomingBirthdays() {
+    return this.employeesService.getUpcomingBirthdays();
   }
 
   @Get(':id')

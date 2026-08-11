@@ -4,9 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Employee } from '../../employee/domain/entities/employee.entity';
+import type { EmployeesService } from '../../employee/application/employees.service';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
 import { EmployeeRequest } from '../domain/entities/employee-request.entity';
+import { RequestKind } from '../domain/enums/request-kind.enum';
 import { RequestStatus } from '../domain/enums/request-status.enum';
 import type { RequestRepository } from '../domain/repositories/request-repository.interface';
 import { RequestsService } from './requests.service';
@@ -41,6 +43,12 @@ describe('RequestsService', () => {
   let requestRepository: jest.Mocked<RequestRepository>;
   let employeeRepository: jest.Mocked<EmployeeRepository>;
   let userRepository: jest.Mocked<UserRepository>;
+  let employeesService: jest.Mocked<
+    Pick<
+      EmployeesService,
+      'previewProfileChanges' | 'applyApprovedProfileChange'
+    >
+  >;
 
   beforeEach(() => {
     requestRepository = {
@@ -63,11 +71,16 @@ describe('RequestsService', () => {
       findAll: jest.fn(),
       save: jest.fn(),
     };
+    employeesService = {
+      previewProfileChanges: jest.fn(),
+      applyApprovedProfileChange: jest.fn(),
+    };
 
     service = new RequestsService(
       requestRepository,
       employeeRepository,
       userRepository,
+      employeesService as unknown as EmployeesService,
     );
   });
 
@@ -98,6 +111,78 @@ describe('RequestsService', () => {
       );
       expect(result.status).toBe(RequestStatus.SUBMITTED);
       expect(result.requesterName).toBe('Jane Doe');
+    });
+  });
+
+  describe('submitItemRequest', () => {
+    it('creates a MANAGER_APPROVED request, skipping the manager step', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      requestRepository.save.mockImplementation((r) => Promise.resolve(r));
+      requestRepository.findById.mockImplementation((id) =>
+        Promise.resolve(
+          buildRequest({
+            id,
+            status: RequestStatus.MANAGER_APPROVED,
+            kind: RequestKind.ITEM,
+          }),
+        ),
+      );
+
+      const result = await service.submitItemRequest('user-1', {
+        itemName: 'Stapler',
+        purpose: 'My old one broke.',
+      });
+
+      expect(requestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          employeeId: 'employee-1',
+          kind: RequestKind.ITEM,
+          status: RequestStatus.MANAGER_APPROVED,
+        }),
+      );
+      expect(result.status).toBe(RequestStatus.MANAGER_APPROVED);
+    });
+  });
+
+  describe('submitProfileChangeRequest', () => {
+    it('throws BadRequestException when nothing actually changed', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      employeesService.previewProfileChanges.mockResolvedValue([]);
+
+      await expect(
+        service.submitProfileChangeRequest('user-1', { phoneNumber: '123' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('creates a MANAGER_APPROVED request carrying the proposed changes', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      employeesService.previewProfileChanges.mockResolvedValue([
+        { fieldLabel: 'Phone Number', oldValue: null, newValue: '123' },
+      ]);
+      requestRepository.save.mockImplementation((r) => Promise.resolve(r));
+      requestRepository.findById.mockImplementation((id) =>
+        Promise.resolve(
+          buildRequest({
+            id,
+            status: RequestStatus.MANAGER_APPROVED,
+            kind: RequestKind.PROFILE_CHANGE,
+          }),
+        ),
+      );
+
+      const result = await service.submitProfileChangeRequest('user-1', {
+        phoneNumber: '123',
+      });
+
+      expect(requestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          employeeId: 'employee-1',
+          kind: RequestKind.PROFILE_CHANGE,
+          status: RequestStatus.MANAGER_APPROVED,
+          payload: { phoneNumber: '123' },
+        }),
+      );
+      expect(result.status).toBe(RequestStatus.MANAGER_APPROVED);
     });
   });
 
@@ -190,6 +275,39 @@ describe('RequestsService', () => {
 
       expect(result.status).toBe(RequestStatus.COMPLETED);
       expect(result.hrDecisionByName).toBe('Zahra Shiraz');
+    });
+
+    it('applies the payload to the employee record for a PROFILE_CHANGE request', async () => {
+      requestRepository.findById.mockResolvedValue(
+        buildRequest({
+          status: RequestStatus.MANAGER_APPROVED,
+          kind: RequestKind.PROFILE_CHANGE,
+          payload: { phoneNumber: '123' },
+        }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      requestRepository.save.mockImplementation((r) => Promise.resolve(r));
+
+      await service.approveAsHr('request-1', 'hr-1');
+
+      expect(employeesService.applyApprovedProfileChange).toHaveBeenCalledWith(
+        'employee-1',
+        { phoneNumber: '123' },
+      );
+    });
+
+    it('does not touch the employee record for a non-PROFILE_CHANGE request', async () => {
+      requestRepository.findById.mockResolvedValue(
+        buildRequest({ status: RequestStatus.MANAGER_APPROVED }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      requestRepository.save.mockImplementation((r) => Promise.resolve(r));
+
+      await service.approveAsHr('request-1', 'hr-1');
+
+      expect(
+        employeesService.applyApprovedProfileChange,
+      ).not.toHaveBeenCalled();
     });
   });
 
