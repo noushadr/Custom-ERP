@@ -8,12 +8,14 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/authentication/domain/exceptions/auth_exception.dart';
 import 'package:zera_erp/features/authentication/presentation/pages/login_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/main.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
 import '../../helpers/fake_request.dart';
 
@@ -37,6 +39,7 @@ Widget _appWith(FakeAuthRepository repository) {
       employeeRepositoryProvider.overrideWithValue(FakeEmployeeRepository()),
       noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
       requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
+      leaveRepositoryProvider.overrideWithValue(FakeLeaveRepository()),
     ],
     child: const ZeraApp(),
   );

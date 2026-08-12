@@ -9,6 +9,7 @@ import { Role } from './features/authentication/domain/entities/role.entity';
 import { User } from './features/authentication/domain/entities/user.entity';
 import { UserStatus } from './features/authentication/domain/enums/user-status.enum';
 import { Department } from './features/departments/domain/entities/department.entity';
+import { LeaveType } from './features/leave/domain/entities/leave-type.entity';
 import { Team } from './features/teams/domain/entities/team.entity';
 
 const DEFAULT_PERMISSIONS = [
@@ -20,6 +21,7 @@ const DEFAULT_PERMISSIONS = [
   'teams.manage',
   'audit.viewAll',
   'notices.manage',
+  'leave.manage',
 ];
 
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
@@ -33,10 +35,22 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'departments.manage',
       'teams.manage',
       'notices.manage',
+      'leave.manage',
     ],
   },
   { name: 'Team Lead', permissions: ['employees.read'] },
   { name: 'Employee', permissions: [] },
+];
+
+const SAMPLE_LEAVE_TYPES: {
+  name: string;
+  annualAllowanceDays: string;
+  carryForwardLimitDays?: string;
+  colorHex: string;
+}[] = [
+  { name: 'Annual Leave', annualAllowanceDays: '20.0', carryForwardLimitDays: '5.0', colorHex: '#00D5EE' },
+  { name: 'Casual Leave', annualAllowanceDays: '10.0', colorHex: '#F59E0B' },
+  { name: 'Sick Leave', annualAllowanceDays: '10.0', colorHex: '#DC2626' },
 ];
 
 const SAMPLE_DEPARTMENTS: {
@@ -68,6 +82,9 @@ async function seed() {
     getRepositoryToken(Department),
   );
   const teamRepo = app.get<Repository<Team>>(getRepositoryToken(Team));
+  const leaveTypeRepo = app.get<Repository<LeaveType>>(
+    getRepositoryToken(LeaveType),
+  );
   const config = app.get(ConfigService);
 
   const permissionsByKey = new Map<string, Permission>();
@@ -151,6 +168,16 @@ async function seed() {
         );
         console.log(`  Team ready: ${teamName}`);
       }
+    }
+  }
+
+  for (const typeDef of SAMPLE_LEAVE_TYPES) {
+    const existing = await leaveTypeRepo.findOne({
+      where: { name: typeDef.name },
+    });
+    if (!existing) {
+      await leaveTypeRepo.save(leaveTypeRepo.create(typeDef));
+      console.log(`Leave type ready: ${typeDef.name}`);
     }
   }
 

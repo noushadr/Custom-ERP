@@ -7,11 +7,14 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/upcoming_birthday.dart';
 import 'package:zera_erp/features/employee/presentation/widgets/notification_bell.dart';
+import 'package:zera_erp/features/leave/application/leave_providers.dart';
+import 'package:zera_erp/features/leave/domain/repositories/leave_repository.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/requests/domain/entities/employee_request.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_request.dart';
 
 EmployeeRequest _buildRequest({
@@ -33,6 +36,7 @@ Widget _app({
   required List<String> permissions,
   required FakeEmployeeRepository employeeRepository,
   required FakeRequestRepository requestRepository,
+  FakeLeaveRepository? leaveRepository,
   ValueChanged<NotificationLinkTarget>? onNavigate,
 }) {
   final user = AuthUser(
@@ -49,6 +53,9 @@ Widget _app({
       ),
       employeeRepositoryProvider.overrideWithValue(employeeRepository),
       requestRepositoryProvider.overrideWithValue(requestRepository),
+      leaveRepositoryProvider.overrideWithValue(
+        leaveRepository ?? FakeLeaveRepository(),
+      ),
     ],
     child: MaterialApp(
       home: Scaffold(
@@ -187,6 +194,95 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No notifications right now.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows a leave request awaiting HR approval and navigates to Leave',
+    (tester) async {
+      NotificationLinkTarget? tapped;
+      final leaveRepository = FakeLeaveRepository(
+        pendingHrApproval: [
+          buildTestLeaveRequest(id: 'leave-1', requesterName: 'Amna Irfan'),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: ['leave.manage'],
+          employeeRepository: FakeEmployeeRepository(),
+          requestRepository: FakeRequestRepository(),
+          leaveRepository: leaveRepository,
+          onNavigate: (target) => tapped = target,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Leave awaiting HR approval'), findsOneWidget);
+      await tester.tap(find.text('Leave awaiting HR approval'));
+      await tester.pumpAndSettle();
+
+      expect(tapped, NotificationLinkTarget.leavePage);
+    },
+  );
+
+  testWidgets(
+    'shows the annual reset reminder for a leave.manage holder',
+    (tester) async {
+      final leaveRepository = FakeLeaveRepository(
+        resetStatus: const LeaveResetStatus(year: 2027, isInitialized: false),
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: ['leave.manage'],
+          employeeRepository: FakeEmployeeRepository(),
+          requestRepository: FakeRequestRepository(),
+          leaveRepository: leaveRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Annual leave balances for 2027'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'shows the viewer\'s own recently-decided leave request',
+    (tester) async {
+      final leaveRepository = FakeLeaveRepository(
+        myRequests: [
+          buildTestLeaveRequest(
+            id: 'leave-mine',
+            status: 'approved',
+            hrDecisionAt: DateTime.now().subtract(const Duration(days: 1)),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: const [],
+          employeeRepository: FakeEmployeeRepository(),
+          requestRepository: FakeRequestRepository(),
+          leaveRepository: leaveRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your leave was approved'), findsOneWidget);
     },
   );
 }

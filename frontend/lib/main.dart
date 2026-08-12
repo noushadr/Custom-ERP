@@ -14,6 +14,7 @@ import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
+import 'features/leave/presentation/pages/leave_page.dart';
 import 'features/requests/presentation/pages/requests_page.dart';
 
 void main() {
@@ -82,6 +83,11 @@ const _allDestinations = [
     selectedIcon: Icons.assignment,
   ),
   AppNavDestination(
+    label: 'Leave',
+    icon: Icons.event_busy_outlined,
+    selectedIcon: Icons.event_busy,
+  ),
+  AppNavDestination(
     label: 'Settings',
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings,
@@ -136,6 +142,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const EmployeeDirectoryPage();
       case 'Requests':
         return const RequestsPage();
+      case 'Leave':
+        return const LeavePage();
       default:
         return _ComingSoon(destination: destination);
     }
@@ -182,6 +190,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
                 onNavigate: (target) => _goToDestination(switch (target) {
                   NotificationLinkTarget.adminDashboard => 'Admin Dashboard',
                   NotificationLinkTarget.userDashboard => 'User Dashboard',
+                  NotificationLinkTarget.leavePage => 'Leave',
                 }),
               ),
               const SizedBox(width: 16),
