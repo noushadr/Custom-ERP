@@ -20,10 +20,13 @@ final leaveRepositoryProvider = Provider<LeaveRepository>(
 // dependency edge, so switching identity (impersonate/returnToAdmin/logout)
 // triggers a refetch — see the longer explanation in employee_providers.dart.
 
-final leaveTypesProvider = FutureProvider.autoDispose<List<LeaveType>>((ref) {
-  ref.watch(authControllerProvider);
-  return ref.watch(leaveRepositoryProvider).getLeaveTypes();
-});
+final leaveTypesProvider = FutureProvider.autoDispose
+    .family<List<LeaveType>, bool>((ref, includeArchived) {
+      ref.watch(authControllerProvider);
+      return ref
+          .watch(leaveRepositoryProvider)
+          .getLeaveTypes(includeArchived: includeArchived);
+    });
 
 final myLeaveBalancesProvider = FutureProvider.autoDispose<List<LeaveBalance>>(
   (ref) {

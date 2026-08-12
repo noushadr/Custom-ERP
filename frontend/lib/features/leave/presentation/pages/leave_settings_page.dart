@@ -22,7 +22,7 @@ class _LeaveSettingsPageState extends ConsumerState<LeaveSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final leaveTypesAsync = ref.watch(leaveTypesProvider);
+    final leaveTypesAsync = ref.watch(leaveTypesProvider(_includeArchived));
 
     return Scaffold(
       appBar: AppBar(
@@ -75,15 +75,12 @@ class _LeaveSettingsPageState extends ConsumerState<LeaveSettingsPage> {
                   error: (_, _) =>
                       const Text('Could not load leave types. Please try again.'),
                   data: (leaveTypes) {
-                    final visible = _includeArchived
-                        ? leaveTypes
-                        : leaveTypes.where((t) => !t.isArchived).toList();
-                    if (visible.isEmpty) {
+                    if (leaveTypes.isEmpty) {
                       return const Text('No leave types yet.');
                     }
                     return Column(
                       children: [
-                        for (final type in visible) ...[
+                        for (final type in leaveTypes) ...[
                           _LeaveTypeCard(leaveType: type),
                           const SizedBox(height: 12),
                         ],
@@ -448,7 +445,7 @@ class _AdjustBalanceDialogState extends ConsumerState<_AdjustBalanceDialog> {
   @override
   Widget build(BuildContext context) {
     final employeesAsync = ref.watch(employeeListProvider);
-    final leaveTypesAsync = ref.watch(leaveTypesProvider);
+    final leaveTypesAsync = ref.watch(leaveTypesProvider(false));
 
     return AlertDialog(
       title: const Text('Adjust a balance'),

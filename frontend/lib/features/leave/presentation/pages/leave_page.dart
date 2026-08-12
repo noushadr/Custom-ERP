@@ -23,9 +23,12 @@ class LeavePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
-    final canSeeHrApprovals =
-        authState is AuthAuthenticated &&
-        authState.user.hasPermission('leave.manage');
+    final authUser = authState is AuthAuthenticated ? authState.user : null;
+    final canSeeHrApprovals = authUser?.hasPermission('leave.manage') ?? false;
+    // Super Admin has no Employee profile (see RequestsPage), so they have no
+    // personal leave balance or history of their own — only the approval
+    // sections and (via leave.manage) the settings/reset banner apply.
+    final isSuperAdmin = authUser?.role == 'Super Admin';
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -52,10 +55,12 @@ class LeavePage extends ConsumerWidget {
                   const _ResetReminderBanner(),
                   const SizedBox(height: 16),
                 ],
-                const _BalancesSection(),
-                const SizedBox(height: 16),
-                const _MyLeaveRequestsSection(),
-                const SizedBox(height: 16),
+                if (!isSuperAdmin) ...[
+                  const _BalancesSection(),
+                  const SizedBox(height: 16),
+                  const _MyLeaveRequestsSection(),
+                  const SizedBox(height: 16),
+                ],
                 const LeaveCalendarView(),
                 const SizedBox(height: 16),
                 const _PendingMyApprovalSection(),
@@ -486,7 +491,7 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final leaveTypesAsync = ref.watch(leaveTypesProvider);
+    final leaveTypesAsync = ref.watch(leaveTypesProvider(false));
 
     return AlertDialog(
       title: const Text('Apply for leave'),
