@@ -3,6 +3,7 @@ import '../../../shared/models/named_ref.dart';
 import '../../authentication/application/auth_providers.dart';
 import '../data/datasources/employee_remote_data_source.dart';
 import '../data/repositories/employee_repository_impl.dart';
+import '../domain/entities/asset.dart';
 import '../domain/entities/audit_log_entry.dart';
 import '../domain/entities/department.dart';
 import '../domain/entities/education_record.dart';
@@ -134,6 +135,23 @@ final employeeSalaryHistoryProvider = FutureProvider.autoDispose
           .watch(employeeRepositoryProvider)
           .getSalaryHistory(employeeId);
     });
+
+final myAssetsProvider = FutureProvider.autoDispose<List<Asset>>((ref) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getMyAssets();
+});
+
+final employeeAssetsProvider = FutureProvider.autoDispose
+    .family<List<Asset>, String>((ref, employeeId) {
+      ref.watch(authControllerProvider);
+      return ref.watch(employeeRepositoryProvider).getAssets(employeeId);
+    });
+
+/// Currently-unassigned assets, for the "assign existing asset" picker.
+final availableAssetsProvider = FutureProvider.autoDispose<List<Asset>>((ref) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getAvailableAssets();
+});
 
 final myEducationHistoryProvider =
     FutureProvider.autoDispose<List<EducationRecord>>((ref) {

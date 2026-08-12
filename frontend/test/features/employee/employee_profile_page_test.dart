@@ -11,6 +11,13 @@ import 'package:zera_erp/shared/widgets/tag_input.dart';
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
 
+Future<void> _useTallSurface(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(900, 2600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 Widget _app({
   required AuthUser viewer,
   required FakeEmployeeRepository repository,
@@ -521,6 +528,172 @@ void main() {
       expect(repository.lastUpdateTagsId, 'employee-2');
       expect(repository.lastUpdateTagsCertifications, ['PMP']);
       expect(repository.lastUpdateTagsSkills, isNull);
+    },
+  );
+
+  testWidgets(
+    'shows your own assigned assets without edit controls',
+    (tester) async {
+      final me = buildTestEmployee();
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(
+            me: me,
+            assets: [buildTestAsset(name: 'Dell Laptop')],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dell Laptop'), findsOneWidget);
+      expect(find.text('Add asset'), findsNothing);
+      expect(find.text('Unassign'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    "hides Assets for someone else's profile when the viewer cannot manage "
+    'employees',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'user-3',
+        email: 'coworker@zeracreative.com',
+        role: 'Employee',
+        permissions: const ['employees.read'],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(
+            employees: [other],
+            assets: [buildTestAsset()],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assets'), findsNothing);
+      expect(find.text('Dell Laptop'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'HR/Admin sees Add asset and Unassign on someone else\'s profile',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.read', 'employees.manage'],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(
+            employees: [other],
+            assets: [buildTestAsset(name: 'Dell Laptop')],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dell Laptop'), findsOneWidget);
+      expect(find.text('Add asset'), findsOneWidget);
+      expect(find.text('Unassign'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'adding a new asset calls createAndAssignAsset',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.read', 'employees.manage'],
+      );
+      final repository = FakeEmployeeRepository(employees: [other]);
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(viewer: viewer, employeeId: 'employee-2', repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Add asset'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Name'),
+        'MacBook Pro',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(
+        repository.lastCreateAndAssignAssetInput,
+        (employeeId: 'employee-2', name: 'MacBook Pro'),
+      );
+      expect(find.byType(AlertDialog), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'unassigning an asset calls unassignAsset',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.read', 'employees.manage'],
+      );
+      final repository = FakeEmployeeRepository(
+        employees: [other],
+        assets: [buildTestAsset(id: 'asset-9', name: 'Dell Laptop')],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(viewer: viewer, employeeId: 'employee-2', repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Unassign'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUnassignAssetId, 'asset-9');
     },
   );
 }

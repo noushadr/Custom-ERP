@@ -17,7 +17,9 @@ import { Permissions } from '../../authentication/presentation/decorators/permis
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
 import { AddEducationRecordDto } from '../application/dto/add-education-record.dto';
 import { AddSalaryRecordDto } from '../application/dto/add-salary-record.dto';
+import { CreateAssetDto } from '../application/dto/create-asset.dto';
 import { InviteEmployeeDto } from '../application/dto/invite-employee.dto';
+import { UpdateAssetDto } from '../application/dto/update-asset.dto';
 import { UpdateEmployeeDto } from '../application/dto/update-employee.dto';
 import { UpdateMyProfileDto } from '../application/dto/update-my-profile.dto';
 import { UploadDocumentDto } from '../application/dto/upload-document.dto';
@@ -117,6 +119,11 @@ export class EmployeesController {
     return this.employeesService.getMyEducationHistory(user.sub);
   }
 
+  @Get('me/assets')
+  getMyAssets(@CurrentUser() user: JwtPayload) {
+    return this.employeesService.getMyAssets(user.sub);
+  }
+
   @Post('me/education-history')
   addMyEducationRecord(
     @CurrentUser() user: JwtPayload,
@@ -146,6 +153,13 @@ export class EmployeesController {
   @Permissions('employees.manage')
   getUpcomingBirthdays() {
     return this.employeesService.getUpcomingBirthdays();
+  }
+
+  // Must come before @Get(':id') for the same reason as "audit-log" above.
+  @Get('assets/available')
+  @Permissions('employees.manage')
+  getAvailableAssets() {
+    return this.employeesService.getAvailableAssets();
   }
 
   @Get(':id')
@@ -254,5 +268,51 @@ export class EmployeesController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.employeesService.deleteEducationRecord(id, recordId, user.sub);
+  }
+
+  @Get(':id/assets')
+  @Permissions('employees.manage')
+  getAssets(@Param('id') id: string) {
+    return this.employeesService.getAssets(id);
+  }
+
+  @Post(':id/assets')
+  @Permissions('employees.manage')
+  createAndAssignAsset(
+    @Param('id') id: string,
+    @Body() dto: CreateAssetDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.employeesService.createAndAssignAsset(id, dto, user.sub);
+  }
+
+  @Post(':id/assets/:assetId/assign')
+  @Permissions('employees.manage')
+  assignExistingAsset(
+    @Param('id') id: string,
+    @Param('assetId') assetId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.employeesService.assignExistingAsset(id, assetId, user.sub);
+  }
+
+  @Patch(':id/assets/:assetId')
+  @Permissions('employees.manage')
+  updateAsset(
+    @Param('id') id: string,
+    @Param('assetId') assetId: string,
+    @Body() dto: UpdateAssetDto,
+  ) {
+    return this.employeesService.updateAsset(id, assetId, dto);
+  }
+
+  @Patch(':id/assets/:assetId/unassign')
+  @Permissions('employees.manage')
+  unassignAsset(
+    @Param('id') id: string,
+    @Param('assetId') assetId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.employeesService.unassignAsset(id, assetId, user.sub);
   }
 }

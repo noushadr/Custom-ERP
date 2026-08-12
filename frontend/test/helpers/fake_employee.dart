@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:zera_erp/features/employee/domain/entities/asset.dart';
 import 'package:zera_erp/features/employee/domain/entities/audit_log_entry.dart';
 import 'package:zera_erp/features/employee/domain/entities/department.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
@@ -66,6 +67,29 @@ Employee buildTestEmployee({
   );
 }
 
+Asset buildTestAsset({
+  String id = 'asset-1',
+  String name = 'Dell Laptop',
+  String? category = 'Laptop',
+  String? serialNumber = 'SN-001',
+  String status = 'assigned',
+  String? assignedEmployeeId = 'employee-1',
+  DateTime? assignedAt,
+  String? notes,
+}) {
+  return Asset(
+    id: id,
+    name: name,
+    category: category,
+    serialNumber: serialNumber,
+    status: status,
+    assignedEmployeeId: assignedEmployeeId,
+    assignedAt: assignedAt ?? DateTime(2026, 1, 1),
+    notes: notes,
+    createdAt: DateTime(2026, 1, 1),
+  );
+}
+
 class FakeEmployeeRepository implements EmployeeRepository {
   FakeEmployeeRepository({
     this.employees = const [],
@@ -96,6 +120,12 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.deleteDepartmentError,
     this.upcomingBirthdays = const [],
     this.getUpcomingBirthdaysError,
+    this.assets = const [],
+    this.availableAssets = const [],
+    this.createAndAssignAssetError,
+    this.assignExistingAssetError,
+    this.updateAssetError,
+    this.unassignAssetError,
   }) : me = me ?? buildTestEmployee();
 
   final List<Employee> employees;
@@ -148,6 +178,24 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final List<SalaryRecord> salaryHistory;
   final List<EducationRecord> educationHistory;
   final List<Employee> directReports;
+  final List<Asset> assets;
+  final List<Asset> availableAssets;
+  final Object? createAndAssignAssetError;
+  final Object? assignExistingAssetError;
+  final Object? updateAssetError;
+  final Object? unassignAssetError;
+
+  /// The arguments passed to the most recent [createAndAssignAsset] call.
+  ({String employeeId, String name})? lastCreateAndAssignAssetInput;
+
+  /// The `assetId` passed to the most recent [assignExistingAsset] call.
+  String? lastAssignExistingAssetId;
+
+  /// The `assetId` passed to the most recent [updateAsset] call.
+  String? lastUpdateAssetId;
+
+  /// The `assetId` passed to the most recent [unassignAsset] call.
+  String? lastUnassignAssetId;
 
   @override
   Future<List<Employee>> getAll() async => employees;
@@ -395,4 +443,66 @@ class FakeEmployeeRepository implements EmployeeRepository {
     String employeeId,
     String recordId,
   ) async {}
+
+  @override
+  Future<List<Asset>> getMyAssets() async => assets;
+
+  @override
+  Future<List<Asset>> getAssets(String employeeId) async => assets;
+
+  @override
+  Future<List<Asset>> getAvailableAssets() async => availableAssets;
+
+  @override
+  Future<Asset> createAndAssignAsset(
+    String employeeId, {
+    required String name,
+    String? category,
+    String? serialNumber,
+    String? notes,
+  }) async {
+    lastCreateAndAssignAssetInput = (employeeId: employeeId, name: name);
+    if (createAndAssignAssetError != null) throw createAndAssignAssetError!;
+    return buildTestAsset(
+      name: name,
+      category: category,
+      serialNumber: serialNumber,
+      notes: notes,
+      assignedEmployeeId: employeeId,
+    );
+  }
+
+  @override
+  Future<Asset> assignExistingAsset(String employeeId, String assetId) async {
+    lastAssignExistingAssetId = assetId;
+    if (assignExistingAssetError != null) throw assignExistingAssetError!;
+    return buildTestAsset(id: assetId, assignedEmployeeId: employeeId);
+  }
+
+  @override
+  Future<Asset> updateAsset(
+    String employeeId,
+    String assetId, {
+    String? name,
+    String? category,
+    String? serialNumber,
+    String? notes,
+  }) async {
+    lastUpdateAssetId = assetId;
+    if (updateAssetError != null) throw updateAssetError!;
+    return buildTestAsset(
+      id: assetId,
+      name: name ?? 'Dell Laptop',
+      category: category,
+      serialNumber: serialNumber,
+      notes: notes,
+      assignedEmployeeId: employeeId,
+    );
+  }
+
+  @override
+  Future<void> unassignAsset(String employeeId, String assetId) async {
+    lastUnassignAssetId = assetId;
+    if (unassignAssetError != null) throw unassignAssetError!;
+  }
 }

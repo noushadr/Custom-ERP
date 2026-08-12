@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../../../shared/models/named_ref.dart';
+import '../../domain/entities/asset.dart';
 import '../../domain/entities/audit_log_entry.dart';
 import '../../domain/entities/department.dart';
 import '../../domain/entities/education_record.dart';
@@ -248,6 +249,62 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(
         () => _remoteDataSource.deleteEducationRecord(employeeId, recordId),
       );
+
+  @override
+  Future<List<Asset>> getMyAssets() =>
+      _guard(() => _remoteDataSource.getMyAssets());
+
+  @override
+  Future<List<Asset>> getAssets(String employeeId) =>
+      _guard(() => _remoteDataSource.getAssets(employeeId));
+
+  @override
+  Future<List<Asset>> getAvailableAssets() =>
+      _guard(() => _remoteDataSource.getAvailableAssets());
+
+  @override
+  Future<Asset> createAndAssignAsset(
+    String employeeId, {
+    required String name,
+    String? category,
+    String? serialNumber,
+    String? notes,
+  }) => _guard(
+    () => _remoteDataSource.createAndAssignAsset(
+      employeeId,
+      name: name,
+      category: category,
+      serialNumber: serialNumber,
+      notes: notes,
+    ),
+  );
+
+  @override
+  Future<Asset> assignExistingAsset(String employeeId, String assetId) =>
+      _guard(() => _remoteDataSource.assignExistingAsset(employeeId, assetId));
+
+  @override
+  Future<Asset> updateAsset(
+    String employeeId,
+    String assetId, {
+    String? name,
+    String? category,
+    String? serialNumber,
+    String? notes,
+  }) => _guard(
+    () => _remoteDataSource.updateAsset(
+      employeeId,
+      assetId,
+      name: name,
+      category: category,
+      serialNumber: serialNumber,
+      notes: notes,
+    ),
+  );
+
+  @override
+  Future<void> unassignAsset(String employeeId, String assetId) =>
+      _guard(() => _remoteDataSource.unassignAsset(employeeId, assetId));
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

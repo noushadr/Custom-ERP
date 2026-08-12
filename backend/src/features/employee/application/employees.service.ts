@@ -18,16 +18,22 @@ import {
   USER_REPOSITORY,
   type UserRepository,
 } from '../../authentication/domain/repositories/user-repository.interface';
+import { Asset } from '../domain/entities/asset.entity';
 import { Employee } from '../domain/entities/employee.entity';
 import { EmployeeAuditLog } from '../domain/entities/employee-audit-log.entity';
 import { EmployeeDocument } from '../domain/entities/employee-document.entity';
 import { EducationRecord } from '../domain/entities/education-record.entity';
 import { SalaryRecord } from '../domain/entities/salary-record.entity';
+import { AssetStatus } from '../domain/enums/asset-status.enum';
 import { DocumentType } from '../domain/enums/document-type.enum';
 import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../domain/repositories/employee-repository.interface';
+import {
+  ASSET_REPOSITORY,
+  type AssetRepository,
+} from '../domain/repositories/asset-repository.interface';
 import {
   DOCUMENT_REPOSITORY,
   type DocumentRepository,
@@ -44,6 +50,8 @@ import {
   SALARY_RECORD_REPOSITORY,
   type SalaryRecordRepository,
 } from '../domain/repositories/salary-record-repository.interface';
+import { AssetResponse } from './asset-response.interface';
+import { toAssetResponse } from './asset.mapper';
 import { AuditLogResponse } from './audit-log-response.interface';
 import { toAuditLogResponse } from './audit-log.mapper';
 import { DocumentResponse } from './document-response.interface';
@@ -54,7 +62,9 @@ import { generateTemporaryPassword } from '../../../core/utils/generate-temporar
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import { AddEducationRecordDto } from './dto/add-education-record.dto';
 import { AddSalaryRecordDto } from './dto/add-salary-record.dto';
+import { CreateAssetDto } from './dto/create-asset.dto';
 import { InviteEmployeeDto } from './dto/invite-employee.dto';
+import { UpdateAssetDto } from './dto/update-asset.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 import { EducationRecordResponse } from './education-record-response.interface';
@@ -138,6 +148,8 @@ export class EmployeesService {
     private readonly salaryRecordRepository: SalaryRecordRepository,
     @Inject(EDUCATION_RECORD_REPOSITORY)
     private readonly educationRecordRepository: EducationRecordRepository,
+    @Inject(ASSET_REPOSITORY)
+    private readonly assetRepository: AssetRepository,
   ) {}
 
   async invite(
@@ -635,6 +647,122 @@ export class EmployeesService {
         },
       ],
     );
+  }
+
+  async getMyAssets(userId: string): Promise<AssetResponse[]> {
+    const employee = await this.employeeRepository.findByUserId(userId);
+    if (!employee) throw new NotFoundException('Employee profile not found');
+    return this.getAssets(employee.id);
+  }
+
+  async getAssets(employeeId: string): Promise<AssetResponse[]> {
+    await this.ensureEmployeeExists(employeeId);
+    const assets =
+      await this.assetRepository.findByAssignedEmployeeId(employeeId);
+    return assets.map(toAssetResponse);
+  }
+
+  /** Currently unassigned assets, for the "assign existing asset" picker. */
+  async getAvailableAssets(): Promise<AssetResponse[]> {
+    const assets = await this.assetRepository.findAvailable();
+    return assets.map(toAssetResponse);
+  }
+
+  async createAndAssignAsset(
+    employeeId: string,
+    dto: CreateAssetDto,
+    actorUserId: string,
+  ): Promise<AssetResponse> {
+    await this.ensureEmployeeExists(employeeId);
+
+    const asset = new Asset();
+    asset.name = dto.name;
+    asset.category = dto.category;
+    asset.serialNumber = dto.serialNumber;
+    asset.notes = dto.notes;
+    asset.status = AssetStatus.ASSIGNED;
+    asset.assignedEmployeeId = employeeId;
+    asset.assignedAt = new Date();
+
+    const saved = await this.assetRepository.save(asset);
+
+    const actorName = await this.resolveActorName(actorUserId);
+    await this.recordAuditEntries(
+      employeeId,
+      { userId: actorUserId, name: actorName },
+      [{ fieldLabel: 'Assets', oldValue: null, newValue: `Assigned ${saved.name}` }],
+    );
+
+    return toAssetResponse(saved);
+  }
+
+  async assignExistingAsset(
+    employeeId: string,
+    assetId: string,
+    actorUserId: string,
+  ): Promise<AssetResponse> {
+    await this.ensureEmployeeExists(employeeId);
+    const asset = await this.assetRepository.findById(assetId);
+    if (!asset) throw new NotFoundException('Asset not found');
+    if (asset.status !== AssetStatus.AVAILABLE) {
+      throw new ConflictException('This asset is not available to assign');
+    }
+
+    asset.status = AssetStatus.ASSIGNED;
+    asset.assignedEmployeeId = employeeId;
+    asset.assignedAt = new Date();
+    const saved = await this.assetRepository.save(asset);
+
+    const actorName = await this.resolveActorName(actorUserId);
+    await this.recordAuditEntries(
+      employeeId,
+      { userId: actorUserId, name: actorName },
+      [{ fieldLabel: 'Assets', oldValue: null, newValue: `Assigned ${saved.name}` }],
+    );
+
+    return toAssetResponse(saved);
+  }
+
+  async updateAsset(
+    employeeId: string,
+    assetId: string,
+    dto: UpdateAssetDto,
+  ): Promise<AssetResponse> {
+    const asset = await this.loadAssignedAsset(employeeId, assetId);
+    Object.assign(asset, definedFieldsOnly(dto));
+    const saved = await this.assetRepository.save(asset);
+    return toAssetResponse(saved);
+  }
+
+  async unassignAsset(
+    employeeId: string,
+    assetId: string,
+    actorUserId: string,
+  ): Promise<void> {
+    const asset = await this.loadAssignedAsset(employeeId, assetId);
+
+    asset.status = AssetStatus.AVAILABLE;
+    asset.assignedEmployeeId = null;
+    asset.assignedAt = null;
+    await this.assetRepository.save(asset);
+
+    const actorName = await this.resolveActorName(actorUserId);
+    await this.recordAuditEntries(
+      employeeId,
+      { userId: actorUserId, name: actorName },
+      [{ fieldLabel: 'Assets', oldValue: `Unassigned ${asset.name}`, newValue: null }],
+    );
+  }
+
+  private async loadAssignedAsset(
+    employeeId: string,
+    assetId: string,
+  ): Promise<Asset> {
+    const asset = await this.assetRepository.findById(assetId);
+    if (!asset || asset.assignedEmployeeId !== employeeId) {
+      throw new NotFoundException('Asset not found');
+    }
+    return asset;
   }
 
   private formatAmount(amount: string): string {

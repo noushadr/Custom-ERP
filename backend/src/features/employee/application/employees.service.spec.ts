@@ -9,15 +9,31 @@ import { User } from '../../authentication/domain/entities/user.entity';
 import { UserStatus } from '../../authentication/domain/enums/user-status.enum';
 import type { RoleRepository } from '../../authentication/domain/repositories/role-repository.interface';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
+import { Asset } from '../domain/entities/asset.entity';
 import { Employee } from '../domain/entities/employee.entity';
+import { AssetStatus } from '../domain/enums/asset-status.enum';
 import { EmploymentStatus } from '../domain/enums/employment-status.enum';
 import { EmploymentType } from '../domain/enums/employment-type.enum';
+import type { AssetRepository } from '../domain/repositories/asset-repository.interface';
 import type { AuditLogRepository } from '../domain/repositories/audit-log-repository.interface';
 import type { DocumentRepository } from '../domain/repositories/document-repository.interface';
 import type { EmployeeRepository } from '../domain/repositories/employee-repository.interface';
 import type { EducationRecordRepository } from '../domain/repositories/education-record-repository.interface';
 import type { SalaryRecordRepository } from '../domain/repositories/salary-record-repository.interface';
 import { EmployeesService } from './employees.service';
+
+function buildAsset(overrides: Partial<Asset> = {}): Asset {
+  return {
+    id: 'asset-1',
+    name: 'Dell Laptop',
+    status: AssetStatus.AVAILABLE,
+    assignedEmployeeId: null,
+    assignedAt: null,
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+    ...overrides,
+  } as Asset;
+}
 
 jest.mock('bcryptjs');
 
@@ -73,6 +89,7 @@ describe('EmployeesService', () => {
   let auditLogRepository: jest.Mocked<AuditLogRepository>;
   let salaryRecordRepository: jest.Mocked<SalaryRecordRepository>;
   let educationRecordRepository: jest.Mocked<EducationRecordRepository>;
+  let assetRepository: jest.Mocked<AssetRepository>;
 
   beforeEach(() => {
     employeeRepository = {
@@ -115,6 +132,12 @@ describe('EmployeesService', () => {
       save: jest.fn(),
       remove: jest.fn(),
     };
+    assetRepository = {
+      findByAssignedEmployeeId: jest.fn().mockResolvedValue([]),
+      findAvailable: jest.fn().mockResolvedValue([]),
+      findById: jest.fn(),
+      save: jest.fn(),
+    };
 
     service = new EmployeesService(
       employeeRepository,
@@ -124,6 +147,7 @@ describe('EmployeesService', () => {
       auditLogRepository,
       salaryRecordRepository,
       educationRecordRepository,
+      assetRepository,
     );
 
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-temp-password');
@@ -385,6 +409,146 @@ describe('EmployeesService', () => {
           fieldLabel: 'Phone Number',
           newValue: '+1234567890',
         }),
+      ]);
+    });
+  });
+
+  describe('getMyAssets', () => {
+    it('throws NotFoundException when the caller has no employee profile', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await expect(service.getMyAssets('user-1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it("returns the caller's assigned assets", async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+      assetRepository.findByAssignedEmployeeId.mockResolvedValue([
+        buildAsset({ status: AssetStatus.ASSIGNED, assignedEmployeeId: 'employee-1' }),
+      ]);
+
+      const result = await service.getMyAssets('user-1');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].status).toBe(AssetStatus.ASSIGNED);
+    });
+  });
+
+  describe('createAndAssignAsset', () => {
+    it('creates a new asset already assigned to the employee', async () => {
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      assetRepository.save.mockImplementation((asset) =>
+        Promise.resolve({ ...asset, id: 'new-asset-id' } as Asset),
+      );
+
+      const result = await service.createAndAssignAsset(
+        'employee-1',
+        { name: 'Dell Laptop', serialNumber: 'SN-1' },
+        'user-1',
+      );
+
+      expect(assetRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Dell Laptop',
+          status: AssetStatus.ASSIGNED,
+          assignedEmployeeId: 'employee-1',
+        }),
+      );
+      expect(result.status).toBe(AssetStatus.ASSIGNED);
+      expect(auditLogRepository.saveMany).toHaveBeenCalledWith([
+        expect.objectContaining({ fieldLabel: 'Assets' }),
+      ]);
+    });
+  });
+
+  describe('assignExistingAsset', () => {
+    it('throws ConflictException when the asset is not available', async () => {
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+      assetRepository.findById.mockResolvedValue(
+        buildAsset({ status: AssetStatus.ASSIGNED, assignedEmployeeId: 'someone-else' }),
+      );
+
+      await expect(
+        service.assignExistingAsset('employee-1', 'asset-1', 'user-1'),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('assigns an available asset to the employee', async () => {
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      assetRepository.findById.mockResolvedValue(
+        buildAsset({ status: AssetStatus.AVAILABLE }),
+      );
+      assetRepository.save.mockImplementation((asset) =>
+        Promise.resolve(asset),
+      );
+
+      const result = await service.assignExistingAsset(
+        'employee-1',
+        'asset-1',
+        'user-1',
+      );
+
+      expect(result.assignedEmployeeId).toBe('employee-1');
+      expect(result.status).toBe(AssetStatus.ASSIGNED);
+    });
+  });
+
+  describe('updateAsset', () => {
+    it('throws NotFoundException when the asset is not assigned to that employee', async () => {
+      assetRepository.findById.mockResolvedValue(
+        buildAsset({ assignedEmployeeId: 'someone-else' }),
+      );
+
+      await expect(
+        service.updateAsset('employee-1', 'asset-1', { name: 'New name' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('updates the asset details', async () => {
+      assetRepository.findById.mockResolvedValue(
+        buildAsset({ assignedEmployeeId: 'employee-1' }),
+      );
+      assetRepository.save.mockImplementation((asset) =>
+        Promise.resolve(asset),
+      );
+
+      const result = await service.updateAsset('employee-1', 'asset-1', {
+        name: 'Updated name',
+      });
+
+      expect(result.name).toBe('Updated name');
+    });
+  });
+
+  describe('unassignAsset', () => {
+    it('clears the assignment and records an audit entry', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      assetRepository.findById.mockResolvedValue(
+        buildAsset({
+          status: AssetStatus.ASSIGNED,
+          assignedEmployeeId: 'employee-1',
+          assignedAt: new Date('2026-01-01'),
+        }),
+      );
+      assetRepository.save.mockImplementation((asset) =>
+        Promise.resolve(asset),
+      );
+
+      await service.unassignAsset('employee-1', 'asset-1', 'user-1');
+
+      expect(assetRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: AssetStatus.AVAILABLE,
+          assignedEmployeeId: null,
+          assignedAt: null,
+        }),
+      );
+      expect(auditLogRepository.saveMany).toHaveBeenCalledWith([
+        expect.objectContaining({ fieldLabel: 'Assets' }),
       ]);
     });
   });

@@ -5,6 +5,7 @@ import '../../domain/entities/employee_document.dart';
 import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
+import '../models/asset_model.dart';
 import '../models/audit_log_entry_model.dart';
 import '../models/department_model.dart';
 import '../models/education_record_model.dart';
@@ -375,5 +376,86 @@ class EmployeeRemoteDataSource {
     String recordId,
   ) async {
     await _dio.delete('/employees/$employeeId/education-history/$recordId');
+  }
+
+  Future<List<AssetModel>> getMyAssets() async {
+    final response = await _dio.get<List<dynamic>>('/employees/me/assets');
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(AssetModel.fromJson)
+        .toList();
+  }
+
+  Future<List<AssetModel>> getAssets(String employeeId) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/employees/$employeeId/assets',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(AssetModel.fromJson)
+        .toList();
+  }
+
+  Future<List<AssetModel>> getAvailableAssets() async {
+    final response = await _dio.get<List<dynamic>>(
+      '/employees/assets/available',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(AssetModel.fromJson)
+        .toList();
+  }
+
+  Future<AssetModel> createAndAssignAsset(
+    String employeeId, {
+    required String name,
+    String? category,
+    String? serialNumber,
+    String? notes,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/employees/$employeeId/assets',
+      data: {
+        'name': name,
+        'category': ?category,
+        'serialNumber': ?serialNumber,
+        'notes': ?notes,
+      },
+    );
+    return AssetModel.fromJson(response.data!);
+  }
+
+  Future<AssetModel> assignExistingAsset(
+    String employeeId,
+    String assetId,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/employees/$employeeId/assets/$assetId/assign',
+    );
+    return AssetModel.fromJson(response.data!);
+  }
+
+  Future<AssetModel> updateAsset(
+    String employeeId,
+    String assetId, {
+    String? name,
+    String? category,
+    String? serialNumber,
+    String? notes,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/employees/$employeeId/assets/$assetId',
+      data: {
+        'name': ?name,
+        'category': ?category,
+        'serialNumber': ?serialNumber,
+        'notes': ?notes,
+      },
+    );
+    return AssetModel.fromJson(response.data!);
+  }
+
+  Future<void> unassignAsset(String employeeId, String assetId) async {
+    await _dio.patch('/employees/$employeeId/assets/$assetId/unassign');
   }
 }

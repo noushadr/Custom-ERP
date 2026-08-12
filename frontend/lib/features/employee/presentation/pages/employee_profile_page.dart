@@ -9,6 +9,7 @@ import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
+import '../widgets/employee_assets_section.dart';
 import '../widgets/employee_audit_log_panel.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_documents_section.dart';
@@ -251,6 +252,12 @@ class _ProfileBody extends ConsumerWidget {
         if (showAuditLog) ...[
           const SizedBox(height: 16),
           EmployeeSalaryHistorySection(
+            employeeId: employee.id,
+            isSelf: isOwnProfile,
+            canManage: canManage,
+          ),
+          const SizedBox(height: 16),
+          EmployeeAssetsSection(
             employeeId: employee.id,
             isSelf: isOwnProfile,
             canManage: canManage,

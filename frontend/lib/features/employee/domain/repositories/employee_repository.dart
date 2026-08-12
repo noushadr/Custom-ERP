@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import '../../../../shared/models/named_ref.dart';
+import '../entities/asset.dart';
 import '../entities/audit_log_entry.dart';
 import '../entities/department.dart';
 import '../entities/education_record.dart';
@@ -147,4 +148,43 @@ abstract interface class EmployeeRepository {
 
   /// Requires `employees.manage`.
   Future<void> deleteEducationRecord(String employeeId, String recordId);
+
+  /// Assets currently assigned to the caller.
+  Future<List<Asset>> getMyAssets();
+
+  /// Assets currently assigned to [employeeId]. Requires `employees.manage`.
+  Future<List<Asset>> getAssets(String employeeId);
+
+  /// Currently unassigned assets, for the "assign existing asset" picker.
+  /// Requires `employees.manage`.
+  Future<List<Asset>> getAvailableAssets();
+
+  /// Creates a brand-new asset and assigns it to [employeeId] immediately.
+  /// Requires `employees.manage`.
+  Future<Asset> createAndAssignAsset(
+    String employeeId, {
+    required String name,
+    String? category,
+    String? serialNumber,
+    String? notes,
+  });
+
+  /// Assigns a previously-unassigned asset to [employeeId]. Requires
+  /// `employees.manage`.
+  Future<Asset> assignExistingAsset(String employeeId, String assetId);
+
+  /// Edits an assigned asset's own details (not its assignment). Requires
+  /// `employees.manage`.
+  Future<Asset> updateAsset(
+    String employeeId,
+    String assetId, {
+    String? name,
+    String? category,
+    String? serialNumber,
+    String? notes,
+  });
+
+  /// Unassigns an asset from [employeeId], making it available again.
+  /// Requires `employees.manage`.
+  Future<void> unassignAsset(String employeeId, String assetId);
 }
