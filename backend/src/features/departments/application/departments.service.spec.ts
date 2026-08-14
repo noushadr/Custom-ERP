@@ -1,7 +1,9 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
 import { Department } from '../domain/entities/department.entity';
 import type { DepartmentRepository } from '../domain/repositories/department-repository.interface';
 import { DepartmentsService } from './departments.service';
+import { UpdateDepartmentDto } from './dto/update-department.dto';
 
 function buildDepartment(overrides: Partial<Department> = {}): Department {
   return {
@@ -87,6 +89,30 @@ describe('DepartmentsService', () => {
         service.update('missing-department', { name: 'New Name' }),
       ).rejects.toThrow(NotFoundException);
       expect(departmentRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('archiving alone does not wipe the name — regression test for the real request shape', async () => {
+      // A plain object literal like `{ isArchived: true }` has no `name` key
+      // at all, so it can't reproduce this bug. The real HTTP pipeline runs
+      // the body through class-transformer first, and every declared-but-
+      // unset field on the resulting instance is an explicit `undefined` own
+      // property (`useDefineForClassFields`) — that's what previously made
+      // `Object.assign(department, dto)` overwrite `name` with `undefined`.
+      const dto = plainToInstance(UpdateDepartmentDto, { isArchived: true });
+      expect(Object.keys(dto)).toContain('name');
+
+      const existing = buildDepartment({ headEmployeeId: 'employee-1' });
+      departmentRepository.findById.mockResolvedValue(existing);
+      departmentRepository.save.mockImplementation((department) =>
+        Promise.resolve(department),
+      );
+
+      const result = await service.update('department-1', dto);
+
+      expect(result.isArchived).toBe(true);
+      expect(result.name).toBe('Engineering');
+      expect(result.description).toBe('Product engineering');
+      expect(result.headEmployeeId).toBe('employee-1');
     });
   });
 

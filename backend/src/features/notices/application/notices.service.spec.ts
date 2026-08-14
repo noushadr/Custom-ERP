@@ -67,7 +67,7 @@ describe('NoticesService', () => {
       expect(result.title).toBe('Office closed');
     });
 
-    it('falls back to the user email when there is no employee profile', async () => {
+    it('derives a display name from the email when there is no employee profile', async () => {
       employeeRepository.findByUserId.mockResolvedValue(null);
       userRepository.findById.mockResolvedValue({
         email: 'admin@zeracreative.com',
@@ -81,7 +81,7 @@ describe('NoticesService', () => {
         'user-2',
       );
 
-      expect(result.authorName).toBe('admin@zeracreative.com');
+      expect(result.authorName).toBe('Admin');
     });
   });
 });

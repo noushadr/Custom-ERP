@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util';
 import { Department } from '../domain/entities/department.entity';
 import {
   DEPARTMENT_REPOSITORY,
@@ -37,7 +38,7 @@ export class DepartmentsService {
     const department = await this.departmentRepository.findById(id);
     if (!department) throw new NotFoundException('Department not found');
 
-    Object.assign(department, dto);
+    Object.assign(department, definedFieldsOnly(dto));
     return this.departmentRepository.save(department);
   }
 
