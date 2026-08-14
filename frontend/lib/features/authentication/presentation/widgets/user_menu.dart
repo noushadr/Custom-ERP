@@ -4,13 +4,12 @@ import '../../../../core/theme/app_colors.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
 
-enum _UserMenuAction { profile, signOut }
+enum _UserMenuAction { signOut }
 
 /// Avatar + dropdown shown in the top bar of the authenticated shell.
 class UserMenu extends ConsumerWidget {
-  const UserMenu({super.key, required this.onProfileTap, required this.onSignOut});
+  const UserMenu({super.key, required this.onSignOut});
 
-  final VoidCallback onProfileTap;
   final VoidCallback onSignOut;
 
   @override
@@ -24,7 +23,6 @@ class UserMenu extends ConsumerWidget {
       tooltip: 'Account menu',
       offset: const Offset(0, 44),
       onSelected: (action) => switch (action) {
-        _UserMenuAction.profile => onProfileTap(),
         _UserMenuAction.signOut => onSignOut(),
       },
       itemBuilder: (context) => [
@@ -45,16 +43,6 @@ class UserMenu extends ConsumerWidget {
           ),
         ),
         const PopupMenuDivider(),
-        const PopupMenuItem<_UserMenuAction>(
-          value: _UserMenuAction.profile,
-          child: Row(
-            children: [
-              Icon(Icons.account_circle_outlined, size: 20),
-              SizedBox(width: 12),
-              Text('My profile'),
-            ],
-          ),
-        ),
         const PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.signOut,
           child: Row(

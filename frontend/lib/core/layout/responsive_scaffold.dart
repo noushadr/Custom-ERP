@@ -67,24 +67,30 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
     return Scaffold(
       body: Row(
         children: [
-          NavigationRail(
-            extended: true,
-            selectedIndex: widget.selectedIndex,
-            onDestinationSelected: widget.onDestinationSelected,
-            leading: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: const ZeraLogo(height: 24),
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              border: Border(
+                right: BorderSide(color: AppColors.borderSubtle),
               ),
             ),
-            destinations: _railDestinations,
+            child: NavigationRail(
+              extended: true,
+              selectedIndex: widget.selectedIndex,
+              onDestinationSelected: widget.onDestinationSelected,
+              leading: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: const ZeraLogo(height: 24),
+                ),
+              ),
+              destinations: _railDestinations,
+            ),
           ),
           Expanded(
             child: Column(
               children: [
                 _TopBar(title: _currentLabel, actions: widget.actions),
-                const Divider(height: 1),
                 Expanded(child: _canvas(widget.body)),
                 const AppFooter(),
               ],
@@ -168,9 +174,18 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      color: AppColors.background,
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.navActive.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(
         children: [
           Text(title, style: Theme.of(context).textTheme.titleMedium),

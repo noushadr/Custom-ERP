@@ -43,9 +43,10 @@ Each feature: presentation / application / domain / data layers.
 
 ## Branding
 - Company: Zera Creative
-- Colors: background white `#FFFFFF`, primary/brand `#00D5EE`, text dark gray/near-black, cards white, borders light gray, plus standard success/warning/error status colors. Use the brand accent consistently for primary buttons, links, active nav, icons, progress, selected/focus states, interactive components — avoid extra accent colors.
+- Colors (updated to a modern-SaaS palette, see `frontend/lib/core/theme/app_colors.dart`): background white `#FFFFFF`, canvas/fields softly lavender-tinted `#F5F4FB`/`#F1F0F9`, primary/brand violet `#6C5DD3` with a soft tint `#EDEBFC`, secondary blue `#4F8EF7` and the original Zera cyan `#00D5EE` kept as a tertiary accent — used together across stat tiles, charts, and progress indicators rather than a single flat accent. Near-black `#181425` for high-contrast tiles and the active nav pill. Text dark gray/near-black, cards white with soft shadows (not just borders), plus standard success/warning/error status colors (each with a soft tint for pill badges/tiles).
+- Shape language: generous rounded corners (cards ~18px, buttons/inputs ~12px, pills fully rounded), soft drop shadows instead of flat borders on cards, colorful soft-tinted stat tiles (`MetricCard`) rather than plain white-with-colored-number tiles.
 - Logo: official Zera Creative logo (not yet supplied in repo) goes in `assets/branding/`; used on login, sidebar, header, splash, app icon, favicon. Never recreate/modify it.
-- Feel: clean, minimal, spacious, premium.
+- Feel: modern SaaS dashboard — clean and spacious, but colorful/lively rather than monochrome-minimal.
 
 ## Authentication
 - Company-email-only registration (`firstname.lastname@zeracreative.com`), no public registration
