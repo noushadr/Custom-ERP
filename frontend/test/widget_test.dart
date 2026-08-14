@@ -60,7 +60,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Total Employees'), findsOneWidget);
-    expect(find.text('Employment Status'), findsOneWidget);
+    expect(find.text('Active'), findsOneWidget);
   });
 
   testWidgets('switching destinations updates the body', (

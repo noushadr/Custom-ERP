@@ -57,14 +57,6 @@ class _DashboardStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = employees.length;
-    final departmentCount = employees
-        .map((e) => e.department?.id)
-        .whereType<String>()
-        .toSet()
-        .length;
-    final pendingInvites = employees
-        .where((e) => e.accountStatus == 'pending_invite')
-        .length;
     final now = DateTime.now();
     final newHiresThisMonth = employees.where((e) {
       final joined = DateTime.tryParse(e.joiningDate);
@@ -121,60 +113,49 @@ class _DashboardStats extends StatelessWidget {
                 label: 'Total Employees',
                 value: '$total',
                 color: AppColors.primary,
-              ),
-              MetricCard(
-                label: 'Departments',
-                value: '$departmentCount',
-                color: AppColors.primary,
-              ),
-              MetricCard(
-                label: 'Pending Invites',
-                value: '$pendingInvites',
-                color: AppColors.warning,
+                icon: Icons.people_alt_outlined,
               ),
               MetricCard(
                 label: 'New Hires (This Month)',
                 value: '$newHiresThisMonth',
                 color: AppColors.success,
+                icon: Icons.person_add_alt_outlined,
               ),
               MetricCard(
                 label: 'Avg. Profile Completion',
                 value: '$avgProfileCompletion%',
-                color: AppColors.textSecondary,
+                color: AppColors.accentTeal,
+                icon: Icons.donut_large_outlined,
               ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          const _SectionHeader('Employment Status'),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
               MetricCard(
                 label: 'Active',
                 value: '${byStatus['active'] ?? 0}',
                 color: AppColors.success,
+                icon: Icons.check_circle_outline,
               ),
               MetricCard(
                 label: 'On Leave',
                 value: '${byStatus['on_leave'] ?? 0}',
                 color: AppColors.warning,
+                icon: Icons.beach_access_outlined,
               ),
               MetricCard(
                 label: 'Notice Period',
                 value: '${byStatus['notice_period'] ?? 0}',
-                color: AppColors.warning,
+                color: AppColors.secondary,
+                icon: Icons.event_busy_outlined,
               ),
               MetricCard(
                 label: 'Resigned',
                 value: '${byStatus['resigned'] ?? 0}',
                 color: AppColors.error,
+                icon: Icons.logout_outlined,
               ),
               MetricCard(
                 label: 'Terminated',
                 value: '${byStatus['terminated'] ?? 0}',
                 color: AppColors.error,
+                icon: Icons.cancel_outlined,
               ),
             ],
           ),
@@ -189,16 +170,19 @@ class _DashboardStats extends StatelessWidget {
                 label: 'On-site',
                 value: '${byWorkMode['on_site'] ?? 0}',
                 color: AppColors.textSecondary,
+                icon: Icons.apartment_outlined,
               ),
               MetricCard(
                 label: 'Remote',
                 value: '${byWorkMode['remote'] ?? 0}',
                 color: AppColors.textSecondary,
+                icon: Icons.home_outlined,
               ),
               MetricCard(
                 label: 'Hybrid',
                 value: '${byWorkMode['hybrid'] ?? 0}',
                 color: AppColors.textSecondary,
+                icon: Icons.sync_alt_outlined,
               ),
             ],
           ),
