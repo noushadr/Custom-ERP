@@ -24,17 +24,16 @@ class AuditLogEntry {
 const _dateFieldLabels = {'Joining Date', 'Date of Leaving', 'Date of Birth'};
 
 extension AuditLogEntryDescription on AuditLogEntry {
-  /// A human-readable summary of the change, e.g. "Old → New", or just the
-  /// one side that's set for additive/removal-only changes (uploads, deletes).
+  /// A human-readable summary of the change, always as "Before → After" so
+  /// the changelog never leaves either side to guesswork — a field that was
+  /// empty beforehand (or cleared) shows explicitly as "Not set".
   String get describeChange {
     final old = _display(oldValue);
     final current = _display(newValue);
     final hasOld = old != null && old.isNotEmpty;
     final hasNew = current != null && current.isNotEmpty;
-    if (hasOld && hasNew) return '$old → $current';
-    if (hasNew) return current;
-    if (hasOld) return old;
-    return 'No details recorded.';
+    if (!hasOld && !hasNew) return 'No details recorded.';
+    return '${hasOld ? old : 'Not set'} → ${hasNew ? current : 'Not set'}';
   }
 
   String? _display(String? value) {
