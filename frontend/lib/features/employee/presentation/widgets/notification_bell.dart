@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/utils/date_format.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../leave/application/leave_providers.dart';
@@ -13,14 +14,19 @@ import '../../domain/entities/upcoming_birthday.dart';
 /// Where tapping a notification should take the viewer.
 enum NotificationLinkTarget { adminDashboard, userDashboard, leavePage }
 
-const _recentlyDecidedWindow = Duration(days: 7);
+// How many past (already-decided) items to keep per history list — a record
+// of what happened, not just what's still pending, but bounded so the list
+// doesn't grow forever for a long-tenured employee. Unlike the old 7-day
+// cutoff this never hides something just because time passed.
+const _maxDecidedHistory = 10;
 
 /// Bell + dropdown shown in the top bar, next to the account menu — mirrors
 /// how most SaaS/social apps surface notifications rather than giving them
 /// their own nav destination. Combines birthday reminders (Super
-/// Admin/HR-Manager only), requests/leave awaiting the viewer's approval,
-/// a leave-balance-reset reminder (Super Admin/HR only), and the viewer's
-/// own recently-decided leave requests.
+/// Admin/HR-Manager only), requests/leave awaiting the viewer's approval, a
+/// leave-balance-reset reminder (Super Admin/HR only), and the viewer's own
+/// recently-decided requests/leave — every item shows how long ago it
+/// happened.
 class NotificationBell extends ConsumerWidget {
   const NotificationBell({super.key, required this.onNavigate});
 
@@ -56,10 +62,17 @@ class NotificationBell extends ConsumerWidget {
         ? ref.watch(leaveResetStatusProvider).valueOrNull
         : null;
     final needsLeaveReset = resetStatus != null && !resetStatus.isInitialized;
-    final myRecentLeaveDecisions =
-        (ref.watch(myLeaveRequestsProvider).valueOrNull ?? const [])
-            .where(_wasRecentlyDecided)
-            .toList();
+
+    final myRecentLeaveDecisions = _recentlyDecided(
+      ref.watch(myLeaveRequestsProvider).valueOrNull ?? const [],
+      isDecided: (r) => r.status == 'approved' || r.status == 'rejected',
+      decidedAt: (r) => r.hrDecisionAt ?? r.managerDecisionAt,
+    );
+    final myRecentRequestDecisions = _recentlyDecided(
+      ref.watch(myRequestsProvider).valueOrNull ?? const [],
+      isDecided: (r) => r.status == 'completed' || r.status == 'rejected',
+      decidedAt: (r) => r.hrDecisionAt ?? r.managerDecisionAt,
+    );
 
     final totalCount =
         birthdays.length +
@@ -68,6 +81,7 @@ class NotificationBell extends ConsumerWidget {
         leaveHrApprovals.length +
         leaveManagerApprovals.length +
         myRecentLeaveDecisions.length +
+        myRecentRequestDecisions.length +
         (needsLeaveReset ? 1 : 0);
 
     return PopupMenuButton<NotificationLinkTarget>(
@@ -107,6 +121,7 @@ class NotificationBell extends ConsumerWidget {
               child: _RequestRow(
                 request: request,
                 caption: 'Awaiting HR approval',
+                timestamp: request.managerDecisionAt ?? request.createdAt,
               ),
             ),
           for (final request in managerApprovals)
@@ -116,6 +131,7 @@ class NotificationBell extends ConsumerWidget {
               child: _RequestRow(
                 request: request,
                 caption: 'Awaiting your approval',
+                timestamp: request.createdAt,
               ),
             ),
           for (final request in leaveHrApprovals)
@@ -125,6 +141,7 @@ class NotificationBell extends ConsumerWidget {
               child: _LeaveRequestRow(
                 request: request,
                 caption: 'Leave awaiting HR approval',
+                timestamp: request.managerDecisionAt ?? request.createdAt,
               ),
             ),
           for (final request in leaveManagerApprovals)
@@ -134,6 +151,7 @@ class NotificationBell extends ConsumerWidget {
               child: _LeaveRequestRow(
                 request: request,
                 caption: 'Leave awaiting your approval',
+                timestamp: request.createdAt,
               ),
             ),
           for (final request in myRecentLeaveDecisions)
@@ -145,6 +163,25 @@ class NotificationBell extends ConsumerWidget {
                 caption: request.status == 'approved'
                     ? 'Your leave was approved'
                     : 'Your leave was rejected',
+                timestamp:
+                    request.hrDecisionAt ??
+                    request.managerDecisionAt ??
+                    request.createdAt,
+              ),
+            ),
+          for (final request in myRecentRequestDecisions)
+            PopupMenuItem<NotificationLinkTarget>(
+              value: NotificationLinkTarget.userDashboard,
+              height: 44,
+              child: _RequestRow(
+                request: request,
+                caption: request.status == 'completed'
+                    ? 'Your request was completed'
+                    : 'Your request was rejected',
+                timestamp:
+                    request.hrDecisionAt ??
+                    request.managerDecisionAt ??
+                    request.createdAt,
               ),
             ),
         ],
@@ -158,15 +195,23 @@ class NotificationBell extends ConsumerWidget {
       ),
     );
   }
+}
 
-  bool _wasRecentlyDecided(LeaveRequest request) {
-    if (request.status != 'approved' && request.status != 'rejected') {
-      return false;
-    }
-    final decidedAt = request.hrDecisionAt ?? request.managerDecisionAt;
-    if (decidedAt == null) return false;
-    return DateTime.now().difference(decidedAt) <= _recentlyDecidedWindow;
-  }
+/// Keeps only the already-decided items (per [isDecided]), newest-first by
+/// [decidedAt], capped to [_maxDecidedHistory] — a bounded history rather
+/// than a time-window cutoff, so nothing vanishes just because time passed.
+List<T> _recentlyDecided<T>(
+  List<T> items, {
+  required bool Function(T) isDecided,
+  required DateTime? Function(T) decidedAt,
+}) {
+  final decided = items.where(isDecided).toList()
+    ..sort((a, b) {
+      final aAt = decidedAt(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bAt = decidedAt(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bAt.compareTo(aAt);
+    });
+  return decided.take(_maxDecidedHistory).toList();
 }
 
 class _BirthdayRow extends StatelessWidget {
@@ -199,10 +244,15 @@ class _BirthdayRow extends StatelessWidget {
 }
 
 class _LeaveRequestRow extends StatelessWidget {
-  const _LeaveRequestRow({required this.request, required this.caption});
+  const _LeaveRequestRow({
+    required this.request,
+    required this.caption,
+    required this.timestamp,
+  });
 
   final LeaveRequest request;
   final String caption;
+  final DateTime timestamp;
 
   @override
   Widget build(BuildContext context) {
@@ -219,12 +269,25 @@ class _LeaveRequestRow extends StatelessWidget {
               context,
             ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
           ),
-          Text(
-            caption,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.textSecondary,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  caption,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                formatRelativeTime(timestamp),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textSecondary.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -233,10 +296,15 @@ class _LeaveRequestRow extends StatelessWidget {
 }
 
 class _RequestRow extends StatelessWidget {
-  const _RequestRow({required this.request, required this.caption});
+  const _RequestRow({
+    required this.request,
+    required this.caption,
+    required this.timestamp,
+  });
 
   final EmployeeRequest request;
   final String caption;
+  final DateTime timestamp;
 
   @override
   Widget build(BuildContext context) {
@@ -253,12 +321,25 @@ class _RequestRow extends StatelessWidget {
               context,
             ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
           ),
-          Text(
-            caption,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.textSecondary,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  caption,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                formatRelativeTime(timestamp),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textSecondary.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
           ),
         ],
       ),

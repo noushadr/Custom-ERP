@@ -8,6 +8,9 @@ EmployeeRequest buildTestRequest({
   String subject = 'New laptop',
   String description = 'Current one is broken.',
   String status = 'submitted',
+  DateTime? managerDecisionAt,
+  DateTime? hrDecisionAt,
+  DateTime? createdAt,
 }) {
   return EmployeeRequest(
     id: id,
@@ -16,7 +19,9 @@ EmployeeRequest buildTestRequest({
     subject: subject,
     description: description,
     status: status,
-    createdAt: DateTime(2026, 1, 1),
+    managerDecisionAt: managerDecisionAt,
+    hrDecisionAt: hrDecisionAt,
+    createdAt: createdAt ?? DateTime(2026, 1, 1),
   );
 }
 

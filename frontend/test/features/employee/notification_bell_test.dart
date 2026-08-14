@@ -283,6 +283,69 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Your leave was approved'), findsOneWidget);
+      expect(find.text('1 day ago'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows the viewer\'s own recently-decided employee request',
+    (tester) async {
+      final requestRepository = FakeRequestRepository(
+        mine: [
+          buildTestRequest(
+            id: 'request-mine',
+            requesterName: 'Jane Doe',
+            status: 'completed',
+            hrDecisionAt: DateTime.now().subtract(const Duration(hours: 5)),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: const [],
+          employeeRepository: FakeEmployeeRepository(),
+          requestRepository: requestRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your request was completed'), findsOneWidget);
+      expect(find.text('5 hours ago'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'keeps showing a leave decision from weeks ago instead of hiding it',
+    (tester) async {
+      final leaveRepository = FakeLeaveRepository(
+        myRequests: [
+          buildTestLeaveRequest(
+            id: 'leave-old',
+            status: 'rejected',
+            hrDecisionAt: DateTime.now().subtract(const Duration(days: 30)),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: const [],
+          employeeRepository: FakeEmployeeRepository(),
+          requestRepository: FakeRequestRepository(),
+          leaveRepository: leaveRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your leave was rejected'), findsOneWidget);
+      expect(find.text('30 days ago'), findsOneWidget);
     },
   );
 }

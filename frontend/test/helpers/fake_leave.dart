@@ -78,6 +78,7 @@ LeaveRequest buildTestLeaveRequest({
   String? managerDecisionByName,
   DateTime? managerDecisionAt,
   DateTime? hrDecisionAt,
+  DateTime? createdAt,
 }) {
   return LeaveRequest(
     id: id,
@@ -93,7 +94,7 @@ LeaveRequest buildTestLeaveRequest({
     managerDecisionByName: managerDecisionByName,
     managerDecisionAt: managerDecisionAt,
     hrDecisionAt: hrDecisionAt,
-    createdAt: DateTime(2026, 1, 1),
+    createdAt: createdAt ?? DateTime(2026, 1, 1),
   );
 }
 
