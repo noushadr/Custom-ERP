@@ -73,3 +73,10 @@ class Employee {
   final List<String> certifications;
   final int profileCompletionPercentage;
 }
+
+extension EmployeeStatusChecks on Employee {
+  /// False once someone has resigned or been terminated — used to keep
+  /// former employees out of the org chart and out of "current" counts.
+  bool get isCurrentEmployee =>
+      employmentStatus != 'resigned' && employmentStatus != 'terminated';
+}

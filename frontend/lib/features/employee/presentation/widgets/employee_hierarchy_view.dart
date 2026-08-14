@@ -32,11 +32,21 @@ class _EmployeeHierarchyViewState extends State<EmployeeHierarchyView> {
 
   @override
   Widget build(BuildContext context) {
+    // Former employees don't belong in a live org chart. If one of them was
+    // someone's manager, their still-active reports become roots instead of
+    // disappearing along with them.
+    final visible = widget.employees
+        .where((employee) => employee.isCurrentEmployee)
+        .toList();
+    final visibleIds = visible.map((employee) => employee.id).toSet();
+
     final reportsByManagerId = <String?, List<Employee>>{};
-    for (final employee in widget.employees) {
-      reportsByManagerId
-          .putIfAbsent(employee.reportingManager?.id, () => [])
-          .add(employee);
+    for (final employee in visible) {
+      final managerId = employee.reportingManager?.id;
+      final key = (managerId != null && visibleIds.contains(managerId))
+          ? managerId
+          : null;
+      reportsByManagerId.putIfAbsent(key, () => []).add(employee);
     }
     final roots = reportsByManagerId[null] ?? [];
 

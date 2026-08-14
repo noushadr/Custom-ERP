@@ -124,24 +124,26 @@ class _ProfileBody extends ConsumerWidget {
                           const SizedBox(width: 8),
                         ],
                         if (isOwnProfile)
-                          OutlinedButton(
+                          OutlinedButton.icon(
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) =>
                                     EditMyProfilePage(employee: employee),
                               ),
                             ),
-                            child: const Text('Edit'),
+                            icon: const Icon(Icons.edit_outlined, size: 16),
+                            label: const Text('Edit'),
                           )
                         else if (canManage)
-                          OutlinedButton(
+                          OutlinedButton.icon(
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) =>
                                     EditEmployeePage(employee: employee),
                               ),
                             ),
-                            child: const Text('Edit'),
+                            icon: const Icon(Icons.edit_outlined, size: 16),
+                            label: const Text('Edit'),
                           ),
                       ],
                     ),

@@ -15,15 +15,6 @@ import 'invite_employee_page.dart';
 
 enum _DirectoryViewMode { list, hierarchy }
 
-enum _SortOption {
-  joiningDate('Joining date'),
-  companyId('Company ID'),
-  department('Department');
-
-  const _SortOption(this.label);
-  final String label;
-}
-
 class EmployeeDirectoryPage extends ConsumerStatefulWidget {
   const EmployeeDirectoryPage({super.key});
 
@@ -37,7 +28,6 @@ class _EmployeeDirectoryPageState
   _DirectoryViewMode _viewMode = _DirectoryViewMode.list;
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  _SortOption? _sortOption;
 
   @override
   void dispose() {
@@ -69,23 +59,9 @@ class _EmployeeDirectoryPageState
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (canRead)
-                    SegmentedButton<_DirectoryViewMode>(
-                      segments: const [
-                        ButtonSegment(
-                          value: _DirectoryViewMode.list,
-                          icon: Icon(Icons.view_list_outlined, size: 18),
-                          label: Text('List'),
-                        ),
-                        ButtonSegment(
-                          value: _DirectoryViewMode.hierarchy,
-                          icon: Icon(Icons.account_tree_outlined, size: 18),
-                          label: Text('Hierarchy'),
-                        ),
-                      ],
-                      selected: {_viewMode},
-                      showSelectedIcon: false,
-                      onSelectionChanged: (selection) =>
-                          setState(() => _viewMode = selection.first),
+                    _ViewModeToggle(
+                      value: _viewMode,
+                      onChanged: (mode) => setState(() => _viewMode = mode),
                     ),
                   if (canRead && _viewMode == _DirectoryViewMode.list)
                     SizedBox(
@@ -107,46 +83,6 @@ class _EmployeeDirectoryPageState
                                   }),
                                 ),
                           isDense: true,
-                        ),
-                      ),
-                    ),
-                  if (canRead && _viewMode == _DirectoryViewMode.list)
-                    PopupMenuButton<_SortOption?>(
-                      tooltip: 'Sort by',
-                      initialValue: _sortOption,
-                      onSelected: (value) =>
-                          setState(() => _sortOption = value),
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: null,
-                          child: Text('Default order'),
-                        ),
-                        for (final option in _SortOption.values)
-                          PopupMenuItem(value: option, child: Text(option.label)),
-                      ],
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.sort, size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              _sortOption == null
-                                  ? 'Sort'
-                                  : 'Sort: ${_sortOption!.label}',
-                            ),
-                            const Icon(Icons.arrow_drop_down, size: 18),
-                          ],
                         ),
                       ),
                     ),
@@ -178,7 +114,6 @@ class _EmployeeDirectoryPageState
                     ? _DirectoryBody(
                         viewMode: _viewMode,
                         searchQuery: _searchQuery,
-                        sortOption: _sortOption,
                       )
                     : const _NoDirectoryAccess(),
               ),
@@ -191,15 +126,10 @@ class _EmployeeDirectoryPageState
 }
 
 class _DirectoryBody extends ConsumerWidget {
-  const _DirectoryBody({
-    required this.viewMode,
-    required this.searchQuery,
-    required this.sortOption,
-  });
+  const _DirectoryBody({required this.viewMode, required this.searchQuery});
 
   final _DirectoryViewMode viewMode;
   final String searchQuery;
-  final _SortOption? sortOption;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -219,17 +149,34 @@ class _DirectoryBody extends ConsumerWidget {
         }
 
         if (viewMode == _DirectoryViewMode.hierarchy) {
-          return EmployeeHierarchyView(employees: employees);
+          final shown = employees
+              .where((employee) => employee.isCurrentEmployee)
+              .length;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DirectorySummary(employees: employees, shown: shown),
+              const SizedBox(height: 14),
+              Expanded(child: EmployeeHierarchyView(employees: employees)),
+            ],
+          );
         }
 
-        final filtered = _sortEmployees(
-          _filterEmployees(employees, searchQuery),
-          sortOption,
+        final filtered = _filterEmployees(employees, searchQuery);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _DirectorySummary(employees: employees, shown: filtered.length),
+            const SizedBox(height: 14),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(
+                      child: Text('No employees match your search.'),
+                    )
+                  : _EmployeeList(employees: filtered),
+            ),
+          ],
         );
-        if (filtered.isEmpty) {
-          return const Center(child: Text('No employees match your search.'));
-        }
-        return _EmployeeList(employees: filtered);
       },
     );
   }
@@ -247,26 +194,180 @@ class _DirectoryBody extends ConsumerWidget {
         )
         .toList();
   }
+}
 
-  List<Employee> _sortEmployees(List<Employee> employees, _SortOption? sort) {
-    if (sort == null) return employees;
-    final sorted = [...employees];
-    switch (sort) {
-      case _SortOption.joiningDate:
-        sorted.sort((a, b) => a.joiningDate.compareTo(b.joiningDate));
-      case _SortOption.companyId:
-        sorted.sort((a, b) => a.employeeCode.compareTo(b.employeeCode));
-      case _SortOption.department:
-        sorted.sort((a, b) {
-          final aName = a.department?.name ?? '';
-          final bName = b.department?.name ?? '';
-          if (aName.isEmpty && bName.isEmpty) return 0;
-          if (aName.isEmpty) return 1;
-          if (bName.isEmpty) return -1;
-          return aName.compareTo(bName);
-        });
+/// A soft, pill-shaped List/Hierarchy switcher matching the app's rounded,
+/// pastel-tinted visual language — in place of the stock Material
+/// [SegmentedButton] chrome.
+class _ViewModeToggle extends StatelessWidget {
+  const _ViewModeToggle({required this.value, required this.onChanged});
+
+  final _DirectoryViewMode value;
+  final ValueChanged<_DirectoryViewMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.fieldFill,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ViewModeSegment(
+            icon: Icons.view_list_outlined,
+            label: 'List',
+            selected: value == _DirectoryViewMode.list,
+            onTap: () => onChanged(_DirectoryViewMode.list),
+          ),
+          _ViewModeSegment(
+            icon: Icons.account_tree_outlined,
+            label: 'Hierarchy',
+            selected: value == _DirectoryViewMode.hierarchy,
+            onTap: () => onChanged(_DirectoryViewMode.hierarchy),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ViewModeSegment extends StatelessWidget {
+  const _ViewModeSegment({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.primary : AppColors.textSecondary;
+    return Material(
+      color: selected ? AppColors.primarySoft : Colors.transparent,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: color,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A "N employees" (or "Showing N of M") headline, followed by the same
+/// employment-status and work-mode breakdown the dashboard shows — as plain,
+/// well-spaced text rather than another row of boxes, since this page
+/// already has its own card grid below.
+class _DirectorySummary extends StatelessWidget {
+  const _DirectorySummary({required this.employees, required this.shown});
+
+  final List<Employee> employees;
+  final int shown;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = employees.length;
+    final byStatus = <String, int>{};
+    final byWorkMode = <String, int>{};
+    for (final employee in employees) {
+      byStatus.update(
+        employee.employmentStatus,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+      byWorkMode.update(
+        employee.workMode,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
     }
-    return sorted;
+
+    final headline = shown == total
+        ? '$total ${total == 1 ? 'employee' : 'employees'}'
+        : 'Showing $shown of $total employees';
+    final statLabelStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          headline,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 18,
+          runSpacing: 6,
+          children: [
+            Text('Active: ${byStatus['active'] ?? 0}', style: statLabelStyle),
+            Text(
+              'On Leave: ${byStatus['on_leave'] ?? 0}',
+              style: statLabelStyle,
+            ),
+            Text(
+              'Notice Period: ${byStatus['notice_period'] ?? 0}',
+              style: statLabelStyle,
+            ),
+            Text(
+              'Resigned: ${byStatus['resigned'] ?? 0}',
+              style: statLabelStyle,
+            ),
+            Text(
+              'Terminated: ${byStatus['terminated'] ?? 0}',
+              style: statLabelStyle,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 18,
+          runSpacing: 6,
+          children: [
+            Text(
+              'On-site: ${byWorkMode['on_site'] ?? 0}',
+              style: statLabelStyle,
+            ),
+            Text(
+              'Remote: ${byWorkMode['remote'] ?? 0}',
+              style: statLabelStyle,
+            ),
+            Text(
+              'Hybrid: ${byWorkMode['hybrid'] ?? 0}',
+              style: statLabelStyle,
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
 
@@ -399,9 +500,25 @@ class _EmployeeCard extends StatelessWidget {
                         if ((employee.designation ?? '').isNotEmpty)
                           Text(
                             employee.designation!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: AppColors.textSecondary),
                           ),
+                        Text(
+                          'Department: ${employee.department?.name ?? 'None'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
+                        Text(
+                          'Reports to: ${employee.reportingManager?.name ?? '—'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
                       ],
                     ),
                   ),
@@ -414,16 +531,6 @@ class _EmployeeCard extends StatelessWidget {
                 children: [
                   EmploymentStatusBadge(status: employee.employmentStatus),
                   WorkModeBadge(workMode: employee.workMode),
-                  InfoChip(
-                    icon: Icons.apartment_outlined,
-                    label: employee.department?.name ?? 'No department',
-                    maxWidth: contentWidth,
-                  ),
-                  InfoChip(
-                    icon: Icons.supervisor_account_outlined,
-                    label: 'Reports to: ${employee.reportingManager?.name ?? '—'}',
-                    maxWidth: contentWidth,
-                  ),
                   InfoChip(
                     icon: Icons.email_outlined,
                     label: employee.email,

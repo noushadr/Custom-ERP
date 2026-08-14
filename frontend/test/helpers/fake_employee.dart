@@ -6,6 +6,7 @@ import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee_document.dart';
 import 'package:zera_erp/features/employee/domain/entities/education_record.dart';
 import 'package:zera_erp/features/employee/domain/entities/invite_employee_input.dart';
+import 'package:zera_erp/features/employee/domain/entities/paginated_audit_log.dart';
 import 'package:zera_erp/features/employee/domain/entities/salary_record.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_my_profile_input.dart';
@@ -27,6 +28,7 @@ Employee buildTestEmployee({
   List<String> skills = const [],
   List<String> certifications = const [],
   String joiningDate = '2026-01-01',
+  String employmentStatus = 'active',
 }) {
   final parts = fullName.split(' ');
   return Employee(
@@ -45,7 +47,7 @@ Employee buildTestEmployee({
     team: null,
     reportingManager: reportingManager,
     employmentType: 'full_time',
-    employmentStatus: 'active',
+    employmentStatus: employmentStatus,
     workMode: 'on_site',
     joiningDate: joiningDate,
     dateOfLeaving: null,
@@ -70,22 +72,18 @@ Employee buildTestEmployee({
 Asset buildTestAsset({
   String id = 'asset-1',
   String name = 'Dell Laptop',
-  String? category = 'Laptop',
-  String? serialNumber = 'SN-001',
   String status = 'assigned',
   String? assignedEmployeeId = 'employee-1',
   DateTime? assignedAt,
-  String? notes,
+  double? value = 150000,
 }) {
   return Asset(
     id: id,
     name: name,
-    category: category,
-    serialNumber: serialNumber,
     status: status,
     assignedEmployeeId: assignedEmployeeId,
     assignedAt: assignedAt ?? DateTime(2026, 1, 1),
-    notes: notes,
+    value: value,
     createdAt: DateTime(2026, 1, 1),
   );
 }
@@ -368,7 +366,38 @@ class FakeEmployeeRepository implements EmployeeRepository {
       auditLog;
 
   @override
-  Future<List<AuditLogEntry>> getCompanyAuditLog() async => auditLog;
+  Future<PaginatedAuditLog> getCompanyAuditLog({
+    int page = 1,
+    int limit = 10,
+    String? search,
+  }) async {
+    var filtered = auditLog;
+    if (search != null && search.isNotEmpty) {
+      final lower = search.toLowerCase();
+      bool matches(String? value) => value?.toLowerCase().contains(lower) ?? false;
+      filtered = filtered
+          .where(
+            (e) =>
+                matches(e.employeeName) ||
+                matches(e.fieldLabel) ||
+                matches(e.actorName) ||
+                matches(e.oldValue) ||
+                matches(e.newValue),
+          )
+          .toList();
+    }
+    final total = filtered.length;
+    final start = (page - 1) * limit;
+    final pageItems = start >= filtered.length
+        ? <AuditLogEntry>[]
+        : filtered.skip(start).take(limit).toList();
+    return PaginatedAuditLog(
+      items: pageItems,
+      total: total,
+      page: page,
+      limit: limit,
+    );
+  }
 
   @override
   Future<List<SalaryRecord>> getMySalaryHistory() async => salaryHistory;
@@ -457,19 +486,11 @@ class FakeEmployeeRepository implements EmployeeRepository {
   Future<Asset> createAndAssignAsset(
     String employeeId, {
     required String name,
-    String? category,
-    String? serialNumber,
-    String? notes,
+    double? value,
   }) async {
     lastCreateAndAssignAssetInput = (employeeId: employeeId, name: name);
     if (createAndAssignAssetError != null) throw createAndAssignAssetError!;
-    return buildTestAsset(
-      name: name,
-      category: category,
-      serialNumber: serialNumber,
-      notes: notes,
-      assignedEmployeeId: employeeId,
-    );
+    return buildTestAsset(name: name, value: value, assignedEmployeeId: employeeId);
   }
 
   @override
@@ -484,18 +505,14 @@ class FakeEmployeeRepository implements EmployeeRepository {
     String employeeId,
     String assetId, {
     String? name,
-    String? category,
-    String? serialNumber,
-    String? notes,
+    double? value,
   }) async {
     lastUpdateAssetId = assetId;
     if (updateAssetError != null) throw updateAssetError!;
     return buildTestAsset(
       id: assetId,
       name: name ?? 'Dell Laptop',
-      category: category,
-      serialNumber: serialNumber,
-      notes: notes,
+      value: value,
       assignedEmployeeId: employeeId,
     );
   }
