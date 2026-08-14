@@ -9,6 +9,7 @@ import '../domain/entities/department.dart';
 import '../domain/entities/education_record.dart';
 import '../domain/entities/employee.dart';
 import '../domain/entities/employee_document.dart';
+import '../domain/entities/paginated_audit_log.dart';
 import '../domain/entities/salary_record.dart';
 import '../domain/entities/upcoming_birthday.dart';
 import '../domain/repositories/employee_repository.dart';
@@ -114,12 +115,39 @@ final employeeAuditLogProvider = FutureProvider.autoDispose
       return ref.watch(employeeRepositoryProvider).getAuditLog(employeeId);
     });
 
-final companyAuditLogProvider = FutureProvider.autoDispose<List<AuditLogEntry>>(
-  (ref) {
-    ref.watch(authControllerProvider);
-    return ref.watch(employeeRepositoryProvider).getCompanyAuditLog();
-  },
-);
+class CompanyAuditLogQuery {
+  const CompanyAuditLogQuery({
+    required this.page,
+    required this.limit,
+    this.search,
+  });
+
+  final int page;
+  final int limit;
+  final String? search;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CompanyAuditLogQuery &&
+      other.page == page &&
+      other.limit == limit &&
+      other.search == search;
+
+  @override
+  int get hashCode => Object.hash(page, limit, search);
+}
+
+final companyAuditLogProvider = FutureProvider.autoDispose
+    .family<PaginatedAuditLog, CompanyAuditLogQuery>((ref, query) {
+      ref.watch(authControllerProvider);
+      return ref
+          .watch(employeeRepositoryProvider)
+          .getCompanyAuditLog(
+            page: query.page,
+            limit: query.limit,
+            search: query.search,
+          );
+    });
 
 final mySalaryHistoryProvider = FutureProvider.autoDispose<List<SalaryRecord>>(
   (ref) {

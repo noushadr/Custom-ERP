@@ -7,6 +7,7 @@ import '../entities/education_record.dart';
 import '../entities/employee.dart';
 import '../entities/employee_document.dart';
 import '../entities/invite_employee_input.dart';
+import '../entities/paginated_audit_log.dart';
 import '../entities/salary_record.dart';
 import '../entities/update_employee_input.dart';
 import '../entities/update_my_profile_input.dart';
@@ -102,8 +103,13 @@ abstract interface class EmployeeRepository {
   /// Requires `employees.manage`.
   Future<List<AuditLogEntry>> getAuditLog(String employeeId);
 
-  /// Combined feed across all employees. Requires `audit.viewAll`.
-  Future<List<AuditLogEntry>> getCompanyAuditLog();
+  /// Combined, paginated, and searchable feed across all employees. Requires
+  /// `audit.viewAll`.
+  Future<PaginatedAuditLog> getCompanyAuditLog({
+    int page = 1,
+    int limit = 10,
+    String? search,
+  });
 
   /// Chronological, oldest first — the first entry is the joining salary,
   /// the last is the current salary.
@@ -164,9 +170,7 @@ abstract interface class EmployeeRepository {
   Future<Asset> createAndAssignAsset(
     String employeeId, {
     required String name,
-    String? category,
-    String? serialNumber,
-    String? notes,
+    double? value,
   });
 
   /// Assigns a previously-unassigned asset to [employeeId]. Requires
@@ -179,9 +183,7 @@ abstract interface class EmployeeRepository {
     String employeeId,
     String assetId, {
     String? name,
-    String? category,
-    String? serialNumber,
-    String? notes,
+    double? value,
   });
 
   /// Unassigns an asset from [employeeId], making it available again.

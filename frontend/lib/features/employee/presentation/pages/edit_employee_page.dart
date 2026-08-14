@@ -8,6 +8,8 @@ import '../../domain/entities/update_employee_input.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 
+final _companyEmailRegExp = RegExp(r'^[a-z]+\.[a-z]+@zeracreative\.com$');
+
 const _employmentTypes = {
   'full_time': 'Full-time',
   'part_time': 'Part-time',
@@ -46,6 +48,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _firstNameController;
   late final TextEditingController _lastNameController;
+  late final TextEditingController _companyEmailController;
   late final TextEditingController _designationController;
   late final TextEditingController _personalEmailController;
   late final TextEditingController _phoneController;
@@ -74,6 +77,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     final e = widget.employee;
     _firstNameController = TextEditingController(text: e.firstName);
     _lastNameController = TextEditingController(text: e.lastName);
+    _companyEmailController = TextEditingController(text: e.email);
     _designationController = TextEditingController(text: e.designation);
     _personalEmailController = TextEditingController(text: e.personalEmail);
     _phoneController = TextEditingController(text: e.phoneNumber);
@@ -111,6 +115,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _companyEmailController.dispose();
     _designationController.dispose();
     _personalEmailController.dispose();
     _phoneController.dispose();
@@ -154,6 +159,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
           UpdateEmployeeInput(
             firstName: _firstNameController.text.trim(),
             lastName: _lastNameController.text.trim(),
+            companyEmail: _companyEmailController.text.trim(),
             designation: _designationController.text.trim().isEmpty
                 ? null
                 : _designationController.text.trim(),
@@ -277,6 +283,25 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                           decoration: const InputDecoration(
                             labelText: 'Designation',
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _companyEmailController,
+                          enabled: !isSubmitting,
+                          decoration: const InputDecoration(
+                            labelText: 'Company email',
+                            hintText: 'firstname.lastname@zeracreative.com',
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            final trimmed = value?.trim() ?? '';
+                            if (trimmed.isEmpty) {
+                              return 'Company email is required';
+                            }
+                            return _companyEmailRegExp.hasMatch(trimmed)
+                                ? null
+                                : 'Must match firstname.lastname@zeracreative.com';
+                          },
                         ),
                       ],
                     ),

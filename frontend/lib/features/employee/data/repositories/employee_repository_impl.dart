@@ -8,6 +8,7 @@ import '../../domain/entities/education_record.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/employee_document.dart';
 import '../../domain/entities/invite_employee_input.dart';
+import '../../domain/entities/paginated_audit_log.dart';
 import '../../domain/entities/salary_record.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
@@ -174,8 +175,17 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(() => _remoteDataSource.getAuditLog(employeeId));
 
   @override
-  Future<List<AuditLogEntry>> getCompanyAuditLog() =>
-      _guard(() => _remoteDataSource.getCompanyAuditLog());
+  Future<PaginatedAuditLog> getCompanyAuditLog({
+    int page = 1,
+    int limit = 10,
+    String? search,
+  }) => _guard(
+    () => _remoteDataSource.getCompanyAuditLog(
+      page: page,
+      limit: limit,
+      search: search,
+    ),
+  );
 
   @override
   Future<List<SalaryRecord>> getMySalaryHistory() =>
@@ -266,16 +276,12 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   Future<Asset> createAndAssignAsset(
     String employeeId, {
     required String name,
-    String? category,
-    String? serialNumber,
-    String? notes,
+    double? value,
   }) => _guard(
     () => _remoteDataSource.createAndAssignAsset(
       employeeId,
       name: name,
-      category: category,
-      serialNumber: serialNumber,
-      notes: notes,
+      value: value,
     ),
   );
 
@@ -288,17 +294,13 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
     String employeeId,
     String assetId, {
     String? name,
-    String? category,
-    String? serialNumber,
-    String? notes,
+    double? value,
   }) => _guard(
     () => _remoteDataSource.updateAsset(
       employeeId,
       assetId,
       name: name,
-      category: category,
-      serialNumber: serialNumber,
-      notes: notes,
+      value: value,
     ),
   );
 

@@ -7,6 +7,7 @@ class UpdateEmployeeInput {
   const UpdateEmployeeInput({
     this.firstName,
     this.lastName,
+    this.companyEmail,
     this.designation,
     this.departmentId,
     this.teamId,
@@ -32,6 +33,7 @@ class UpdateEmployeeInput {
 
   final String? firstName;
   final String? lastName;
+  final String? companyEmail;
   final String? designation;
   final String? departmentId;
   final String? teamId;
@@ -57,6 +59,7 @@ class UpdateEmployeeInput {
   Map<String, dynamic> toJson() => {
     'firstName': firstName,
     'lastName': lastName,
+    'companyEmail': companyEmail,
     'designation': designation,
     'departmentId': departmentId,
     'teamId': teamId,

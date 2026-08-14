@@ -11,6 +11,7 @@ import '../models/department_model.dart';
 import '../models/education_record_model.dart';
 import '../models/employee_document_model.dart';
 import '../models/employee_model.dart';
+import '../models/paginated_audit_log_model.dart';
 import '../models/salary_record_model.dart';
 import '../models/upcoming_birthday_model.dart';
 
@@ -263,12 +264,20 @@ class EmployeeRemoteDataSource {
         .toList();
   }
 
-  Future<List<AuditLogEntryModel>> getCompanyAuditLog() async {
-    final response = await _dio.get<List<dynamic>>('/employees/audit-log');
-    return response.data!
-        .cast<Map<String, dynamic>>()
-        .map(AuditLogEntryModel.fromJson)
-        .toList();
+  Future<PaginatedAuditLogModel> getCompanyAuditLog({
+    required int page,
+    required int limit,
+    String? search,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/employees/audit-log',
+      queryParameters: {
+        'page': page,
+        'limit': limit,
+        'search': ?search,
+      },
+    );
+    return PaginatedAuditLogModel.fromJson(response.data!);
   }
 
   Future<List<SalaryRecordModel>> getMySalaryHistory() async {
@@ -409,18 +418,11 @@ class EmployeeRemoteDataSource {
   Future<AssetModel> createAndAssignAsset(
     String employeeId, {
     required String name,
-    String? category,
-    String? serialNumber,
-    String? notes,
+    double? value,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/employees/$employeeId/assets',
-      data: {
-        'name': name,
-        'category': ?category,
-        'serialNumber': ?serialNumber,
-        'notes': ?notes,
-      },
+      data: {'name': name, 'value': ?value},
     );
     return AssetModel.fromJson(response.data!);
   }
@@ -439,18 +441,11 @@ class EmployeeRemoteDataSource {
     String employeeId,
     String assetId, {
     String? name,
-    String? category,
-    String? serialNumber,
-    String? notes,
+    double? value,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/employees/$employeeId/assets/$assetId',
-      data: {
-        'name': ?name,
-        'category': ?category,
-        'serialNumber': ?serialNumber,
-        'notes': ?notes,
-      },
+      data: {'name': ?name, 'value': ?value},
     );
     return AssetModel.fromJson(response.data!);
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../application/employee_providers.dart';
@@ -62,9 +63,7 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
             .createAndAssignAsset(
               widget.employeeId,
               name: result.name!,
-              category: result.category,
-              serialNumber: result.serialNumber,
-              notes: result.notes,
+              value: result.value,
             );
       } else {
         await ref
@@ -91,9 +90,7 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
             widget.employeeId,
             asset.id,
             name: result.name,
-            category: result.category,
-            serialNumber: result.serialNumber,
-            notes: result.notes,
+            value: result.value,
           );
       _invalidate();
     } on EmployeeException catch (error) {
@@ -206,12 +203,6 @@ class _AssetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subtitleParts = [
-      if (asset.category != null && asset.category!.isNotEmpty) asset.category!,
-      if (asset.serialNumber != null && asset.serialNumber!.isNotEmpty)
-        'S/N ${asset.serialNumber}',
-    ];
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -234,10 +225,10 @@ class _AssetRow extends StatelessWidget {
                     _AssetStatusBadge(status: asset.status),
                   ],
                 ),
-                if (subtitleParts.isNotEmpty) ...[
+                if (asset.value != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    subtitleParts.join(' · '),
+                    'PKR ${formatAmount(asset.value!)}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -251,10 +242,6 @@ class _AssetRow extends StatelessWidget {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                ],
-                if (asset.notes != null && asset.notes!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(asset.notes!, style: Theme.of(context).textTheme.bodySmall),
                 ],
               ],
             ),
@@ -296,9 +283,7 @@ typedef _AddAssetResult = ({
   bool isNew,
   String? assetId,
   String? name,
-  String? category,
-  String? serialNumber,
-  String? notes,
+  double? value,
 });
 
 class _AddAssetDialog extends ConsumerStatefulWidget {
@@ -311,9 +296,7 @@ class _AddAssetDialog extends ConsumerStatefulWidget {
 class _AddAssetDialogState extends ConsumerState<_AddAssetDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _categoryController = TextEditingController();
-  final _serialController = TextEditingController();
-  final _notesController = TextEditingController();
+  final _valueController = TextEditingController();
   bool _isNew = true;
   String? _selectedAssetId;
   String? _errorMessage;
@@ -321,9 +304,7 @@ class _AddAssetDialogState extends ConsumerState<_AddAssetDialog> {
   @override
   void dispose() {
     _nameController.dispose();
-    _categoryController.dispose();
-    _serialController.dispose();
-    _notesController.dispose();
+    _valueController.dispose();
     super.dispose();
   }
 
@@ -334,15 +315,9 @@ class _AddAssetDialogState extends ConsumerState<_AddAssetDialog> {
         isNew: true,
         assetId: null,
         name: _nameController.text.trim(),
-        category: _categoryController.text.trim().isEmpty
+        value: _valueController.text.trim().isEmpty
             ? null
-            : _categoryController.text.trim(),
-        serialNumber: _serialController.text.trim().isEmpty
-            ? null
-            : _serialController.text.trim(),
-        notes: _notesController.text.trim().isEmpty
-            ? null
-            : _notesController.text.trim(),
+            : double.tryParse(_valueController.text.trim()),
       ) as _AddAssetResult);
       return;
     }
@@ -355,9 +330,7 @@ class _AddAssetDialogState extends ConsumerState<_AddAssetDialog> {
       isNew: false,
       assetId: _selectedAssetId,
       name: null,
-      category: null,
-      serialNumber: null,
-      notes: null,
+      value: null,
     ) as _AddAssetResult);
   }
 
@@ -406,25 +379,19 @@ class _AddAssetDialogState extends ConsumerState<_AddAssetDialog> {
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
-                      controller: _categoryController,
-                      decoration: const InputDecoration(
-                        labelText: 'Category (optional)',
+                      controller: _valueController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _serialController,
                       decoration: const InputDecoration(
-                        labelText: 'Serial number (optional)',
+                        labelText: 'Value in PKR (optional)',
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _notesController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Notes (optional)',
-                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return null;
+                        return double.tryParse(value.trim()) == null
+                            ? 'Enter a valid amount'
+                            : null;
+                      },
                     ),
                   ],
                 ),
@@ -465,12 +432,7 @@ class _AddAssetDialogState extends ConsumerState<_AddAssetDialog> {
   }
 }
 
-typedef _EditAssetResult = ({
-  String? name,
-  String? category,
-  String? serialNumber,
-  String? notes,
-});
+typedef _EditAssetResult = ({String? name, double? value});
 
 class _EditAssetDialog extends StatefulWidget {
   const _EditAssetDialog({required this.asset});
@@ -484,25 +446,23 @@ class _EditAssetDialog extends StatefulWidget {
 class _EditAssetDialogState extends State<_EditAssetDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
-  late final TextEditingController _categoryController;
-  late final TextEditingController _serialController;
-  late final TextEditingController _notesController;
+  late final TextEditingController _valueController;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.asset.name);
-    _categoryController = TextEditingController(text: widget.asset.category);
-    _serialController = TextEditingController(text: widget.asset.serialNumber);
-    _notesController = TextEditingController(text: widget.asset.notes);
+    _valueController = TextEditingController(
+      text: widget.asset.value == null
+          ? null
+          : _plainNumberText(widget.asset.value!),
+    );
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _categoryController.dispose();
-    _serialController.dispose();
-    _notesController.dispose();
+    _valueController.dispose();
     super.dispose();
   }
 
@@ -510,15 +470,9 @@ class _EditAssetDialogState extends State<_EditAssetDialog> {
     if (!_formKey.currentState!.validate()) return;
     Navigator.of(context).pop((
       name: _nameController.text.trim(),
-      category: _categoryController.text.trim().isEmpty
+      value: _valueController.text.trim().isEmpty
           ? null
-          : _categoryController.text.trim(),
-      serialNumber: _serialController.text.trim().isEmpty
-          ? null
-          : _serialController.text.trim(),
-      notes: _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
+          : double.tryParse(_valueController.text.trim()),
     ) as _EditAssetResult);
   }
 
@@ -542,23 +496,19 @@ class _EditAssetDialogState extends State<_EditAssetDialog> {
               ),
               const SizedBox(height: 12),
               TextFormField(
-                controller: _categoryController,
-                decoration: const InputDecoration(
-                  labelText: 'Category (optional)',
+                controller: _valueController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _serialController,
                 decoration: const InputDecoration(
-                  labelText: 'Serial number (optional)',
+                  labelText: 'Value in PKR (optional)',
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _notesController,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Notes (optional)'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return null;
+                  return double.tryParse(value.trim()) == null
+                      ? 'Enter a valid amount'
+                      : null;
+                },
               ),
             ],
           ),
@@ -573,4 +523,13 @@ class _EditAssetDialogState extends State<_EditAssetDialog> {
       ],
     );
   }
+}
+
+/// Formats a raw double back into a plain editable number string (no
+/// thousands separators) for pre-filling the value field — e.g. 150000.0 ->
+/// "150000", 150000.5 -> "150000.5".
+String _plainNumberText(double value) {
+  return value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toString();
 }

@@ -6,6 +6,16 @@ import '../../application/employee_providers.dart';
 import '../../domain/entities/department.dart';
 import '../../domain/exceptions/employee_exception.dart';
 
+/// Refetches both the archived and non-archived department lists — since
+/// [departmentsManagementProvider] is keyed by that bool, invalidating the
+/// bare family reference isn't guaranteed to refresh whichever instance is
+/// currently on screen, so both are named explicitly.
+void _invalidateDepartments(WidgetRef ref) {
+  ref.invalidate(departmentsManagementProvider(true));
+  ref.invalidate(departmentsManagementProvider(false));
+  ref.invalidate(departmentsProvider);
+}
+
 /// Lets Super Admin/HR-Manager view, create, edit, archive, and delete
 /// departments. Requires `departments.manage`.
 class DepartmentsPage extends ConsumerStatefulWidget {
@@ -129,8 +139,7 @@ class _DepartmentCard extends ConsumerWidget {
       await ref
           .read(employeeRepositoryProvider)
           .setDepartmentArchived(department.id, isArchived: value);
-      ref.invalidate(departmentsManagementProvider);
-      ref.invalidate(departmentsProvider);
+      _invalidateDepartments(ref);
     } on EmployeeException catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
@@ -168,8 +177,7 @@ class _DepartmentCard extends ConsumerWidget {
 
     try {
       await ref.read(employeeRepositoryProvider).deleteDepartment(department.id);
-      ref.invalidate(departmentsManagementProvider);
-      ref.invalidate(departmentsProvider);
+      _invalidateDepartments(ref);
     } on EmployeeException catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
@@ -348,8 +356,7 @@ class _DepartmentFormDialogState
           headEmployeeId: _headEmployeeId,
         );
       }
-      ref.invalidate(departmentsProvider);
-      ref.invalidate(departmentsManagementProvider);
+      _invalidateDepartments(ref);
       if (mounted) Navigator.of(context).pop();
     } on EmployeeException catch (error) {
       setState(() => _errorMessage = error.message);
