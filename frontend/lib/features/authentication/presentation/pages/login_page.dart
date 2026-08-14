@@ -71,15 +71,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               const Center(child: ZeraLogo(height: 44)),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Zera Creative',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineMedium,
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 20),
                               Text(
                                 'Sign in to your account',
                                 style: Theme.of(context).textTheme.bodyMedium
