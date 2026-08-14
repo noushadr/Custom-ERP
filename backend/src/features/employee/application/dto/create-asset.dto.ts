@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNotEmpty } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateAssetDto {
   @IsString()
@@ -6,14 +6,7 @@ export class CreateAssetDto {
   name: string;
 
   @IsOptional()
-  @IsString()
-  category?: string;
-
-  @IsOptional()
-  @IsString()
-  serialNumber?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
+  @IsNumber()
+  @Min(0)
+  value?: number;
 }

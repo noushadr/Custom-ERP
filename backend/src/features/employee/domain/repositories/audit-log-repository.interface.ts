@@ -2,12 +2,24 @@ import { EmployeeAuditLog } from '../entities/employee-audit-log.entity';
 
 export const AUDIT_LOG_REPOSITORY = Symbol('AUDIT_LOG_REPOSITORY');
 
+export interface AuditLogSearchParams {
+  page: number;
+  limit: number;
+  search?: string;
+}
+
+export interface AuditLogSearchResult {
+  items: EmployeeAuditLog[];
+  total: number;
+}
+
 export interface AuditLogRepository {
   findByEmployeeId(employeeId: string): Promise<EmployeeAuditLog[]>;
 
-  /** Most recent entries across all employees, newest first, with the
-   * `employee` relation loaded. */
-  findAll(limit: number): Promise<EmployeeAuditLog[]>;
+  /** Paginated, newest first, with the `employee` relation loaded. When
+   * [AuditLogSearchParams.search] is set, matches across the employee's name,
+   * the field label, old/new values, and the actor's name. */
+  findAllPaginated(params: AuditLogSearchParams): Promise<AuditLogSearchResult>;
 
   saveMany(entries: EmployeeAuditLog[]): Promise<EmployeeAuditLog[]>;
 }

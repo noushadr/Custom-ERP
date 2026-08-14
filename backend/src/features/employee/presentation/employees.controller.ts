@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -17,6 +18,7 @@ import { Permissions } from '../../authentication/presentation/decorators/permis
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
 import { AddEducationRecordDto } from '../application/dto/add-education-record.dto';
 import { AddSalaryRecordDto } from '../application/dto/add-salary-record.dto';
+import { CompanyAuditLogQueryDto } from '../application/dto/company-audit-log-query.dto';
 import { CreateAssetDto } from '../application/dto/create-asset.dto';
 import { InviteEmployeeDto } from '../application/dto/invite-employee.dto';
 import { UpdateAssetDto } from '../application/dto/update-asset.dto';
@@ -144,8 +146,8 @@ export class EmployeesController {
   // as the :id parameter instead of matching this route.
   @Get('audit-log')
   @Permissions('audit.viewAll')
-  getCompanyAuditLog() {
-    return this.employeesService.getCompanyAuditLog();
+  getCompanyAuditLog(@Query() query: CompanyAuditLogQueryDto) {
+    return this.employeesService.getCompanyAuditLog(query);
   }
 
   // Must come before @Get(':id') for the same reason as "audit-log" above.

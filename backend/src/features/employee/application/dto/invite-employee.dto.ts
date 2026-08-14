@@ -43,4 +43,13 @@ export class InviteEmployeeDto {
   @IsOptional()
   @IsDateString()
   joiningDate?: string;
+
+  /** Overrides the auto-generated sequence — used only when importing
+   * historical records that must keep a pre-existing employee code. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^ZC-\d+$/, {
+    message: 'employeeCode must match the ZC-<digits> format',
+  })
+  employeeCode?: string;
 }

@@ -7,12 +7,6 @@ export class Asset extends BaseEntity {
   @Column()
   name: string;
 
-  @Column({ nullable: true })
-  category?: string;
-
-  @Column({ nullable: true })
-  serialNumber?: string;
-
   @Column({ type: 'enum', enum: AssetStatus, default: AssetStatus.AVAILABLE })
   status: AssetStatus;
 
@@ -25,6 +19,6 @@ export class Asset extends BaseEntity {
   @Column({ type: 'timestamptz', nullable: true })
   assignedAt: Date | null;
 
-  @Column({ type: 'text', nullable: true })
-  notes?: string;
+  @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
+  value?: string;
 }

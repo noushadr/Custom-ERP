@@ -8,7 +8,7 @@ export class AddAssets1786300000000 implements MigrationInterface {
       `CREATE TYPE "assets_status_enum" AS ENUM('available', 'assigned', 'repair', 'lost', 'retired')`,
     );
     await queryRunner.query(
-      `CREATE TABLE "assets" ("id" uuid NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "name" character varying NOT NULL, "category" character varying, "serialNumber" character varying, "status" "assets_status_enum" NOT NULL DEFAULT 'available', "assignedEmployeeId" uuid, "assignedAt" TIMESTAMP WITH TIME ZONE, "notes" text, CONSTRAINT "PK_assets_id" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "assets" ("id" uuid NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "name" character varying NOT NULL, "status" "assets_status_enum" NOT NULL DEFAULT 'available', "assignedEmployeeId" uuid, "assignedAt" TIMESTAMP WITH TIME ZONE, "value" numeric(12,2), CONSTRAINT "PK_assets_id" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_assets_assignedEmployeeId" ON "assets" ("assignedEmployeeId")`,

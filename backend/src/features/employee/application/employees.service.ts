@@ -54,14 +54,17 @@ import { AssetResponse } from './asset-response.interface';
 import { toAssetResponse } from './asset.mapper';
 import { AuditLogResponse } from './audit-log-response.interface';
 import { toAuditLogResponse } from './audit-log.mapper';
+import { PaginatedAuditLogResponse } from './paginated-audit-log-response.interface';
 import { DocumentResponse } from './document-response.interface';
 import { toDocumentResponse } from './document.mapper';
 import { EmployeeResponse } from './employee-response.interface';
 import { toEmployeeResponse } from './employee.mapper';
+import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util';
 import { generateTemporaryPassword } from '../../../core/utils/generate-temporary-password.util';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import { AddEducationRecordDto } from './dto/add-education-record.dto';
 import { AddSalaryRecordDto } from './dto/add-salary-record.dto';
+import { CompanyAuditLogQueryDto } from './dto/company-audit-log-query.dto';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { InviteEmployeeDto } from './dto/invite-employee.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
@@ -74,7 +77,7 @@ import { toSalaryRecordResponse } from './salary-record.mapper';
 import { UpcomingBirthdayResponse } from './upcoming-birthday-response.interface';
 
 const DEFAULT_INVITE_ROLE = 'Employee';
-const COMPANY_AUDIT_LOG_LIMIT = 100;
+const COMPANY_AUDIT_LOG_DEFAULT_LIMIT = 10;
 
 const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   [DocumentType.CONTRACT]: 'Contract',
@@ -87,18 +90,6 @@ export interface FieldDiff {
   fieldLabel: string;
   oldValue: string | null;
   newValue: string | null;
-}
-
-/** Class-validator DTOs declare every optional field as a class property,
- * which TypeScript (under `useDefineForClassFields`, default from ES2022+)
- * initializes to an explicit `undefined` own-property on every instance —
- * even fields absent from the request body. Spreading/assigning such a DTO
- * directly would overwrite untouched entity fields (e.g. NOT NULL columns
- * like `skills`) with `undefined`; this strips those out first. */
-function definedFieldsOnly<T extends object>(dto: T): Partial<T> {
-  return Object.fromEntries(
-    Object.entries(dto).filter(([, value]) => value !== undefined),
-  ) as Partial<T>;
 }
 
 /** The subset of Employee fields diffed for the audit log — a plain snapshot
@@ -183,7 +174,7 @@ export class EmployeesService {
 
     const employee = new Employee();
     employee.userId = savedUser.id;
-    employee.employeeCode = await this.generateEmployeeCode();
+    employee.employeeCode = dto.employeeCode ?? (await this.generateEmployeeCode());
     employee.firstName = dto.firstName;
     employee.lastName = dto.lastName;
     employee.designation = dto.designation;
@@ -358,11 +349,34 @@ export class EmployeesService {
     if (!employee) throw new NotFoundException('Employee not found');
 
     const before = { ...employee };
-    Object.assign(employee, definedFieldsOnly(dto));
+    const previousEmail = employee.user.email;
+    const { companyEmail, ...employeeFields } = dto;
+    Object.assign(employee, definedFieldsOnly(employeeFields));
     const saved = await this.employeeRepository.save(employee);
+
+    const emailChanged = !!companyEmail && companyEmail !== previousEmail;
+    if (emailChanged) {
+      const existingUser = await this.userRepository.findByEmail(
+        companyEmail,
+      );
+      if (existingUser && existingUser.id !== employee.userId) {
+        throw new ConflictException('A user with this email already exists');
+      }
+      const user = await this.userRepository.findById(employee.userId);
+      user!.email = companyEmail;
+      await this.userRepository.save(user!);
+    }
+
     const reloaded = await this.employeeRepository.findById(saved.id);
 
     const diffs = await this.buildFieldDiffs(before, reloaded!);
+    if (emailChanged) {
+      diffs.push({
+        fieldLabel: 'Company Email',
+        oldValue: previousEmail,
+        newValue: companyEmail,
+      });
+    }
     const actorName = await this.resolveActorName(actorUserId);
     await this.recordAuditEntries(
       saved.id,
@@ -385,11 +399,17 @@ export class EmployeesService {
     return this.getAuditLog(employee.id);
   }
 
-  async getCompanyAuditLog(): Promise<AuditLogResponse[]> {
-    const entries = await this.auditLogRepository.findAll(
-      COMPANY_AUDIT_LOG_LIMIT,
-    );
-    return entries.map(toAuditLogResponse);
+  async getCompanyAuditLog(
+    query: CompanyAuditLogQueryDto,
+  ): Promise<PaginatedAuditLogResponse> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? COMPANY_AUDIT_LOG_DEFAULT_LIMIT;
+    const { items, total } = await this.auditLogRepository.findAllPaginated({
+      page,
+      limit,
+      search: query.search?.trim() || undefined,
+    });
+    return { items: items.map(toAuditLogResponse), total, page, limit };
   }
 
   async listMyDocuments(userId: string): Promise<DocumentResponse[]> {
@@ -677,9 +697,7 @@ export class EmployeesService {
 
     const asset = new Asset();
     asset.name = dto.name;
-    asset.category = dto.category;
-    asset.serialNumber = dto.serialNumber;
-    asset.notes = dto.notes;
+    asset.value = dto.value?.toFixed(2);
     asset.status = AssetStatus.ASSIGNED;
     asset.assignedEmployeeId = employeeId;
     asset.assignedAt = new Date();
@@ -729,7 +747,8 @@ export class EmployeesService {
     dto: UpdateAssetDto,
   ): Promise<AssetResponse> {
     const asset = await this.loadAssignedAsset(employeeId, assetId);
-    Object.assign(asset, definedFieldsOnly(dto));
+    if (dto.name !== undefined) asset.name = dto.name;
+    if (dto.value !== undefined) asset.value = dto.value.toFixed(2);
     const saved = await this.assetRepository.save(asset);
     return toAssetResponse(saved);
   }

@@ -11,6 +11,7 @@ import type { RoleRepository } from '../../authentication/domain/repositories/ro
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
 import { Asset } from '../domain/entities/asset.entity';
 import { Employee } from '../domain/entities/employee.entity';
+import { EmployeeAuditLog } from '../domain/entities/employee-audit-log.entity';
 import { AssetStatus } from '../domain/enums/asset-status.enum';
 import { EmploymentStatus } from '../domain/enums/employment-status.enum';
 import { EmploymentType } from '../domain/enums/employment-type.enum';
@@ -117,7 +118,7 @@ describe('EmployeesService', () => {
     };
     auditLogRepository = {
       findByEmployeeId: jest.fn(),
-      findAll: jest.fn(),
+      findAllPaginated: jest.fn().mockResolvedValue({ items: [], total: 0 }),
       saveMany: jest.fn().mockResolvedValue([]),
     };
     salaryRecordRepository = {
@@ -209,6 +210,113 @@ describe('EmployeesService', () => {
       );
       expect(result.temporaryPassword).toHaveLength(12);
       expect(result.employee.employeeCode).toBe('ZC-00005');
+    });
+
+    it('uses a provided employeeCode instead of generating one, for imports that must keep a legacy code', async () => {
+      userRepository.findByEmail.mockResolvedValue(null);
+      roleRepository.findByName.mockResolvedValue(buildRole());
+      userRepository.save.mockImplementation(
+        (user) =>
+          Promise.resolve({ ...user, id: 'new-user-id' }) as Promise<User>,
+      );
+      employeeRepository.save.mockImplementation((employee) =>
+        Promise.resolve({ ...employee, id: 'new-employee-id' }),
+      );
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ id: 'new-employee-id', employeeCode: 'ZC-002' }),
+      );
+
+      await service.invite({ ...dto, employeeCode: 'ZC-002' });
+
+      expect(employeeRepository.count).not.toHaveBeenCalled();
+      expect(employeeRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ employeeCode: 'ZC-002' }),
+      );
+    });
+  });
+
+  describe('update', () => {
+    it('updates a plain field without touching the login email', async () => {
+      const employee = buildEmployee();
+      employeeRepository.findById
+        .mockResolvedValueOnce(employee)
+        .mockResolvedValueOnce({ ...employee, designation: 'Team Lead' });
+      employeeRepository.save.mockResolvedValue(employee);
+
+      await service.update(
+        employee.id,
+        { designation: 'Team Lead' },
+        'actor-1',
+      );
+
+      expect(userRepository.findByEmail).not.toHaveBeenCalled();
+      expect(userRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("changes the employee's company email when it isn't taken", async () => {
+      const employee = buildEmployee();
+      employeeRepository.findById
+        .mockResolvedValueOnce(employee)
+        .mockResolvedValueOnce({
+          ...employee,
+          user: buildUser({ email: 'jane.smith@zeracreative.com' }),
+        });
+      employeeRepository.save.mockResolvedValue(employee);
+      userRepository.findByEmail.mockResolvedValue(null);
+      userRepository.findById.mockResolvedValue(buildUser());
+      userRepository.save.mockResolvedValue(buildUser());
+
+      const result = await service.update(
+        employee.id,
+        { companyEmail: 'jane.smith@zeracreative.com' },
+        'actor-1',
+      );
+
+      expect(userRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'jane.smith@zeracreative.com' }),
+      );
+      expect(result.email).toBe('jane.smith@zeracreative.com');
+      expect(auditLogRepository.saveMany).toHaveBeenCalledWith([
+        expect.objectContaining({
+          fieldLabel: 'Company Email',
+          oldValue: 'jane.doe@zeracreative.com',
+          newValue: 'jane.smith@zeracreative.com',
+        }),
+      ]);
+    });
+
+    it('throws when the requested company email already belongs to someone else', async () => {
+      const employee = buildEmployee();
+      employeeRepository.findById.mockResolvedValue(employee);
+      userRepository.findByEmail.mockResolvedValue(
+        buildUser({ id: 'someone-else' }),
+      );
+
+      await expect(
+        service.update(
+          employee.id,
+          { companyEmail: 'taken@zeracreative.com' },
+          'actor-1',
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(userRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when the submitted company email matches the current one', async () => {
+      const employee = buildEmployee();
+      employeeRepository.findById
+        .mockResolvedValueOnce(employee)
+        .mockResolvedValueOnce(employee);
+      employeeRepository.save.mockResolvedValue(employee);
+
+      await service.update(
+        employee.id,
+        { companyEmail: employee.user.email },
+        'actor-1',
+      );
+
+      expect(userRepository.findByEmail).not.toHaveBeenCalled();
+      expect(userRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -446,7 +554,7 @@ describe('EmployeesService', () => {
 
       const result = await service.createAndAssignAsset(
         'employee-1',
-        { name: 'Dell Laptop', serialNumber: 'SN-1' },
+        { name: 'Dell Laptop', value: 150000 },
         'user-1',
       );
 
@@ -549,6 +657,92 @@ describe('EmployeesService', () => {
       );
       expect(auditLogRepository.saveMany).toHaveBeenCalledWith([
         expect.objectContaining({ fieldLabel: 'Assets' }),
+      ]);
+    });
+  });
+
+  describe('getCompanyAuditLog', () => {
+    it('defaults to page 1 with a limit of 10 and no search', async () => {
+      auditLogRepository.findAllPaginated.mockResolvedValue({
+        items: [],
+        total: 0,
+      });
+
+      const result = await service.getCompanyAuditLog({});
+
+      expect(auditLogRepository.findAllPaginated).toHaveBeenCalledWith({
+        page: 1,
+        limit: 10,
+        search: undefined,
+      });
+      expect(result).toEqual({ items: [], total: 0, page: 1, limit: 10 });
+    });
+
+    it('passes through an explicit page and limit', async () => {
+      auditLogRepository.findAllPaginated.mockResolvedValue({
+        items: [],
+        total: 25,
+      });
+
+      const result = await service.getCompanyAuditLog({ page: 3, limit: 5 });
+
+      expect(auditLogRepository.findAllPaginated).toHaveBeenCalledWith({
+        page: 3,
+        limit: 5,
+        search: undefined,
+      });
+      expect(result.total).toBe(25);
+    });
+
+    it('trims and forwards the search term, dropping it when blank', async () => {
+      auditLogRepository.findAllPaginated.mockResolvedValue({
+        items: [],
+        total: 0,
+      });
+
+      await service.getCompanyAuditLog({ search: '  Amna  ' });
+
+      expect(auditLogRepository.findAllPaginated).toHaveBeenCalledWith({
+        page: 1,
+        limit: 10,
+        search: 'Amna',
+      });
+
+      await service.getCompanyAuditLog({ search: '   ' });
+
+      expect(auditLogRepository.findAllPaginated).toHaveBeenLastCalledWith({
+        page: 1,
+        limit: 10,
+        search: undefined,
+      });
+    });
+
+    it('maps returned entries to the response shape', async () => {
+      auditLogRepository.findAllPaginated.mockResolvedValue({
+        items: [
+          {
+            id: 'log-1',
+            employeeId: 'employee-1',
+            employee: buildEmployee({ firstName: 'Jane', lastName: 'Doe' }),
+            actorUserId: 'user-1',
+            actorName: 'HR Admin',
+            fieldLabel: 'Phone Number',
+            oldValue: '123',
+            newValue: '456',
+            createdAt: new Date('2026-01-01'),
+          } as EmployeeAuditLog,
+        ],
+        total: 1,
+      });
+
+      const result = await service.getCompanyAuditLog({});
+
+      expect(result.items).toEqual([
+        expect.objectContaining({
+          id: 'log-1',
+          employeeName: 'Jane Doe',
+          fieldLabel: 'Phone Number',
+        }),
       ]);
     });
   });
