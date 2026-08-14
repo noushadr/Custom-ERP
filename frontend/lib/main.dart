@@ -11,7 +11,6 @@ import 'features/authentication/presentation/widgets/impersonation_banner.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
 import 'features/employee/presentation/pages/admin_dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
-import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
@@ -61,36 +60,39 @@ class _SplashScreen extends StatelessWidget {
 // Placeholder navigation until the corresponding feature modules exist.
 // Stable, full set — never resized. Visibility per role is filtered at
 // render time in _HomeShellState.build, keyed off this list's indices.
+// Icons stay outlined regardless of selection — a minimal, single-weight
+// icon style, with the pastel indicator pill (not a glyph swap) carrying the
+// selected state.
 const _allDestinations = [
   AppNavDestination(
     label: 'Admin Dashboard',
     icon: Icons.dashboard_outlined,
-    selectedIcon: Icons.dashboard,
+    selectedIcon: Icons.dashboard_outlined,
   ),
   AppNavDestination(
     label: 'User Dashboard',
     icon: Icons.home_outlined,
-    selectedIcon: Icons.home,
+    selectedIcon: Icons.home_outlined,
   ),
   AppNavDestination(
     label: 'Employees',
     icon: Icons.people_outline,
-    selectedIcon: Icons.people,
+    selectedIcon: Icons.people_outline,
   ),
   AppNavDestination(
     label: 'Requests',
     icon: Icons.assignment_outlined,
-    selectedIcon: Icons.assignment,
+    selectedIcon: Icons.assignment_outlined,
   ),
   AppNavDestination(
-    label: 'Leave',
-    icon: Icons.event_busy_outlined,
-    selectedIcon: Icons.event_busy,
+    label: 'Leaves',
+    icon: Icons.beach_access_outlined,
+    selectedIcon: Icons.beach_access_outlined,
   ),
   AppNavDestination(
     label: 'Settings',
     icon: Icons.settings_outlined,
-    selectedIcon: Icons.settings,
+    selectedIcon: Icons.settings_outlined,
     comingSoon: true,
   ),
 ];
@@ -142,7 +144,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const EmployeeDirectoryPage();
       case 'Requests':
         return const RequestsPage();
-      case 'Leave':
+      case 'Leaves':
         return const LeavePage();
       default:
         return _ComingSoon(destination: destination);
@@ -190,19 +192,11 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
                 onNavigate: (target) => _goToDestination(switch (target) {
                   NotificationLinkTarget.adminDashboard => 'Admin Dashboard',
                   NotificationLinkTarget.userDashboard => 'User Dashboard',
-                  NotificationLinkTarget.leavePage => 'Leave',
+                  NotificationLinkTarget.leavePage => 'Leaves',
                 }),
               ),
               const SizedBox(width: 16),
               UserMenu(
-                onProfileTap: () => _sectionNavigatorKeys[effectiveIndex]
-                    .currentState!
-                    .push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const EmployeeProfilePage(employeeId: null),
-                      ),
-                    ),
                 onSignOut: () =>
                     ref.read(authControllerProvider.notifier).logout(),
               ),
