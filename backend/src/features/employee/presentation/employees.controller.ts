@@ -157,13 +157,6 @@ export class EmployeesController {
     return this.employeesService.getUpcomingBirthdays();
   }
 
-  // Must come before @Get(':id') for the same reason as "audit-log" above.
-  @Get('assets/available')
-  @Permissions('employees.manage')
-  getAvailableAssets() {
-    return this.employeesService.getAvailableAssets();
-  }
-
   @Get(':id')
   @Permissions('employees.read')
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
@@ -178,6 +171,17 @@ export class EmployeesController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.employeesService.update(id, dto, user.sub);
+  }
+
+  @Post(':id/photo')
+  @Permissions('employees.manage')
+  @UseInterceptors(FileInterceptor('file', avatarUploadOptions))
+  uploadPhoto(
+    @Param('id') id: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.employeesService.updatePhoto(id, file);
   }
 
   @Get(':id/audit-log')
@@ -288,16 +292,6 @@ export class EmployeesController {
     return this.employeesService.createAndAssignAsset(id, dto, user.sub);
   }
 
-  @Post(':id/assets/:assetId/assign')
-  @Permissions('employees.manage')
-  assignExistingAsset(
-    @Param('id') id: string,
-    @Param('assetId') assetId: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.employeesService.assignExistingAsset(id, assetId, user.sub);
-  }
-
   @Patch(':id/assets/:assetId')
   @Permissions('employees.manage')
   updateAsset(
@@ -308,13 +302,13 @@ export class EmployeesController {
     return this.employeesService.updateAsset(id, assetId, dto);
   }
 
-  @Patch(':id/assets/:assetId/unassign')
+  @Delete(':id/assets/:assetId')
   @Permissions('employees.manage')
-  unassignAsset(
+  deleteAsset(
     @Param('id') id: string,
     @Param('assetId') assetId: string,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.employeesService.unassignAsset(id, assetId, user.sub);
+    return this.employeesService.deleteAsset(id, assetId, user.sub);
   }
 }

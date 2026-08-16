@@ -34,10 +34,6 @@ export class InviteEmployeeDto {
 
   @IsOptional()
   @IsUUID()
-  teamId?: string;
-
-  @IsOptional()
-  @IsUUID()
   reportingManagerId?: string;
 
   @IsOptional()

@@ -2,7 +2,6 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { User } from '../../../authentication/domain/entities/user.entity';
 import { Department } from '../../../departments/domain/entities/department.entity';
-import { Team } from '../../../teams/domain/entities/team.entity';
 import { EmploymentStatus } from '../enums/employment-status.enum';
 import { EmploymentType } from '../enums/employment-type.enum';
 import { WorkMode } from '../enums/work-mode.enum';
@@ -37,13 +36,6 @@ export class Employee extends BaseEntity {
   @ManyToOne(() => Department, { eager: true })
   @JoinColumn({ name: 'departmentId' })
   department?: Department;
-
-  @Column({ nullable: true })
-  teamId?: string;
-
-  @ManyToOne(() => Team, { eager: true })
-  @JoinColumn({ name: 'teamId' })
-  team?: Team;
 
   @Column({ nullable: true })
   reportingManagerId?: string;

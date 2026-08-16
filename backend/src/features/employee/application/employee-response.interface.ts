@@ -15,7 +15,6 @@ export interface EmployeeResponse {
   profilePhotoUrl: string | null;
   designation: string | null;
   department: { id: string; name: string } | null;
-  team: { id: string; name: string } | null;
   reportingManager: {
     id: string;
     name: string;

@@ -10,7 +10,6 @@ import { User } from './features/authentication/domain/entities/user.entity';
 import { UserStatus } from './features/authentication/domain/enums/user-status.enum';
 import { Department } from './features/departments/domain/entities/department.entity';
 import { LeaveType } from './features/leave/domain/entities/leave-type.entity';
-import { Team } from './features/teams/domain/entities/team.entity';
 
 const DEFAULT_PERMISSIONS = [
   'users.manage',
@@ -18,7 +17,6 @@ const DEFAULT_PERMISSIONS = [
   'employees.read',
   'employees.manage',
   'departments.manage',
-  'teams.manage',
   'audit.viewAll',
   'notices.manage',
   'leave.manage',
@@ -34,7 +32,6 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'employees.read',
       'employees.manage',
       'departments.manage',
-      'teams.manage',
       'notices.manage',
       'leave.manage',
     ],
@@ -57,17 +54,14 @@ const SAMPLE_LEAVE_TYPES: {
 const SAMPLE_DEPARTMENTS: {
   name: string;
   description: string;
-  teams: string[];
 }[] = [
   {
     name: 'Engineering',
     description: 'Product engineering and platform development',
-    teams: ['Platform', 'Web'],
   },
   {
     name: 'Human Resources',
     description: 'People operations and recruitment',
-    teams: [],
   },
 ];
 
@@ -82,7 +76,6 @@ async function seed() {
   const departmentRepo = app.get<Repository<Department>>(
     getRepositoryToken(Department),
   );
-  const teamRepo = app.get<Repository<Team>>(getRepositoryToken(Team));
   const leaveTypeRepo = app.get<Repository<LeaveType>>(
     getRepositoryToken(LeaveType),
   );
@@ -158,18 +151,6 @@ async function seed() {
       }),
     );
     console.log(`Department ready: ${deptDef.name}`);
-
-    for (const teamName of deptDef.teams) {
-      const existingTeam = await teamRepo.findOne({
-        where: { name: teamName, departmentId: department.id },
-      });
-      if (!existingTeam) {
-        await teamRepo.save(
-          teamRepo.create({ name: teamName, departmentId: department.id }),
-        );
-        console.log(`  Team ready: ${teamName}`);
-      }
-    }
   }
 
   for (const typeDef of SAMPLE_LEAVE_TYPES) {

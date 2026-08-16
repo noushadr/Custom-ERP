@@ -19,7 +19,6 @@ describe('calculateProfileCompletion', () => {
       profilePhotoUrl: 'https://example.com/photo.jpg',
       designation: 'Software Engineer',
       departmentId: 'dept-1',
-      teamId: 'team-1',
       reportingManagerId: 'manager-1',
       personalEmail: 'jane@example.com',
       phoneNumber: '+1234567890',

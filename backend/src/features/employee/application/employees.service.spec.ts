@@ -146,9 +146,9 @@ describe('EmployeesService', () => {
     };
     assetRepository = {
       findByAssignedEmployeeId: jest.fn().mockResolvedValue([]),
-      findAvailable: jest.fn().mockResolvedValue([]),
       findById: jest.fn(),
       save: jest.fn(),
+      remove: jest.fn(),
     };
 
     service = new EmployeesService(
@@ -660,6 +660,73 @@ describe('EmployeesService', () => {
     });
   });
 
+  describe('updateMyPhoto', () => {
+    it('throws NotFoundException when the caller has no employee profile', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await expect(
+        service.updateMyPhoto('user-1', {
+          filename: 'photo.jpg',
+        } as Express.Multer.File),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("updates the caller's own photo", async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      employeeRepository.save.mockImplementation((employee) =>
+        Promise.resolve(employee),
+      );
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ profilePhotoUrl: '/uploads/avatars/photo.jpg' }),
+      );
+
+      const result = await service.updateMyPhoto('user-1', {
+        filename: 'photo.jpg',
+      } as Express.Multer.File);
+
+      expect(employeeRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profilePhotoUrl: '/uploads/avatars/photo.jpg',
+        }),
+      );
+      expect(result.profilePhotoUrl).toBe('/uploads/avatars/photo.jpg');
+    });
+  });
+
+  describe('updatePhoto', () => {
+    it('throws NotFoundException when the employee does not exist', async () => {
+      employeeRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.updatePhoto('employee-1', {
+          filename: 'photo.jpg',
+        } as Express.Multer.File),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("updates another employee's photo, for HR/Admin", async () => {
+      employeeRepository.findById
+        .mockResolvedValueOnce(buildEmployee())
+        .mockResolvedValueOnce(
+          buildEmployee({ profilePhotoUrl: '/uploads/avatars/photo.jpg' }),
+        );
+      employeeRepository.save.mockImplementation((employee) =>
+        Promise.resolve(employee),
+      );
+
+      const result = await service.updatePhoto('employee-1', {
+        filename: 'photo.jpg',
+      } as Express.Multer.File);
+
+      expect(employeeRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profilePhotoUrl: '/uploads/avatars/photo.jpg',
+        }),
+      );
+      expect(result.profilePhotoUrl).toBe('/uploads/avatars/photo.jpg');
+    });
+  });
+
   describe('getMyAssets', () => {
     it('throws NotFoundException when the caller has no employee profile', async () => {
       employeeRepository.findByUserId.mockResolvedValue(null);
@@ -711,39 +778,6 @@ describe('EmployeesService', () => {
     });
   });
 
-  describe('assignExistingAsset', () => {
-    it('throws ConflictException when the asset is not available', async () => {
-      employeeRepository.findById.mockResolvedValue(buildEmployee());
-      assetRepository.findById.mockResolvedValue(
-        buildAsset({ status: AssetStatus.ASSIGNED, assignedEmployeeId: 'someone-else' }),
-      );
-
-      await expect(
-        service.assignExistingAsset('employee-1', 'asset-1', 'user-1'),
-      ).rejects.toBeInstanceOf(ConflictException);
-    });
-
-    it('assigns an available asset to the employee', async () => {
-      employeeRepository.findById.mockResolvedValue(buildEmployee());
-      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
-      assetRepository.findById.mockResolvedValue(
-        buildAsset({ status: AssetStatus.AVAILABLE }),
-      );
-      assetRepository.save.mockImplementation((asset) =>
-        Promise.resolve(asset),
-      );
-
-      const result = await service.assignExistingAsset(
-        'employee-1',
-        'asset-1',
-        'user-1',
-      );
-
-      expect(result.assignedEmployeeId).toBe('employee-1');
-      expect(result.status).toBe(AssetStatus.ASSIGNED);
-    });
-  });
-
   describe('updateAsset', () => {
     it('throws NotFoundException when the asset is not assigned to that employee', async () => {
       assetRepository.findById.mockResolvedValue(
@@ -771,29 +805,30 @@ describe('EmployeesService', () => {
     });
   });
 
-  describe('unassignAsset', () => {
-    it('clears the assignment and records an audit entry', async () => {
-      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+  describe('deleteAsset', () => {
+    it('throws NotFoundException when the asset is not assigned to that employee', async () => {
       assetRepository.findById.mockResolvedValue(
-        buildAsset({
-          status: AssetStatus.ASSIGNED,
-          assignedEmployeeId: 'employee-1',
-          assignedAt: new Date('2026-01-01'),
-        }),
-      );
-      assetRepository.save.mockImplementation((asset) =>
-        Promise.resolve(asset),
+        buildAsset({ assignedEmployeeId: 'someone-else' }),
       );
 
-      await service.unassignAsset('employee-1', 'asset-1', 'user-1');
+      await expect(
+        service.deleteAsset('employee-1', 'asset-1', 'user-1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(assetRepository.remove).not.toHaveBeenCalled();
+    });
 
-      expect(assetRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: AssetStatus.AVAILABLE,
-          assignedEmployeeId: null,
-          assignedAt: null,
-        }),
-      );
+    it('permanently removes the asset and records an audit entry', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      const asset = buildAsset({
+        status: AssetStatus.ASSIGNED,
+        assignedEmployeeId: 'employee-1',
+        assignedAt: new Date('2026-01-01'),
+      });
+      assetRepository.findById.mockResolvedValue(asset);
+
+      await service.deleteAsset('employee-1', 'asset-1', 'user-1');
+
+      expect(assetRepository.remove).toHaveBeenCalledWith(asset);
       expect(auditLogRepository.saveMany).toHaveBeenCalledWith([
         expect.objectContaining({ fieldLabel: 'Assets' }),
       ]);

@@ -7,7 +7,6 @@ import { validate } from './core/config/env.validation';
 import { DatabaseModule } from './core/database/database.module';
 import { AuthenticationModule } from './features/authentication/authentication.module';
 import { DepartmentsModule } from './features/departments/departments.module';
-import { TeamsModule } from './features/teams/teams.module';
 import { EmployeeModule } from './features/employee/employee.module';
 import { HolidaysModule } from './features/holidays/holidays.module';
 import { LeaveModule } from './features/leave/leave.module';
@@ -24,7 +23,6 @@ import { RequestsModule } from './features/requests/requests.module';
     DatabaseModule,
     AuthenticationModule,
     DepartmentsModule,
-    TeamsModule,
     EmployeeModule,
     NoticesModule,
     RequestsModule,

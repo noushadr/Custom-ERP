@@ -101,7 +101,6 @@ type EmployeeSnapshot = Pick<
   | 'lastName'
   | 'designation'
   | 'department'
-  | 'team'
   | 'employmentType'
   | 'employmentStatus'
   | 'workMode'
@@ -180,7 +179,6 @@ export class EmployeesService {
     employee.lastName = dto.lastName;
     employee.designation = dto.designation;
     employee.departmentId = dto.departmentId;
-    employee.teamId = dto.teamId;
     employee.reportingManagerId = dto.reportingManagerId;
     employee.joiningDate =
       dto.joiningDate ?? new Date().toISOString().slice(0, 10);
@@ -371,7 +369,23 @@ export class EmployeesService {
   ): Promise<EmployeeResponse> {
     const employee = await this.employeeRepository.findByUserId(userId);
     if (!employee) throw new NotFoundException('Employee profile not found');
+    return this.applyPhoto(employee, file);
+  }
 
+  /** HR/Admin uploading a photo for someone else's record. */
+  async updatePhoto(
+    employeeId: string,
+    file: Express.Multer.File,
+  ): Promise<EmployeeResponse> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    if (!employee) throw new NotFoundException('Employee not found');
+    return this.applyPhoto(employee, file);
+  }
+
+  private async applyPhoto(
+    employee: Employee,
+    file: Express.Multer.File,
+  ): Promise<EmployeeResponse> {
     const previousPhotoUrl = employee.profilePhotoUrl;
     employee.profilePhotoUrl = `/uploads/avatars/${file.filename}`;
     const saved = await this.employeeRepository.save(employee);
@@ -728,12 +742,6 @@ export class EmployeesService {
     return assets.map(toAssetResponse);
   }
 
-  /** Currently unassigned assets, for the "assign existing asset" picker. */
-  async getAvailableAssets(): Promise<AssetResponse[]> {
-    const assets = await this.assetRepository.findAvailable();
-    return assets.map(toAssetResponse);
-  }
-
   async createAndAssignAsset(
     employeeId: string,
     dto: CreateAssetDto,
@@ -760,33 +768,6 @@ export class EmployeesService {
     return toAssetResponse(saved);
   }
 
-  async assignExistingAsset(
-    employeeId: string,
-    assetId: string,
-    actorUserId: string,
-  ): Promise<AssetResponse> {
-    await this.ensureEmployeeExists(employeeId);
-    const asset = await this.assetRepository.findById(assetId);
-    if (!asset) throw new NotFoundException('Asset not found');
-    if (asset.status !== AssetStatus.AVAILABLE) {
-      throw new ConflictException('This asset is not available to assign');
-    }
-
-    asset.status = AssetStatus.ASSIGNED;
-    asset.assignedEmployeeId = employeeId;
-    asset.assignedAt = new Date();
-    const saved = await this.assetRepository.save(asset);
-
-    const actorName = await this.resolveActorName(actorUserId);
-    await this.recordAuditEntries(
-      employeeId,
-      { userId: actorUserId, name: actorName },
-      [{ fieldLabel: 'Assets', oldValue: null, newValue: `Assigned ${saved.name}` }],
-    );
-
-    return toAssetResponse(saved);
-  }
-
   async updateAsset(
     employeeId: string,
     assetId: string,
@@ -799,23 +780,20 @@ export class EmployeesService {
     return toAssetResponse(saved);
   }
 
-  async unassignAsset(
+  async deleteAsset(
     employeeId: string,
     assetId: string,
     actorUserId: string,
   ): Promise<void> {
     const asset = await this.loadAssignedAsset(employeeId, assetId);
-
-    asset.status = AssetStatus.AVAILABLE;
-    asset.assignedEmployeeId = null;
-    asset.assignedAt = null;
-    await this.assetRepository.save(asset);
+    const assetName = asset.name;
+    await this.assetRepository.remove(asset);
 
     const actorName = await this.resolveActorName(actorUserId);
     await this.recordAuditEntries(
       employeeId,
       { userId: actorUserId, name: actorName },
-      [{ fieldLabel: 'Assets', oldValue: `Unassigned ${asset.name}`, newValue: null }],
+      [{ fieldLabel: 'Assets', oldValue: `Assigned ${assetName}`, newValue: null }],
     );
   }
 
@@ -906,7 +884,6 @@ export class EmployeesService {
       before.department?.name ?? null,
       after.department?.name ?? null,
     );
-    addIfChanged('Team', before.team?.name ?? null, after.team?.name ?? null);
     addIfChanged(
       'Employment Type',
       before.employmentType,

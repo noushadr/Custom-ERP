@@ -18,9 +18,6 @@ export function toEmployeeResponse(employee: Employee): EmployeeResponse {
     department: employee.department
       ? { id: employee.department.id, name: employee.department.name }
       : null,
-    team: employee.team
-      ? { id: employee.team.id, name: employee.team.name }
-      : null,
     reportingManager: employee.reportingManager
       ? {
           id: employee.reportingManager.id,

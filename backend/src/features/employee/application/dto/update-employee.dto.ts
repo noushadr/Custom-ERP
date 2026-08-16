@@ -40,10 +40,6 @@ export class UpdateEmployeeDto extends UpdateMyProfileDto {
 
   @IsOptional()
   @IsUUID()
-  teamId?: string;
-
-  @IsOptional()
-  @IsUUID()
   reportingManagerId?: string;
 
   @IsOptional()

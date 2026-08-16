@@ -7,7 +7,7 @@ import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/m
 
 export const AVATAR_UPLOAD_DIR = join(process.cwd(), 'uploads', 'avatars');
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 export const avatarUploadOptions: MulterOptions = {
   storage: diskStorage({
