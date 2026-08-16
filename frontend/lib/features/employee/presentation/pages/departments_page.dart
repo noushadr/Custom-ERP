@@ -4,7 +4,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/department.dart';
+import '../../domain/entities/employee.dart';
 import '../../domain/exceptions/employee_exception.dart';
+import '../widgets/employee_avatar.dart';
+import '../widgets/employee_status_badges.dart';
 
 /// Refetches both the archived and non-archived department lists — since
 /// [departmentsManagementProvider] is keyed by that bool, invalidating the
@@ -98,17 +101,15 @@ class _DepartmentsPageState extends ConsumerState<DepartmentsPage> {
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final department = departments[index];
-                        final headName = department.headEmployeeId == null
-                            ? null
-                            : employeesById[department.headEmployeeId]
-                                  ?.fullName;
-                        final employeeCount = employees
+                        final headEmployee =
+                            employeesById[department.headEmployeeId];
+                        final members = employees
                             .where((e) => e.department?.id == department.id)
-                            .length;
+                            .toList();
                         return _DepartmentCard(
                           department: department,
-                          headName: headName,
-                          employeeCount: employeeCount,
+                          headEmployee: headEmployee,
+                          members: members,
                         );
                       },
                     );
@@ -126,13 +127,13 @@ class _DepartmentsPageState extends ConsumerState<DepartmentsPage> {
 class _DepartmentCard extends ConsumerWidget {
   const _DepartmentCard({
     required this.department,
-    required this.headName,
-    required this.employeeCount,
+    required this.headEmployee,
+    required this.members,
   });
 
   final Department department;
-  final String? headName;
-  final int employeeCount;
+  final Employee? headEmployee;
+  final List<Employee> members;
 
   Future<void> _setArchived(BuildContext context, WidgetRef ref, bool value) async {
     try {
@@ -233,23 +234,45 @@ class _DepartmentCard extends ConsumerWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 4),
-                Text(
-                  headName == null
-                      ? 'No department head assigned'
-                      : 'Head: $headName',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
+                const SizedBox(height: 8),
+                if (headEmployee != null)
+                  Row(
+                    children: [
+                      EmployeeAvatar(
+                        fullName: headEmployee!.fullName,
+                        photoUrl: headEmployee!.profilePhotoUrl,
+                        radius: 14,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Head: ${headEmployee!.fullName}',
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: AppColors.textSecondary),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    'No department head assigned',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  employeeCount == 1
-                      ? '1 employee'
-                      : '$employeeCount employees',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    StatusBadge(
+                      label: members.length == 1
+                          ? '1 employee'
+                          : '${members.length} employees',
+                      color: AppColors.primary,
+                      icon: Icons.groups_outlined,
+                    ),
+                    if (members.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Expanded(child: _AvatarStack(employees: members)),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -285,6 +308,79 @@ class _DepartmentCard extends ConsumerWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Overlapping face thumbnails for a department's members, capped to
+/// [maxVisible] with a "+N" bubble for the rest — a quick "who's in here"
+/// glance without listing every name.
+class _AvatarStack extends StatelessWidget {
+  const _AvatarStack({required this.employees});
+
+  final List<Employee> employees;
+
+  static const _maxVisible = 8;
+  static const _radius = 14.0;
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = _radius;
+    final visible = employees.take(_maxVisible).toList();
+    final overflow = employees.length - visible.length;
+    final diameter = radius * 2;
+    final step = radius * 1.3;
+    final bubbleCount = visible.length + (overflow > 0 ? 1 : 0);
+    final width = diameter + step * (bubbleCount - 1);
+
+    return SizedBox(
+      height: diameter + 4,
+      width: width,
+      child: Stack(
+        children: [
+          for (var i = 0; i < visible.length; i++)
+            Positioned(
+              left: step * i,
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.fromBorderSide(
+                    BorderSide(color: AppColors.surface, width: 2),
+                  ),
+                ),
+                child: EmployeeAvatar(
+                  fullName: visible[i].fullName,
+                  photoUrl: visible[i].profilePhotoUrl,
+                  radius: radius,
+                ),
+              ),
+            ),
+          if (overflow > 0)
+            Positioned(
+              left: step * visible.length,
+              child: Container(
+                width: diameter,
+                height: diameter,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.fieldFill,
+                  border: Border.fromBorderSide(
+                    BorderSide(color: AppColors.surface, width: 2),
+                  ),
+                ),
+                child: Text(
+                  '+$overflow',
+                  style: TextStyle(
+                    fontSize: radius * 0.6,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
