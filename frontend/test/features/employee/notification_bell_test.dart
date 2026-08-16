@@ -9,12 +9,15 @@ import 'package:zera_erp/features/employee/domain/entities/upcoming_birthday.dar
 import 'package:zera_erp/features/employee/presentation/widgets/notification_bell.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/leave/domain/repositories/leave_repository.dart';
+import 'package:zera_erp/features/notices/application/notice_providers.dart';
+import 'package:zera_erp/features/notices/domain/entities/notice.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/requests/domain/entities/employee_request.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_leave.dart';
+import '../../helpers/fake_notice.dart';
 import '../../helpers/fake_request.dart';
 
 EmployeeRequest _buildRequest({
@@ -37,12 +40,14 @@ Widget _app({
   required FakeEmployeeRepository employeeRepository,
   required FakeRequestRepository requestRepository,
   FakeLeaveRepository? leaveRepository,
+  FakeNoticeRepository? noticeRepository,
+  String role = 'HR/Manager',
   ValueChanged<NotificationLinkTarget>? onNavigate,
 }) {
   final user = AuthUser(
     id: 'user-1',
     email: 'jane.doe@zeracreative.com',
-    role: 'HR/Manager',
+    role: role,
     permissions: permissions,
   );
 
@@ -55,6 +60,9 @@ Widget _app({
       requestRepositoryProvider.overrideWithValue(requestRepository),
       leaveRepositoryProvider.overrideWithValue(
         leaveRepository ?? FakeLeaveRepository(),
+      ),
+      noticeRepositoryProvider.overrideWithValue(
+        noticeRepository ?? FakeNoticeRepository(),
       ),
     ],
     child: MaterialApp(
@@ -346,6 +354,116 @@ void main() {
 
       expect(find.text('Your leave was rejected'), findsOneWidget);
       expect(find.text('30 days ago'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows a birthday that already happened this week as "days ago"',
+    (tester) async {
+      final employeeRepository = FakeEmployeeRepository(
+        upcomingBirthdays: const [
+          UpcomingBirthday(
+            employeeId: 'employee-2',
+            fullName: 'Aamna Irfan',
+            dateOfBirth: '1997-08-13',
+            daysUntil: -1,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: ['employees.manage'],
+          employeeRepository: employeeRepository,
+          requestRepository: FakeRequestRepository(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining("Aamna Irfan's birthday — 1 day ago"),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'shows a recent company notice and navigates on tap',
+    (tester) async {
+      NotificationLinkTarget? tapped;
+      final noticeRepository = FakeNoticeRepository(
+        notices: [
+          Notice(
+            id: 'notice-1',
+            title: 'Office closed for holiday',
+            body: 'All employees get the day off. Enjoy!',
+            authorName: 'Noushad',
+            createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: const [],
+          employeeRepository: FakeEmployeeRepository(),
+          requestRepository: FakeRequestRepository(),
+          noticeRepository: noticeRepository,
+          onNavigate: (target) => tapped = target,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Office closed for holiday'), findsOneWidget);
+      expect(find.text('2 hours ago'), findsOneWidget);
+
+      await tester.tap(find.text('Office closed for holiday'));
+      await tester.pumpAndSettle();
+
+      expect(tapped, NotificationLinkTarget.adminDashboard);
+    },
+  );
+
+  testWidgets(
+    'routes a notice tap to the user dashboard for a plain employee',
+    (tester) async {
+      NotificationLinkTarget? tapped;
+      final noticeRepository = FakeNoticeRepository(
+        notices: [
+          Notice(
+            id: 'notice-1',
+            title: 'Office closed for holiday',
+            body: 'All employees get the day off. Enjoy!',
+            authorName: 'Noushad',
+            createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: const [],
+          role: 'Employee',
+          employeeRepository: FakeEmployeeRepository(),
+          requestRepository: FakeRequestRepository(),
+          noticeRepository: noticeRepository,
+          onNavigate: (target) => tapped = target,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Office closed for holiday'));
+      await tester.pumpAndSettle();
+
+      expect(tapped, NotificationLinkTarget.userDashboard);
     },
   );
 }

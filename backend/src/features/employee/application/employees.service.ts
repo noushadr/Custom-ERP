@@ -200,9 +200,13 @@ export class EmployeesService {
     return employees.map(toEmployeeResponse);
   }
 
-  /** Employees whose birthday falls within the next [withinDays] days. */
+  /** Employees whose birthday falls within the next [withinDays] days, or
+   * happened within the last [recentDays] days — so a just-passed birthday
+   * still shows up as a "recently happened" notification instead of
+   * disappearing until its next occurrence a year away. */
   async getUpcomingBirthdays(
     withinDays = 7,
+    recentDays = 7,
   ): Promise<UpcomingBirthdayResponse[]> {
     const employees = await this.employeeRepository.findAll();
     const today = new Date();
@@ -212,9 +216,9 @@ export class EmployeesService {
       .filter((employee) => employee.dateOfBirth)
       .map((employee) => ({
         employee,
-        daysUntil: this.daysUntilNextBirthday(employee.dateOfBirth!, today),
+        daysUntil: this.daysUntilBirthday(employee.dateOfBirth!, today),
       }))
-      .filter(({ daysUntil }) => daysUntil <= withinDays)
+      .filter(({ daysUntil }) => daysUntil <= withinDays && daysUntil >= -recentDays)
       .sort((a, b) => a.daysUntil - b.daysUntil)
       .map(({ employee, daysUntil }) => ({
         employeeId: employee.id,
@@ -225,16 +229,23 @@ export class EmployeesService {
       }));
   }
 
-  /** Days from [today] to this year's (or next year's, if already passed)
-   * occurrence of the month/day encoded in [dateOfBirth]. */
-  private daysUntilNextBirthday(dateOfBirth: string, today: Date): number {
+  /** Signed day count from [today] to the closest occurrence (last year's,
+   * this year's, or next year's) of the month/day encoded in [dateOfBirth]:
+   * negative if it already happened, positive if it's still to come. */
+  private daysUntilBirthday(dateOfBirth: string, today: Date): number {
     const dob = new Date(dateOfBirth);
-    let next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-    if (next < today) {
-      next = new Date(today.getFullYear() + 1, dob.getMonth(), dob.getDate());
-    }
     const msPerDay = 24 * 60 * 60 * 1000;
-    return Math.round((next.getTime() - today.getTime()) / msPerDay);
+    const candidates = [-1, 0, 1].map((yearOffset) => {
+      const occurrence = new Date(
+        today.getFullYear() + yearOffset,
+        dob.getMonth(),
+        dob.getDate(),
+      );
+      return Math.round((occurrence.getTime() - today.getTime()) / msPerDay);
+    });
+    return candidates.reduce((closest, candidate) =>
+      Math.abs(candidate) < Math.abs(closest) ? candidate : closest,
+    );
   }
 
   async findById(id: string): Promise<EmployeeResponse> {

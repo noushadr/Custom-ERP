@@ -6,6 +6,8 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../leave/application/leave_providers.dart';
 import '../../../leave/domain/entities/leave_request.dart';
+import '../../../notices/application/notice_providers.dart';
+import '../../../notices/domain/entities/notice.dart';
 import '../../../requests/application/request_providers.dart';
 import '../../../requests/domain/entities/employee_request.dart';
 import '../../application/employee_providers.dart';
@@ -20,13 +22,18 @@ enum NotificationLinkTarget { adminDashboard, userDashboard, leavePage }
 // cutoff this never hides something just because time passed.
 const _maxDecidedHistory = 10;
 
+// Company notices have no targeting/read state, so every viewer sees the
+// same feed — capped to the most recent few so the bell isn't dominated by
+// old announcements.
+const _maxNoticeHistory = 5;
+
 /// Bell + dropdown shown in the top bar, next to the account menu — mirrors
 /// how most SaaS/social apps surface notifications rather than giving them
 /// their own nav destination. Combines birthday reminders (Super
-/// Admin/HR-Manager only), requests/leave awaiting the viewer's approval, a
-/// leave-balance-reset reminder (Super Admin/HR only), and the viewer's own
-/// recently-decided requests/leave — every item shows how long ago it
-/// happened.
+/// Admin/HR-Manager only, recently-passed or upcoming), company notices,
+/// requests/leave awaiting the viewer's approval, a leave-balance-reset
+/// reminder (Super Admin/HR only), and the viewer's own recently-decided
+/// requests/leave — every item shows how long ago it happened.
 class NotificationBell extends ConsumerWidget {
   const NotificationBell({super.key, required this.onNavigate});
 
@@ -39,10 +46,17 @@ class NotificationBell extends ConsumerWidget {
     final canSeeBirthdays = authUser?.hasPermission('employees.manage') ?? false;
     final canSeeHrApprovals = authUser?.hasPermission('users.manage') ?? false;
     final canManageLeave = authUser?.hasPermission('leave.manage') ?? false;
+    final seesAdminDashboard =
+        authUser?.role == 'Super Admin' || authUser?.role == 'HR/Manager';
 
     final birthdays = canSeeBirthdays
         ? ref.watch(upcomingBirthdaysProvider).valueOrNull ?? const []
         : const <UpcomingBirthday>[];
+    // No targeting/permission on notices — every authenticated viewer sees
+    // the same feed, so no gate here.
+    final recentNotices = (ref.watch(noticeListProvider).valueOrNull ?? const [])
+        .take(_maxNoticeHistory)
+        .toList();
     final hrApprovals = canSeeHrApprovals
         ? ref.watch(pendingHrApprovalRequestsProvider).valueOrNull ?? const []
         : const <EmployeeRequest>[];
@@ -76,6 +90,7 @@ class NotificationBell extends ConsumerWidget {
 
     final totalCount =
         birthdays.length +
+        recentNotices.length +
         hrApprovals.length +
         managerApprovals.length +
         leaveHrApprovals.length +
@@ -103,6 +118,14 @@ class NotificationBell extends ConsumerWidget {
               enabled: false,
               height: 36,
               child: _BirthdayRow(birthday: birthday),
+            ),
+          for (final notice in recentNotices)
+            PopupMenuItem<NotificationLinkTarget>(
+              value: seesAdminDashboard
+                  ? NotificationLinkTarget.adminDashboard
+                  : NotificationLinkTarget.userDashboard,
+              height: 44,
+              child: _NoticeRow(notice: notice),
             ),
           if (needsLeaveReset)
             PopupMenuItem<NotificationLinkTarget>(
@@ -220,14 +243,12 @@ class _BirthdayRow extends StatelessWidget {
   final UpcomingBirthday birthday;
 
   String get _whenLabel {
-    switch (birthday.daysUntil) {
-      case 0:
-        return 'Today';
-      case 1:
-        return 'Tomorrow';
-      default:
-        return 'In ${birthday.daysUntil} days';
-    }
+    final daysUntil = birthday.daysUntil;
+    if (daysUntil == 0) return 'Today';
+    if (daysUntil == 1) return 'Tomorrow';
+    if (daysUntil > 1) return 'In $daysUntil days';
+    if (daysUntil == -1) return '1 day ago';
+    return '${-daysUntil} days ago';
   }
 
   @override
@@ -238,6 +259,52 @@ class _BirthdayRow extends StatelessWidget {
         "🎂 ${birthday.fullName}'s birthday — $_whenLabel",
         overflow: TextOverflow.ellipsis,
         style: Theme.of(context).textTheme.bodySmall,
+      ),
+    );
+  }
+}
+
+class _NoticeRow extends StatelessWidget {
+  const _NoticeRow({required this.notice});
+
+  final Notice notice;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 280),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            notice.title,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Company notice',
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                formatRelativeTime(notice.createdAt),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textSecondary.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

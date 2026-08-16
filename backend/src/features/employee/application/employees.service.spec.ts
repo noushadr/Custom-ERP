@@ -404,9 +404,7 @@ describe('EmployeesService', () => {
       expect(result[1].daysUntil).toBe(3);
     });
 
-    it('wraps a birthday that already passed this year to next year', async () => {
-      // "Passed a moment ago" (-1 day) should resolve to the occurrence
-      // ~364-366 days out next year, not a negative/near-zero count.
+    it('includes a birthday that recently passed, with a negative daysUntil', async () => {
       const employee = buildEmployee({
         id: 'employee-passed',
         dateOfBirth: isoDobInDays(-1),
@@ -415,7 +413,48 @@ describe('EmployeesService', () => {
 
       const result = await service.getUpcomingBirthdays(7);
 
+      expect(result.map((r) => r.employeeId)).toEqual(['employee-passed']);
+      expect(result[0].daysUntil).toBe(-1);
+    });
+
+    it('excludes a birthday that passed further back than the recent window', async () => {
+      const employee = buildEmployee({
+        id: 'employee-long-passed',
+        dateOfBirth: isoDobInDays(-10),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+
+      const result = await service.getUpcomingBirthdays(7);
+
       expect(result).toHaveLength(0);
+    });
+
+    it('sorts recently-passed birthdays before today and upcoming ones', async () => {
+      const passed = buildEmployee({
+        id: 'employee-passed',
+        dateOfBirth: isoDobInDays(-3),
+      });
+      const today = buildEmployee({
+        id: 'employee-today',
+        dateOfBirth: isoDobInDays(0),
+      });
+      const upcoming = buildEmployee({
+        id: 'employee-upcoming',
+        dateOfBirth: isoDobInDays(2),
+      });
+      employeeRepository.findAll.mockResolvedValue([
+        upcoming,
+        today,
+        passed,
+      ]);
+
+      const result = await service.getUpcomingBirthdays(7);
+
+      expect(result.map((r) => r.employeeId)).toEqual([
+        'employee-passed',
+        'employee-today',
+        'employee-upcoming',
+      ]);
     });
 
     it('includes a birthday that falls today', async () => {
