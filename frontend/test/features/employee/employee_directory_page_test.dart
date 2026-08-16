@@ -261,4 +261,40 @@ void main() {
       expect(find.textContaining('person'), findsNothing);
     },
   );
+
+  testWidgets(
+    'only counts active employees in the work-mode summary',
+    (tester) async {
+      final repository = FakeEmployeeRepository(
+        employees: [
+          buildTestEmployee(
+            id: 'employee-1',
+            employmentStatus: 'active',
+            workMode: 'remote',
+          ),
+          buildTestEmployee(
+            id: 'employee-2',
+            employmentStatus: 'resigned',
+            workMode: 'remote',
+          ),
+          buildTestEmployee(
+            id: 'employee-3',
+            employmentStatus: 'terminated',
+            workMode: 'hybrid',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      // Only employee-1 is active, so Remote should read 1 (not 2), and
+      // Hybrid should read 0 since its only member has left.
+      expect(find.text('On-site: 0'), findsOneWidget);
+      expect(find.text('Remote: 1'), findsOneWidget);
+      expect(find.text('Hybrid: 0'), findsOneWidget);
+    },
+  );
 }

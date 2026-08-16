@@ -80,11 +80,15 @@ class _DashboardStats extends StatelessWidget {
         (count) => count + 1,
         ifAbsent: () => 1,
       );
-      byWorkMode.update(
-        employee.workMode,
-        (count) => count + 1,
-        ifAbsent: () => 1,
-      );
+      // Work mode only makes sense for people currently working, so resigned/
+      // terminated/on-leave/notice-period employees aren't counted here.
+      if (employee.employmentStatus == 'active') {
+        byWorkMode.update(
+          employee.workMode,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+      }
     }
 
     return SingleChildScrollView(
@@ -116,6 +120,12 @@ class _DashboardStats extends StatelessWidget {
                 icon: Icons.people_alt_outlined,
               ),
               MetricCard(
+                label: 'Active',
+                value: '${byStatus['active'] ?? 0}',
+                color: AppColors.success,
+                icon: Icons.check_circle_outline,
+              ),
+              MetricCard(
                 label: 'New Hires (This Month)',
                 value: '$newHiresThisMonth',
                 color: AppColors.success,
@@ -126,12 +136,6 @@ class _DashboardStats extends StatelessWidget {
                 value: '$avgProfileCompletion%',
                 color: AppColors.accentTeal,
                 icon: Icons.donut_large_outlined,
-              ),
-              MetricCard(
-                label: 'Active',
-                value: '${byStatus['active'] ?? 0}',
-                color: AppColors.success,
-                icon: Icons.check_circle_outline,
               ),
               MetricCard(
                 label: 'On Leave',

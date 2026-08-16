@@ -286,11 +286,15 @@ class _DirectorySummary extends StatelessWidget {
         (count) => count + 1,
         ifAbsent: () => 1,
       );
-      byWorkMode.update(
-        employee.workMode,
-        (count) => count + 1,
-        ifAbsent: () => 1,
-      );
+      // Work mode only makes sense for people currently working, so resigned/
+      // terminated/on-leave/notice-period employees aren't counted here.
+      if (employee.employmentStatus == 'active') {
+        byWorkMode.update(
+          employee.workMode,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+      }
     }
 
     final headline = shown == total

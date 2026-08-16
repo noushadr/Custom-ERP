@@ -5,9 +5,11 @@ import 'package:zera_erp/features/authentication/application/auth_providers.dart
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
+import 'package:zera_erp/shared/widgets/metric_card.dart';
 
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_auth.dart';
@@ -16,14 +18,17 @@ import 'helpers/fake_leave.dart';
 import 'helpers/fake_notice.dart';
 import 'helpers/fake_request.dart';
 
-Widget _authenticatedApp({AuthUser user = testAuthUser}) {
+Widget _authenticatedApp({
+  AuthUser user = testAuthUser,
+  List<Employee>? employees,
+}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
         (ref) => PresetAuthController(AuthAuthenticated(user)),
       ),
       employeeRepositoryProvider.overrideWithValue(
-        FakeEmployeeRepository(employees: [buildTestEmployee()]),
+        FakeEmployeeRepository(employees: employees ?? [buildTestEmployee()]),
       ),
       noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
       requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
@@ -62,6 +67,57 @@ void main() {
     expect(find.text('Total Employees'), findsOneWidget);
     expect(find.text('Active'), findsOneWidget);
   });
+
+  testWidgets(
+    'admin dashboard Work Mode tiles only count active employees',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          employees: [
+            buildTestEmployee(
+              id: 'employee-1',
+              employmentStatus: 'active',
+              workMode: 'remote',
+            ),
+            buildTestEmployee(
+              id: 'employee-2',
+              employmentStatus: 'resigned',
+              workMode: 'remote',
+            ),
+            buildTestEmployee(
+              id: 'employee-3',
+              employmentStatus: 'terminated',
+              workMode: 'hybrid',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final onSiteCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'On-site'),
+      );
+      final remoteCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Remote'),
+      );
+      final hybridCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Hybrid'),
+      );
+
+      // Only employee-1 is active, so Remote reads 1 (not 2) and Hybrid
+      // reads 0 since its only member has left.
+      expect(onSiteCard.value, '0');
+      expect(remoteCard.value, '1');
+      expect(hybridCard.value, '0');
+    },
+  );
 
   testWidgets('switching destinations updates the body', (
     WidgetTester tester,
