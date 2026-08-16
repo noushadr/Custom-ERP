@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
-import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/asset.dart';
 import '../../domain/entities/audit_log_entry.dart';
 import '../../domain/entities/department.dart';
@@ -10,7 +9,6 @@ import '../../domain/entities/employee_document.dart';
 import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/paginated_audit_log.dart';
 import '../../domain/entities/salary_record.dart';
-import '../../domain/entities/team.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../../domain/entities/upcoming_birthday.dart';
@@ -68,6 +66,10 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(() => _remoteDataSource.uploadMyPhoto(bytes, fileName));
 
   @override
+  Future<Employee> uploadPhoto(String id, Uint8List bytes, String fileName) =>
+      _guard(() => _remoteDataSource.uploadPhoto(id, bytes, fileName));
+
+  @override
   Future<({Employee employee, String temporaryPassword})> invite(
     InviteEmployeeInput input,
   ) => _guard(() => _remoteDataSource.invite(input));
@@ -118,57 +120,6 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   @override
   Future<void> deleteDepartment(String id) =>
       _guard(() => _remoteDataSource.deleteDepartment(id));
-
-  @override
-  Future<List<NamedRef>> getTeams({String? departmentId}) =>
-      _guard(() => _remoteDataSource.getTeams(departmentId: departmentId));
-
-  @override
-  Future<List<Team>> getTeamsManagement({
-    String? departmentId,
-    bool includeArchived = false,
-  }) => _guard(
-    () => _remoteDataSource.getTeamsManagement(
-      departmentId: departmentId,
-      includeArchived: includeArchived,
-    ),
-  );
-
-  @override
-  Future<Team> createTeam({
-    required String name,
-    required String departmentId,
-    String? leadEmployeeId,
-  }) => _guard(
-    () => _remoteDataSource.createTeam(
-      name: name,
-      departmentId: departmentId,
-      leadEmployeeId: leadEmployeeId,
-    ),
-  );
-
-  @override
-  Future<Team> updateTeam(
-    String id, {
-    required String name,
-    required String departmentId,
-    String? leadEmployeeId,
-  }) => _guard(
-    () => _remoteDataSource.updateTeam(
-      id,
-      name: name,
-      departmentId: departmentId,
-      leadEmployeeId: leadEmployeeId,
-    ),
-  );
-
-  @override
-  Future<Team> setTeamArchived(String id, {required bool isArchived}) =>
-      _guard(() => _remoteDataSource.setTeamArchived(id, isArchived: isArchived));
-
-  @override
-  Future<void> deleteTeam(String id) =>
-      _guard(() => _remoteDataSource.deleteTeam(id));
 
   @override
   Future<List<EmployeeDocument>> getMyDocuments() =>
@@ -317,10 +268,6 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(() => _remoteDataSource.getAssets(employeeId));
 
   @override
-  Future<List<Asset>> getAvailableAssets() =>
-      _guard(() => _remoteDataSource.getAvailableAssets());
-
-  @override
   Future<Asset> createAndAssignAsset(
     String employeeId, {
     required String name,
@@ -332,10 +279,6 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       value: value,
     ),
   );
-
-  @override
-  Future<Asset> assignExistingAsset(String employeeId, String assetId) =>
-      _guard(() => _remoteDataSource.assignExistingAsset(employeeId, assetId));
 
   @override
   Future<Asset> updateAsset(
@@ -353,8 +296,8 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   );
 
   @override
-  Future<void> unassignAsset(String employeeId, String assetId) =>
-      _guard(() => _remoteDataSource.unassignAsset(employeeId, assetId));
+  Future<void> deleteAsset(String employeeId, String assetId) =>
+      _guard(() => _remoteDataSource.deleteAsset(employeeId, assetId));
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
@@ -376,6 +319,7 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       }
       return 'Invalid request.';
     }
+    if (status == 401) return 'Your session has expired. Please sign in again.';
     if (status == 403) return "You don't have permission to do that.";
     if (status == 404) return 'Not found.';
     if (status == 409) {
@@ -384,6 +328,9 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
         return data['message'] as String;
       }
       return 'This conflicts with existing data.';
+    }
+    if (status == 413) {
+      return 'This file is too large. Please choose one under 10 MB.';
     }
     if (error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout) {

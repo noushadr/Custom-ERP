@@ -37,7 +37,6 @@ void main() {
       _app(
         permissions: const [
           'departments.manage',
-          'teams.manage',
           'leave.manage',
           'roles.manage',
         ],
@@ -46,7 +45,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Departments'), findsOneWidget);
-    expect(find.text('Teams'), findsOneWidget);
     expect(find.text('Leave Types & Policies'), findsOneWidget);
     expect(find.text('Public Holidays'), findsOneWidget);
     expect(find.text('Roles & Permissions'), findsOneWidget);
@@ -59,22 +57,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Departments'), findsNothing);
-    expect(find.text('Teams'), findsNothing);
     expect(find.text('Leave Types & Policies'), findsNothing);
     expect(find.text('Public Holidays'), findsNothing);
     expect(find.text('Roles & Permissions'), findsNothing);
     expect(find.text("You don't have access to any settings."), findsOneWidget);
-  });
-
-  testWidgets('shows only the Teams entry for a teams.manage-only viewer', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_app(permissions: const ['teams.manage']));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Teams'), findsOneWidget);
-    expect(find.text('Departments'), findsNothing);
-    expect(find.text('Roles & Permissions'), findsNothing);
   });
 
   testWidgets('tapping Departments navigates to the departments page', (

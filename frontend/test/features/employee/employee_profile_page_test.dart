@@ -64,6 +64,27 @@ void main() {
   });
 
   testWidgets(
+    'shows a human-readable employment type instead of the raw enum value',
+    (tester) async {
+      final me = buildTestEmployee(email: 'jane.doe@zeracreative.com');
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
+
+      await tester.pumpWidget(
+        _app(viewer: viewer, repository: FakeEmployeeRepository(me: me)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Full-time'), findsOneWidget);
+      expect(find.text('full_time'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'shows Edit for someone else\'s profile when the viewer can manage employees',
     (tester) async {
       final other = buildTestEmployee(
@@ -555,7 +576,7 @@ void main() {
 
       expect(find.text('Dell Laptop'), findsOneWidget);
       expect(find.text('Add asset'), findsNothing);
-      expect(find.text('Unassign'), findsNothing);
+      expect(find.byTooltip('Delete'), findsNothing);
     },
   );
 
@@ -593,7 +614,7 @@ void main() {
   );
 
   testWidgets(
-    'HR/Admin sees Add asset and Unassign on someone else\'s profile',
+    'HR/Admin sees Add asset and Delete on someone else\'s profile',
     (tester) async {
       final other = buildTestEmployee(
         id: 'employee-2',
@@ -621,7 +642,7 @@ void main() {
 
       expect(find.text('Dell Laptop'), findsOneWidget);
       expect(find.text('Add asset'), findsOneWidget);
-      expect(find.text('Unassign'), findsOneWidget);
+      expect(find.byTooltip('Delete'), findsOneWidget);
     },
   );
 
@@ -666,7 +687,7 @@ void main() {
   );
 
   testWidgets(
-    'unassigning an asset calls unassignAsset',
+    'deleting an asset asks for confirmation, then calls deleteAsset',
     (tester) async {
       final other = buildTestEmployee(
         id: 'employee-2',
@@ -690,10 +711,51 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Unassign'));
+      await tester.tap(find.byTooltip('Delete'));
       await tester.pumpAndSettle();
 
-      expect(repository.lastUnassignAssetId, 'asset-9');
+      expect(find.text('Delete asset?'), findsOneWidget);
+      expect(repository.lastDeleteAssetId, isNull);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastDeleteAssetId, 'asset-9');
+    },
+  );
+
+  testWidgets(
+    'cancelling the delete-asset confirmation does not call deleteAsset',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.read', 'employees.manage'],
+      );
+      final repository = FakeEmployeeRepository(
+        employees: [other],
+        assets: [buildTestAsset(id: 'asset-9', name: 'Dell Laptop')],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(viewer: viewer, employeeId: 'employee-2', repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Delete'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastDeleteAssetId, isNull);
+      expect(find.text('Dell Laptop'), findsOneWidget);
     },
   );
 }

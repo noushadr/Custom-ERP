@@ -308,7 +308,7 @@ void main() {
           Department(id: 'department-1', name: 'Engineering'),
         ],
         deleteDepartmentError: const EmployeeException(
-          'Cannot delete a department that still has employees or teams '
+          'Cannot delete a department that still has employees '
           'assigned. Archive it instead.',
         ),
       );
@@ -325,7 +325,7 @@ void main() {
 
       expect(
         find.text(
-          'Cannot delete a department that still has employees or teams '
+          'Cannot delete a department that still has employees '
           'assigned. Archive it instead.',
         ),
         findsOneWidget,

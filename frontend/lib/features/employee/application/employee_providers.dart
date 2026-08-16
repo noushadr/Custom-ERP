@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../shared/models/named_ref.dart';
 import '../../authentication/application/auth_providers.dart';
 import '../data/datasources/employee_remote_data_source.dart';
 import '../data/repositories/employee_repository_impl.dart';
@@ -11,7 +10,6 @@ import '../domain/entities/employee.dart';
 import '../domain/entities/employee_document.dart';
 import '../domain/entities/paginated_audit_log.dart';
 import '../domain/entities/salary_record.dart';
-import '../domain/entities/team.dart';
 import '../domain/entities/upcoming_birthday.dart';
 import '../domain/repositories/employee_repository.dart';
 
@@ -79,25 +77,6 @@ final departmentsManagementProvider = FutureProvider.autoDispose
       return ref
           .watch(employeeRepositoryProvider)
           .getDepartments(includeArchived: includeArchived);
-    });
-
-final teamsProvider = FutureProvider.autoDispose.family<List<NamedRef>, String?>(
-  (ref, departmentId) {
-    ref.watch(authControllerProvider);
-    return ref
-        .watch(employeeRepositoryProvider)
-        .getTeams(departmentId: departmentId);
-  },
-);
-
-/// Keyed by whether archived teams should be included — used by the teams
-/// management screen, mirroring [departmentsManagementProvider].
-final teamsManagementProvider = FutureProvider.autoDispose
-    .family<List<Team>, bool>((ref, includeArchived) {
-      ref.watch(authControllerProvider);
-      return ref
-          .watch(employeeRepositoryProvider)
-          .getTeamsManagement(includeArchived: includeArchived);
     });
 
 final myDocumentsProvider = FutureProvider.autoDispose<List<EmployeeDocument>>(
@@ -185,12 +164,6 @@ final employeeAssetsProvider = FutureProvider.autoDispose
       ref.watch(authControllerProvider);
       return ref.watch(employeeRepositoryProvider).getAssets(employeeId);
     });
-
-/// Currently-unassigned assets, for the "assign existing asset" picker.
-final availableAssetsProvider = FutureProvider.autoDispose<List<Asset>>((ref) {
-  ref.watch(authControllerProvider);
-  return ref.watch(employeeRepositoryProvider).getAvailableAssets();
-});
 
 final myEducationHistoryProvider =
     FutureProvider.autoDispose<List<EducationRecord>>((ref) {

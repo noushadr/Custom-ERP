@@ -23,7 +23,6 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
   final _lastNameController = TextEditingController();
   final _designationController = TextEditingController();
   String? _departmentId;
-  String? _teamId;
 
   @override
   void dispose() {
@@ -48,7 +47,6 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
                 ? null
                 : _designationController.text.trim(),
             departmentId: _departmentId,
-            teamId: _teamId,
           ),
         );
   }
@@ -152,42 +150,9 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
                     ],
                     onChanged: isSubmitting
                         ? null
-                        : (value) => setState(() {
-                            _departmentId = value;
-                            _teamId = null;
-                          }),
+                        : (value) => setState(() => _departmentId = value),
                   ),
                 ),
-                if (_departmentId != null) ...[
-                  const SizedBox(height: 16),
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final teamsAsync = ref.watch(
-                        teamsProvider(_departmentId),
-                      );
-                      return teamsAsync.when(
-                        loading: () => const LinearProgressIndicator(),
-                        error: (_, _) => const Text('Could not load teams.'),
-                        data: (teams) => DropdownButtonFormField<String>(
-                          initialValue: _teamId,
-                          decoration: const InputDecoration(
-                            labelText: 'Team (optional)',
-                          ),
-                          items: [
-                            for (final team in teams)
-                              DropdownMenuItem(
-                                value: team.id,
-                                child: Text(team.name),
-                              ),
-                          ],
-                          onChanged: isSubmitting
-                              ? null
-                              : (value) => setState(() => _teamId = value),
-                        ),
-                      );
-                    },
-                  ),
-                ],
                 const SizedBox(height: 22),
                 ElevatedButton(
                   onPressed: isSubmitting ? null : _submit,

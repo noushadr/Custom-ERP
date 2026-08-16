@@ -16,7 +16,6 @@ class EmployeeModel extends Employee {
     required super.profilePhotoUrl,
     required super.designation,
     required super.department,
-    required super.team,
     required super.reportingManager,
     required super.employmentType,
     required super.employmentStatus,
@@ -55,9 +54,6 @@ class EmployeeModel extends Employee {
     department: json['department'] == null
         ? null
         : NamedRef.fromJson(json['department'] as Map<String, dynamic>),
-    team: json['team'] == null
-        ? null
-        : NamedRef.fromJson(json['team'] as Map<String, dynamic>),
     reportingManager: _resolveReportingManager(
       json['reportingManager'] as Map<String, dynamic>?,
     ),

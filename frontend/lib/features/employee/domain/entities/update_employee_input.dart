@@ -10,7 +10,6 @@ class UpdateEmployeeInput {
     this.companyEmail,
     this.designation,
     this.departmentId,
-    this.teamId,
     this.reportingManagerId,
     this.employmentType,
     this.employmentStatus,
@@ -36,7 +35,6 @@ class UpdateEmployeeInput {
   final String? companyEmail;
   final String? designation;
   final String? departmentId;
-  final String? teamId;
   final String? reportingManagerId;
   final String? employmentType;
   final String? employmentStatus;
@@ -62,7 +60,6 @@ class UpdateEmployeeInput {
     'companyEmail': companyEmail,
     'designation': designation,
     'departmentId': departmentId,
-    'teamId': teamId,
     'reportingManagerId': reportingManagerId,
     'employmentType': employmentType,
     'employmentStatus': employmentStatus,

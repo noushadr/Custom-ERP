@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import '../../../../shared/models/named_ref.dart';
 import '../entities/asset.dart';
 import '../entities/audit_log_entry.dart';
 import '../entities/department.dart';
@@ -9,7 +8,6 @@ import '../entities/employee_document.dart';
 import '../entities/invite_employee_input.dart';
 import '../entities/paginated_audit_log.dart';
 import '../entities/salary_record.dart';
-import '../entities/team.dart';
 import '../entities/update_employee_input.dart';
 import '../entities/update_my_profile_input.dart';
 import '../entities/upcoming_birthday.dart';
@@ -45,6 +43,9 @@ abstract interface class EmployeeRepository {
 
   Future<Employee> uploadMyPhoto(Uint8List bytes, String fileName);
 
+  /// Requires `employees.manage`.
+  Future<Employee> uploadPhoto(String id, Uint8List bytes, String fileName);
+
   Future<({Employee employee, String temporaryPassword})> invite(
     InviteEmployeeInput input,
   );
@@ -69,40 +70,9 @@ abstract interface class EmployeeRepository {
   /// Requires `departments.manage`.
   Future<Department> setDepartmentArchived(String id, {required bool isArchived});
 
-  /// Requires `departments.manage`. Fails if any employees or teams are
-  /// still assigned to this department — archive it instead.
+  /// Requires `departments.manage`. Fails if any employees are still
+  /// assigned to this department — archive it instead.
   Future<void> deleteDepartment(String id);
-
-  Future<List<NamedRef>> getTeams({String? departmentId});
-
-  /// The full team list for the teams management screen (unlike [getTeams],
-  /// which is a lightweight picker for other forms).
-  Future<List<Team>> getTeamsManagement({
-    String? departmentId,
-    bool includeArchived = false,
-  });
-
-  /// Requires `teams.manage`.
-  Future<Team> createTeam({
-    required String name,
-    required String departmentId,
-    String? leadEmployeeId,
-  });
-
-  /// Requires `teams.manage`.
-  Future<Team> updateTeam(
-    String id, {
-    required String name,
-    required String departmentId,
-    String? leadEmployeeId,
-  });
-
-  /// Requires `teams.manage`.
-  Future<Team> setTeamArchived(String id, {required bool isArchived});
-
-  /// Requires `teams.manage`. Fails if any employees are still assigned to
-  /// this team — archive it instead.
-  Future<void> deleteTeam(String id);
 
   Future<List<EmployeeDocument>> getMyDocuments();
 
@@ -191,10 +161,6 @@ abstract interface class EmployeeRepository {
   /// Assets currently assigned to [employeeId]. Requires `employees.manage`.
   Future<List<Asset>> getAssets(String employeeId);
 
-  /// Currently unassigned assets, for the "assign existing asset" picker.
-  /// Requires `employees.manage`.
-  Future<List<Asset>> getAvailableAssets();
-
   /// Creates a brand-new asset and assigns it to [employeeId] immediately.
   /// Requires `employees.manage`.
   Future<Asset> createAndAssignAsset(
@@ -202,10 +168,6 @@ abstract interface class EmployeeRepository {
     required String name,
     double? value,
   });
-
-  /// Assigns a previously-unassigned asset to [employeeId]. Requires
-  /// `employees.manage`.
-  Future<Asset> assignExistingAsset(String employeeId, String assetId);
 
   /// Edits an assigned asset's own details (not its assignment). Requires
   /// `employees.manage`.
@@ -216,7 +178,7 @@ abstract interface class EmployeeRepository {
     double? value,
   });
 
-  /// Unassigns an asset from [employeeId], making it available again.
-  /// Requires `employees.manage`.
-  Future<void> unassignAsset(String employeeId, String assetId);
+  /// Permanently removes an asset assigned to [employeeId]. Requires
+  /// `employees.manage`.
+  Future<void> deleteAsset(String employeeId, String assetId);
 }

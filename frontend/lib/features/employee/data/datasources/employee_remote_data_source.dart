@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
-import '../../../../shared/models/named_ref.dart';
 import '../../domain/entities/employee_document.dart';
 import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/update_employee_input.dart';
@@ -13,7 +12,6 @@ import '../models/employee_document_model.dart';
 import '../models/employee_model.dart';
 import '../models/paginated_audit_log_model.dart';
 import '../models/salary_record_model.dart';
-import '../models/team_model.dart';
 import '../models/upcoming_birthday_model.dart';
 
 class EmployeeRemoteDataSource {
@@ -102,6 +100,20 @@ class EmployeeRemoteDataSource {
     return EmployeeModel.fromJson(response.data!);
   }
 
+  Future<EmployeeModel> uploadPhoto(
+    String id,
+    Uint8List bytes,
+    String fileName,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/employees/$id/photo',
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: fileName),
+      }),
+    );
+    return EmployeeModel.fromJson(response.data!);
+  }
+
   Future<({EmployeeModel employee, String temporaryPassword})> invite(
     InviteEmployeeInput input,
   ) async {
@@ -175,82 +187,6 @@ class EmployeeRemoteDataSource {
 
   Future<void> deleteDepartment(String id) async {
     await _dio.delete('/departments/$id');
-  }
-
-  Future<List<NamedRef>> getTeams({String? departmentId}) async {
-    final response = await _dio.get<List<dynamic>>(
-      '/teams',
-      queryParameters: departmentId == null
-          ? null
-          : {'departmentId': departmentId},
-    );
-    return response.data!
-        .cast<Map<String, dynamic>>()
-        .map(NamedRef.fromJson)
-        .toList();
-  }
-
-  Future<List<TeamModel>> getTeamsManagement({
-    String? departmentId,
-    bool includeArchived = false,
-  }) async {
-    final queryParameters = <String, dynamic>{
-      'includeArchived': includeArchived.toString(),
-    };
-    if (departmentId != null) queryParameters['departmentId'] = departmentId;
-    final response = await _dio.get<List<dynamic>>(
-      '/teams',
-      queryParameters: queryParameters,
-    );
-    return response.data!
-        .cast<Map<String, dynamic>>()
-        .map(TeamModel.fromJson)
-        .toList();
-  }
-
-  Future<TeamModel> createTeam({
-    required String name,
-    required String departmentId,
-    String? leadEmployeeId,
-  }) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/teams',
-      data: {
-        'name': name,
-        'departmentId': departmentId,
-        'leadEmployeeId': leadEmployeeId,
-      },
-    );
-    return TeamModel.fromJson(response.data!);
-  }
-
-  Future<TeamModel> updateTeam(
-    String id, {
-    required String name,
-    required String departmentId,
-    String? leadEmployeeId,
-  }) async {
-    final response = await _dio.patch<Map<String, dynamic>>(
-      '/teams/$id',
-      data: {
-        'name': name,
-        'departmentId': departmentId,
-        'leadEmployeeId': leadEmployeeId,
-      },
-    );
-    return TeamModel.fromJson(response.data!);
-  }
-
-  Future<TeamModel> setTeamArchived(String id, {required bool isArchived}) async {
-    final response = await _dio.patch<Map<String, dynamic>>(
-      '/teams/$id',
-      data: {'isArchived': isArchived},
-    );
-    return TeamModel.fromJson(response.data!);
-  }
-
-  Future<void> deleteTeam(String id) async {
-    await _dio.delete('/teams/$id');
   }
 
   Future<List<EmployeeDocumentModel>> getMyDocuments() async {
@@ -469,16 +405,6 @@ class EmployeeRemoteDataSource {
         .toList();
   }
 
-  Future<List<AssetModel>> getAvailableAssets() async {
-    final response = await _dio.get<List<dynamic>>(
-      '/employees/assets/available',
-    );
-    return response.data!
-        .cast<Map<String, dynamic>>()
-        .map(AssetModel.fromJson)
-        .toList();
-  }
-
   Future<AssetModel> createAndAssignAsset(
     String employeeId, {
     required String name,
@@ -487,16 +413,6 @@ class EmployeeRemoteDataSource {
     final response = await _dio.post<Map<String, dynamic>>(
       '/employees/$employeeId/assets',
       data: {'name': name, 'value': ?value},
-    );
-    return AssetModel.fromJson(response.data!);
-  }
-
-  Future<AssetModel> assignExistingAsset(
-    String employeeId,
-    String assetId,
-  ) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/employees/$employeeId/assets/$assetId/assign',
     );
     return AssetModel.fromJson(response.data!);
   }
@@ -514,7 +430,7 @@ class EmployeeRemoteDataSource {
     return AssetModel.fromJson(response.data!);
   }
 
-  Future<void> unassignAsset(String employeeId, String assetId) async {
-    await _dio.patch('/employees/$employeeId/assets/$assetId/unassign');
+  Future<void> deleteAsset(String employeeId, String assetId) async {
+    await _dio.delete('/employees/$employeeId/assets/$assetId');
   }
 }

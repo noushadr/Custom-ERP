@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/edit_employee_controller.dart';
@@ -5,6 +6,8 @@ import '../../application/edit_employee_state.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/update_employee_input.dart';
+import '../../domain/exceptions/employee_exception.dart';
+import '../widgets/employee_avatar.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 
@@ -62,7 +65,6 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
   late final TextEditingController _branchCodeController;
   late final TextEditingController _ibanController;
   String? _departmentId;
-  String? _teamId;
   String? _reportingManagerId;
   late String _employmentType;
   late String _employmentStatus;
@@ -70,6 +72,8 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
   late DateTime _joiningDate;
   DateTime? _dateOfLeaving;
   DateTime? _dateOfBirth;
+  late String? _photoUrl;
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
@@ -97,7 +101,6 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     _branchCodeController = TextEditingController(text: e.branchCode);
     _ibanController = TextEditingController(text: e.iban);
     _departmentId = e.department?.id;
-    _teamId = e.team?.id;
     _reportingManagerId = e.reportingManager?.id;
     _employmentType = e.employmentType;
     _employmentStatus = e.employmentStatus;
@@ -109,6 +112,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     _dateOfBirth = e.dateOfBirth == null
         ? null
         : DateTime.tryParse(e.dateOfBirth!);
+    _photoUrl = e.profilePhotoUrl;
   }
 
   @override
@@ -129,6 +133,33 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     _branchCodeController.dispose();
     _ibanController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUploadPhoto() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    final picked = result?.files.single;
+    if (picked?.bytes == null) return;
+
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final employee = await ref
+          .read(employeeRepositoryProvider)
+          .uploadPhoto(widget.employee.id, picked!.bytes!, picked.name);
+      ref.invalidate(employeeListProvider);
+      ref.invalidate(employeeDetailProvider(widget.employee.id));
+      if (!mounted) return;
+      setState(() => _photoUrl = employee.profilePhotoUrl);
+    } on EmployeeException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
   }
 
   static String _isoDate(DateTime date) =>
@@ -164,7 +195,6 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                 ? null
                 : _designationController.text.trim(),
             departmentId: _departmentId,
-            teamId: _teamId,
             reportingManagerId: _reportingManagerId,
             employmentType: _employmentType,
             employmentStatus: _employmentStatus,
@@ -251,6 +281,33 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   FormSection(
+                    child: Row(
+                      children: [
+                        EmployeeAvatar(
+                          fullName: widget.employee.fullName,
+                          photoUrl: _photoUrl,
+                          radius: 32,
+                        ),
+                        const SizedBox(width: 16),
+                        TextButton(
+                          onPressed: (isSubmitting || _isUploadingPhoto)
+                              ? null
+                              : _pickAndUploadPhoto,
+                          child: _isUploadingPhoto
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Change photo'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FormSection(
                     title: 'Identity',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -330,43 +387,9 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                             ],
                             onChanged: isSubmitting
                                 ? null
-                                : (value) => setState(() {
-                                    _departmentId = value;
-                                    _teamId = null;
-                                  }),
+                                : (value) =>
+                                    setState(() => _departmentId = value),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Consumer(
-                          builder: (context, ref, _) {
-                            final teamsAsync = ref.watch(
-                              teamsProvider(_departmentId),
-                            );
-                            return teamsAsync.when(
-                              loading: () => const LinearProgressIndicator(),
-                              error: (_, _) =>
-                                  const Text('Could not load teams.'),
-                              data: (teams) => DropdownButtonFormField<String>(
-                                initialValue: teams.any((t) => t.id == _teamId)
-                                    ? _teamId
-                                    : null,
-                                decoration: const InputDecoration(
-                                  labelText: 'Team',
-                                ),
-                                items: [
-                                  for (final t in teams)
-                                    DropdownMenuItem(
-                                      value: t.id,
-                                      child: Text(t.name),
-                                    ),
-                                ],
-                                onChanged: isSubmitting
-                                    ? null
-                                    : (value) =>
-                                        setState(() => _teamId = value),
-                              ),
-                            );
-                          },
                         ),
                         const SizedBox(height: 16),
                         employeesAsync.when(

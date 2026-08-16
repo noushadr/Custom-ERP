@@ -5,7 +5,6 @@ class InviteEmployeeInput {
     required this.lastName,
     this.designation,
     this.departmentId,
-    this.teamId,
     this.reportingManagerId,
     this.joiningDate,
   });
@@ -15,7 +14,6 @@ class InviteEmployeeInput {
   final String lastName;
   final String? designation;
   final String? departmentId;
-  final String? teamId;
   final String? reportingManagerId;
   final String? joiningDate;
 
@@ -25,7 +23,6 @@ class InviteEmployeeInput {
     'lastName': lastName,
     if (designation != null) 'designation': designation,
     if (departmentId != null) 'departmentId': departmentId,
-    if (teamId != null) 'teamId': teamId,
     if (reportingManagerId != null) 'reportingManagerId': reportingManagerId,
     if (joiningDate != null) 'joiningDate': joiningDate,
   };

@@ -11,7 +11,7 @@ import 'employee_status_badges.dart';
 
 /// Company assets assigned to an employee — visible to the employee
 /// themselves and to HR/Admin; only HR/Admin (when [canManage] is true) can
-/// add, edit, or unassign. [employeeId] is always the real employee id; set
+/// add, edit, or delete. [employeeId] is always the real employee id; set
 /// [isSelf] to read via the self-service endpoint instead of the
 /// `employees.manage`-gated one.
 class EmployeeAssetsSection extends ConsumerStatefulWidget {
@@ -42,7 +42,6 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
   void _invalidate() {
     ref.invalidate(employeeAssetsProvider(widget.employeeId));
     ref.invalidate(employeeAuditLogProvider(widget.employeeId));
-    ref.invalidate(availableAssetsProvider);
     if (widget.isSelf) {
       ref.invalidate(myAssetsProvider);
       ref.invalidate(myAuditLogProvider);
@@ -57,19 +56,13 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
     if (result == null) return;
 
     try {
-      if (result.isNew) {
-        await ref
-            .read(employeeRepositoryProvider)
-            .createAndAssignAsset(
-              widget.employeeId,
-              name: result.name!,
-              value: result.value,
-            );
-      } else {
-        await ref
-            .read(employeeRepositoryProvider)
-            .assignExistingAsset(widget.employeeId, result.assetId!);
-      }
+      await ref
+          .read(employeeRepositoryProvider)
+          .createAndAssignAsset(
+            widget.employeeId,
+            name: result.name,
+            value: result.value,
+          );
       _invalidate();
     } on EmployeeException catch (error) {
       _showError(error.message);
@@ -98,12 +91,36 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
     }
   }
 
-  Future<void> _unassign(Asset asset) async {
+  Future<void> _delete(Asset asset) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete asset?'),
+        content: Text(
+          'This permanently removes "${asset.name}" from the system.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     setState(() => _workingAssetId = asset.id);
     try {
       await ref
           .read(employeeRepositoryProvider)
-          .unassignAsset(widget.employeeId, asset.id);
+          .deleteAsset(widget.employeeId, asset.id);
       _invalidate();
     } on EmployeeException catch (error) {
       _showError(error.message);
@@ -143,8 +160,8 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
                     asset: assets[i],
                     isWorking: _workingAssetId == assets[i].id,
                     onEdit: widget.canManage ? () => _editAsset(assets[i]) : null,
-                    onUnassign: widget.canManage
-                        ? () => _unassign(assets[i])
+                    onDelete: widget.canManage
+                        ? () => _delete(assets[i])
                         : null,
                   ),
                   if (i < assets.length - 1)
@@ -193,13 +210,13 @@ class _AssetRow extends StatelessWidget {
     required this.asset,
     required this.isWorking,
     this.onEdit,
-    this.onUnassign,
+    this.onDelete,
   });
 
   final Asset asset;
   final bool isWorking;
   final VoidCallback? onEdit;
-  final VoidCallback? onUnassign;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -246,7 +263,7 @@ class _AssetRow extends StatelessWidget {
               ],
             ),
           ),
-          if (onEdit != null || onUnassign != null) ...[
+          if (onEdit != null || onDelete != null) ...[
             const SizedBox(width: 8),
             if (isWorking)
               const Padding(
@@ -264,8 +281,16 @@ class _AssetRow extends StatelessWidget {
                   tooltip: 'Edit',
                   onPressed: onEdit,
                 ),
-              if (onUnassign != null)
-                TextButton(onPressed: onUnassign, child: const Text('Unassign')),
+              if (onDelete != null)
+                IconButton(
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  tooltip: 'Delete',
+                  onPressed: onDelete,
+                ),
             ],
           ],
         ],
@@ -279,27 +304,19 @@ class _AssetRow extends StatelessWidget {
       '${date.day.toString().padLeft(2, '0')}';
 }
 
-typedef _AddAssetResult = ({
-  bool isNew,
-  String? assetId,
-  String? name,
-  double? value,
-});
+typedef _AddAssetResult = ({String name, double? value});
 
-class _AddAssetDialog extends ConsumerStatefulWidget {
+class _AddAssetDialog extends StatefulWidget {
   const _AddAssetDialog();
 
   @override
-  ConsumerState<_AddAssetDialog> createState() => _AddAssetDialogState();
+  State<_AddAssetDialog> createState() => _AddAssetDialogState();
 }
 
-class _AddAssetDialogState extends ConsumerState<_AddAssetDialog> {
+class _AddAssetDialogState extends State<_AddAssetDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _valueController = TextEditingController();
-  bool _isNew = true;
-  String? _selectedAssetId;
-  String? _errorMessage;
 
   @override
   void dispose() {
@@ -309,116 +326,52 @@ class _AddAssetDialogState extends ConsumerState<_AddAssetDialog> {
   }
 
   void _submit() {
-    if (_isNew) {
-      if (!_formKey.currentState!.validate()) return;
-      Navigator.of(context).pop((
-        isNew: true,
-        assetId: null,
-        name: _nameController.text.trim(),
-        value: _valueController.text.trim().isEmpty
-            ? null
-            : double.tryParse(_valueController.text.trim()),
-      ) as _AddAssetResult);
-      return;
-    }
-
-    if (_selectedAssetId == null) {
-      setState(() => _errorMessage = 'Choose an asset to assign.');
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
     Navigator.of(context).pop((
-      isNew: false,
-      assetId: _selectedAssetId,
-      name: null,
-      value: null,
-    ) as _AddAssetResult);
+      name: _nameController.text.trim(),
+      value: _valueController.text.trim().isEmpty
+          ? null
+          : double.tryParse(_valueController.text.trim()),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final availableAsync = ref.watch(availableAssetsProvider);
-
     return AlertDialog(
       title: const Text('Add asset'),
       content: SizedBox(
         width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_errorMessage != null) ...[
-              Text(
-                _errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Name'),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Required'
+                    : null,
               ),
               const SizedBox(height: 12),
-            ],
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: true, label: Text('New asset')),
-                ButtonSegment(value: false, label: Text('Existing asset')),
-              ],
-              selected: {_isNew},
-              onSelectionChanged: (selection) =>
-                  setState(() => _isNew = selection.first),
-            ),
-            const SizedBox(height: 16),
-            if (_isNew)
-              Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(labelText: 'Name'),
-                      validator: (value) => (value == null || value.trim().isEmpty)
-                          ? 'Required'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _valueController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Value in PKR (optional)',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) return null;
-                        return double.tryParse(value.trim()) == null
-                            ? 'Enter a valid amount'
-                            : null;
-                      },
-                    ),
-                  ],
+              TextFormField(
+                controller: _valueController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
                 ),
-              )
-            else
-              availableAsync.when(
-                loading: () => const LinearProgressIndicator(),
-                error: (_, _) => const Text('Could not load available assets.'),
-                data: (available) {
-                  if (available.isEmpty) {
-                    return const Text('No unassigned assets available.');
-                  }
-                  return DropdownButtonFormField<String>(
-                    initialValue: _selectedAssetId,
-                    decoration: const InputDecoration(labelText: 'Asset'),
-                    items: [
-                      for (final asset in available)
-                        DropdownMenuItem(
-                          value: asset.id,
-                          child: Text(asset.name),
-                        ),
-                    ],
-                    onChanged: (value) => setState(() => _selectedAssetId = value),
-                  );
+                decoration: const InputDecoration(
+                  labelText: 'Value in PKR (optional)',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return null;
+                  return double.tryParse(value.trim()) == null
+                      ? 'Enter a valid amount'
+                      : null;
                 },
               ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: [

@@ -193,10 +193,6 @@ class _ProfileBody extends ConsumerWidget {
               child: Text(employee.department?.name ?? '—'),
             ),
             _LabeledRow(
-              label: 'Team',
-              child: Text(employee.team?.name ?? '—'),
-            ),
-            _LabeledRow(
               label: 'Reporting Manager',
               child: employee.reportingManager == null
                   ? const Text('—')
@@ -215,7 +211,7 @@ class _ProfileBody extends ConsumerWidget {
             ),
             _LabeledRow(
               label: 'Employment type',
-              child: Text(employee.employmentType),
+              child: Text(formatEmploymentType(employee.employmentType)),
             ),
             _LabeledRow(
               label: 'Employment status',

@@ -5,15 +5,14 @@ import '../../../authentication/application/auth_state.dart';
 import '../../../authentication/presentation/pages/role_permissions_page.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../employee/presentation/pages/departments_page.dart';
-import '../../../employee/presentation/pages/teams_page.dart';
 import '../../../holidays/presentation/pages/holidays_page.dart';
 import '../../../leave/presentation/pages/leave_settings_page.dart';
 
 /// A single home for the admin-configuration screens that used to be
-/// scattered across other pages (Departments/Teams under Employees, Leave
-/// Types under Leaves) plus Roles & Permissions and Public Holidays, which
-/// didn't have a home at all before. Each entry is hidden if the viewer
-/// lacks the permission it requires.
+/// scattered across other pages (Departments under Employees, Leave Types
+/// under Leaves) plus Roles & Permissions and Public Holidays, which didn't
+/// have a home at all before. Each entry is hidden if the viewer lacks the
+/// permission it requires.
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
@@ -23,7 +22,6 @@ class SettingsPage extends ConsumerWidget {
     final authUser = authState is AuthAuthenticated ? authState.user : null;
     final canManageDepartments =
         authUser?.hasPermission('departments.manage') ?? false;
-    final canManageTeams = authUser?.hasPermission('teams.manage') ?? false;
     final canManageLeave = authUser?.hasPermission('leave.manage') ?? false;
     final canManageRoles = authUser?.hasPermission('roles.manage') ?? false;
 
@@ -34,13 +32,6 @@ class SettingsPage extends ConsumerWidget {
           title: 'Departments',
           subtitle: 'Create, edit, and archive departments',
           builder: (_) => const DepartmentsPage(),
-        ),
-      if (canManageTeams)
-        _SettingsEntry(
-          icon: Icons.groups_outlined,
-          title: 'Teams',
-          subtitle: 'Create, edit, and archive teams',
-          builder: (_) => const TeamsPage(),
         ),
       if (canManageLeave)
         _SettingsEntry(

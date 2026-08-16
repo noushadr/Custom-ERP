@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 
+const _employmentTypeLabels = {
+  'full_time': 'Full-time',
+  'part_time': 'Part-time',
+  'contract': 'Contract',
+  'intern': 'Intern',
+};
+
+/// Formats the raw `employmentType` enum value for display, e.g. `full_time`
+/// becomes "Full-time". Falls back to the raw value for anything unmapped.
+String formatEmploymentType(String employmentType) =>
+    _employmentTypeLabels[employmentType] ?? employmentType;
+
 /// A small icon + label chip, e.g. for showing an employee code, email, or
 /// joining date inline.
 class InfoChip extends StatelessWidget {

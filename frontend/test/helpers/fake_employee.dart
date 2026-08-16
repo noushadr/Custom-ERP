@@ -8,7 +8,6 @@ import 'package:zera_erp/features/employee/domain/entities/education_record.dart
 import 'package:zera_erp/features/employee/domain/entities/invite_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/paginated_audit_log.dart';
 import 'package:zera_erp/features/employee/domain/entities/salary_record.dart';
-import 'package:zera_erp/features/employee/domain/entities/team.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_my_profile_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/upcoming_birthday.dart';
@@ -24,7 +23,6 @@ Employee buildTestEmployee({
   String fullName = 'Jane Doe',
   String? designation = 'Software Engineer',
   NamedRef? department,
-  NamedRef? team,
   NamedRef? reportingManager,
   int profileCompletionPercentage = 25,
   List<String> skills = const [],
@@ -47,7 +45,6 @@ Employee buildTestEmployee({
     profilePhotoUrl: null,
     designation: designation,
     department: department,
-    team: team,
     reportingManager: reportingManager,
     employmentType: 'full_time',
     employmentStatus: employmentStatus,
@@ -96,7 +93,6 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.employees = const [],
     Employee? me,
     this.departments = const [],
-    this.teams = const [],
     this.inviteResult,
     this.inviteError,
     this.updateMeResult,
@@ -105,6 +101,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.updateEmployeeError,
     this.uploadMyPhotoResult,
     this.uploadMyPhotoError,
+    this.uploadPhotoResult,
+    this.uploadPhotoError,
     this.documents = const [],
     this.auditLog = const [],
     this.salaryHistory = const [],
@@ -119,22 +117,12 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.setDepartmentArchivedResult,
     this.setDepartmentArchivedError,
     this.deleteDepartmentError,
-    this.teamsManagement = const [],
-    this.createTeamResult,
-    this.createTeamError,
-    this.updateTeamResult,
-    this.updateTeamError,
-    this.setTeamArchivedResult,
-    this.setTeamArchivedError,
-    this.deleteTeamError,
     this.upcomingBirthdays = const [],
     this.getUpcomingBirthdaysError,
     this.assets = const [],
-    this.availableAssets = const [],
     this.createAndAssignAssetError,
-    this.assignExistingAssetError,
     this.updateAssetError,
-    this.unassignAssetError,
+    this.deleteAssetError,
   }) : me = me ?? buildTestEmployee();
 
   final List<Employee> employees;
@@ -143,7 +131,6 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final List<UpcomingBirthday> upcomingBirthdays;
   final Object? getUpcomingBirthdaysError;
   final List<Department> departments;
-  final List<NamedRef> teams;
   final ({Employee employee, String temporaryPassword})? inviteResult;
   final Object? inviteError;
   final Employee? updateMeResult;
@@ -158,28 +145,6 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final Department? setDepartmentArchivedResult;
   final Object? setDepartmentArchivedError;
   final Object? deleteDepartmentError;
-  final List<Team> teamsManagement;
-  final Team? createTeamResult;
-  final Object? createTeamError;
-  final Team? updateTeamResult;
-  final Object? updateTeamError;
-  final Team? setTeamArchivedResult;
-  final Object? setTeamArchivedError;
-  final Object? deleteTeamError;
-
-  /// The arguments passed to the most recent [createTeam] call.
-  ({String name, String departmentId, String? leadEmployeeId})?
-  lastCreateTeamInput;
-
-  /// The `id` and arguments passed to the most recent [updateTeam] call.
-  ({String id, String name, String departmentId, String? leadEmployeeId})?
-  lastUpdateTeamInput;
-
-  /// The arguments passed to the most recent [setTeamArchived] call.
-  ({String id, bool isArchived})? lastSetTeamArchivedInput;
-
-  /// The `id` passed to the most recent [deleteTeam] call.
-  String? lastDeleteTeamId;
 
   /// The `id` passed to the most recent [updateEmployeeTags] call.
   String? lastUpdateTagsId;
@@ -204,29 +169,29 @@ class FakeEmployeeRepository implements EmployeeRepository {
   UpdateMyProfileInput? lastUpdateMeInput;
   final Employee? uploadMyPhotoResult;
   final Object? uploadMyPhotoError;
+  final Employee? uploadPhotoResult;
+  final Object? uploadPhotoError;
   final List<EmployeeDocument> documents;
   final List<AuditLogEntry> auditLog;
   final List<SalaryRecord> salaryHistory;
   final List<EducationRecord> educationHistory;
   final List<Employee> directReports;
   final List<Asset> assets;
-  final List<Asset> availableAssets;
   final Object? createAndAssignAssetError;
-  final Object? assignExistingAssetError;
   final Object? updateAssetError;
-  final Object? unassignAssetError;
+  final Object? deleteAssetError;
 
   /// The arguments passed to the most recent [createAndAssignAsset] call.
   ({String employeeId, String name})? lastCreateAndAssignAssetInput;
 
-  /// The `assetId` passed to the most recent [assignExistingAsset] call.
-  String? lastAssignExistingAssetId;
-
   /// The `assetId` passed to the most recent [updateAsset] call.
   String? lastUpdateAssetId;
 
-  /// The `assetId` passed to the most recent [unassignAsset] call.
-  String? lastUnassignAssetId;
+  /// The `assetId` passed to the most recent [deleteAsset] call.
+  String? lastDeleteAssetId;
+
+  /// The `id` passed to the most recent [uploadPhoto] call.
+  String? lastUploadPhotoId;
 
   @override
   Future<List<Employee>> getAll() async => employees;
@@ -280,6 +245,17 @@ class FakeEmployeeRepository implements EmployeeRepository {
   Future<Employee> uploadMyPhoto(Uint8List bytes, String fileName) async {
     if (uploadMyPhotoError != null) throw uploadMyPhotoError!;
     return uploadMyPhotoResult ?? me;
+  }
+
+  @override
+  Future<Employee> uploadPhoto(
+    String id,
+    Uint8List bytes,
+    String fileName,
+  ) async {
+    lastUploadPhotoId = id;
+    if (uploadPhotoError != null) throw uploadPhotoError!;
+    return uploadPhotoResult ?? me;
   }
 
   @override
@@ -358,63 +334,6 @@ class FakeEmployeeRepository implements EmployeeRepository {
   Future<void> deleteDepartment(String id) async {
     lastDeleteDepartmentId = id;
     if (deleteDepartmentError != null) throw deleteDepartmentError!;
-  }
-
-  @override
-  Future<List<NamedRef>> getTeams({String? departmentId}) async => teams;
-
-  @override
-  Future<List<Team>> getTeamsManagement({
-    String? departmentId,
-    bool includeArchived = false,
-  }) async => teamsManagement;
-
-  @override
-  Future<Team> createTeam({
-    required String name,
-    required String departmentId,
-    String? leadEmployeeId,
-  }) async {
-    lastCreateTeamInput = (
-      name: name,
-      departmentId: departmentId,
-      leadEmployeeId: leadEmployeeId,
-    );
-    if (createTeamError != null) throw createTeamError!;
-    return createTeamResult ??
-        Team(id: 'team-1', name: name, departmentId: departmentId, leadEmployeeId: leadEmployeeId);
-  }
-
-  @override
-  Future<Team> updateTeam(
-    String id, {
-    required String name,
-    required String departmentId,
-    String? leadEmployeeId,
-  }) async {
-    lastUpdateTeamInput = (
-      id: id,
-      name: name,
-      departmentId: departmentId,
-      leadEmployeeId: leadEmployeeId,
-    );
-    if (updateTeamError != null) throw updateTeamError!;
-    return updateTeamResult ??
-        Team(id: id, name: name, departmentId: departmentId, leadEmployeeId: leadEmployeeId);
-  }
-
-  @override
-  Future<Team> setTeamArchived(String id, {required bool isArchived}) async {
-    lastSetTeamArchivedInput = (id: id, isArchived: isArchived);
-    if (setTeamArchivedError != null) throw setTeamArchivedError!;
-    return setTeamArchivedResult ??
-        Team(id: id, name: 'Team', departmentId: 'department-1', isArchived: isArchived);
-  }
-
-  @override
-  Future<void> deleteTeam(String id) async {
-    lastDeleteTeamId = id;
-    if (deleteTeamError != null) throw deleteTeamError!;
   }
 
   @override
@@ -567,9 +486,6 @@ class FakeEmployeeRepository implements EmployeeRepository {
   Future<List<Asset>> getAssets(String employeeId) async => assets;
 
   @override
-  Future<List<Asset>> getAvailableAssets() async => availableAssets;
-
-  @override
   Future<Asset> createAndAssignAsset(
     String employeeId, {
     required String name,
@@ -578,13 +494,6 @@ class FakeEmployeeRepository implements EmployeeRepository {
     lastCreateAndAssignAssetInput = (employeeId: employeeId, name: name);
     if (createAndAssignAssetError != null) throw createAndAssignAssetError!;
     return buildTestAsset(name: name, value: value, assignedEmployeeId: employeeId);
-  }
-
-  @override
-  Future<Asset> assignExistingAsset(String employeeId, String assetId) async {
-    lastAssignExistingAssetId = assetId;
-    if (assignExistingAssetError != null) throw assignExistingAssetError!;
-    return buildTestAsset(id: assetId, assignedEmployeeId: employeeId);
   }
 
   @override
@@ -605,8 +514,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
   }
 
   @override
-  Future<void> unassignAsset(String employeeId, String assetId) async {
-    lastUnassignAssetId = assetId;
-    if (unassignAssetError != null) throw unassignAssetError!;
+  Future<void> deleteAsset(String employeeId, String assetId) async {
+    lastDeleteAssetId = assetId;
+    if (deleteAssetError != null) throw deleteAssetError!;
   }
 }
