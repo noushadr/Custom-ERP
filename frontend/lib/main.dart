@@ -15,6 +15,7 @@ import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
 import 'features/requests/presentation/pages/requests_page.dart';
+import 'features/settings/presentation/pages/settings_page.dart';
 
 void main() {
   runApp(const ProviderScope(child: ZeraApp()));
@@ -93,7 +94,6 @@ const _allDestinations = [
     label: 'Settings',
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings_outlined,
-    comingSoon: true,
   ),
 ];
 
@@ -146,6 +146,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const RequestsPage();
       case 'Leaves':
         return const LeavePage();
+      case 'Settings':
+        return const SettingsPage();
       default:
         return _ComingSoon(destination: destination);
     }

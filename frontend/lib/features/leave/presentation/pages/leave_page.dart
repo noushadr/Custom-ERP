@@ -11,7 +11,6 @@ import '../../domain/entities/leave_request.dart';
 import '../../domain/exceptions/leave_exception.dart';
 import '../utils/leave_format_utils.dart';
 import '../widgets/leave_calendar_view.dart';
-import 'leave_settings_page.dart';
 
 /// Consolidates everything about leave in one place: the viewer's own
 /// balances and submitted requests, requests awaiting their approval as a
@@ -40,18 +39,6 @@ class LeavePage extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (canSeeHrApprovals) ...[
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const LeaveSettingsPage(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.settings_outlined, size: 16),
-                      label: const Text('Leave Settings'),
-                    ),
-                  ),
                   const _ResetReminderBanner(),
                   const SizedBox(height: 16),
                 ],

@@ -69,39 +69,6 @@ void main() {
     expect(find.text('Invite Employee'), findsNothing);
   });
 
-  testWidgets('shows the manage departments button with departments.manage', (
-    tester,
-  ) async {
-    final repository = FakeEmployeeRepository(
-      employees: [buildTestEmployee()],
-    );
-
-    await tester.pumpWidget(
-      _app(
-        permissions: ['employees.read', 'departments.manage'],
-        repository: repository,
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Manage Departments'), findsOneWidget);
-  });
-
-  testWidgets('hides the manage departments button without departments.manage', (
-    tester,
-  ) async {
-    final repository = FakeEmployeeRepository(
-      employees: [buildTestEmployee()],
-    );
-
-    await tester.pumpWidget(
-      _app(permissions: ['employees.read'], repository: repository),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Manage Departments'), findsNothing);
-  });
-
   testWidgets('hierarchy view nests reports under their manager', (
     tester,
   ) async {

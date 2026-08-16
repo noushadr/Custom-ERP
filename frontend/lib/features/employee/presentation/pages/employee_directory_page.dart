@@ -9,7 +9,6 @@ import '../../domain/entities/employee.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_hierarchy_view.dart';
 import '../widgets/employee_status_badges.dart';
-import 'departments_page.dart';
 import 'employee_profile_page.dart';
 import 'invite_employee_page.dart';
 
@@ -41,8 +40,6 @@ class _EmployeeDirectoryPageState
     final authUser = authState is AuthAuthenticated ? authState.user : null;
     final canRead = authUser?.hasPermission('employees.read') ?? false;
     final canManage = authUser?.hasPermission('employees.manage') ?? false;
-    final canManageDepartments =
-        authUser?.hasPermission('departments.manage') ?? false;
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -85,16 +82,6 @@ class _EmployeeDirectoryPageState
                           isDense: true,
                         ),
                       ),
-                    ),
-                  if (canManageDepartments)
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const DepartmentsPage(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.apartment_outlined, size: 18),
-                      label: const Text('Manage Departments'),
                     ),
                   if (canManage)
                     ElevatedButton.icon(
