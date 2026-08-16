@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../shared/utils/date_format.dart';
+import '../../../../shared/models/named_ref.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/domain/exceptions/auth_exception.dart';
-import '../../../notices/application/notice_providers.dart';
-import '../../../notices/domain/entities/notice.dart';
+import '../../../leave/presentation/widgets/leave_balances_section.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/exceptions/employee_exception.dart';
+import '../widgets/company_notices_section.dart';
 import '../widgets/employee_audit_log_panel.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_status_badges.dart';
@@ -60,7 +60,12 @@ class _UserDashboardBody extends StatelessWidget {
         children: [
           _ProfileSummaryCard(employee: employee),
           const SizedBox(height: 16),
-          const _CompanyNoticesSection(),
+          const FormSection(
+            title: 'Leave Balances',
+            child: LeaveBalancesSection(),
+          ),
+          const SizedBox(height: 16),
+          const CompanyNoticesSection(),
           const SizedBox(height: 16),
           const _TeamMembersSection(),
           const SizedBox(height: 16),
@@ -101,25 +106,12 @@ class _ProfileSummaryCard extends StatelessWidget {
                         employee.fullName,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      Text(
-                        [
-                          employee.designation,
-                          employee.department?.name,
-                        ].whereType<String>().join(' · '),
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          InfoChip(
-                            icon: Icons.badge_outlined,
-                            label: employee.employeeCode,
-                          ),
-                        ],
-                      ),
+                      if (employee.designation != null)
+                        Text(
+                          employee.designation!,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
                     ],
                   ),
                 ),
@@ -145,6 +137,27 @@ class _ProfileSummaryCard extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            // A full-width row rather than nested inside the Expanded above,
+            // so these chips still have room to wrap at narrow widths instead
+            // of being squeezed by the button column next to them.
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                InfoChip(icon: Icons.badge_outlined, label: employee.employeeCode),
+                EmploymentStatusBadge(status: employee.employmentStatus),
+                WorkModeBadge(workMode: employee.workMode),
+                if (employee.department != null)
+                  InfoChip(
+                    icon: Icons.apartment_outlined,
+                    label: 'Department: ${employee.department!.name}',
+                  ),
+                if (employee.reportingManager != null)
+                  _ReportingManagerChip(manager: employee.reportingManager!),
+              ],
+            ),
             const SizedBox(height: 14),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -162,6 +175,29 @@ class _ProfileSummaryCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReportingManagerChip extends StatelessWidget {
+  const _ReportingManagerChip({required this.manager});
+
+  final NamedRef manager;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        EmployeeAvatar(fullName: manager.name, photoUrl: manager.photoUrl, radius: 12),
+        const SizedBox(width: 6),
+        Text(
+          'Reporting Manager: ${manager.name}',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        ),
+      ],
     );
   }
 }
@@ -282,76 +318,6 @@ class _ChangePasswordDialogState
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Text('Change password'),
-        ),
-      ],
-    );
-  }
-}
-
-class _CompanyNoticesSection extends ConsumerWidget {
-  const _CompanyNoticesSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final noticesAsync = ref.watch(noticeListProvider);
-
-    return FormSection(
-      title: 'Company Notices',
-      child: noticesAsync.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
-          child: LinearProgressIndicator(),
-        ),
-        error: (_, _) => const Text('Could not load company notices.'),
-        data: (notices) {
-          if (notices.isEmpty) {
-            return Text(
-              'No company notices yet.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            );
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < notices.length; i++) ...[
-                _NoticeRow(notice: notices[i]),
-                if (i < notices.length - 1)
-                  const Divider(height: 20, color: AppColors.borderSubtle),
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _NoticeRow extends StatelessWidget {
-  const _NoticeRow({required this.notice});
-
-  final Notice notice;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          notice.title,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 4),
-        Text(notice.body, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 4),
-        Text(
-          '${notice.authorName} · ${formatDisplayDateTime(notice.createdAt)}',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
         ),
       ],
     );

@@ -4,11 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
+import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/holidays/application/holiday_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/leave/domain/repositories/leave_repository.dart';
 import 'package:zera_erp/features/leave/presentation/pages/leave_page.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_holiday.dart';
 import '../../helpers/fake_leave.dart';
 
 AuthUser _viewer({String role = 'Employee', List<String> permissions = const []}) =>
@@ -30,6 +34,7 @@ Widget _app({
   String role = 'Employee',
   List<String> permissions = const [],
   FakeLeaveRepository? leaveRepository,
+  FakeHolidayRepository? holidayRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -40,6 +45,16 @@ Widget _app({
       ),
       leaveRepositoryProvider.overrideWithValue(
         leaveRepository ?? FakeLeaveRepository(),
+      ),
+      // LeavePage embeds LeaveCalendarView, which checks department headship
+      // to decide whether to show the "My Team" toggle — no test in this
+      // file cares about that, so a plain, deterministic fake avoids a real
+      // network call for myProfileProvider/departmentsProvider.
+      employeeRepositoryProvider.overrideWithValue(FakeEmployeeRepository()),
+      // The apply-leave dialog previews the working-day count against
+      // configured holidays — default to none so tests stay deterministic.
+      holidayRepositoryProvider.overrideWithValue(
+        holidayRepository ?? FakeHolidayRepository(),
       ),
     ],
     child: const MaterialApp(home: Scaffold(body: LeavePage())),
@@ -69,6 +84,56 @@ void main() {
     expect(find.text('15.5'), findsOneWidget);
     expect(find.text('remaining of 20.5'), findsOneWidget);
   });
+
+  testWidgets('shows an empty state when there are no leave balances', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    expect(find.text('No leave balances yet.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'previews the working-day count once both dates are selected',
+    (tester) async {
+      await _useTallSurface(tester);
+      final leaveRepository = FakeLeaveRepository(
+        leaveTypes: [buildTestLeaveType(id: 'type-1', name: 'Casual Leave')],
+      );
+      await tester.pumpWidget(_app(leaveRepository: leaveRepository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Apply for leave'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('selected'), findsNothing);
+      expect(find.textContaining('No working days'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('leave-start-date')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('leave-end-date')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      // Start == end == "today" here, since both date pickers were confirmed
+      // without picking a different day. Whether that lands on a working day
+      // depends on which day of the week the suite happens to run — assert
+      // the label's shape rather than an exact count so this stays stable.
+      final label = find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            (RegExp(r'^\d+ working days? selected$').hasMatch(widget.data ?? '') ||
+                widget.data == 'No working days in this range'),
+      );
+      expect(label, findsOneWidget);
+    },
+  );
 
   testWidgets('submitting a leave request calls the repository', (tester) async {
     await _useTallSurface(tester);

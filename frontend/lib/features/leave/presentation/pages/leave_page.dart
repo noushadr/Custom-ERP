@@ -5,11 +5,12 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../employee/presentation/widgets/employee_status_badges.dart';
+import '../../../holidays/application/holiday_providers.dart';
 import '../../application/leave_providers.dart';
-import '../../domain/entities/leave_balance.dart';
 import '../../domain/entities/leave_request.dart';
 import '../../domain/exceptions/leave_exception.dart';
 import '../utils/leave_format_utils.dart';
+import '../widgets/leave_balances_section.dart';
 import '../widgets/leave_calendar_view.dart';
 
 /// Consolidates everything about leave in one place: the viewer's own
@@ -43,7 +44,7 @@ class LeavePage extends ConsumerWidget {
                   const SizedBox(height: 16),
                 ],
                 if (!isSuperAdmin) ...[
-                  const _BalancesSection(),
+                  const LeaveBalancesSection(),
                   const SizedBox(height: 16),
                   const _MyLeaveRequestsSection(),
                   const SizedBox(height: 16),
@@ -60,31 +61,6 @@ class LeavePage extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _BalancesSection extends ConsumerWidget {
-  const _BalancesSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final balancesAsync = ref.watch(myLeaveBalancesProvider);
-
-    return balancesAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: LinearProgressIndicator(),
-      ),
-      error: (_, _) => const Text('Could not load your leave balances.'),
-      data: (balances) {
-        if (balances.isEmpty) return const SizedBox.shrink();
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [for (final balance in balances) _BalanceCard(balance: balance)],
-        );
-      },
     );
   }
 }
@@ -153,61 +129,6 @@ class _ResetReminderBannerState extends ConsumerState<_ResetReminderBanner> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Text('Reset now'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BalanceCard extends StatelessWidget {
-  const _BalanceCard({required this.balance});
-
-  final LeaveBalance balance;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = parseLeaveColor(balance.colorHex) ?? AppColors.primary;
-    return Container(
-      width: 190,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  balance.leaveTypeName,
-                  style: Theme.of(context).textTheme.titleSmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            formatLeaveDays(balance.remaining),
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          Text(
-            'remaining of ${formatLeaveDays(balance.allocated)}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -417,11 +338,6 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
     super.dispose();
   }
 
-  static String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
-
   Future<void> _pickDate({required bool isStart}) async {
     final initial = (isStart ? _startDate : _endDate) ?? DateTime.now();
     final picked = await showDatePicker(
@@ -461,8 +377,8 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
           .read(leaveRepositoryProvider)
           .submitLeaveRequest(
             leaveTypeId: _leaveTypeId!,
-            startDate: _isoDate(_startDate!),
-            endDate: _isoDate(_endDate!),
+            startDate: isoDate(_startDate!),
+            endDate: isoDate(_endDate!),
             reason: _reasonController.text.trim(),
           );
       ref.invalidate(myLeaveRequestsProvider);
@@ -479,6 +395,11 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
   @override
   Widget build(BuildContext context) {
     final leaveTypesAsync = ref.watch(leaveTypesProvider(false));
+    final holidaysAsync = ref.watch(holidaysProvider);
+    final holidayDates = <String>{
+      for (final holiday in holidaysAsync.valueOrNull ?? const [])
+        holiday.date,
+    };
 
     return AlertDialog(
       title: const Text('Apply for leave'),
@@ -523,7 +444,7 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
                       child: InputDecorator(
                         decoration: const InputDecoration(labelText: 'Start date'),
                         child: Text(
-                          _startDate == null ? '—' : _isoDate(_startDate!),
+                          _startDate == null ? '—' : isoDate(_startDate!),
                         ),
                       ),
                     ),
@@ -536,13 +457,23 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
                       child: InputDecorator(
                         decoration: const InputDecoration(labelText: 'End date'),
                         child: Text(
-                          _endDate == null ? '—' : _isoDate(_endDate!),
+                          _endDate == null ? '—' : isoDate(_endDate!),
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
+              if (_startDate != null &&
+                  _endDate != null &&
+                  !_endDate!.isBefore(_startDate!)) ...[
+                const SizedBox(height: 8),
+                _DaysSelectedLabel(
+                  startDate: _startDate!,
+                  endDate: _endDate!,
+                  holidayDates: holidayDates,
+                ),
+              ],
               const SizedBox(height: 12),
               TextFormField(
                 controller: _reasonController,
@@ -572,6 +503,35 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
               : const Text('Submit'),
         ),
       ],
+    );
+  }
+}
+
+/// Live preview of how many working days the selected range covers —
+/// excludes weekends and configured holidays, mirroring the backend's
+/// authoritative count so this never contradicts what gets submitted.
+class _DaysSelectedLabel extends StatelessWidget {
+  const _DaysSelectedLabel({
+    required this.startDate,
+    required this.endDate,
+    required this.holidayDates,
+  });
+
+  final DateTime startDate;
+  final DateTime endDate;
+  final Set<String> holidayDates;
+
+  @override
+  Widget build(BuildContext context) {
+    final days = countWorkingDays(startDate, endDate, holidayDates);
+    final text = days == 0
+        ? 'No working days in this range'
+        : '$days working day${days == 1 ? '' : 's'} selected';
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: days == 0 ? AppColors.error : AppColors.textSecondary,
+      ),
     );
   }
 }
