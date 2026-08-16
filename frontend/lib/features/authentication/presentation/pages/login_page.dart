@@ -92,8 +92,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
                                   labelText: 'Company email',
-                                  hintText:
-                                      'firstname.lastname@zeracreative.com',
+                                  hintText: 'name@zeracreative.com',
                                 ),
                                 validator: _validateEmail,
                               ),
