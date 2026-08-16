@@ -9,6 +9,7 @@ import { AuthenticationModule } from './features/authentication/authentication.m
 import { DepartmentsModule } from './features/departments/departments.module';
 import { TeamsModule } from './features/teams/teams.module';
 import { EmployeeModule } from './features/employee/employee.module';
+import { HolidaysModule } from './features/holidays/holidays.module';
 import { LeaveModule } from './features/leave/leave.module';
 import { NoticesModule } from './features/notices/notices.module';
 import { RequestsModule } from './features/requests/requests.module';
@@ -28,6 +29,7 @@ import { RequestsModule } from './features/requests/requests.module';
     NoticesModule,
     RequestsModule,
     LeaveModule,
+    HolidaysModule,
   ],
   controllers: [AppController],
   providers: [AppService],

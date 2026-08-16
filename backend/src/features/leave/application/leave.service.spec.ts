@@ -3,6 +3,7 @@ import type { UserRepository } from '../../authentication/domain/repositories/us
 import { Employee } from '../../employee/domain/entities/employee.entity';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
+import type { HolidaysService } from '../../holidays/application/holidays.service';
 import { LeaveBalance } from '../domain/entities/leave-balance.entity';
 import { LeaveBalanceAdjustment } from '../domain/entities/leave-balance-adjustment.entity';
 import { LeaveRequest } from '../domain/entities/leave-request.entity';
@@ -76,6 +77,7 @@ describe('LeaveService', () => {
   let leaveBalanceAdjustmentRepository: jest.Mocked<LeaveBalanceAdjustmentRepository>;
   let employeeRepository: jest.Mocked<EmployeeRepository>;
   let userRepository: jest.Mocked<UserRepository>;
+  let holidaysService: jest.Mocked<HolidaysService>;
 
   beforeEach(() => {
     leaveTypeRepository = {
@@ -116,6 +118,11 @@ describe('LeaveService', () => {
       findAll: jest.fn(),
       save: jest.fn(),
     };
+    // Defaults to no holidays so every pre-existing test below keeps behaving
+    // exactly as it did before holidays were wired in.
+    holidaysService = {
+      getDatesInRange: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<HolidaysService>;
 
     service = new LeaveService(
       leaveTypeRepository,
@@ -124,6 +131,7 @@ describe('LeaveService', () => {
       leaveBalanceAdjustmentRepository,
       employeeRepository,
       userRepository,
+      holidaysService,
     );
   });
 
@@ -161,6 +169,30 @@ describe('LeaveService', () => {
 
       expect(leaveRequestRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ numberOfDays: '2.0' }),
+      );
+      expect(result.status).toBe(LeaveRequestStatus.SUBMITTED);
+    });
+
+    it('excludes a public holiday that falls on a weekday from the working-day count', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      leaveTypeRepository.findById.mockResolvedValue(buildLeaveType());
+      leaveBalanceRepository.findOne.mockResolvedValue(null);
+      leaveRequestRepository.save.mockImplementation((r) => Promise.resolve(r));
+      leaveRequestRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildLeaveRequest({ id })),
+      );
+      // 2026-03-02 through 2026-03-06 (Mon-Fri) would otherwise be 5 working
+      // days; mark Wednesday 2026-03-04 as a public holiday.
+      holidaysService.getDatesInRange.mockResolvedValue(['2026-03-04']);
+
+      const result = await service.submitLeaveRequest('user-1', {
+        ...dto,
+        startDate: '2026-03-02',
+        endDate: '2026-03-06',
+      });
+
+      expect(leaveRequestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ numberOfDays: '4.0' }),
       );
       expect(result.status).toBe(LeaveRequestStatus.SUBMITTED);
     });

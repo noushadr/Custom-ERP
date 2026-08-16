@@ -16,6 +16,7 @@ import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
+import { HolidaysService } from '../../holidays/application/holidays.service';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CreateLeaveTypeDto } from './dto/create-leave-type.dto';
 import { SubmitLeaveRequestDto } from './dto/submit-leave-request.dto';
@@ -63,6 +64,7 @@ export class LeaveService {
     private readonly employeeRepository: EmployeeRepository,
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
+    private readonly holidaysService: HolidaysService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -143,7 +145,10 @@ export class LeaveService {
       );
     }
 
-    const numberOfDays = this.countWorkingDays(dto.startDate, dto.endDate);
+    const numberOfDays = await this.countWorkingDays(
+      dto.startDate,
+      dto.endDate,
+    );
     if (numberOfDays === 0) {
       throw new BadRequestException('Selected range contains no working days');
     }
@@ -514,16 +519,25 @@ export class LeaveService {
   // Private helpers
   // ---------------------------------------------------------------------
 
-  /** Working days (Mon-Fri) between two ISO dates, inclusive. Dates are
-   * parsed as UTC midnight throughout to keep day-of-week checks stable
-   * regardless of the server's local timezone. */
-  private countWorkingDays(startDate: string, endDate: string): number {
+  /** Working days (Mon-Fri, excluding public holidays) between two ISO
+   * dates, inclusive. Dates are parsed as UTC midnight throughout to keep
+   * day-of-week checks stable regardless of the server's local timezone. */
+  private async countWorkingDays(
+    startDate: string,
+    endDate: string,
+  ): Promise<number> {
+    const holidayDates = new Set(
+      await this.holidaysService.getDatesInRange(startDate, endDate),
+    );
+
     const cursor = new Date(`${startDate}T00:00:00Z`);
     const end = new Date(`${endDate}T00:00:00Z`);
     let count = 0;
     while (cursor.getTime() <= end.getTime()) {
       const day = cursor.getUTCDay();
-      if (day !== 0 && day !== 6) count++;
+      const isWeekend = day === 0 || day === 6;
+      const isHoliday = holidayDates.has(cursor.toISOString().slice(0, 10));
+      if (!isWeekend && !isHoliday) count++;
       cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
     return count;

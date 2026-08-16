@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthenticationModule } from '../authentication/authentication.module';
 import { EmployeeModule } from '../employee/employee.module';
+import { HolidaysModule } from '../holidays/holidays.module';
 import { LeaveService } from './application/leave.service';
 import { TypeOrmLeaveBalanceAdjustmentRepository } from './data/repositories/leave-balance-adjustment.repository';
 import { TypeOrmLeaveBalanceRepository } from './data/repositories/leave-balance.repository';
@@ -27,6 +28,7 @@ import { LeaveController } from './presentation/leave.controller';
     ]),
     AuthenticationModule,
     EmployeeModule,
+    HolidaysModule,
   ],
   controllers: [LeaveController],
   providers: [
