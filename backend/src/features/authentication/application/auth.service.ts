@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -30,6 +31,8 @@ export interface AuthenticatedUser {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
@@ -91,6 +94,15 @@ export class AuthService {
     if (target.status === UserStatus.DISABLED) {
       throw new BadRequestException('This account is disabled');
     }
+
+    // No dedicated audit trail exists for impersonation yet — logging it
+    // here is the minimum bar so who-acted-as-whom is at least traceable
+    // in server logs, since the JWT's `impersonatedBy` claim alone isn't
+    // queryable after the fact.
+    const admin = await this.userRepository.findById(actingAdminId);
+    this.logger.warn(
+      `Impersonation started: ${admin?.email ?? actingAdminId} (${actingAdminId}) is now acting as ${target.email} (${target.id})`,
+    );
 
     return {
       ...this.issueTokens(target, actingAdminId),

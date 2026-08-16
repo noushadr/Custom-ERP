@@ -234,6 +234,24 @@ describe('AuthService', () => {
         expect.anything(),
       );
     });
+
+    it('logs who impersonated whom, for traceability', async () => {
+      const admin = buildUser({ id: 'admin-1', email: 'admin@zeracreative.com' });
+      const target = buildUser({ id: 'user-2', email: 'jane.doe@zeracreative.com' });
+      userRepository.findById.mockImplementation(async (id) =>
+        id === 'admin-1' ? admin : target,
+      );
+      const logSpy = jest.spyOn((service as unknown as { logger: { warn: () => void } }).logger, 'warn');
+
+      await service.impersonate(target.id, admin.id);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('admin@zeracreative.com'),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('jane.doe@zeracreative.com'),
+      );
+    });
   });
 
   describe('changePassword', () => {
