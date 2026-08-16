@@ -11,6 +11,10 @@ import {
   USER_REPOSITORY,
   type UserRepository,
 } from '../../authentication/domain/repositories/user-repository.interface';
+import {
+  DEPARTMENT_REPOSITORY,
+  type DepartmentRepository,
+} from '../../departments/domain/repositories/department-repository.interface';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
 import {
   EMPLOYEE_REPOSITORY,
@@ -64,6 +68,8 @@ export class LeaveService {
     private readonly employeeRepository: EmployeeRepository,
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
+    @Inject(DEPARTMENT_REPOSITORY)
+    private readonly departmentRepository: DepartmentRepository,
     private readonly holidaysService: HolidaysService,
   ) {}
 
@@ -173,11 +179,17 @@ export class LeaveService {
     request.endDate = dto.endDate;
     request.numberOfDays = numberOfDays.toFixed(1);
     request.reason = dto.reason;
-    // No reporting manager to approve it — skip straight to the HR stage
-    // rather than leaving it stuck at SUBMITTED forever.
-    request.status = employee.reportingManagerId
-      ? LeaveRequestStatus.SUBMITTED
-      : LeaveRequestStatus.MANAGER_APPROVED;
+    // No department head to approve it (no department, no head assigned, or
+    // the employee IS the head) — skip straight to the HR stage rather than
+    // leaving it stuck at SUBMITTED forever.
+    const departmentHeadId = employee.departmentId
+      ? (await this.departmentRepository.findById(employee.departmentId))
+          ?.headEmployeeId
+      : undefined;
+    request.status =
+      departmentHeadId && departmentHeadId !== employee.id
+        ? LeaveRequestStatus.SUBMITTED
+        : LeaveRequestStatus.MANAGER_APPROVED;
 
     const saved = await this.leaveRequestRepository.save(request);
     const reloaded = await this.leaveRequestRepository.findById(saved.id);
@@ -221,21 +233,28 @@ export class LeaveService {
   }
 
   // ---------------------------------------------------------------------
-  // Leave requests — reporting-manager approval (identity-gated, no
+  // Leave requests — department-head approval (identity-gated, no
   // permission needed — mirrors RequestsService)
   // ---------------------------------------------------------------------
 
   async getPendingManagerApproval(
     actorUserId: string,
   ): Promise<LeaveRequestResponse[]> {
-    const manager = await this.employeeRepository.findByUserId(actorUserId);
-    if (!manager) return [];
+    const head = await this.employeeRepository.findByUserId(actorUserId);
+    if (!head) return [];
+
+    const headedDepartmentIds = await this.getHeadedDepartmentIds(head.id);
+    if (headedDepartmentIds.size === 0) return [];
 
     const submitted = await this.leaveRequestRepository.findByStatus(
       LeaveRequestStatus.SUBMITTED,
     );
     return submitted
-      .filter((request) => request.employee.reportingManagerId === manager.id)
+      .filter(
+        (request) =>
+          !!request.employee.departmentId &&
+          headedDepartmentIds.has(request.employee.departmentId),
+      )
       .map(toLeaveRequestResponse);
   }
 
@@ -489,11 +508,15 @@ export class LeaveService {
     if (scope === 'team') {
       const viewer = await this.employeeRepository.findByUserId(actorUserId);
       if (!viewer) return [];
-      const directReports = await this.employeeRepository.findByReportingManagerId(
+      const headedDepartmentIds = await this.getHeadedDepartmentIds(
         viewer.id,
       );
-      const teamIds = new Set([viewer.id, ...directReports.map((e) => e.id)]);
-      scoped = requests.filter((request) => teamIds.has(request.employeeId));
+      if (headedDepartmentIds.size === 0) return [];
+      scoped = requests.filter(
+        (request) =>
+          !!request.employee.departmentId &&
+          headedDepartmentIds.has(request.employee.departmentId),
+      );
     }
 
     return scoped
@@ -665,18 +688,38 @@ export class LeaveService {
     if (!request) throw new NotFoundException('Leave request not found');
     if (request.status !== LeaveRequestStatus.SUBMITTED) {
       throw new BadRequestException(
-        'This request has already moved past the manager approval stage',
+        'This request has already moved past the department head approval stage',
       );
     }
 
-    const manager = await this.employeeRepository.findByUserId(actorUserId);
-    if (!manager || request.employee.reportingManagerId !== manager.id) {
+    const head = await this.employeeRepository.findByUserId(actorUserId);
+    const headedDepartmentIds = head
+      ? await this.getHeadedDepartmentIds(head.id)
+      : new Set<string>();
+    if (
+      !head ||
+      !request.employee.departmentId ||
+      !headedDepartmentIds.has(request.employee.departmentId)
+    ) {
       throw new ForbiddenException(
-        "You aren't the reporting manager for this request",
+        "You aren't the department head for this request",
       );
     }
 
-    return { request, actorName: `${manager.firstName} ${manager.lastName}` };
+    return { request, actorName: `${head.firstName} ${head.lastName}` };
+  }
+
+  /** Department ids where this employee is the head — the department-head
+   * equivalent of "direct reports" for the leave approval chain. */
+  private async getHeadedDepartmentIds(
+    employeeId: string,
+  ): Promise<Set<string>> {
+    const departments = await this.departmentRepository.findAll();
+    return new Set(
+      departments
+        .filter((department) => department.headEmployeeId === employeeId)
+        .map((department) => department.id),
+    );
   }
 
   private async loadForHrDecision(requestId: string): Promise<LeaveRequest> {

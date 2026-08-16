@@ -13,6 +13,6 @@ import { DepartmentsController } from './presentation/departments.controller';
     DepartmentsService,
     { provide: DEPARTMENT_REPOSITORY, useClass: TypeOrmDepartmentRepository },
   ],
-  exports: [DepartmentsService],
+  exports: [DepartmentsService, DEPARTMENT_REPOSITORY],
 })
 export class DepartmentsModule {}

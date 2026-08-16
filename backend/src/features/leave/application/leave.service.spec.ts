@@ -1,5 +1,11 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
+import { Department } from '../../departments/domain/entities/department.entity';
+import type { DepartmentRepository } from '../../departments/domain/repositories/department-repository.interface';
 import { Employee } from '../../employee/domain/entities/employee.entity';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
@@ -20,11 +26,21 @@ function buildEmployee(overrides: Partial<Employee> = {}): Employee {
     id: 'employee-1',
     firstName: 'Jane',
     lastName: 'Doe',
-    reportingManagerId: 'manager-1',
+    departmentId: 'dept-1',
     employmentStatus: EmploymentStatus.ACTIVE,
     profilePhotoUrl: undefined,
     ...overrides,
   } as Employee;
+}
+
+function buildDepartment(overrides: Partial<Department> = {}): Department {
+  return {
+    id: 'dept-1',
+    name: 'Engineering',
+    headEmployeeId: 'head-1',
+    isArchived: false,
+    ...overrides,
+  } as Department;
 }
 
 function buildLeaveType(overrides: Partial<LeaveType> = {}): LeaveType {
@@ -77,6 +93,7 @@ describe('LeaveService', () => {
   let leaveBalanceAdjustmentRepository: jest.Mocked<LeaveBalanceAdjustmentRepository>;
   let employeeRepository: jest.Mocked<EmployeeRepository>;
   let userRepository: jest.Mocked<UserRepository>;
+  let departmentRepository: jest.Mocked<DepartmentRepository>;
   let holidaysService: jest.Mocked<HolidaysService>;
 
   beforeEach(() => {
@@ -118,6 +135,17 @@ describe('LeaveService', () => {
       findAll: jest.fn(),
       save: jest.fn(),
     };
+    departmentRepository = {
+      findAll: jest.fn(),
+      findById: jest.fn(),
+      save: jest.fn(),
+      remove: jest.fn(),
+    };
+    // Defaults to a department whose head is someone other than the default
+    // employee, so pre-existing tests that don't care about the approval
+    // routing keep seeing a SUBMITTED request, as before.
+    departmentRepository.findById.mockResolvedValue(buildDepartment());
+    departmentRepository.findAll.mockResolvedValue([buildDepartment()]);
     // Defaults to no holidays so every pre-existing test below keeps behaving
     // exactly as it did before holidays were wired in.
     holidaysService = {
@@ -131,6 +159,7 @@ describe('LeaveService', () => {
       leaveBalanceAdjustmentRepository,
       employeeRepository,
       userRepository,
+      departmentRepository,
       holidaysService,
     );
   });
@@ -197,8 +226,11 @@ describe('LeaveService', () => {
       expect(result.status).toBe(LeaveRequestStatus.SUBMITTED);
     });
 
-    it('creates a SUBMITTED request when the employee has a reporting manager', async () => {
+    it('creates a SUBMITTED request when the employee\'s department has a head', async () => {
       employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      departmentRepository.findById.mockResolvedValue(
+        buildDepartment({ headEmployeeId: 'head-1' }),
+      );
       leaveTypeRepository.findById.mockResolvedValue(buildLeaveType());
       leaveBalanceRepository.findOne.mockResolvedValue(null);
       leaveRequestRepository.save.mockImplementation((r) => Promise.resolve(r));
@@ -213,9 +245,47 @@ describe('LeaveService', () => {
       );
     });
 
-    it('skips straight to MANAGER_APPROVED when the employee has no reporting manager', async () => {
+    it('skips straight to MANAGER_APPROVED when the employee has no department', async () => {
       employeeRepository.findByUserId.mockResolvedValue(
-        buildEmployee({ reportingManagerId: undefined }),
+        buildEmployee({ departmentId: undefined }),
+      );
+      leaveTypeRepository.findById.mockResolvedValue(buildLeaveType());
+      leaveBalanceRepository.findOne.mockResolvedValue(null);
+      leaveRequestRepository.save.mockImplementation((r) => Promise.resolve(r));
+      leaveRequestRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildLeaveRequest({ id })),
+      );
+
+      await service.submitLeaveRequest('user-1', dto);
+
+      expect(leaveRequestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: LeaveRequestStatus.MANAGER_APPROVED }),
+      );
+    });
+
+    it('skips straight to MANAGER_APPROVED when the department has no head assigned', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      departmentRepository.findById.mockResolvedValue(
+        buildDepartment({ headEmployeeId: undefined }),
+      );
+      leaveTypeRepository.findById.mockResolvedValue(buildLeaveType());
+      leaveBalanceRepository.findOne.mockResolvedValue(null);
+      leaveRequestRepository.save.mockImplementation((r) => Promise.resolve(r));
+      leaveRequestRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildLeaveRequest({ id })),
+      );
+
+      await service.submitLeaveRequest('user-1', dto);
+
+      expect(leaveRequestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: LeaveRequestStatus.MANAGER_APPROVED }),
+      );
+    });
+
+    it('skips straight to MANAGER_APPROVED when the employee is the head of their own department', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee({ id: 'head-1' }));
+      departmentRepository.findById.mockResolvedValue(
+        buildDepartment({ headEmployeeId: 'head-1' }),
       );
       leaveTypeRepository.findById.mockResolvedValue(buildLeaveType());
       leaveBalanceRepository.findOne.mockResolvedValue(null);
@@ -241,6 +311,124 @@ describe('LeaveService', () => {
       await expect(
         service.submitLeaveRequest('user-1', dto), // 5 working days requested
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('getPendingManagerApproval', () => {
+    it('returns an empty array when the actor has no employee profile', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      const result = await service.getPendingManagerApproval('user-1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('returns an empty array when the actor does not head any department', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'not-a-head' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+      ]);
+
+      const result = await service.getPendingManagerApproval('user-1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('only returns submitted requests from departments the actor heads', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'head-1' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+        buildDepartment({ id: 'dept-2', headEmployeeId: 'someone-else' }),
+      ]);
+      leaveRequestRepository.findByStatus.mockResolvedValue([
+        buildLeaveRequest({
+          id: 'request-mine',
+          employee: buildEmployee({ id: 'member-1', departmentId: 'dept-1' }),
+        }),
+        buildLeaveRequest({
+          id: 'request-not-mine',
+          employee: buildEmployee({ id: 'member-2', departmentId: 'dept-2' }),
+        }),
+      ]);
+
+      const result = await service.getPendingManagerApproval('user-1');
+
+      expect(result.map((r) => r.id)).toEqual(['request-mine']);
+    });
+  });
+
+  describe('approveAsManager / rejectAsManager', () => {
+    it('throws ForbiddenException when the actor does not head the request\'s department', async () => {
+      leaveRequestRepository.findById.mockResolvedValue(
+        buildLeaveRequest({
+          employee: buildEmployee({ departmentId: 'dept-1' }),
+        }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'not-a-head' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+      ]);
+
+      await expect(
+        service.approveAsManager('request-1', 'user-1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('throws BadRequestException once the request has moved past the department-head stage', async () => {
+      leaveRequestRepository.findById.mockResolvedValue(
+        buildLeaveRequest({ status: LeaveRequestStatus.MANAGER_APPROVED }),
+      );
+
+      await expect(
+        service.approveAsManager('request-1', 'user-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('approves as the department head and records their name', async () => {
+      leaveRequestRepository.findById.mockResolvedValue(
+        buildLeaveRequest({
+          employee: buildEmployee({ departmentId: 'dept-1' }),
+        }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'head-1', firstName: 'Amir', lastName: 'Khan' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+      ]);
+      leaveRequestRepository.save.mockImplementation((r) => Promise.resolve(r));
+
+      const result = await service.approveAsManager('request-1', 'user-1', 'Go ahead');
+
+      expect(result.status).toBe(LeaveRequestStatus.MANAGER_APPROVED);
+      expect(result.managerDecisionByName).toBe('Amir Khan');
+      expect(result.managerComment).toBe('Go ahead');
+    });
+
+    it('rejects as the department head', async () => {
+      leaveRequestRepository.findById.mockResolvedValue(
+        buildLeaveRequest({
+          employee: buildEmployee({ departmentId: 'dept-1' }),
+        }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'head-1' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+      ]);
+      leaveRequestRepository.save.mockImplementation((r) => Promise.resolve(r));
+
+      const result = await service.rejectAsManager('request-1', 'user-1', 'Not now');
+
+      expect(result.status).toBe(LeaveRequestStatus.REJECTED);
+      expect(result.managerComment).toBe('Not now');
     });
   });
 
@@ -335,17 +523,17 @@ describe('LeaveService', () => {
   });
 
   describe('getLeaveCalendar', () => {
-    it('only includes the viewer and their direct reports for team scope', async () => {
+    it('only includes members of departments the viewer heads, for team scope', async () => {
       const teamRequest = buildLeaveRequest({
         id: 'request-team',
-        employeeId: 'report-1',
-        employee: buildEmployee({ id: 'report-1' }),
+        employeeId: 'member-1',
+        employee: buildEmployee({ id: 'member-1', departmentId: 'dept-1' }),
         status: LeaveRequestStatus.APPROVED,
       });
       const otherRequest = buildLeaveRequest({
         id: 'request-other',
         employeeId: 'someone-else',
-        employee: buildEmployee({ id: 'someone-else' }),
+        employee: buildEmployee({ id: 'someone-else', departmentId: 'dept-2' }),
         status: LeaveRequestStatus.APPROVED,
       });
       leaveRequestRepository.findByStatuses.mockResolvedValue([
@@ -353,10 +541,11 @@ describe('LeaveService', () => {
         otherRequest,
       ]);
       employeeRepository.findByUserId.mockResolvedValue(
-        buildEmployee({ id: 'manager-1' }),
+        buildEmployee({ id: 'head-1' }),
       );
-      employeeRepository.findByReportingManagerId.mockResolvedValue([
-        buildEmployee({ id: 'report-1' }),
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+        buildDepartment({ id: 'dept-2', headEmployeeId: 'someone-elses-head' }),
       ]);
 
       const result = await service.getLeaveCalendar(
@@ -366,7 +555,23 @@ describe('LeaveService', () => {
         2026,
       );
 
-      expect(result.map((r) => r.employeeId)).toEqual(['report-1']);
+      expect(result.map((r) => r.employeeId)).toEqual(['member-1']);
+    });
+
+    it('returns nothing for team scope when the viewer does not head any department', async () => {
+      leaveRequestRepository.findByStatuses.mockResolvedValue([
+        buildLeaveRequest({ employeeId: 'member-1', employee: buildEmployee({ id: 'member-1' }) }),
+      ]);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'not-a-head' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+      ]);
+
+      const result = await service.getLeaveCalendar('user-1', 'team', 3, 2026);
+
+      expect(result).toHaveLength(0);
     });
 
     it('includes everyone for company scope', async () => {

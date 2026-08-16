@@ -51,7 +51,7 @@ export class DepartmentsService {
     } catch (error) {
       if (this.isForeignKeyViolation(error)) {
         throw new ConflictException(
-          'Cannot delete a department that still has employees or teams ' +
+          'Cannot delete a department that still has employees ' +
             'assigned. Archive it instead.',
         );
       }

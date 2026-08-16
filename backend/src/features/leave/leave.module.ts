@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthenticationModule } from '../authentication/authentication.module';
+import { DepartmentsModule } from '../departments/departments.module';
 import { EmployeeModule } from '../employee/employee.module';
 import { HolidaysModule } from '../holidays/holidays.module';
 import { LeaveService } from './application/leave.service';
@@ -27,6 +28,7 @@ import { LeaveController } from './presentation/leave.controller';
       LeaveBalanceAdjustment,
     ]),
     AuthenticationModule,
+    DepartmentsModule,
     EmployeeModule,
     HolidaysModule,
   ],
