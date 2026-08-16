@@ -15,7 +15,15 @@ export class TypeOrmNoticeRepository implements NoticeRepository {
     return this.repository.find({ order: { createdAt: 'DESC' } });
   }
 
+  findById(id: string): Promise<Notice | null> {
+    return this.repository.findOneBy({ id });
+  }
+
   save(notice: Notice): Promise<Notice> {
     return this.repository.save(notice);
+  }
+
+  async remove(notice: Notice): Promise<void> {
+    await this.repository.remove(notice);
   }
 }

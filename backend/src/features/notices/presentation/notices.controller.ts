@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
@@ -18,5 +18,11 @@ export class NoticesController {
   @Permissions('notices.manage')
   create(@Body() dto: CreateNoticeDto, @CurrentUser() user: JwtPayload) {
     return this.noticesService.create(dto, user.sub);
+  }
+
+  @Delete(':id')
+  @Permissions('notices.manage')
+  delete(@Param('id') id: string) {
+    return this.noticesService.delete(id);
   }
 }

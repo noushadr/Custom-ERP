@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import {
   USER_REPOSITORY,
@@ -44,5 +44,12 @@ export class NoticesService {
     notice.authorName = authorName;
 
     return this.noticeRepository.save(notice);
+  }
+
+  async delete(id: string): Promise<void> {
+    const notice = await this.noticeRepository.findById(id);
+    if (!notice) throw new NotFoundException('Notice not found');
+
+    await this.noticeRepository.remove(notice);
   }
 }

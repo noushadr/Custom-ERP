@@ -14,7 +14,9 @@ describe('NoticesService', () => {
   beforeEach(() => {
     noticeRepository = {
       findAll: jest.fn(),
+      findById: jest.fn(),
       save: jest.fn(),
+      remove: jest.fn(),
     };
     employeeRepository = {
       findAll: jest.fn(),
@@ -82,6 +84,26 @@ describe('NoticesService', () => {
       );
 
       expect(result.authorName).toBe('Admin');
+    });
+  });
+
+  describe('delete', () => {
+    it('removes the notice when it exists', async () => {
+      const notice = { id: 'notice-1' } as never;
+      noticeRepository.findById.mockResolvedValue(notice);
+
+      await service.delete('notice-1');
+
+      expect(noticeRepository.remove).toHaveBeenCalledWith(notice);
+    });
+
+    it('throws NotFoundException when the notice does not exist', async () => {
+      noticeRepository.findById.mockResolvedValue(null);
+
+      await expect(service.delete('missing')).rejects.toThrow(
+        'Notice not found',
+      );
+      expect(noticeRepository.remove).not.toHaveBeenCalled();
     });
   });
 });
