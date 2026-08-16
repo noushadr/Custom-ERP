@@ -18,4 +18,7 @@ export default () => ({
     superAdminEmail: process.env.SEED_SUPER_ADMIN_EMAIL,
     superAdminPassword: process.env.SEED_SUPER_ADMIN_PASSWORD,
   },
+  // Comma-separated list of allowed frontend origins. Falls back to the
+  // local Flutter-web dev server when unset — never wide open by default.
+  corsOrigin: process.env.CORS_ORIGIN,
 });

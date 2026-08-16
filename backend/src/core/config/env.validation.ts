@@ -54,6 +54,10 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SEED_SUPER_ADMIN_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  CORS_ORIGIN?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

@@ -6,7 +6,9 @@ import {
   HttpStatus,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   AuthService,
   type AuthenticatedUser,
@@ -23,7 +25,12 @@ import type { JwtPayload } from './strategies/jwt.strategy';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Unauthenticated by design (@Public), so it's the one route an attacker
+  // can hit repeatedly with password guesses — throttled tighter than the
+  // app-wide default to make that impractical.
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Body() dto: LoginDto) {

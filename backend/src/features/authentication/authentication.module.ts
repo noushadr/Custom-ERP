@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import type { StringValue } from 'ms';
 import { AuthService } from './application/auth.service';
@@ -38,6 +39,10 @@ import { UsersController } from './presentation/users.controller';
         },
       }),
     }),
+    // Used only by the login route's own @Throttle override (see
+    // AuthController) — not registered as a global guard, so it never
+    // affects any other route's rate.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 5 }]),
   ],
   controllers: [
     AuthController,
