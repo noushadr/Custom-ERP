@@ -156,7 +156,7 @@ class _DepartmentCard extends ConsumerWidget {
         title: const Text('Delete department?'),
         content: Text(
           'This permanently deletes "${department.name}". It fails if any '
-          'employees or teams are still assigned to it — archive it instead '
+          'employees are still assigned to it — archive it instead '
           'if you want to keep that history.',
         ),
         actions: [
