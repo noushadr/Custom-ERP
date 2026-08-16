@@ -11,9 +11,12 @@ export class TypeOrmTeamRepository implements TeamRepository {
     private readonly repository: Repository<Team>,
   ) {}
 
-  findAll(departmentId?: string): Promise<Team[]> {
+  findAll(departmentId?: string, includeArchived = false): Promise<Team[]> {
     return this.repository.find({
-      where: departmentId ? { departmentId } : {},
+      where: {
+        ...(departmentId ? { departmentId } : {}),
+        ...(includeArchived ? {} : { isArchived: false }),
+      },
       order: { name: 'ASC' },
     });
   }
@@ -24,5 +27,9 @@ export class TypeOrmTeamRepository implements TeamRepository {
 
   save(team: Team): Promise<Team> {
     return this.repository.save(team);
+  }
+
+  async remove(team: Team): Promise<void> {
+    await this.repository.remove(team);
   }
 }

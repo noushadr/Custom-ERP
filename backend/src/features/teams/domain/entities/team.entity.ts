@@ -17,4 +17,7 @@ export class Team extends BaseEntity {
   /** Employee id of the team lead. Not a typed relation, see Department.headEmployeeId. */
   @Column({ nullable: true })
   leadEmployeeId?: string;
+
+  @Column({ default: false })
+  isArchived: boolean;
 }
