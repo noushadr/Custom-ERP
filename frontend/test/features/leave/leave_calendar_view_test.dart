@@ -3,19 +3,41 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
+import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/employee/domain/entities/department.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/leave/presentation/widgets/leave_calendar_view.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_leave.dart';
 
-Widget _app(FakeLeaveRepository leaveRepository) {
+/// [isDepartmentHead] simulates the viewer heading `dept-1` (the default
+/// department id [buildTestEmployee] belongs to) — the "My Team" toggle
+/// only renders for department heads.
+Widget _app(
+  FakeLeaveRepository leaveRepository, {
+  bool isDepartmentHead = true,
+}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
         (ref) => PresetAuthController(const AuthAuthenticated(testAuthUser)),
       ),
       leaveRepositoryProvider.overrideWithValue(leaveRepository),
+      employeeRepositoryProvider.overrideWithValue(
+        FakeEmployeeRepository(
+          departments: isDepartmentHead
+              ? [
+                  const Department(
+                    id: 'dept-1',
+                    name: 'Engineering',
+                    headEmployeeId: 'employee-1',
+                  ),
+                ]
+              : const [],
+        ),
+      ),
     ],
     child: const MaterialApp(
       home: Scaffold(
@@ -71,6 +93,20 @@ void main() {
 
     expect(leaveRepository.lastCalendarScope, 'company');
   });
+
+  testWidgets(
+    'hides the My Team toggle and always queries company scope for a non-department-head',
+    (tester) async {
+      await _useTallSurface(tester);
+      final leaveRepository = FakeLeaveRepository();
+      await tester.pumpWidget(_app(leaveRepository, isDepartmentHead: false));
+      await tester.pumpAndSettle();
+
+      expect(find.text('My Team'), findsNothing);
+      expect(find.text('Company'), findsNothing);
+      expect(leaveRepository.lastCalendarScope, 'company');
+    },
+  );
 
   testWidgets('the next-month arrow advances the displayed month', (
     tester,

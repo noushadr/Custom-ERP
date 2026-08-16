@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../employee/application/employee_providers.dart';
+import '../../../employee/domain/entities/department.dart';
 import '../../application/leave_providers.dart';
 import '../../domain/entities/leave_calendar_entry.dart';
 import '../utils/leave_format_utils.dart';
@@ -23,8 +25,10 @@ const _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const _maxEntriesPerCell = 3;
 
 /// A custom-built month grid (no calendar package) showing who's on leave
-/// each day, scoped to the viewer's team or the whole company — lets anyone
-/// spot scheduling conflicts before applying.
+/// each day, scoped to the viewer's department or the whole company — lets
+/// anyone spot scheduling conflicts before applying. The "My Team" scope is
+/// only meaningful for department heads, so its toggle is hidden for anyone
+/// else (including Super Admin, who has no department at all).
 class LeaveCalendarView extends ConsumerStatefulWidget {
   const LeaveCalendarView({super.key});
 
@@ -42,9 +46,33 @@ class _LeaveCalendarViewState extends ConsumerState<LeaveCalendarView> {
 
   @override
   Widget build(BuildContext context) {
+    // AsyncError.valueOrNull can still return a stale previous value (e.g.
+    // right after "return to admin", while the Super Admin's 404 for
+    // getMe() is settling) — pattern-match on AsyncData so an errored
+    // lookup (no Employee profile) is never mistaken for someone else's
+    // cached profile.
+    final myProfileAsync = ref.watch(myProfileProvider);
+    final myEmployeeId = switch (myProfileAsync) {
+      AsyncData(:final value) => value.id,
+      _ => null,
+    };
+    final departmentsAsync = ref.watch(departmentsProvider);
+    final departments = switch (departmentsAsync) {
+      AsyncData(:final value) => value,
+      _ => const <Department>[],
+    };
+    final isDepartmentHead =
+        myEmployeeId != null &&
+        departments.any((department) => department.headEmployeeId == myEmployeeId);
+    final effectiveScope = isDepartmentHead ? _scope : 'company';
+
     final entriesAsync = ref.watch(
       leaveCalendarProvider(
-        LeaveCalendarQuery(scope: _scope, month: _month.month, year: _month.year),
+        LeaveCalendarQuery(
+          scope: effectiveScope,
+          month: _month.month,
+          year: _month.year,
+        ),
       ),
     );
 
@@ -79,15 +107,16 @@ class _LeaveCalendarViewState extends ConsumerState<LeaveCalendarView> {
                     ),
                   ],
                 ),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'team', label: Text('My Team')),
-                    ButtonSegment(value: 'company', label: Text('Company')),
-                  ],
-                  selected: {_scope},
-                  onSelectionChanged: (selection) =>
-                      setState(() => _scope = selection.first),
-                ),
+                if (isDepartmentHead)
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'team', label: Text('My Team')),
+                      ButtonSegment(value: 'company', label: Text('Company')),
+                    ],
+                    selected: {_scope},
+                    onSelectionChanged: (selection) =>
+                        setState(() => _scope = selection.first),
+                  ),
               ],
             ),
             const SizedBox(height: 16),
