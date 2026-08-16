@@ -22,6 +22,7 @@ const DEFAULT_PERMISSIONS = [
   'audit.viewAll',
   'notices.manage',
   'leave.manage',
+  'roles.manage',
 ];
 
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [

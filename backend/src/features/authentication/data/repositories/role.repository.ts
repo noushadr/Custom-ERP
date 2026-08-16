@@ -14,4 +14,20 @@ export class TypeOrmRoleRepository implements RoleRepository {
   findByName(name: string): Promise<Role | null> {
     return this.repository.findOne({ where: { name } });
   }
+
+  findById(id: string): Promise<Role | null> {
+    return this.repository.findOne({ where: { id } });
+  }
+
+  findAll(): Promise<Role[]> {
+    return this.repository.find({ order: { name: 'ASC' } });
+  }
+
+  save(role: Role): Promise<Role> {
+    return this.repository.save(role);
+  }
+
+  async remove(role: Role): Promise<void> {
+    await this.repository.remove(role);
+  }
 }
