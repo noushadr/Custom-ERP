@@ -6,4 +6,7 @@ abstract interface class NoticeRepository {
 
   /// Requires `notices.manage`.
   Future<Notice> create({required String title, required String body});
+
+  /// Requires `notices.manage`.
+  Future<void> delete(String id);
 }

@@ -9,6 +9,7 @@ import '../../../notices/domain/exceptions/notice_exception.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/company_audit_log_section.dart';
+import '../widgets/company_notices_section.dart';
 
 class AdminDashboardPage extends ConsumerWidget {
   const AdminDashboardPage({super.key});
@@ -108,7 +109,7 @@ class _DashboardStats extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -190,6 +191,8 @@ class _DashboardStats extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 18),
+          const CompanyNoticesSection(),
           if (showCompanyAuditLog) ...[
             const SizedBox(height: 18),
             const CompanyAuditLogSection(),

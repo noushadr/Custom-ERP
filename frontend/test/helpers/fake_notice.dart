@@ -2,13 +2,19 @@ import 'package:zera_erp/features/notices/domain/entities/notice.dart';
 import 'package:zera_erp/features/notices/domain/repositories/notice_repository.dart';
 
 class FakeNoticeRepository implements NoticeRepository {
-  FakeNoticeRepository({this.notices = const [], this.createError});
+  FakeNoticeRepository({
+    this.notices = const [],
+    this.createError,
+    this.deleteError,
+  });
 
   final List<Notice> notices;
   final Object? createError;
+  final Object? deleteError;
 
   /// The most recently created notice's title, if any.
   String? lastCreatedTitle;
+  String? lastDeletedId;
 
   @override
   Future<List<Notice>> getAll() async => notices;
@@ -24,5 +30,11 @@ class FakeNoticeRepository implements NoticeRepository {
       authorName: 'Test Author',
       createdAt: DateTime(2026, 1, 1),
     );
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    lastDeletedId = id;
+    if (deleteError != null) throw deleteError!;
   }
 }

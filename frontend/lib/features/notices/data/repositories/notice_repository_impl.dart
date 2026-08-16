@@ -16,6 +16,9 @@ class NoticeRepositoryImpl implements NoticeRepository {
   Future<Notice> create({required String title, required String body}) =>
       _guard(() => _remoteDataSource.create(title: title, body: body));
 
+  @override
+  Future<void> delete(String id) => _guard(() => _remoteDataSource.delete(id));
+
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
       return await action();
@@ -34,6 +37,7 @@ class NoticeRepositoryImpl implements NoticeRepository {
       return 'Invalid request.';
     }
     if (status == 403) return "You don't have permission to do that.";
+    if (status == 404) return 'Not found.';
     if (error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout) {
       return 'Could not reach the server. Check your connection.';

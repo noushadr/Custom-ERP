@@ -24,4 +24,6 @@ class NoticeRemoteDataSource {
     );
     return NoticeModel.fromJson(response.data!);
   }
+
+  Future<void> delete(String id) => _dio.delete<void>('/notices/$id');
 }
