@@ -41,8 +41,8 @@ export class EmployeesController {
 
   @Get()
   @Permissions('employees.read')
-  findAll() {
-    return this.employeesService.findAll();
+  findAll(@CurrentUser() user: JwtPayload) {
+    return this.employeesService.findAll(user);
   }
 
   @Get('me')
@@ -166,8 +166,8 @@ export class EmployeesController {
 
   @Get(':id')
   @Permissions('employees.read')
-  findOne(@Param('id') id: string) {
-    return this.employeesService.findById(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.employeesService.findById(id, user);
   }
 
   @Patch(':id')

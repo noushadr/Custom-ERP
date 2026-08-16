@@ -9,6 +9,7 @@ import { User } from '../../authentication/domain/entities/user.entity';
 import { UserStatus } from '../../authentication/domain/enums/user-status.enum';
 import type { RoleRepository } from '../../authentication/domain/repositories/role-repository.interface';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
+import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
 import { Asset } from '../domain/entities/asset.entity';
 import { Employee } from '../domain/entities/employee.entity';
 import { EmployeeAuditLog } from '../domain/entities/employee-audit-log.entity';
@@ -22,6 +23,16 @@ import type { EmployeeRepository } from '../domain/repositories/employee-reposit
 import type { EducationRecordRepository } from '../domain/repositories/education-record-repository.interface';
 import type { SalaryRecordRepository } from '../domain/repositories/salary-record-repository.interface';
 import { EmployeesService } from './employees.service';
+
+function buildViewer(overrides: Partial<JwtPayload> = {}): JwtPayload {
+  return {
+    sub: 'viewer-user-1',
+    email: 'viewer@zeracreative.com',
+    role: 'Employee',
+    permissions: [],
+    ...overrides,
+  };
+}
 
 function buildAsset(overrides: Partial<Asset> = {}): Asset {
   return {
@@ -324,18 +335,107 @@ describe('EmployeesService', () => {
     it('throws NotFoundException when missing', async () => {
       employeeRepository.findById.mockResolvedValue(null);
 
-      await expect(service.findById('missing')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.findById('missing', buildViewer({ permissions: ['employees.manage'] })),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('returns the mapped employee when found', async () => {
       employeeRepository.findById.mockResolvedValue(buildEmployee());
 
-      const result = await service.findById('employee-1');
+      const result = await service.findById(
+        'employee-1',
+        buildViewer({ permissions: ['employees.manage'] }),
+      );
 
       expect(result.fullName).toBe('Jane Doe');
       expect(result.email).toBe('jane.doe@zeracreative.com');
+    });
+
+    it('strips financial and personal-contact fields for a viewer without employees.manage', async () => {
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({
+          bankName: 'Habib Bank',
+          accountNumber: '1234567890',
+          iban: 'PK00HABB0000001234567890',
+          dateOfBirth: '1997-08-13',
+          personalEmail: 'jane.personal@example.com',
+          phoneNumber: '+92-300-1234567',
+          address: '123 Street, Karachi',
+          emergencyContactName: 'John Doe',
+        }),
+      );
+
+      const result = await service.findById(
+        'employee-1',
+        buildViewer({ sub: 'someone-else', permissions: ['employees.read'] }),
+      );
+
+      expect(result.bankName).toBeNull();
+      expect(result.accountNumber).toBeNull();
+      expect(result.iban).toBeNull();
+      expect(result.dateOfBirth).toBeNull();
+      expect(result.personalEmail).toBeNull();
+      expect(result.phoneNumber).toBeNull();
+      expect(result.address).toBeNull();
+      expect(result.emergencyContactName).toBeNull();
+      // Directory-level fields remain visible.
+      expect(result.fullName).toBe('Jane Doe');
+    });
+
+    it('still shows a viewer their own financial and personal-contact fields', async () => {
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ userId: 'user-1', bankName: 'Habib Bank' }),
+      );
+
+      const result = await service.findById(
+        'employee-1',
+        buildViewer({ sub: 'user-1', permissions: [] }),
+      );
+
+      expect(result.bankName).toBe('Habib Bank');
+    });
+  });
+
+  describe('findAll', () => {
+    it('strips financial and personal-contact fields for a viewer without employees.manage', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-1', userId: 'user-1', bankName: 'Habib Bank' }),
+        buildEmployee({ id: 'employee-2', userId: 'user-2', bankName: 'Meezan Bank' }),
+      ]);
+
+      const [first, second] = await service.findAll(
+        buildViewer({ sub: 'someone-else', permissions: ['employees.read'] }),
+      );
+
+      expect(first.bankName).toBeNull();
+      expect(second.bankName).toBeNull();
+    });
+
+    it('keeps every field for an employees.manage viewer', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-1', userId: 'user-1', bankName: 'Habib Bank' }),
+      ]);
+
+      const [result] = await service.findAll(
+        buildViewer({ permissions: ['employees.manage'] }),
+      );
+
+      expect(result.bankName).toBe('Habib Bank');
+    });
+
+    it("keeps the viewer's own record unstripped even without employees.manage", async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-1', userId: 'user-1', bankName: 'Habib Bank' }),
+        buildEmployee({ id: 'employee-2', userId: 'user-2', bankName: 'Meezan Bank' }),
+      ]);
+
+      const [own, other] = await service.findAll(
+        buildViewer({ sub: 'user-1', permissions: ['employees.read'] }),
+      );
+
+      expect(own.bankName).toBe('Habib Bank');
+      expect(other.bankName).toBeNull();
     });
   });
 

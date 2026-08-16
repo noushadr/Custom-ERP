@@ -10,6 +10,7 @@ import {
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../authentication/domain/entities/user.entity';
 import { UserStatus } from '../../authentication/domain/enums/user-status.enum';
+import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
 import {
   ROLE_REPOSITORY,
   type RoleRepository,
@@ -195,9 +196,14 @@ export class EmployeesService {
     };
   }
 
-  async findAll(): Promise<EmployeeResponse[]> {
+  /** `employees.read` (e.g. Team Lead) only grants a directory-style view —
+   * financial and personal-contact fields are stripped unless the viewer
+   * also holds `employees.manage`, or is looking at their own record. */
+  async findAll(viewer: JwtPayload): Promise<EmployeeResponse[]> {
     const employees = await this.employeeRepository.findAll();
-    return employees.map(toEmployeeResponse);
+    return employees.map((employee) =>
+      this.applyFieldVisibility(toEmployeeResponse(employee), employee, viewer),
+    );
   }
 
   /** Employees whose birthday falls within the next [withinDays] days, or
@@ -248,10 +254,39 @@ export class EmployeesService {
     );
   }
 
-  async findById(id: string): Promise<EmployeeResponse> {
+  async findById(id: string, viewer: JwtPayload): Promise<EmployeeResponse> {
     const employee = await this.employeeRepository.findById(id);
     if (!employee) throw new NotFoundException('Employee not found');
-    return toEmployeeResponse(employee);
+    return this.applyFieldVisibility(toEmployeeResponse(employee), employee, viewer);
+  }
+
+  /** Financial/personal-contact fields are only visible to `employees.manage`
+   * holders or to the employee themselves — not to a plain `employees.read`
+   * viewer (e.g. Team Lead), who only needs directory-level fields. */
+  private applyFieldVisibility(
+    response: EmployeeResponse,
+    employee: Employee,
+    viewer: JwtPayload,
+  ): EmployeeResponse {
+    const isSelf = employee.userId === viewer.sub;
+    const canManage = viewer.permissions.includes('employees.manage');
+    if (isSelf || canManage) return response;
+
+    return {
+      ...response,
+      dateOfBirth: null,
+      personalEmail: null,
+      phoneNumber: null,
+      emergencyContactName: null,
+      emergencyContactPhone: null,
+      emergencyContactRelation: null,
+      address: null,
+      bankName: null,
+      accountTitle: null,
+      accountNumber: null,
+      branchCode: null,
+      iban: null,
+    };
   }
 
   async findByUserId(userId: string): Promise<EmployeeResponse> {
