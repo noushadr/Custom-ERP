@@ -9,6 +9,7 @@ import '../entities/employee_document.dart';
 import '../entities/invite_employee_input.dart';
 import '../entities/paginated_audit_log.dart';
 import '../entities/salary_record.dart';
+import '../entities/team.dart';
 import '../entities/update_employee_input.dart';
 import '../entities/update_my_profile_input.dart';
 import '../entities/upcoming_birthday.dart';
@@ -73,6 +74,35 @@ abstract interface class EmployeeRepository {
   Future<void> deleteDepartment(String id);
 
   Future<List<NamedRef>> getTeams({String? departmentId});
+
+  /// The full team list for the teams management screen (unlike [getTeams],
+  /// which is a lightweight picker for other forms).
+  Future<List<Team>> getTeamsManagement({
+    String? departmentId,
+    bool includeArchived = false,
+  });
+
+  /// Requires `teams.manage`.
+  Future<Team> createTeam({
+    required String name,
+    required String departmentId,
+    String? leadEmployeeId,
+  });
+
+  /// Requires `teams.manage`.
+  Future<Team> updateTeam(
+    String id, {
+    required String name,
+    required String departmentId,
+    String? leadEmployeeId,
+  });
+
+  /// Requires `teams.manage`.
+  Future<Team> setTeamArchived(String id, {required bool isArchived});
+
+  /// Requires `teams.manage`. Fails if any employees are still assigned to
+  /// this team — archive it instead.
+  Future<void> deleteTeam(String id);
 
   Future<List<EmployeeDocument>> getMyDocuments();
 

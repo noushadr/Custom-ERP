@@ -13,6 +13,7 @@ import '../models/employee_document_model.dart';
 import '../models/employee_model.dart';
 import '../models/paginated_audit_log_model.dart';
 import '../models/salary_record_model.dart';
+import '../models/team_model.dart';
 import '../models/upcoming_birthday_model.dart';
 
 class EmployeeRemoteDataSource {
@@ -187,6 +188,69 @@ class EmployeeRemoteDataSource {
         .cast<Map<String, dynamic>>()
         .map(NamedRef.fromJson)
         .toList();
+  }
+
+  Future<List<TeamModel>> getTeamsManagement({
+    String? departmentId,
+    bool includeArchived = false,
+  }) async {
+    final queryParameters = <String, dynamic>{
+      'includeArchived': includeArchived.toString(),
+    };
+    if (departmentId != null) queryParameters['departmentId'] = departmentId;
+    final response = await _dio.get<List<dynamic>>(
+      '/teams',
+      queryParameters: queryParameters,
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(TeamModel.fromJson)
+        .toList();
+  }
+
+  Future<TeamModel> createTeam({
+    required String name,
+    required String departmentId,
+    String? leadEmployeeId,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/teams',
+      data: {
+        'name': name,
+        'departmentId': departmentId,
+        'leadEmployeeId': leadEmployeeId,
+      },
+    );
+    return TeamModel.fromJson(response.data!);
+  }
+
+  Future<TeamModel> updateTeam(
+    String id, {
+    required String name,
+    required String departmentId,
+    String? leadEmployeeId,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/teams/$id',
+      data: {
+        'name': name,
+        'departmentId': departmentId,
+        'leadEmployeeId': leadEmployeeId,
+      },
+    );
+    return TeamModel.fromJson(response.data!);
+  }
+
+  Future<TeamModel> setTeamArchived(String id, {required bool isArchived}) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/teams/$id',
+      data: {'isArchived': isArchived},
+    );
+    return TeamModel.fromJson(response.data!);
+  }
+
+  Future<void> deleteTeam(String id) async {
+    await _dio.delete('/teams/$id');
   }
 
   Future<List<EmployeeDocumentModel>> getMyDocuments() async {

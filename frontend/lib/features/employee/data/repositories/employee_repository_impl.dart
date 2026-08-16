@@ -10,6 +10,7 @@ import '../../domain/entities/employee_document.dart';
 import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/paginated_audit_log.dart';
 import '../../domain/entities/salary_record.dart';
+import '../../domain/entities/team.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../../domain/entities/upcoming_birthday.dart';
@@ -121,6 +122,53 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   @override
   Future<List<NamedRef>> getTeams({String? departmentId}) =>
       _guard(() => _remoteDataSource.getTeams(departmentId: departmentId));
+
+  @override
+  Future<List<Team>> getTeamsManagement({
+    String? departmentId,
+    bool includeArchived = false,
+  }) => _guard(
+    () => _remoteDataSource.getTeamsManagement(
+      departmentId: departmentId,
+      includeArchived: includeArchived,
+    ),
+  );
+
+  @override
+  Future<Team> createTeam({
+    required String name,
+    required String departmentId,
+    String? leadEmployeeId,
+  }) => _guard(
+    () => _remoteDataSource.createTeam(
+      name: name,
+      departmentId: departmentId,
+      leadEmployeeId: leadEmployeeId,
+    ),
+  );
+
+  @override
+  Future<Team> updateTeam(
+    String id, {
+    required String name,
+    required String departmentId,
+    String? leadEmployeeId,
+  }) => _guard(
+    () => _remoteDataSource.updateTeam(
+      id,
+      name: name,
+      departmentId: departmentId,
+      leadEmployeeId: leadEmployeeId,
+    ),
+  );
+
+  @override
+  Future<Team> setTeamArchived(String id, {required bool isArchived}) =>
+      _guard(() => _remoteDataSource.setTeamArchived(id, isArchived: isArchived));
+
+  @override
+  Future<void> deleteTeam(String id) =>
+      _guard(() => _remoteDataSource.deleteTeam(id));
 
   @override
   Future<List<EmployeeDocument>> getMyDocuments() =>
