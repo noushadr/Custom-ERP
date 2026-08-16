@@ -5,6 +5,8 @@ import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
+import '../../../employee/application/employee_providers.dart';
+import '../../../employee/domain/entities/department.dart';
 import '../../../employee/presentation/widgets/employee_status_badges.dart';
 import '../../application/request_providers.dart';
 import '../../domain/entities/employee_request.dart';
@@ -28,6 +30,32 @@ class RequestsPage extends ConsumerWidget {
     // this page to decide on requests from everyone else.
     final isSuperAdmin = authUser?.role == 'Super Admin';
 
+    // AsyncError.valueOrNull can still return a stale previous value (see the
+    // same gotcha documented in LeaveCalendarView), so pattern-match on
+    // AsyncData rather than using valueOrNull.
+    final myProfileAsync = ref.watch(myProfileProvider);
+    final myEmployeeId = switch (myProfileAsync) {
+      AsyncData(:final value) => value.id,
+      _ => null,
+    };
+    final departmentsAsync = ref.watch(departmentsProvider);
+    final departments = switch (departmentsAsync) {
+      AsyncData(:final value) => value,
+      _ => const <Department>[],
+    };
+    final isDepartmentHead =
+        myEmployeeId != null &&
+        departments.any((department) => department.headEmployeeId == myEmployeeId);
+    // "Requests Awaiting My Approval" is only meaningful for people actually
+    // expected to approve on someone's behalf — Super Admin, HR/Manager,
+    // Team Leads, or a department head — not just anyone who happens to be
+    // set as a reportingManagerId.
+    final canSeeManagerApprovals =
+        isSuperAdmin ||
+        authUser?.role == 'HR/Manager' ||
+        authUser?.role == 'Team Lead' ||
+        isDepartmentHead;
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Center(
@@ -41,11 +69,11 @@ class RequestsPage extends ConsumerWidget {
                   const _MyRequestsSection(),
                   const SizedBox(height: 16),
                 ],
-                const _PendingMyApprovalSection(),
-                if (canSeeHrApprovals) ...[
+                if (canSeeManagerApprovals) ...[
+                  const _PendingMyApprovalSection(),
                   const SizedBox(height: 16),
-                  const _PendingHrApprovalSection(),
                 ],
+                if (canSeeHrApprovals) const _PendingHrApprovalSection(),
               ],
             ),
           ),

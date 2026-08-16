@@ -4,10 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
+import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/employee/domain/entities/department.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/requests/presentation/pages/requests_page.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_request.dart';
 
 AuthUser _viewer({String role = 'Employee', List<String> permissions = const []}) =>
@@ -22,6 +25,7 @@ Widget _app({
   String role = 'Employee',
   List<String> permissions = const [],
   FakeRequestRepository? requestRepository,
+  FakeEmployeeRepository? employeeRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -32,6 +36,13 @@ Widget _app({
       ),
       requestRepositoryProvider.overrideWithValue(
         requestRepository ?? FakeRequestRepository(),
+      ),
+      // RequestsPage checks department headship (same as LeaveCalendarView)
+      // to decide whether to show the manager-approval section — default to
+      // a plain, deterministic fake so tests that don't care about that
+      // don't hit a real network call for myProfileProvider/departmentsProvider.
+      employeeRepositoryProvider.overrideWithValue(
+        employeeRepository ?? FakeEmployeeRepository(),
       ),
     ],
     child: const MaterialApp(home: Scaffold(body: RequestsPage())),
@@ -98,7 +109,9 @@ void main() {
         buildTestRequest(id: 'request-1', subject: 'Time off'),
       ],
     );
-    await tester.pumpWidget(_app(requestRepository: requestRepository));
+    await tester.pumpWidget(
+      _app(role: 'Team Lead', requestRepository: requestRepository),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(FilledButton, 'Approve'));
@@ -107,6 +120,55 @@ void main() {
     expect(requestRepository.lastDecidedRequestId, 'request-1');
     expect(requestRepository.lastDecisionApproved, isTrue);
   });
+
+  testWidgets(
+    'hides the manager approval section from a plain employee',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          requestRepository: FakeRequestRepository(
+            pendingManagerApproval: [buildTestRequest(id: 'request-1')],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Requests Awaiting My Approval'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'shows the manager approval section for an actual department head',
+    (tester) async {
+      final requestRepository = FakeRequestRepository(
+        pendingManagerApproval: [
+          buildTestRequest(id: 'request-1', subject: 'Time off'),
+        ],
+      );
+      await tester.pumpWidget(
+        _app(
+          requestRepository: requestRepository,
+          employeeRepository: FakeEmployeeRepository(
+            departments: [
+              Department(
+                id: 'dept-1',
+                name: 'Engineering',
+                headEmployeeId: buildTestEmployee().id,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Requests Awaiting My Approval'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Approve'));
+      await tester.pumpAndSettle();
+
+      expect(requestRepository.lastDecidedRequestId, 'request-1');
+    },
+  );
 
   testWidgets(
     'hides the HR approval section from a viewer without users.manage',
