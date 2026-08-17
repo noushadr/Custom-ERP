@@ -11,6 +11,7 @@ import '../domain/entities/employee_document.dart';
 import '../domain/entities/paginated_audit_log.dart';
 import '../domain/entities/salary_record.dart';
 import '../domain/entities/upcoming_birthday.dart';
+import '../domain/entities/upcoming_work_anniversary.dart';
 import '../domain/repositories/employee_repository.dart';
 
 final employeeRemoteDataSourceProvider = Provider<EmployeeRemoteDataSource>(
@@ -45,6 +46,12 @@ final upcomingBirthdaysProvider =
     FutureProvider.autoDispose<List<UpcomingBirthday>>((ref) {
       ref.watch(authControllerProvider);
       return ref.watch(employeeRepositoryProvider).getUpcomingBirthdays();
+    });
+
+final upcomingWorkAnniversariesProvider =
+    FutureProvider.autoDispose<List<UpcomingWorkAnniversary>>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(employeeRepositoryProvider).getUpcomingWorkAnniversaries();
     });
 
 final myDirectReportsProvider = FutureProvider.autoDispose<List<Employee>>((

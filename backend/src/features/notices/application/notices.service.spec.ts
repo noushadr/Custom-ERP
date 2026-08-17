@@ -2,6 +2,7 @@ import { Employee } from '../../employee/domain/entities/employee.entity';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
 import { User } from '../../authentication/domain/entities/user.entity';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
+import { Notice } from '../domain/entities/notice.entity';
 import type { NoticeRepository } from '../domain/repositories/notice-repository.interface';
 import { NoticesService } from './notices.service';
 
@@ -84,6 +85,34 @@ describe('NoticesService', () => {
       );
 
       expect(result.authorName).toBe('Admin');
+    });
+  });
+
+  describe('update', () => {
+    it('applies only the fields provided', async () => {
+      const notice = {
+        id: 'notice-1',
+        title: 'Old title',
+        body: 'Old body',
+        authorName: 'Jane Doe',
+      } as Notice;
+      noticeRepository.findById.mockResolvedValue(notice);
+      noticeRepository.save.mockImplementation((n) => Promise.resolve(n));
+
+      const result = await service.update('notice-1', { title: 'New title' });
+
+      expect(result.title).toBe('New title');
+      expect(result.body).toBe('Old body');
+      expect(result.authorName).toBe('Jane Doe');
+    });
+
+    it('throws NotFoundException when the notice does not exist', async () => {
+      noticeRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.update('missing', { title: 'New title' }),
+      ).rejects.toThrow('Notice not found');
+      expect(noticeRepository.save).not.toHaveBeenCalled();
     });
   });
 

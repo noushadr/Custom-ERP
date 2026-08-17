@@ -13,6 +13,7 @@ import '../models/employee_model.dart';
 import '../models/paginated_audit_log_model.dart';
 import '../models/salary_record_model.dart';
 import '../models/upcoming_birthday_model.dart';
+import '../models/upcoming_work_anniversary_model.dart';
 
 class EmployeeRemoteDataSource {
   const EmployeeRemoteDataSource(this._dio);
@@ -44,6 +45,16 @@ class EmployeeRemoteDataSource {
     return response.data!
         .cast<Map<String, dynamic>>()
         .map(UpcomingBirthdayModel.fromJson)
+        .toList();
+  }
+
+  Future<List<UpcomingWorkAnniversaryModel>> getUpcomingWorkAnniversaries() async {
+    final response = await _dio.get<List<dynamic>>(
+      '/employees/anniversaries/upcoming',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(UpcomingWorkAnniversaryModel.fromJson)
         .toList();
   }
 

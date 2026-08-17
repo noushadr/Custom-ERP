@@ -25,5 +25,13 @@ class NoticeRemoteDataSource {
     return NoticeModel.fromJson(response.data!);
   }
 
+  Future<NoticeModel> update(String id, {String? title, String? body}) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/notices/$id',
+      data: {'title': ?title, 'body': ?body},
+    );
+    return NoticeModel.fromJson(response.data!);
+  }
+
   Future<void> delete(String id) => _dio.delete<void>('/notices/$id');
 }

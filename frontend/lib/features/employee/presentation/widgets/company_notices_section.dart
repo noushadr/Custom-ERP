@@ -27,6 +27,13 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
   int _page = 0;
   String? _deletingId;
 
+  Future<void> _openEditDialog(Notice notice) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _EditNoticeDialog(notice: notice),
+    );
+  }
+
   Future<void> _confirmDelete(Notice notice) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -72,6 +79,21 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
         authState is AuthAuthenticated &&
         authState.user.hasPermission('notices.manage');
 
+    // Set by the notification bell when the viewer taps a specific notice —
+    // jump to whichever page it's actually on instead of always page 1,
+    // since pagination means an older notice might not be there. Left
+    // as-is afterward rather than cleared, so a rebuild for an unrelated
+    // reason doesn't accidentally re-trigger the jump.
+    ref.listen<String?>(focusedNoticeIdProvider, (previous, noticeId) {
+      if (noticeId == null) return;
+      final notices = ref.read(noticeListProvider).valueOrNull;
+      if (notices == null) return;
+      final index = notices.indexWhere((n) => n.id == noticeId);
+      if (index == -1) return;
+      final targetPage = index ~/ _pageSize;
+      if (targetPage != _page) setState(() => _page = targetPage);
+    });
+
     return FormSection(
       title: 'Company Notices',
       child: noticesAsync.when(
@@ -110,6 +132,7 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
                 _NoticeCard(
                   notice: pageNotices[i],
                   isLatest: start + i == 0,
+                  onEdit: canDelete ? () => _openEditDialog(pageNotices[i]) : null,
                   onDelete: canDelete
                       ? () => _confirmDelete(pageNotices[i])
                       : null,
@@ -214,12 +237,14 @@ class _NoticeCard extends StatelessWidget {
   const _NoticeCard({
     required this.notice,
     required this.isLatest,
+    this.onEdit,
     this.onDelete,
     this.isDeleting = false,
   });
 
   final Notice notice;
   final bool isLatest;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final bool isDeleting;
 
@@ -263,7 +288,7 @@ class _NoticeCard extends StatelessWidget {
                 Text(notice.body, style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 8),
                 Text(
-                  '${notice.authorName} · ${formatDisplayDateTime(notice.createdAt)}',
+                  'Posted by ${notice.authorName} · ${formatDisplayDateTime(notice.createdAt)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -271,24 +296,141 @@ class _NoticeCard extends StatelessWidget {
               ],
             ),
           ),
-          if (onDelete != null)
-            isDeleting
-                ? const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    color: AppColors.error,
-                    tooltip: 'Delete notice',
-                    onPressed: onDelete,
-                  ),
+          if (isDeleting)
+            const Padding(
+              padding: EdgeInsets.all(8),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else ...[
+            if (onEdit != null)
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                color: AppColors.textSecondary,
+                tooltip: 'Edit notice',
+                onPressed: onEdit,
+              ),
+            if (onDelete != null)
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                color: AppColors.error,
+                tooltip: 'Delete notice',
+                onPressed: onDelete,
+              ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _EditNoticeDialog extends ConsumerStatefulWidget {
+  const _EditNoticeDialog({required this.notice});
+
+  final Notice notice;
+
+  @override
+  ConsumerState<_EditNoticeDialog> createState() => _EditNoticeDialogState();
+}
+
+class _EditNoticeDialogState extends ConsumerState<_EditNoticeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _titleController = TextEditingController(text: widget.notice.title);
+  late final _bodyController = TextEditingController(text: widget.notice.body);
+  bool _submitting = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _bodyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await ref
+          .read(noticeRepositoryProvider)
+          .update(
+            widget.notice.id,
+            title: _titleController.text,
+            body: _bodyController.text,
+          );
+      ref.invalidate(noticeListProvider);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } on NoticeException catch (error) {
+      setState(() => _errorMessage = error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit notice'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_errorMessage != null) ...[
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 12),
+              ],
+              TextFormField(
+                controller: _titleController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: 'Title'),
+                validator: (value) =>
+                    (value == null || value.isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _bodyController,
+                enabled: !_submitting,
+                maxLines: 4,
+                decoration: const InputDecoration(labelText: 'Message'),
+                validator: (value) =>
+                    (value == null || value.isEmpty) ? 'Required' : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
     );
   }
 }

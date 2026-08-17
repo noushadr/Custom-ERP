@@ -157,6 +157,13 @@ export class EmployeesController {
     return this.employeesService.getUpcomingBirthdays();
   }
 
+  // Must come before @Get(':id') for the same reason as "audit-log" above.
+  @Get('anniversaries/upcoming')
+  @Permissions('employees.manage')
+  getUpcomingWorkAnniversaries() {
+    return this.employeesService.getUpcomingWorkAnniversaries();
+  }
+
   @Get(':id')
   @Permissions('employees.read')
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {

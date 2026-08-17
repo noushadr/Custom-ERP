@@ -20,3 +20,9 @@ final noticeListProvider = FutureProvider.autoDispose<List<Notice>>((ref) {
   ref.watch(authControllerProvider);
   return ref.watch(noticeRepositoryProvider).getAll();
 });
+
+/// Set by the notification bell when the viewer taps a specific notice, so
+/// the dashboard's notices section can jump to whichever page that notice
+/// falls on instead of just showing page 1 regardless of where it actually
+/// is. Read once and left as-is afterward — see CompanyNoticesSection.
+final focusedNoticeIdProvider = StateProvider<String?>((ref) => null);

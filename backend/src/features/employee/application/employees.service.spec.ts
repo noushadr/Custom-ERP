@@ -59,6 +59,20 @@ function isoDobInDays(offsetDays: number): string {
   return `1990-${month}-${day}`;
 }
 
+/** ISO 'YYYY-MM-DD' joining date whose anniversary falls [offsetDays] from
+ * today, [yearsAgo] years in the past — so both the day-window and the
+ * years-of-service math can be controlled independently in a test. */
+function isoJoiningDateAnniversaryInDays(
+  yearsAgo: number,
+  offsetDays: number,
+): string {
+  const target = new Date();
+  target.setDate(target.getDate() + offsetDays);
+  const month = String(target.getMonth() + 1).padStart(2, '0');
+  const day = String(target.getDate()).padStart(2, '0');
+  return `${target.getFullYear() - yearsAgo}-${month}-${day}`;
+}
+
 function buildRole(name = 'Employee'): Role {
   return { id: `role-${name}`, name, permissions: [] } as Role;
 }
@@ -568,6 +582,141 @@ describe('EmployeesService', () => {
 
       expect(result.map((r) => r.employeeId)).toEqual(['employee-today']);
       expect(result[0].daysUntil).toBe(0);
+    });
+
+    it("excludes an employee whose employmentStatus isn't active", async () => {
+      const onLeave = buildEmployee({
+        id: 'employee-on-leave',
+        employmentStatus: EmploymentStatus.ON_LEAVE,
+        dateOfBirth: isoDobInDays(1),
+      });
+      const resigned = buildEmployee({
+        id: 'employee-resigned',
+        employmentStatus: EmploymentStatus.RESIGNED,
+        dateOfBirth: isoDobInDays(1),
+      });
+      employeeRepository.findAll.mockResolvedValue([onLeave, resigned]);
+
+      const result = await service.getUpcomingBirthdays(7);
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('getUpcomingWorkAnniversaries', () => {
+    it('returns active employees within the window, soonest first', async () => {
+      const soon = buildEmployee({
+        id: 'employee-soon',
+        firstName: 'Soon',
+        joiningDate: isoJoiningDateAnniversaryInDays(2, 3),
+      });
+      const soonest = buildEmployee({
+        id: 'employee-soonest',
+        firstName: 'Soonest',
+        joiningDate: isoJoiningDateAnniversaryInDays(5, 1),
+      });
+      const tooFarAway = buildEmployee({
+        id: 'employee-far',
+        firstName: 'Far',
+        joiningDate: isoJoiningDateAnniversaryInDays(1, 30),
+      });
+      employeeRepository.findAll.mockResolvedValue([soon, soonest, tooFarAway]);
+
+      const result = await service.getUpcomingWorkAnniversaries(7);
+
+      expect(result.map((r) => r.employeeId)).toEqual([
+        'employee-soonest',
+        'employee-soon',
+      ]);
+      expect(result[0]).toMatchObject({ daysUntil: 1, yearsOfService: 5 });
+      expect(result[1]).toMatchObject({ daysUntil: 3, yearsOfService: 2 });
+    });
+
+    it('includes an anniversary that recently passed, with a negative daysUntil', async () => {
+      const employee = buildEmployee({
+        id: 'employee-passed',
+        joiningDate: isoJoiningDateAnniversaryInDays(1, -1),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+
+      const result = await service.getUpcomingWorkAnniversaries(7);
+
+      expect(result.map((r) => r.employeeId)).toEqual(['employee-passed']);
+      expect(result[0].daysUntil).toBe(-1);
+    });
+
+    it('excludes an anniversary that passed further back than the recent window', async () => {
+      const employee = buildEmployee({
+        id: 'employee-long-passed',
+        joiningDate: isoJoiningDateAnniversaryInDays(1, -10),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+
+      const result = await service.getUpcomingWorkAnniversaries(7);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('sorts recently-passed anniversaries before today and upcoming ones', async () => {
+      const passed = buildEmployee({
+        id: 'employee-passed',
+        joiningDate: isoJoiningDateAnniversaryInDays(1, -3),
+      });
+      const today = buildEmployee({
+        id: 'employee-today',
+        joiningDate: isoJoiningDateAnniversaryInDays(2, 0),
+      });
+      const upcoming = buildEmployee({
+        id: 'employee-upcoming',
+        joiningDate: isoJoiningDateAnniversaryInDays(3, 2),
+      });
+      employeeRepository.findAll.mockResolvedValue([upcoming, today, passed]);
+
+      const result = await service.getUpcomingWorkAnniversaries(7);
+
+      expect(result.map((r) => r.employeeId)).toEqual([
+        'employee-passed',
+        'employee-today',
+        'employee-upcoming',
+      ]);
+    });
+
+    it('includes an anniversary that falls today', async () => {
+      const employee = buildEmployee({
+        id: 'employee-today',
+        joiningDate: isoJoiningDateAnniversaryInDays(4, 0),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+
+      const result = await service.getUpcomingWorkAnniversaries(7);
+
+      expect(result.map((r) => r.employeeId)).toEqual(['employee-today']);
+      expect(result[0]).toMatchObject({ daysUntil: 0, yearsOfService: 4 });
+    });
+
+    it('excludes an employee who joined less than a year ago', async () => {
+      const employee = buildEmployee({
+        id: 'employee-new',
+        joiningDate: isoJoiningDateAnniversaryInDays(0, 1),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+
+      const result = await service.getUpcomingWorkAnniversaries(7);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it("excludes an employee whose employmentStatus isn't active", async () => {
+      const terminated = buildEmployee({
+        id: 'employee-terminated',
+        employmentStatus: EmploymentStatus.TERMINATED,
+        joiningDate: isoJoiningDateAnniversaryInDays(3, 1),
+      });
+      employeeRepository.findAll.mockResolvedValue([terminated]);
+
+      const result = await service.getUpcomingWorkAnniversaries(7);
+
+      expect(result).toHaveLength(0);
     });
   });
 

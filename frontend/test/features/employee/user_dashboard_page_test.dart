@@ -208,6 +208,80 @@ void main() {
     },
   );
 
+  testWidgets(
+    'hides the edit button from a viewer without notices.manage',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          noticeRepository: FakeNoticeRepository(
+            notices: [
+              Notice(
+                id: 'notice-1',
+                title: 'Office closed',
+                body: 'Closed for the holiday.',
+                authorName: 'HR Team',
+                createdAt: DateTime(2026, 1, 1),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Edit notice'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'HR/Admin can edit a notice, pre-filled with its current text',
+    (tester) async {
+      final noticeRepository = FakeNoticeRepository(
+        notices: [
+          Notice(
+            id: 'notice-1',
+            title: 'Office closed',
+            body: 'Closed for the holiday.',
+            authorName: 'HR Team',
+            createdAt: DateTime(2026, 1, 1),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        _app(
+          viewer: const AuthUser(
+            id: 'user-1',
+            email: 'jane.doe@zeracreative.com',
+            role: 'HR/Manager',
+            permissions: ['notices.manage'],
+          ),
+          noticeRepository: noticeRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Edit notice'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit notice'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Office closed'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextFormField, 'Closed for the holiday.'),
+        findsOneWidget,
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Title'),
+        'Office closed early',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(noticeRepository.lastUpdatedId, 'notice-1');
+      expect(noticeRepository.lastUpdatedTitle, 'Office closed early');
+      expect(find.byType(AlertDialog), findsNothing);
+    },
+  );
+
   testWidgets('only highlights the newest notice; older ones are muted', (
     tester,
   ) async {

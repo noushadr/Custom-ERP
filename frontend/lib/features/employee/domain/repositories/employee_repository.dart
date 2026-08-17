@@ -11,6 +11,7 @@ import '../entities/salary_record.dart';
 import '../entities/update_employee_input.dart';
 import '../entities/update_my_profile_input.dart';
 import '../entities/upcoming_birthday.dart';
+import '../entities/upcoming_work_anniversary.dart';
 
 abstract interface class EmployeeRepository {
   /// Throws [EmployeeException] on failure.
@@ -23,6 +24,10 @@ abstract interface class EmployeeRepository {
   /// Employees with a birthday in the next 7 days, soonest first. Requires
   /// `employees.manage`.
   Future<List<UpcomingBirthday>> getUpcomingBirthdays();
+
+  /// Employees marking a work anniversary in the next 7 days, soonest first.
+  /// Requires `employees.manage`.
+  Future<List<UpcomingWorkAnniversary>> getUpcomingWorkAnniversaries();
 
   /// Employees who report to the current user, if any.
   Future<List<Employee>> getMyDirectReports();

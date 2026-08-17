@@ -12,6 +12,7 @@ import '../../domain/entities/salary_record.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../../domain/entities/upcoming_birthday.dart';
+import '../../domain/entities/upcoming_work_anniversary.dart';
 import '../../domain/exceptions/employee_exception.dart';
 import '../../domain/repositories/employee_repository.dart';
 import '../datasources/employee_remote_data_source.dart';
@@ -35,6 +36,10 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   @override
   Future<List<UpcomingBirthday>> getUpcomingBirthdays() =>
       _guard(() => _remoteDataSource.getUpcomingBirthdays());
+
+  @override
+  Future<List<UpcomingWorkAnniversary>> getUpcomingWorkAnniversaries() =>
+      _guard(() => _remoteDataSource.getUpcomingWorkAnniversaries());
 
   @override
   Future<List<Employee>> getMyDirectReports() =>

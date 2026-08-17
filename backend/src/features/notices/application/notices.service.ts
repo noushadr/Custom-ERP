@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import {
   USER_REPOSITORY,
@@ -14,6 +15,7 @@ import {
   type NoticeRepository,
 } from '../domain/repositories/notice-repository.interface';
 import { CreateNoticeDto } from './dto/create-notice.dto';
+import { UpdateNoticeDto } from './dto/update-notice.dto';
 
 @Injectable()
 export class NoticesService {
@@ -43,6 +45,14 @@ export class NoticesService {
     notice.authorUserId = actorUserId;
     notice.authorName = authorName;
 
+    return this.noticeRepository.save(notice);
+  }
+
+  async update(id: string, dto: UpdateNoticeDto): Promise<Notice> {
+    const notice = await this.noticeRepository.findById(id);
+    if (!notice) throw new NotFoundException('Notice not found');
+
+    Object.assign(notice, definedFieldsOnly(dto));
     return this.noticeRepository.save(notice);
   }
 
