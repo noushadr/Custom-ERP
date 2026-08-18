@@ -11,6 +11,7 @@ import '../models/education_record_model.dart';
 import '../models/employee_document_model.dart';
 import '../models/employee_model.dart';
 import '../models/paginated_audit_log_model.dart';
+import '../models/payroll_summary_model.dart';
 import '../models/salary_record_model.dart';
 import '../models/upcoming_birthday_model.dart';
 import '../models/upcoming_work_anniversary_model.dart';
@@ -56,6 +57,13 @@ class EmployeeRemoteDataSource {
         .cast<Map<String, dynamic>>()
         .map(UpcomingWorkAnniversaryModel.fromJson)
         .toList();
+  }
+
+  Future<PayrollSummaryModel> getPayrollSummary() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/employees/payroll/summary',
+    );
+    return PayrollSummaryModel.fromJson(response.data!);
   }
 
   Future<List<EmployeeModel>> getMyDirectReports() async {

@@ -76,6 +76,7 @@ import { EducationRecordResponse } from './education-record-response.interface';
 import { toEducationRecordResponse } from './education-record.mapper';
 import { SalaryRecordResponse } from './salary-record-response.interface';
 import { toSalaryRecordResponse } from './salary-record.mapper';
+import { PayrollSummaryResponse } from './payroll-summary-response.interface';
 import { UpcomingBirthdayResponse } from './upcoming-birthday-response.interface';
 import { UpcomingWorkAnniversaryResponse } from './upcoming-work-anniversary-response.interface';
 
@@ -302,6 +303,45 @@ export class EmployeesService {
     return candidates.reduce((closest, candidate) =>
       Math.abs(candidate.daysUntil) < Math.abs(closest.daysUntil) ? candidate : closest,
     );
+  }
+
+  /** Sums the current salary (the most recent record by effectiveDate) of
+   * every active employee — on-leave/notice-period/resigned/terminated
+   * employees don't count, since they aren't currently drawing a salary
+   * against the payroll the same way. An employee with no salary records
+   * yet simply contributes 0 rather than being excluded. */
+  async getPayrollSummary(): Promise<PayrollSummaryResponse> {
+    const employees = await this.employeeRepository.findAll();
+    const activeEmployees = employees.filter(
+      (employee) => employee.employmentStatus === EmploymentStatus.ACTIVE,
+    );
+
+    const currentSalaries = await Promise.all(
+      activeEmployees.map(async (employee) => {
+        const records = await this.salaryRecordRepository.findByEmployeeId(
+          employee.id,
+        );
+        const current = records[records.length - 1];
+        return current ? Number(current.amount) : 0;
+      }),
+    );
+
+    const totalMonthlyPayroll = currentSalaries.reduce(
+      (sum, amount) => sum + amount,
+      0,
+    );
+    const now = new Date();
+    const daysInMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+    ).getDate();
+
+    return {
+      totalMonthlyPayroll,
+      dailyPayroll: totalMonthlyPayroll / daysInMonth,
+      activeEmployeeCount: activeEmployees.length,
+    };
   }
 
   async findById(id: string, viewer: JwtPayload): Promise<EmployeeResponse> {

@@ -7,6 +7,7 @@ import 'package:zera_erp/features/employee/domain/entities/employee_document.dar
 import 'package:zera_erp/features/employee/domain/entities/education_record.dart';
 import 'package:zera_erp/features/employee/domain/entities/invite_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/paginated_audit_log.dart';
+import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
 import 'package:zera_erp/features/employee/domain/entities/salary_record.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/update_my_profile_input.dart';
@@ -122,6 +123,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.getUpcomingBirthdaysError,
     this.upcomingWorkAnniversaries = const [],
     this.getUpcomingWorkAnniversariesError,
+    this.payrollSummary,
+    this.getPayrollSummaryError,
     this.assets = const [],
     this.createAndAssignAssetError,
     this.updateAssetError,
@@ -135,6 +138,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final Object? getUpcomingBirthdaysError;
   final List<UpcomingWorkAnniversary> upcomingWorkAnniversaries;
   final Object? getUpcomingWorkAnniversariesError;
+  final PayrollSummary? payrollSummary;
+  final Object? getPayrollSummaryError;
   final List<Department> departments;
   final ({Employee employee, String temporaryPassword})? inviteResult;
   final Object? inviteError;
@@ -223,6 +228,17 @@ class FakeEmployeeRepository implements EmployeeRepository {
       throw getUpcomingWorkAnniversariesError!;
     }
     return upcomingWorkAnniversaries;
+  }
+
+  @override
+  Future<PayrollSummary> getPayrollSummary() async {
+    if (getPayrollSummaryError != null) throw getPayrollSummaryError!;
+    return payrollSummary ??
+        const PayrollSummary(
+          totalMonthlyPayroll: 0,
+          dailyPayroll: 0,
+          activeEmployeeCount: 0,
+        );
   }
 
   @override

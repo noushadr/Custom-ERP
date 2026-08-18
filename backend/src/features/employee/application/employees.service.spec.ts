@@ -13,6 +13,7 @@ import type { JwtPayload } from '../../authentication/presentation/strategies/jw
 import { Asset } from '../domain/entities/asset.entity';
 import { Employee } from '../domain/entities/employee.entity';
 import { EmployeeAuditLog } from '../domain/entities/employee-audit-log.entity';
+import { SalaryRecord } from '../domain/entities/salary-record.entity';
 import { AssetStatus } from '../domain/enums/asset-status.enum';
 import { EmploymentStatus } from '../domain/enums/employment-status.enum';
 import { EmploymentType } from '../domain/enums/employment-type.enum';
@@ -45,6 +46,18 @@ function buildAsset(overrides: Partial<Asset> = {}): Asset {
     updatedAt: new Date('2026-01-01'),
     ...overrides,
   } as Asset;
+}
+
+function buildSalaryRecord(overrides: Partial<SalaryRecord> = {}): SalaryRecord {
+  return {
+    id: 'salary-1',
+    employeeId: 'employee-1',
+    amount: '50000.00',
+    effectiveDate: '2026-01-01',
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+    ...overrides,
+  } as SalaryRecord;
 }
 
 jest.mock('bcryptjs');
@@ -717,6 +730,87 @@ describe('EmployeesService', () => {
       const result = await service.getUpcomingWorkAnniversaries(7);
 
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('getPayrollSummary', () => {
+    function mockSalaryByEmployee(amounts: Record<string, string[]>) {
+      salaryRecordRepository.findByEmployeeId.mockImplementation(
+        async (employeeId: string) =>
+          (amounts[employeeId] ?? []).map((amount, index) =>
+            buildSalaryRecord({
+              id: `${employeeId}-salary-${index}`,
+              employeeId,
+              amount,
+            }),
+          ),
+      );
+    }
+
+    it("sums each active employee's current (most recent) salary", async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-1' }),
+        buildEmployee({ id: 'employee-2' }),
+      ]);
+      // Only the LAST amount per employee (the current salary) should count.
+      mockSalaryByEmployee({
+        'employee-1': ['50000.00', '60000.00'],
+        'employee-2': ['40000.00'],
+      });
+
+      const result = await service.getPayrollSummary();
+
+      expect(result.totalMonthlyPayroll).toBe(100000);
+    });
+
+    it('excludes employees whose employmentStatus is not active', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-active' }),
+        buildEmployee({
+          id: 'employee-terminated',
+          employmentStatus: EmploymentStatus.TERMINATED,
+        }),
+      ]);
+      mockSalaryByEmployee({
+        'employee-active': ['50000.00'],
+        'employee-terminated': ['999999.00'],
+      });
+
+      const result = await service.getPayrollSummary();
+
+      expect(result.totalMonthlyPayroll).toBe(50000);
+      expect(result.activeEmployeeCount).toBe(1);
+      expect(salaryRecordRepository.findByEmployeeId).not.toHaveBeenCalledWith(
+        'employee-terminated',
+      );
+    });
+
+    it('treats an active employee with no salary records as contributing zero', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-1' }),
+      ]);
+      salaryRecordRepository.findByEmployeeId.mockResolvedValue([]);
+
+      const result = await service.getPayrollSummary();
+
+      expect(result.totalMonthlyPayroll).toBe(0);
+    });
+
+    it('spreads the monthly total across the days in the current calendar month', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-1' }),
+      ]);
+      mockSalaryByEmployee({ 'employee-1': ['62000.00'] });
+      const now = new Date();
+      const daysInMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0,
+      ).getDate();
+
+      const result = await service.getPayrollSummary();
+
+      expect(result.dailyPayroll).toBeCloseTo(62000 / daysInMonth);
     });
   });
 

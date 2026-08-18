@@ -9,6 +9,7 @@ import '../domain/entities/education_record.dart';
 import '../domain/entities/employee.dart';
 import '../domain/entities/employee_document.dart';
 import '../domain/entities/paginated_audit_log.dart';
+import '../domain/entities/payroll_summary.dart';
 import '../domain/entities/salary_record.dart';
 import '../domain/entities/upcoming_birthday.dart';
 import '../domain/entities/upcoming_work_anniversary.dart';
@@ -53,6 +54,13 @@ final upcomingWorkAnniversariesProvider =
       ref.watch(authControllerProvider);
       return ref.watch(employeeRepositoryProvider).getUpcomingWorkAnniversaries();
     });
+
+final payrollSummaryProvider = FutureProvider.autoDispose<PayrollSummary>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getPayrollSummary();
+});
 
 final myDirectReportsProvider = FutureProvider.autoDispose<List<Employee>>((
   ref,

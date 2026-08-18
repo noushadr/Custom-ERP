@@ -164,6 +164,13 @@ export class EmployeesController {
     return this.employeesService.getUpcomingWorkAnniversaries();
   }
 
+  // Must come before @Get(':id') for the same reason as "audit-log" above.
+  @Get('payroll/summary')
+  @Permissions('employees.manage')
+  getPayrollSummary() {
+    return this.employeesService.getPayrollSummary();
+  }
+
   @Get(':id')
   @Permissions('employees.read')
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
