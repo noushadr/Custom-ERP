@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
+import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
@@ -21,6 +22,7 @@ import 'helpers/fake_request.dart';
 Widget _authenticatedApp({
   AuthUser user = testAuthUser,
   List<Employee>? employees,
+  PayrollSummary? payrollSummary,
 }) {
   return ProviderScope(
     overrides: [
@@ -28,7 +30,10 @@ Widget _authenticatedApp({
         (ref) => PresetAuthController(AuthAuthenticated(user)),
       ),
       employeeRepositoryProvider.overrideWithValue(
-        FakeEmployeeRepository(employees: employees ?? [buildTestEmployee()]),
+        FakeEmployeeRepository(
+          employees: employees ?? [buildTestEmployee()],
+          payrollSummary: payrollSummary,
+        ),
       ),
       noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
       requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
@@ -116,6 +121,54 @@ void main() {
       expect(onSiteCard.value, '0');
       expect(remoteCard.value, '1');
       expect(hybridCard.value, '0');
+    },
+  );
+
+  testWidgets(
+    'admin dashboard shows monthly and daily payroll for an employees.manage holder',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: ['employees.manage'],
+      );
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          payrollSummary: const PayrollSummary(
+            totalMonthlyPayroll: 250000,
+            dailyPayroll: 8333.33,
+            activeEmployeeCount: 4,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payroll'), findsOneWidget);
+      expect(find.text('Monthly Payroll'), findsOneWidget);
+      expect(find.text('PKR 250,000'), findsOneWidget);
+      expect(find.text('Daily Payroll'), findsOneWidget);
+      expect(find.text('PKR 8,333'), findsOneWidget);
+      expect(find.text('Average Salary'), findsOneWidget);
+      expect(find.text('PKR 62,500'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'hides the payroll stats from an admin dashboard viewer without employees.manage',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+      await tester.pumpWidget(_authenticatedApp(user: admin));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payroll'), findsNothing);
+      expect(find.text('Monthly Payroll'), findsNothing);
     },
   );
 

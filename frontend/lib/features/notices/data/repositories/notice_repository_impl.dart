@@ -17,6 +17,10 @@ class NoticeRepositoryImpl implements NoticeRepository {
       _guard(() => _remoteDataSource.create(title: title, body: body));
 
   @override
+  Future<Notice> update(String id, {String? title, String? body}) =>
+      _guard(() => _remoteDataSource.update(id, title: title, body: body));
+
+  @override
   Future<void> delete(String id) => _guard(() => _remoteDataSource.delete(id));
 
   Future<T> _guard<T>(Future<T> Function() action) async {

@@ -11,6 +11,7 @@ import 'features/authentication/presentation/widgets/impersonation_banner.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
 import 'features/employee/presentation/pages/admin_dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
+import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
@@ -158,6 +159,22 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
     if (index != -1) setState(() => _selectedIndex = index);
   }
 
+  // Every section's Navigator lives inside an IndexedStack (see body below),
+  // so it's already mounted even while a different section is showing —
+  // this can push straight onto it without waiting for a rebuild.
+  void _openEmployeeProfile(String employeeId) {
+    final index = _allDestinations.indexWhere((d) => d.label == 'Employees');
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    navigatorState?.push(
+      MaterialPageRoute(
+        builder: (_) => EmployeeProfilePage(employeeId: employeeId),
+      ),
+    );
+    setState(() => _selectedIndex = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdminOrHr = _isAdminOrHr(ref);
@@ -196,6 +213,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
                   NotificationLinkTarget.userDashboard => 'User Dashboard',
                   NotificationLinkTarget.leavePage => 'Leaves',
                 }),
+                onOpenEmployeeProfile: _openEmployeeProfile,
               ),
               const SizedBox(width: 16),
               UserMenu(

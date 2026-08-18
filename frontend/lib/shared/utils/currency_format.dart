@@ -14,3 +14,7 @@ String formatAmount(double amount) {
 
   return '${negative ? '-' : ''}$buffer.${parts[1]}';
 }
+
+/// Like [formatAmount] but without cents, e.g. 50000.49 -> "50,000" — for
+/// headline figures (dashboard totals) where exact cents aren't meaningful.
+String formatWholeAmount(double amount) => formatAmount(amount).split('.').first;

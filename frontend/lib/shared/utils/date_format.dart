@@ -21,6 +21,16 @@ String formatDisplayDate(String isoDate) {
   return '$month $day, ${date.year}';
 }
 
+/// Formats just the month and day of an ISO date string, e.g. "Oct 03" — for
+/// annually-recurring dates (birthdays, work anniversaries) where the year
+/// isn't the point, only which day it falls on.
+String formatMonthDay(String isoDate) {
+  final date = DateTime.parse(isoDate);
+  final month = _monthNames[date.month - 1];
+  final day = date.day.toString().padLeft(2, '0');
+  return '$month $day';
+}
+
 // Pakistan Standard Time is a fixed UTC+5 offset with no daylight saving, so
 // timestamps are shifted here directly rather than via DateTime.toLocal() —
 // which would instead reflect whichever timezone the viewing device is set

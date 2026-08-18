@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
@@ -21,6 +22,9 @@ class AdminDashboardPage extends ConsumerWidget {
     final canViewAllAudit =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('audit.viewAll');
+    final canViewPayroll =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('employees.manage');
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -38,6 +42,7 @@ class AdminDashboardPage extends ConsumerWidget {
             data: (employees) => _DashboardStats(
               employees: employees,
               showCompanyAuditLog: canViewAllAudit,
+              showPayroll: canViewPayroll,
             ),
           ),
         ),
@@ -46,17 +51,19 @@ class AdminDashboardPage extends ConsumerWidget {
   }
 }
 
-class _DashboardStats extends StatelessWidget {
+class _DashboardStats extends ConsumerWidget {
   const _DashboardStats({
     required this.employees,
     required this.showCompanyAuditLog,
+    required this.showPayroll,
   });
 
   final List<Employee> employees;
   final bool showCompanyAuditLog;
+  final bool showPayroll;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final total = employees.length;
     final now = DateTime.now();
     final newHiresThisMonth = employees.where((e) {
@@ -192,6 +199,12 @@ class _DashboardStats extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
+          if (showPayroll) ...[
+            const _SectionHeader('Payroll'),
+            const SizedBox(height: 10),
+            const _PayrollStats(),
+            const SizedBox(height: 18),
+          ],
           const CompanyNoticesSection(),
           if (showCompanyAuditLog) ...[
             const SizedBox(height: 18),
@@ -211,6 +224,60 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(title, style: Theme.of(context).textTheme.titleMedium);
+  }
+}
+
+/// Monthly and daily payroll of active employees, derived from each one's
+/// current salary. A separate small async section (rather than folding into
+/// the Overview stats above) since it depends on a different, more tightly
+/// permissioned endpoint than the plain employee list.
+class _PayrollStats extends ConsumerWidget {
+  const _PayrollStats();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payrollAsync = ref.watch(payrollSummaryProvider);
+
+    return payrollAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: LinearProgressIndicator(),
+      ),
+      error: (_, _) => Text(
+        'Could not load payroll figures.',
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      ),
+      data: (payroll) {
+        final averageSalary = payroll.activeEmployeeCount == 0
+            ? 0.0
+            : payroll.totalMonthlyPayroll / payroll.activeEmployeeCount;
+
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            MetricCard(
+              label: 'Monthly Payroll',
+              value: 'PKR ${formatWholeAmount(payroll.totalMonthlyPayroll)}',
+              color: AppColors.primary,
+              icon: Icons.account_balance_wallet_outlined,
+            ),
+            MetricCard(
+              label: 'Daily Payroll',
+              value: 'PKR ${formatWholeAmount(payroll.dailyPayroll)}',
+              color: AppColors.accentTeal,
+              icon: Icons.today_outlined,
+            ),
+            MetricCard(
+              label: 'Average Salary',
+              value: 'PKR ${formatWholeAmount(averageSalary)}',
+              color: AppColors.secondary,
+              icon: Icons.person_outline,
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 

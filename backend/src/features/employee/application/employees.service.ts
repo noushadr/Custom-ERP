@@ -27,6 +27,7 @@ import { EducationRecord } from '../domain/entities/education-record.entity';
 import { SalaryRecord } from '../domain/entities/salary-record.entity';
 import { AssetStatus } from '../domain/enums/asset-status.enum';
 import { DocumentType } from '../domain/enums/document-type.enum';
+import { EmploymentStatus } from '../domain/enums/employment-status.enum';
 import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
@@ -75,7 +76,9 @@ import { EducationRecordResponse } from './education-record-response.interface';
 import { toEducationRecordResponse } from './education-record.mapper';
 import { SalaryRecordResponse } from './salary-record-response.interface';
 import { toSalaryRecordResponse } from './salary-record.mapper';
+import { PayrollSummaryResponse } from './payroll-summary-response.interface';
 import { UpcomingBirthdayResponse } from './upcoming-birthday-response.interface';
+import { UpcomingWorkAnniversaryResponse } from './upcoming-work-anniversary-response.interface';
 
 const DEFAULT_INVITE_ROLE = 'Employee';
 const COMPANY_AUDIT_LOG_DEFAULT_LIMIT = 10;
@@ -204,10 +207,12 @@ export class EmployeesService {
     );
   }
 
-  /** Employees whose birthday falls within the next [withinDays] days, or
-   * happened within the last [recentDays] days — so a just-passed birthday
-   * still shows up as a "recently happened" notification instead of
-   * disappearing until its next occurrence a year away. */
+  /** Active employees whose birthday falls within the next [withinDays]
+   * days, or happened within the last [recentDays] days — so a just-passed
+   * birthday still shows up as a "recently happened" notification instead
+   * of disappearing until its next occurrence a year away. Employees who
+   * are on leave, on notice, resigned, or terminated are excluded — only
+   * active employees' birthdays are worth notifying about. */
   async getUpcomingBirthdays(
     withinDays = 7,
     recentDays = 7,
@@ -217,10 +222,15 @@ export class EmployeesService {
     today.setHours(0, 0, 0, 0);
 
     return employees
-      .filter((employee) => employee.dateOfBirth)
+      .filter(
+        (employee) =>
+          employee.employmentStatus === EmploymentStatus.ACTIVE &&
+          employee.dateOfBirth,
+      )
       .map((employee) => ({
         employee,
-        daysUntil: this.daysUntilBirthday(employee.dateOfBirth!, today),
+        daysUntil: this.closestAnnualOccurrence(employee.dateOfBirth!, today)
+          .daysUntil,
       }))
       .filter(({ daysUntil }) => daysUntil <= withinDays && daysUntil >= -recentDays)
       .sort((a, b) => a.daysUntil - b.daysUntil)
@@ -233,23 +243,105 @@ export class EmployeesService {
       }));
   }
 
-  /** Signed day count from [today] to the closest occurrence (last year's,
-   * this year's, or next year's) of the month/day encoded in [dateOfBirth]:
-   * negative if it already happened, positive if it's still to come. */
-  private daysUntilBirthday(dateOfBirth: string, today: Date): number {
-    const dob = new Date(dateOfBirth);
+  /** Active employees marking a work anniversary (1+ full years of service)
+   * within the next [withinDays] days, or within the last [recentDays] days.
+   * Mirrors getUpcomingBirthdays, but keyed off joiningDate instead of
+   * dateOfBirth, and only counts once a full year of service has passed
+   * (an employee's own join date isn't their first "anniversary"). */
+  async getUpcomingWorkAnniversaries(
+    withinDays = 7,
+    recentDays = 7,
+  ): Promise<UpcomingWorkAnniversaryResponse[]> {
+    const employees = await this.employeeRepository.findAll();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return employees
+      .filter((employee) => employee.employmentStatus === EmploymentStatus.ACTIVE)
+      .map((employee) => {
+        const { daysUntil, occurrenceYear } = this.closestAnnualOccurrence(
+          employee.joiningDate,
+          today,
+        );
+        const yearsOfService =
+          occurrenceYear - new Date(employee.joiningDate).getFullYear();
+        return { employee, daysUntil, yearsOfService };
+      })
+      .filter(
+        ({ daysUntil, yearsOfService }) =>
+          yearsOfService >= 1 && daysUntil <= withinDays && daysUntil >= -recentDays,
+      )
+      .sort((a, b) => a.daysUntil - b.daysUntil)
+      .map(({ employee, daysUntil, yearsOfService }) => ({
+        employeeId: employee.id,
+        fullName: this.fullName(employee),
+        profilePhotoUrl: employee.profilePhotoUrl ?? null,
+        joiningDate: employee.joiningDate,
+        daysUntil,
+        yearsOfService,
+      }));
+  }
+
+  /** Days until (or since, if negative) the closest occurrence — last
+   * year's, this year's, or next year's — of the month/day encoded in
+   * [dateStr], along with the calendar year that occurrence falls in
+   * (needed to compute e.g. years of service for anniversaries). */
+  private closestAnnualOccurrence(
+    dateStr: string,
+    today: Date,
+  ): { daysUntil: number; occurrenceYear: number } {
+    const date = new Date(dateStr);
     const msPerDay = 24 * 60 * 60 * 1000;
     const candidates = [-1, 0, 1].map((yearOffset) => {
-      const occurrence = new Date(
-        today.getFullYear() + yearOffset,
-        dob.getMonth(),
-        dob.getDate(),
+      const occurrenceYear = today.getFullYear() + yearOffset;
+      const occurrence = new Date(occurrenceYear, date.getMonth(), date.getDate());
+      const daysUntil = Math.round(
+        (occurrence.getTime() - today.getTime()) / msPerDay,
       );
-      return Math.round((occurrence.getTime() - today.getTime()) / msPerDay);
+      return { daysUntil, occurrenceYear };
     });
     return candidates.reduce((closest, candidate) =>
-      Math.abs(candidate) < Math.abs(closest) ? candidate : closest,
+      Math.abs(candidate.daysUntil) < Math.abs(closest.daysUntil) ? candidate : closest,
     );
+  }
+
+  /** Sums the current salary (the most recent record by effectiveDate) of
+   * every active employee — on-leave/notice-period/resigned/terminated
+   * employees don't count, since they aren't currently drawing a salary
+   * against the payroll the same way. An employee with no salary records
+   * yet simply contributes 0 rather than being excluded. */
+  async getPayrollSummary(): Promise<PayrollSummaryResponse> {
+    const employees = await this.employeeRepository.findAll();
+    const activeEmployees = employees.filter(
+      (employee) => employee.employmentStatus === EmploymentStatus.ACTIVE,
+    );
+
+    const currentSalaries = await Promise.all(
+      activeEmployees.map(async (employee) => {
+        const records = await this.salaryRecordRepository.findByEmployeeId(
+          employee.id,
+        );
+        const current = records[records.length - 1];
+        return current ? Number(current.amount) : 0;
+      }),
+    );
+
+    const totalMonthlyPayroll = currentSalaries.reduce(
+      (sum, amount) => sum + amount,
+      0,
+    );
+    const now = new Date();
+    const daysInMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+    ).getDate();
+
+    return {
+      totalMonthlyPayroll,
+      dailyPayroll: totalMonthlyPayroll / daysInMonth,
+      activeEmployeeCount: activeEmployees.length,
+    };
   }
 
   async findById(id: string, viewer: JwtPayload): Promise<EmployeeResponse> {
