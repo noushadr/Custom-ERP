@@ -4,11 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
+import 'package:zera_erp/features/checklists/application/checklist_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/presentation/pages/employee_profile_page.dart';
 import 'package:zera_erp/shared/widgets/tag_input.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_checklist.dart';
 import '../../helpers/fake_employee.dart';
 
 Future<void> _useTallSurface(WidgetTester tester) async {
@@ -23,6 +25,7 @@ Widget _app({
   required FakeEmployeeRepository repository,
   String? employeeId,
   FakeAuthRepository? authRepository,
+  FakeChecklistRepository? checklistRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -33,6 +36,9 @@ Widget _app({
         ),
       ),
       employeeRepositoryProvider.overrideWithValue(repository),
+      checklistRepositoryProvider.overrideWithValue(
+        checklistRepository ?? FakeChecklistRepository(),
+      ),
     ],
     child: MaterialApp(home: EmployeeProfilePage(employeeId: employeeId)),
   );
@@ -756,6 +762,171 @@ void main() {
 
       expect(repository.lastDeleteAssetId, isNull);
       expect(find.text('Dell Laptop'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows the onboarding checklist with a progress count for HR/Admin',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.manage'],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+          checklistRepository: FakeChecklistRepository(
+            employeeChecklist: [
+              buildTestEmployeeChecklistItem(
+                id: 'item-1',
+                employeeId: 'employee-2',
+                title: 'Acceptance of offer letter via email',
+                isCompleted: true,
+              ),
+              buildTestEmployeeChecklistItem(
+                id: 'item-2',
+                employeeId: 'employee-2',
+                title: 'Bring CNIC copy at the time of joining',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Onboarding (1/2)'), findsOneWidget);
+      expect(find.text('Acceptance of offer letter via email'), findsOneWidget);
+      expect(find.text('Bring CNIC copy at the time of joining'), findsOneWidget);
+    },
+  );
+
+  testWidgets('HR/Admin can mark a checklist item as done', (tester) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'hr-1',
+      email: 'hr.manager@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: const ['employees.manage'],
+    );
+    final checklistRepository = FakeChecklistRepository(
+      employeeChecklist: [
+        buildTestEmployeeChecklistItem(
+          id: 'item-1',
+          employeeId: 'employee-2',
+          title: 'Acceptance of offer letter via email',
+        ),
+      ],
+    );
+
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        employeeId: 'employee-2',
+        repository: FakeEmployeeRepository(employees: [other]),
+        checklistRepository: checklistRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.radio_button_unchecked));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Mark as done'));
+    await tester.pumpAndSettle();
+
+    expect(
+      checklistRepository.lastSetChecklistItemCompletedInput,
+      (
+        employeeId: 'employee-2',
+        itemId: 'item-1',
+        isCompleted: true,
+        note: null,
+      ),
+    );
+  });
+
+  testWidgets(
+    "the employee's own checklist view has no tap-to-complete affordance",
+    (tester) async {
+      final me = buildTestEmployee();
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(me: me),
+          checklistRepository: FakeChecklistRepository(
+            myChecklist: [
+              buildTestEmployeeChecklistItem(
+                title: 'Acceptance of offer letter via email',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Acceptance of offer letter via email'), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.byIcon(Icons.radio_button_unchecked),
+          matching: find.byType(InkWell),
+        ),
+        findsNothing,
+      );
+
+      await tester.tap(find.byIcon(Icons.radio_button_unchecked));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'hides the Offboarding block for a still-active employee',
+    (tester) async {
+      final me = buildTestEmployee();
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(me: me),
+          checklistRepository: FakeChecklistRepository(
+            myChecklist: [buildTestEmployeeChecklistItem()],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Offboarding'), findsNothing);
     },
   );
 }

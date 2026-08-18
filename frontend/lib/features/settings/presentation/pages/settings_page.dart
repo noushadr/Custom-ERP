@@ -4,6 +4,7 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../authentication/presentation/pages/role_permissions_page.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../checklists/presentation/pages/checklist_templates_page.dart';
 import '../../../employee/presentation/pages/departments_page.dart';
 import '../../../holidays/presentation/pages/holidays_page.dart';
 import '../../../leave/presentation/pages/leave_settings_page.dart';
@@ -24,6 +25,8 @@ class SettingsPage extends ConsumerWidget {
         authUser?.hasPermission('departments.manage') ?? false;
     final canManageLeave = authUser?.hasPermission('leave.manage') ?? false;
     final canManageRoles = authUser?.hasPermission('roles.manage') ?? false;
+    final canManageEmployees =
+        authUser?.hasPermission('employees.manage') ?? false;
 
     final entries = [
       if (canManageDepartments)
@@ -32,6 +35,13 @@ class SettingsPage extends ConsumerWidget {
           title: 'Departments',
           subtitle: 'Create, edit, and archive departments',
           builder: (_) => const DepartmentsPage(),
+        ),
+      if (canManageEmployees)
+        _SettingsEntry(
+          icon: Icons.checklist_outlined,
+          title: 'Onboarding & Offboarding Checklist',
+          subtitle: 'Configure the checklist items every employee gets',
+          builder: (_) => const ChecklistTemplatesPage(),
         ),
       if (canManageLeave)
         _SettingsEntry(

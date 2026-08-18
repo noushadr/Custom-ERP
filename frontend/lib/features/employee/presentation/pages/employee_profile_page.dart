@@ -7,6 +7,7 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../checklists/presentation/widgets/employee_checklist_section.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/employee_assets_section.dart';
@@ -263,6 +264,12 @@ class _ProfileBody extends ConsumerWidget {
           const SizedBox(height: 16),
           EmployeeDocumentsSection(
             employeeId: isOwnProfile ? null : employee.id,
+          ),
+          const SizedBox(height: 16),
+          EmployeeChecklistSection(
+            employeeId: employee.id,
+            isSelf: isOwnProfile,
+            canManage: canManage,
           ),
         ],
         const SizedBox(height: 16),

@@ -8,7 +8,10 @@ import { Permission } from './features/authentication/domain/entities/permission
 import { Role } from './features/authentication/domain/entities/role.entity';
 import { User } from './features/authentication/domain/entities/user.entity';
 import { UserStatus } from './features/authentication/domain/enums/user-status.enum';
+import { ChecklistTemplateItem } from './features/checklists/domain/entities/checklist-template-item.entity';
+import { ChecklistType } from './features/checklists/domain/enums/checklist-type.enum';
 import { Department } from './features/departments/domain/entities/department.entity';
+import { WorkMode } from './features/employee/domain/enums/work-mode.enum';
 import { LeaveType } from './features/leave/domain/entities/leave-type.entity';
 
 const DEFAULT_PERMISSIONS = [
@@ -51,6 +54,46 @@ const SAMPLE_LEAVE_TYPES: {
   { name: 'Sick Leave', annualAllowanceDays: '10.0', colorHex: '#DC2626' },
 ];
 
+const SAMPLE_CHECKLIST_TEMPLATE_ITEMS: {
+  type: ChecklistType;
+  title: string;
+  appliesToWorkMode?: WorkMode;
+}[] = [
+  { type: ChecklistType.ONBOARDING, title: 'Acceptance of offer letter via email' },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Provide email, phone, bank, and CNIC details',
+  },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Create employment contract and send for approval',
+  },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Bring CNIC copy at the time of joining',
+  },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Sign contract and receive appointment letter',
+  },
+  { type: ChecklistType.ONBOARDING, title: 'Add to company communication groups' },
+  { type: ChecklistType.ONBOARDING, title: 'Team and company introduction' },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Review office rules and regulations',
+    appliesToWorkMode: WorkMode.ON_SITE,
+  },
+  {
+    type: ChecklistType.OFFBOARDING,
+    title: 'Resignation/termination notice acknowledged',
+  },
+  { type: ChecklistType.OFFBOARDING, title: 'Exit interview conducted' },
+  { type: ChecklistType.OFFBOARDING, title: 'Return company assets' },
+  { type: ChecklistType.OFFBOARDING, title: 'Revoke system access and accounts' },
+  { type: ChecklistType.OFFBOARDING, title: 'Final settlement and clearance' },
+  { type: ChecklistType.OFFBOARDING, title: 'Issue relieving/NOC letter' },
+];
+
 const SAMPLE_DEPARTMENTS: {
   name: string;
   description: string;
@@ -78,6 +121,9 @@ async function seed() {
   );
   const leaveTypeRepo = app.get<Repository<LeaveType>>(
     getRepositoryToken(LeaveType),
+  );
+  const checklistTemplateRepo = app.get<Repository<ChecklistTemplateItem>>(
+    getRepositoryToken(ChecklistTemplateItem),
   );
   const config = app.get(ConfigService);
 
@@ -160,6 +206,22 @@ async function seed() {
     if (!existing) {
       await leaveTypeRepo.save(leaveTypeRepo.create(typeDef));
       console.log(`Leave type ready: ${typeDef.name}`);
+    }
+  }
+
+  const checklistSortOrderByType = new Map<ChecklistType, number>();
+  for (const itemDef of SAMPLE_CHECKLIST_TEMPLATE_ITEMS) {
+    const sortOrder = checklistSortOrderByType.get(itemDef.type) ?? 0;
+    checklistSortOrderByType.set(itemDef.type, sortOrder + 1);
+
+    const existing = await checklistTemplateRepo.findOne({
+      where: { type: itemDef.type, title: itemDef.title },
+    });
+    if (!existing) {
+      await checklistTemplateRepo.save(
+        checklistTemplateRepo.create({ ...itemDef, sortOrder }),
+      );
+      console.log(`Checklist template item ready: ${itemDef.title}`);
     }
   }
 
