@@ -21,6 +21,7 @@ export function toClientResponse(client: Client): ClientResponseDto {
     primaryContactPhone: client.primaryContactPhone ?? null,
     notes: client.notes ?? null,
     isArchived: client.isArchived,
+    archivedAt: client.archivedAt ? client.archivedAt.toISOString() : null,
     healthStatus: client.healthStatus,
     healthFactors: client.healthFactors,
     healthNotes: client.healthNotes ?? null,

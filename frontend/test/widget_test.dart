@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zera_erp/features/agency_reporting/application/agency_reporting_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
@@ -18,6 +19,7 @@ import 'package:zera_erp/features/tasks/domain/entities/task_status.dart';
 import 'package:zera_erp/shared/widgets/metric_card.dart';
 
 import 'package:zera_erp/main.dart';
+import 'helpers/fake_agency_reporting.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
@@ -64,6 +66,9 @@ Widget _authenticatedApp({
         taskRepository ?? FakeTaskRepository(),
       ),
       clientsRepositoryProvider.overrideWithValue(FakeClientsRepository()),
+      agencyReportingRepositoryProvider.overrideWithValue(
+        FakeAgencyReportingRepository(),
+      ),
     ],
     child: const ZeraApp(),
   );
@@ -354,6 +359,55 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Clients & Projects'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'shows Agency Reporting in the nav for a Super Admin only',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: const AuthUser(
+            id: 'admin-1',
+            email: 'admin@zeracreative.com',
+            role: 'Super Admin',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Agency Reporting'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'hides Agency Reporting from the nav for HR/Manager',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: const AuthUser(
+            id: 'hr-1',
+            email: 'hr@zeracreative.com',
+            role: 'HR/Manager',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Employees'), findsOneWidget);
+      expect(find.text('Agency Reporting'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'hides Agency Reporting from the nav for a plain employee',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(_authenticatedApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Agency Reporting'), findsNothing);
     },
   );
 

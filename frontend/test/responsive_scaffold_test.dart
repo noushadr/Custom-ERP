@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zera_erp/features/agency_reporting/application/agency_reporting_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
@@ -13,6 +14,7 @@ import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
 
 import 'package:zera_erp/main.dart';
+import 'helpers/fake_agency_reporting.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
@@ -48,6 +50,9 @@ Widget _authenticatedApp() {
       ),
       taskRepositoryProvider.overrideWithValue(FakeTaskRepository()),
       clientsRepositoryProvider.overrideWithValue(FakeClientsRepository()),
+      agencyReportingRepositoryProvider.overrideWithValue(
+        FakeAgencyReportingRepository(),
+      ),
     ],
     child: const ZeraApp(),
   );

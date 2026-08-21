@@ -6,6 +6,7 @@ import 'core/layout/app_nav_destination.dart';
 import 'core/layout/responsive_scaffold.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'features/agency_reporting/presentation/pages/agency_reporting_page.dart';
 import 'features/authentication/application/auth_providers.dart';
 import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
@@ -138,6 +139,11 @@ const _allDestinations = [
     icon: Icons.business_center_outlined,
     selectedIcon: Icons.business_center_outlined,
   ),
+  AppNavDestination(
+    label: 'Agency Reporting',
+    icon: Icons.query_stats_outlined,
+    selectedIcon: Icons.query_stats_outlined,
+  ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
@@ -148,6 +154,7 @@ const _adminOnlyLabels = {
   'Employees',
   'Settings',
   'Clients & Projects',
+  'Agency Reporting',
 };
 
 // Hidden from Super Admin/HR/Manager — they use Admin Dashboard instead.
@@ -158,7 +165,7 @@ const _nonAdminOnlyLabels = {'User Dashboard'};
 // are Super Admin only — Employees, Team Leads, and HR/Manager must not even
 // see the nav entry, unlike every other admin-tier feature (which HR/Manager
 // shares with Super Admin).
-const _superAdminOnlyLabels = {'Clients & Projects'};
+const _superAdminOnlyLabels = {'Clients & Projects', 'Agency Reporting'};
 
 bool _isAdminOrHr(WidgetRef ref) {
   final authState = ref.watch(authControllerProvider);
@@ -271,6 +278,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const SettingsPage();
       case 'Clients & Projects':
         return const ClientsProjectsPage();
+      case 'Agency Reporting':
+        return const AgencyReportingPage();
       default:
         return _ComingSoon(destination: destination);
     }

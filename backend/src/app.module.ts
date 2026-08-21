@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import configuration from './core/config/configuration';
 import { validate } from './core/config/env.validation';
 import { DatabaseModule } from './core/database/database.module';
+import { AgencyReportingModule } from './features/agency-reporting/agency-reporting.module';
 import { AuthenticationModule } from './features/authentication/authentication.module';
 import { ChecklistsModule } from './features/checklists/checklists.module';
 import { ClientsModule } from './features/clients/clients.module';
@@ -40,6 +41,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     KnowledgeBaseModule,
     TasksModule,
     ClientsModule,
+    AgencyReportingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

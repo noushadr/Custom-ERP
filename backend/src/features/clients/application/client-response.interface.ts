@@ -9,6 +9,7 @@ export interface ClientResponseDto {
   primaryContactPhone: string | null;
   notes: string | null;
   isArchived: boolean;
+  archivedAt: string | null;
   healthStatus: string;
   healthFactors: string[];
   healthNotes: string | null;

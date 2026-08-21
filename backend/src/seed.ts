@@ -30,12 +30,14 @@ const DEFAULT_PERMISSIONS = [
   'knowledge_base.manage',
   'tasks.manage',
   'clients.manage',
+  'reports.view',
 ];
 
-// 'clients.manage' (Admin Business Management: Clients & Projects) is
-// deliberately absent from every role below except Super Admin's implicit
-// "every known permission" grant — Employees, Team Leads, and HR/Manager
-// must not see or touch this module at all.
+// 'clients.manage' and 'reports.view' (Admin Business Management: Clients &
+// Projects / Client Health / Agency Reporting) are deliberately absent from
+// every role below except Super Admin's implicit "every known permission"
+// grant — Employees, Team Leads, and HR/Manager must not see or touch these
+// modules at all.
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
   { name: 'Super Admin', permissions: [] }, // always granted every known permission, see below
   {

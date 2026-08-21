@@ -33,6 +33,12 @@ export class Client extends BaseEntity {
   @Column({ default: false })
   isArchived: boolean;
 
+  /** Set when `isArchived` transitions to true, cleared on reactivation —
+   * lets Agency Reporting count "clients lost" within a date range, which
+   * `isArchived` alone (a plain snapshot flag) can't answer. */
+  @Column({ type: 'timestamptz', nullable: true })
+  archivedAt: Date | null;
+
   /** Current health snapshot — the source of truth for badges/dashboards.
    * `ClientHealthHistory` holds the trail of how it got here; this column is
    * never derived/recomputed from that trail, only set directly by

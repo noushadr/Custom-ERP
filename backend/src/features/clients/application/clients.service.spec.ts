@@ -176,6 +176,32 @@ describe('ClientsService', () => {
       expect(result.isArchived).toBe(true);
     });
 
+    it('stamps archivedAt when a client is archived, and clears it on reactivation', async () => {
+      const client = buildClient();
+      clientRepository.findById.mockResolvedValue(client);
+
+      const archived = await service.updateClient('client-1', {
+        isArchived: true,
+      });
+      expect(archived.archivedAt).not.toBeNull();
+
+      clientRepository.findById.mockResolvedValue(client);
+      const reactivated = await service.updateClient('client-1', {
+        isArchived: false,
+      });
+      expect(reactivated.archivedAt).toBeNull();
+    });
+
+    it('leaves archivedAt untouched when isArchived is unchanged', async () => {
+      clientRepository.findById.mockResolvedValue(buildClient());
+
+      const result = await service.updateClient('client-1', {
+        companyName: 'Acme Renamed',
+      });
+
+      expect(result.archivedAt).toBeNull();
+    });
+
     it('throws NotFoundException for a missing client', async () => {
       clientRepository.findById.mockResolvedValue(null);
       await expect(

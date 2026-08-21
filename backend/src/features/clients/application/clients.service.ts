@@ -101,6 +101,7 @@ export class ClientsService {
     client.primaryContactPhone = dto.primaryContactPhone;
     client.notes = dto.notes;
     client.isArchived = false;
+    client.archivedAt = null;
     client.healthStatus = ClientHealthStatus.HEALTHY;
     client.healthFactors = [];
 
@@ -113,7 +114,11 @@ export class ClientsService {
     dto: UpdateClientDto,
   ): Promise<ClientResponseDto> {
     const client = await this.getClientOrThrow(id);
-    Object.assign(client, definedFieldsOnly(dto));
+    const changes = definedFieldsOnly(dto);
+    if (changes.isArchived !== undefined && changes.isArchived !== client.isArchived) {
+      client.archivedAt = changes.isArchived ? new Date() : null;
+    }
+    Object.assign(client, changes);
     const saved = await this.clientRepository.save(client);
     return toClientResponse(saved);
   }
