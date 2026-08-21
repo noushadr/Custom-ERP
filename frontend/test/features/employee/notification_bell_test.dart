@@ -12,14 +12,19 @@ import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/leave/domain/repositories/leave_repository.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notices/domain/entities/notice.dart';
+import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/requests/domain/entities/employee_request.dart';
+import 'package:zera_erp/features/tasks/application/task_providers.dart';
+import 'package:zera_erp/features/tasks/domain/entities/task_status.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
+import '../../helpers/fake_performance_review.dart';
 import '../../helpers/fake_request.dart';
+import '../../helpers/fake_task.dart';
 
 EmployeeRequest _buildRequest({
   String id = 'request-1',
@@ -42,9 +47,13 @@ Widget _app({
   required FakeRequestRepository requestRepository,
   FakeLeaveRepository? leaveRepository,
   FakeNoticeRepository? noticeRepository,
+  FakePerformanceReviewRepository? performanceReviewRepository,
+  FakeTaskRepository? taskRepository,
   String role = 'HR/Manager',
   ValueChanged<NotificationLinkTarget>? onNavigate,
   ValueChanged<String>? onOpenEmployeeProfile,
+  ValueChanged<String>? onOpenPerformanceReview,
+  ValueChanged<String>? onOpenTask,
 }) {
   final user = AuthUser(
     id: 'user-1',
@@ -66,12 +75,20 @@ Widget _app({
       noticeRepositoryProvider.overrideWithValue(
         noticeRepository ?? FakeNoticeRepository(),
       ),
+      performanceReviewRepositoryProvider.overrideWithValue(
+        performanceReviewRepository ?? FakePerformanceReviewRepository(),
+      ),
+      taskRepositoryProvider.overrideWithValue(
+        taskRepository ?? FakeTaskRepository(),
+      ),
     ],
     child: MaterialApp(
       home: Scaffold(
         body: NotificationBell(
           onNavigate: onNavigate ?? (_) {},
           onOpenEmployeeProfile: onOpenEmployeeProfile ?? (_) {},
+          onOpenPerformanceReview: onOpenPerformanceReview ?? (_) {},
+          onOpenTask: onOpenTask ?? (_) {},
         ),
       ),
     ),
@@ -730,6 +747,10 @@ void main() {
           requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
           leaveRepositoryProvider.overrideWithValue(FakeLeaveRepository()),
           noticeRepositoryProvider.overrideWithValue(noticeRepository),
+          performanceReviewRepositoryProvider.overrideWithValue(
+            FakePerformanceReviewRepository(),
+          ),
+          taskRepositoryProvider.overrideWithValue(FakeTaskRepository()),
         ],
       );
       addTearDown(container.dispose);
@@ -742,6 +763,8 @@ void main() {
               body: NotificationBell(
                 onNavigate: (_) {},
                 onOpenEmployeeProfile: (_) {},
+                onOpenPerformanceReview: (_) {},
+                onOpenTask: (_) {},
               ),
             ),
           ),
@@ -796,4 +819,116 @@ void main() {
       expect(tapped, NotificationLinkTarget.userDashboard);
     },
   );
+
+  testWidgets(
+    'shows a newly-assigned task and opens it on tap',
+    (tester) async {
+      String? openedTaskId;
+      final taskRepository = FakeTaskRepository(
+        myTasks: [
+          buildTestTask(
+            id: 'task-1',
+            title: 'Write report',
+            assignedByName: 'Manager Person',
+            status: TaskStatus.todo,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: const [],
+          employeeRepository: FakeEmployeeRepository(),
+          requestRepository: FakeRequestRepository(),
+          taskRepository: taskRepository,
+          onOpenTask: (id) => openedTaskId = id,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Write report'), findsOneWidget);
+      expect(find.text('Assigned by Manager Person'), findsOneWidget);
+
+      await tester.tap(find.text('Write report'));
+      await tester.pumpAndSettle();
+
+      expect(openedTaskId, 'task-1');
+    },
+  );
+
+  testWidgets(
+    'does not show an in-progress task under newly-assigned',
+    (tester) async {
+      final taskRepository = FakeTaskRepository(
+        myTasks: [
+          buildTestTask(
+            id: 'task-1',
+            title: 'Already started',
+            status: TaskStatus.inProgress,
+            dueDate: '2099-01-01',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: const [],
+          employeeRepository: FakeEmployeeRepository(),
+          requestRepository: FakeRequestRepository(),
+          taskRepository: taskRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Already started'), findsNothing);
+    },
+  );
+
+  testWidgets('shows a task that is due soon, but not a completed one', (
+    tester,
+  ) async {
+    final soonDueDate =
+        DateTime.now().add(const Duration(days: 1)).toIso8601String().substring(
+          0,
+          10,
+        );
+    final taskRepository = FakeTaskRepository(
+      myTasks: [
+        buildTestTask(
+          id: 'task-1',
+          title: 'Due soon task',
+          status: TaskStatus.inProgress,
+          dueDate: soonDueDate,
+        ),
+        buildTestTask(
+          id: 'task-2',
+          title: 'Completed task',
+          status: TaskStatus.completed,
+          dueDate: soonDueDate,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _app(
+        permissions: const [],
+        employeeRepository: FakeEmployeeRepository(),
+        requestRepository: FakeRequestRepository(),
+        taskRepository: taskRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Due soon task'), findsOneWidget);
+    expect(find.textContaining('Completed task'), findsNothing);
+  });
 }

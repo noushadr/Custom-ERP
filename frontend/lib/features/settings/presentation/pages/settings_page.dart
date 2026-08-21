@@ -8,6 +8,7 @@ import '../../../checklists/presentation/pages/checklist_templates_page.dart';
 import '../../../employee/presentation/pages/departments_page.dart';
 import '../../../holidays/presentation/pages/holidays_page.dart';
 import '../../../leave/presentation/pages/leave_settings_page.dart';
+import '../../../performance_reviews/presentation/pages/performance_review_criteria_page.dart';
 
 /// A single home for the admin-configuration screens that used to be
 /// scattered across other pages (Departments under Employees, Leave Types
@@ -27,6 +28,8 @@ class SettingsPage extends ConsumerWidget {
     final canManageRoles = authUser?.hasPermission('roles.manage') ?? false;
     final canManageEmployees =
         authUser?.hasPermission('employees.manage') ?? false;
+    final canManagePerformanceReviews =
+        authUser?.hasPermission('performance.manage') ?? false;
 
     final entries = [
       if (canManageDepartments)
@@ -56,6 +59,13 @@ class SettingsPage extends ConsumerWidget {
           title: 'Public Holidays',
           subtitle: 'Dates Leave excludes from working-day counts',
           builder: (_) => const HolidaysPage(),
+        ),
+      if (canManagePerformanceReviews)
+        _SettingsEntry(
+          icon: Icons.rate_review_outlined,
+          title: 'Performance Review Criteria',
+          subtitle: 'Configure the review areas every review is built from',
+          builder: (_) => const PerformanceReviewCriteriaPage(),
         ),
       if (canManageRoles)
         _SettingsEntry(

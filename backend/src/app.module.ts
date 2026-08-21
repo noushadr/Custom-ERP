@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import configuration from './core/config/configuration';
@@ -10,9 +11,12 @@ import { ChecklistsModule } from './features/checklists/checklists.module';
 import { DepartmentsModule } from './features/departments/departments.module';
 import { EmployeeModule } from './features/employee/employee.module';
 import { HolidaysModule } from './features/holidays/holidays.module';
+import { KnowledgeBaseModule } from './features/knowledge-base/knowledge-base.module';
 import { LeaveModule } from './features/leave/leave.module';
 import { NoticesModule } from './features/notices/notices.module';
+import { PerformanceReviewsModule } from './features/performance-reviews/performance-reviews.module';
 import { RequestsModule } from './features/requests/requests.module';
+import { TasksModule } from './features/tasks/tasks.module';
 
 @Module({
   imports: [
@@ -21,6 +25,7 @@ import { RequestsModule } from './features/requests/requests.module';
       load: [configuration],
       validate,
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     AuthenticationModule,
     ChecklistsModule,
@@ -30,6 +35,9 @@ import { RequestsModule } from './features/requests/requests.module';
     RequestsModule,
     LeaveModule,
     HolidaysModule,
+    PerformanceReviewsModule,
+    KnowledgeBaseModule,
+    TasksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

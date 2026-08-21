@@ -13,6 +13,8 @@ import { ChecklistType } from './features/checklists/domain/enums/checklist-type
 import { Department } from './features/departments/domain/entities/department.entity';
 import { WorkMode } from './features/employee/domain/enums/work-mode.enum';
 import { LeaveType } from './features/leave/domain/entities/leave-type.entity';
+import { PerformanceReviewCriterion } from './features/performance-reviews/domain/entities/performance-review-criterion.entity';
+import { CriterionResponseType } from './features/performance-reviews/domain/enums/criterion-response-type.enum';
 
 const DEFAULT_PERMISSIONS = [
   'users.manage',
@@ -24,6 +26,9 @@ const DEFAULT_PERMISSIONS = [
   'notices.manage',
   'leave.manage',
   'roles.manage',
+  'performance.manage',
+  'knowledge_base.manage',
+  'tasks.manage',
 ];
 
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
@@ -37,9 +42,12 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'departments.manage',
       'notices.manage',
       'leave.manage',
+      'performance.manage',
+      'knowledge_base.manage',
+      'tasks.manage',
     ],
   },
-  { name: 'Team Lead', permissions: ['employees.read'] },
+  { name: 'Team Lead', permissions: ['employees.read', 'knowledge_base.manage'] },
   { name: 'Employee', permissions: [] },
 ];
 
@@ -94,6 +102,18 @@ const SAMPLE_CHECKLIST_TEMPLATE_ITEMS: {
   { type: ChecklistType.OFFBOARDING, title: 'Issue relieving/NOC letter' },
 ];
 
+const SAMPLE_PERFORMANCE_REVIEW_CRITERIA: {
+  name: string;
+  responseType: CriterionResponseType;
+}[] = [
+  { name: 'Overall Performance', responseType: CriterionResponseType.RATING },
+  { name: 'Attendance', responseType: CriterionResponseType.RATING },
+  { name: 'Teamwork', responseType: CriterionResponseType.RATING },
+  { name: 'Strengths', responseType: CriterionResponseType.TEXT },
+  { name: 'Areas for Improvement', responseType: CriterionResponseType.TEXT },
+  { name: 'Goals for Next Period', responseType: CriterionResponseType.TEXT },
+];
+
 const SAMPLE_DEPARTMENTS: {
   name: string;
   description: string;
@@ -125,6 +145,9 @@ async function seed() {
   const checklistTemplateRepo = app.get<Repository<ChecklistTemplateItem>>(
     getRepositoryToken(ChecklistTemplateItem),
   );
+  const performanceReviewCriterionRepo = app.get<
+    Repository<PerformanceReviewCriterion>
+  >(getRepositoryToken(PerformanceReviewCriterion));
   const config = app.get(ConfigService);
 
   const permissionsByKey = new Map<string, Permission>();
@@ -222,6 +245,19 @@ async function seed() {
         checklistTemplateRepo.create({ ...itemDef, sortOrder }),
       );
       console.log(`Checklist template item ready: ${itemDef.title}`);
+    }
+  }
+
+  for (let i = 0; i < SAMPLE_PERFORMANCE_REVIEW_CRITERIA.length; i++) {
+    const criterionDef = SAMPLE_PERFORMANCE_REVIEW_CRITERIA[i];
+    const existing = await performanceReviewCriterionRepo.findOne({
+      where: { name: criterionDef.name },
+    });
+    if (!existing) {
+      await performanceReviewCriterionRepo.save(
+        performanceReviewCriterionRepo.create({ ...criterionDef, sortOrder: i }),
+      );
+      console.log(`Performance review criterion ready: ${criterionDef.name}`);
     }
   }
 

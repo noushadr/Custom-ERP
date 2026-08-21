@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
@@ -7,22 +7,33 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
+import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
+import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
+import 'package:zera_erp/features/tasks/application/task_providers.dart';
+import 'package:zera_erp/features/tasks/domain/entities/task_status.dart';
 import 'package:zera_erp/shared/widgets/metric_card.dart';
 
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_employee.dart';
+import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leave.dart';
 import 'helpers/fake_notice.dart';
+import 'helpers/fake_performance_review.dart';
 import 'helpers/fake_request.dart';
+import 'helpers/fake_task.dart';
 
 Widget _authenticatedApp({
   AuthUser user = testAuthUser,
   List<Employee>? employees,
   PayrollSummary? payrollSummary,
+  FakePerformanceReviewRepository? performanceReviewRepository,
+  FakeEmployeeRepository? employeeRepository,
+  FakeRequestRepository? requestRepository,
+  FakeTaskRepository? taskRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -30,17 +41,49 @@ Widget _authenticatedApp({
         (ref) => PresetAuthController(AuthAuthenticated(user)),
       ),
       employeeRepositoryProvider.overrideWithValue(
-        FakeEmployeeRepository(
-          employees: employees ?? [buildTestEmployee()],
-          payrollSummary: payrollSummary,
-        ),
+        employeeRepository ??
+            FakeEmployeeRepository(
+              employees: employees ?? [buildTestEmployee()],
+              payrollSummary: payrollSummary,
+            ),
       ),
       noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
-      requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
+      requestRepositoryProvider.overrideWithValue(
+        requestRepository ?? FakeRequestRepository(),
+      ),
       leaveRepositoryProvider.overrideWithValue(FakeLeaveRepository()),
+      performanceReviewRepositoryProvider.overrideWithValue(
+        performanceReviewRepository ?? FakePerformanceReviewRepository(),
+      ),
+      knowledgeBaseRepositoryProvider.overrideWithValue(
+        FakeKnowledgeBaseRepository(),
+      ),
+      taskRepositoryProvider.overrideWithValue(
+        taskRepository ?? FakeTaskRepository(),
+      ),
     ],
     child: const ZeraApp(),
   );
+}
+
+/// The numbered badge count shown on a nav destination's icon (via
+/// ResponsiveScaffold's `_railIcon`), or null if that destination has no
+/// badge right now — read directly off the constructed `NavigationRail`
+/// rather than searching rendered text, since bare digits elsewhere on the
+/// page (metric tiles, counts) would otherwise collide.
+int? _badgeCountFor(WidgetTester tester, String label) {
+  final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+  for (final destination in rail.destinations) {
+    final labelWidget = destination.label;
+    if (labelWidget is Text && labelWidget.data == label) {
+      final icon = destination.icon;
+      if (icon is Badge && icon.label is Text) {
+        return int.tryParse((icon.label as Text).data ?? '');
+      }
+      return null;
+    }
+  }
+  return null;
 }
 
 void main() {
@@ -148,10 +191,13 @@ void main() {
       expect(find.text('Payroll'), findsOneWidget);
       expect(find.text('Monthly Payroll'), findsOneWidget);
       expect(find.text('PKR 250,000'), findsOneWidget);
+      expect(find.text('≈ \$899'), findsOneWidget);
       expect(find.text('Daily Payroll'), findsOneWidget);
       expect(find.text('PKR 8,333'), findsOneWidget);
+      expect(find.text('≈ \$29'), findsOneWidget);
       expect(find.text('Average Salary'), findsOneWidget);
       expect(find.text('PKR 62,500'), findsOneWidget);
+      expect(find.text('≈ \$224'), findsOneWidget);
     },
   );
 
@@ -169,6 +215,49 @@ void main() {
 
       expect(find.text('Payroll'), findsNothing);
       expect(find.text('Monthly Payroll'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'admin dashboard shows the pending performance reviews count for a performance.manage holder',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: ['performance.manage'],
+      );
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          performanceReviewRepository: FakePerformanceReviewRepository(
+            allPendingReviews: [
+              buildTestPerformanceReview(id: 'review-1'),
+              buildTestPerformanceReview(id: 'review-2'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pending Performance Reviews'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'hides the pending performance reviews stat from an admin dashboard viewer without performance.manage',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+      await tester.pumpWidget(_authenticatedApp(user: admin));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pending Performance Reviews'), findsNothing);
     },
   );
 
@@ -246,4 +335,102 @@ void main() {
       expect(find.text('Total Employees'), findsNothing);
     },
   );
+
+  group('nav badges', () {
+    testWidgets(
+      'badges Requests with the sum of open requests and manager approvals',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          _authenticatedApp(
+            requestRepository: FakeRequestRepository(
+              mine: [
+                buildTestRequest(id: 'mine-open', status: 'submitted'),
+                buildTestRequest(id: 'mine-done', status: 'completed'),
+              ],
+              pendingManagerApproval: [
+                buildTestRequest(id: 'manager-1'),
+                buildTestRequest(id: 'manager-2'),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(_badgeCountFor(tester, 'Requests'), 3);
+      },
+    );
+
+    testWidgets('shows no Requests badge when nothing is open', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          requestRepository: FakeRequestRepository(
+            mine: [buildTestRequest(status: 'completed')],
+          ),
+          employeeRepository: FakeEmployeeRepository(
+            me: buildTestEmployee(profileCompletionPercentage: 100),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_badgeCountFor(tester, 'Requests'), isNull);
+    });
+
+    testWidgets(
+      'badges Tasks with the count of tasks not completed or cancelled',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          _authenticatedApp(
+            taskRepository: FakeTaskRepository(
+              myTasks: [
+                buildTestTask(id: 'task-todo', status: TaskStatus.todo),
+                buildTestTask(
+                  id: 'task-progress',
+                  status: TaskStatus.inProgress,
+                ),
+                buildTestTask(id: 'task-done', status: TaskStatus.completed),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(_badgeCountFor(tester, 'Tasks'), 2);
+      },
+    );
+
+    testWidgets(
+      'badges the dashboard nav item when the viewer\'s profile is incomplete',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          _authenticatedApp(
+            employeeRepository: FakeEmployeeRepository(
+              me: buildTestEmployee(profileCompletionPercentage: 60),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(_badgeCountFor(tester, 'User Dashboard'), 1);
+      },
+    );
+
+    testWidgets(
+      'shows no dashboard badge once the profile is 100% complete',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          _authenticatedApp(
+            employeeRepository: FakeEmployeeRepository(
+              me: buildTestEmployee(profileCompletionPercentage: 100),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(_badgeCountFor(tester, 'User Dashboard'), isNull);
+      },
+    );
+  });
 }

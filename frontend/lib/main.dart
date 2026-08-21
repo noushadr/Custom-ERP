@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/layout/app_nav_destination.dart';
 import 'core/layout/responsive_scaffold.dart';
@@ -9,14 +11,23 @@ import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
 import 'features/authentication/presentation/widgets/impersonation_banner.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
+import 'features/employee/application/employee_providers.dart';
 import 'features/employee/presentation/pages/admin_dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
+import 'features/knowledge_base/presentation/pages/knowledge_base_page.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
+import 'features/performance_reviews/presentation/pages/performance_review_detail_page.dart';
+import 'features/performance_reviews/presentation/pages/performance_reviews_page.dart';
+import 'features/requests/application/request_providers.dart';
 import 'features/requests/presentation/pages/requests_page.dart';
 import 'features/settings/presentation/pages/settings_page.dart';
+import 'features/tasks/application/task_providers.dart';
+import 'features/tasks/domain/entities/task_status.dart';
+import 'features/tasks/presentation/pages/task_detail_page.dart';
+import 'features/tasks/presentation/pages/tasks_page.dart';
 
 void main() {
   runApp(const ProviderScope(child: ZeraApp()));
@@ -30,6 +41,16 @@ class ZeraApp extends StatelessWidget {
     return MaterialApp(
       title: 'Zera Creative ERP',
       theme: AppTheme.light,
+      // Required by the Knowledge Base rich-text editor's toolbar
+      // (flutter_quill), which looks up its tooltip strings via
+      // FlutterQuillLocalizations.of(context).
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en')],
       home: const _AuthGate(),
     );
   }
@@ -92,6 +113,21 @@ const _allDestinations = [
     selectedIcon: Icons.beach_access_outlined,
   ),
   AppNavDestination(
+    label: 'Tasks',
+    icon: Icons.checklist_outlined,
+    selectedIcon: Icons.checklist_outlined,
+  ),
+  AppNavDestination(
+    label: 'Performance Reviews',
+    icon: Icons.rate_review_outlined,
+    selectedIcon: Icons.rate_review_outlined,
+  ),
+  AppNavDestination(
+    label: 'Knowledge Base',
+    icon: Icons.menu_book_outlined,
+    selectedIcon: Icons.menu_book_outlined,
+  ),
+  AppNavDestination(
     label: 'Settings',
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings_outlined,
@@ -112,6 +148,62 @@ bool _isAdminOrHr(WidgetRef ref) {
   return authState is AuthAuthenticated &&
       (authState.user.role == 'Super Admin' ||
           authState.user.role == 'HR/Manager');
+}
+
+/// How many pending items each nav destination should badge for the current
+/// viewer — reusing the same "pending" signals the notification bell already
+/// aggregates, so the nav and the bell never disagree. No permission guard on
+/// the backend for most of these (mirrors NotificationBell) — naturally zero
+/// for anyone the signal doesn't apply to.
+Map<String, int> _navBadgeCounts(WidgetRef ref) {
+  final authState = ref.watch(authControllerProvider);
+  final authUser = authState is AuthAuthenticated ? authState.user : null;
+
+  final myRequests = ref.watch(myRequestsProvider).valueOrNull ?? const [];
+  final myOpenRequests = myRequests
+      .where((r) => r.status != 'completed' && r.status != 'rejected')
+      .length;
+  final managerApprovals =
+      ref.watch(pendingManagerApprovalRequestsProvider).valueOrNull ?? const [];
+  final canSeeHrApprovals = authUser?.hasPermission('users.manage') ?? false;
+  final hrApprovals = canSeeHrApprovals
+      ? ref.watch(pendingHrApprovalRequestsProvider).valueOrNull ?? const []
+      : const [];
+  final requestsBadge =
+      myOpenRequests + managerApprovals.length + hrApprovals.length;
+
+  final myTasks = ref.watch(myTasksProvider).valueOrNull ?? const [];
+  final tasksBadge = myTasks
+      .where(
+        (t) =>
+            t.status != TaskStatus.completed &&
+            t.status != TaskStatus.cancelled,
+      )
+      .length;
+
+  final myProfile = ref.watch(myProfileProvider).valueOrNull;
+  final profileIncomplete =
+      myProfile != null && myProfile.profileCompletionPercentage < 100;
+
+  return {
+    'Requests': requestsBadge,
+    'Tasks': tasksBadge,
+    // Whichever of these two is actually visible depends on role — badging
+    // both is harmless since only one is ever rendered at a time.
+    if (profileIncomplete) 'Admin Dashboard': 1,
+    if (profileIncomplete) 'User Dashboard': 1,
+  };
+}
+
+AppNavDestination _withBadge(AppNavDestination destination, int badgeCount) {
+  if (badgeCount <= 0) return destination;
+  return AppNavDestination(
+    label: destination.label,
+    icon: destination.icon,
+    selectedIcon: destination.selectedIcon,
+    comingSoon: destination.comingSoon,
+    badgeCount: badgeCount,
+  );
 }
 
 class _HomeShell extends ConsumerStatefulWidget {
@@ -147,6 +239,12 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const RequestsPage();
       case 'Leaves':
         return const LeavePage();
+      case 'Tasks':
+        return const TasksPage();
+      case 'Performance Reviews':
+        return const PerformanceReviewsPage();
+      case 'Knowledge Base':
+        return const KnowledgeBasePage();
       case 'Settings':
         return const SettingsPage();
       default:
@@ -175,9 +273,36 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
     setState(() => _selectedIndex = index);
   }
 
+  void _openPerformanceReview(String reviewId) {
+    final index = _allDestinations.indexWhere(
+      (d) => d.label == 'Performance Reviews',
+    );
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    navigatorState?.push(
+      MaterialPageRoute(
+        builder: (_) => PerformanceReviewDetailPage(reviewId: reviewId),
+      ),
+    );
+    setState(() => _selectedIndex = index);
+  }
+
+  void _openTask(String taskId) {
+    final index = _allDestinations.indexWhere((d) => d.label == 'Tasks');
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    navigatorState?.push(
+      MaterialPageRoute(builder: (_) => TaskDetailPage(taskId: taskId)),
+    );
+    setState(() => _selectedIndex = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdminOrHr = _isAdminOrHr(ref);
+    final badgeCounts = _navBadgeCounts(ref);
 
     final visibleOriginalIndices = [
       for (var i = 0; i < _allDestinations.length; i++)
@@ -187,7 +312,11 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
           i,
     ];
     final visibleDestinations = [
-      for (final i in visibleOriginalIndices) _allDestinations[i],
+      for (final i in visibleOriginalIndices)
+        _withBadge(
+          _allDestinations[i],
+          badgeCounts[_allDestinations[i].label] ?? 0,
+        ),
     ];
     // Falls back to the first visible section if the previously-selected one
     // just disappeared (e.g. role changed via impersonation while on Admin
@@ -214,6 +343,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
                   NotificationLinkTarget.leavePage => 'Leaves',
                 }),
                 onOpenEmployeeProfile: _openEmployeeProfile,
+                onOpenPerformanceReview: _openPerformanceReview,
+                onOpenTask: _openTask,
               ),
               const SizedBox(width: 16),
               UserMenu(

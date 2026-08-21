@@ -6,6 +6,7 @@ class AppNavDestination {
     required this.icon,
     required this.selectedIcon,
     this.comingSoon = false,
+    this.badgeCount = 0,
   });
 
   final String label;
@@ -14,4 +15,9 @@ class AppNavDestination {
 
   /// Whether this section isn't built yet — shown with a "Coming soon" tag.
   final bool comingSoon;
+
+  /// How many pending items this section has for the current viewer (e.g.
+  /// open requests, open tasks) — shown as a small red numbered badge on
+  /// the nav icon. Zero means no badge.
+  final int badgeCount;
 }

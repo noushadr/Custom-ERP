@@ -7,6 +7,7 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
+import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/company_audit_log_section.dart';
@@ -25,6 +26,9 @@ class AdminDashboardPage extends ConsumerWidget {
     final canViewPayroll =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('employees.manage');
+    final canViewPerformance =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('performance.manage');
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -43,6 +47,7 @@ class AdminDashboardPage extends ConsumerWidget {
               employees: employees,
               showCompanyAuditLog: canViewAllAudit,
               showPayroll: canViewPayroll,
+              showPendingReviews: canViewPerformance,
             ),
           ),
         ),
@@ -56,11 +61,13 @@ class _DashboardStats extends ConsumerWidget {
     required this.employees,
     required this.showCompanyAuditLog,
     required this.showPayroll,
+    required this.showPendingReviews,
   });
 
   final List<Employee> employees;
   final bool showCompanyAuditLog;
   final bool showPayroll;
+  final bool showPendingReviews;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -169,6 +176,7 @@ class _DashboardStats extends ConsumerWidget {
                 color: AppColors.error,
                 icon: Icons.cancel_outlined,
               ),
+              if (showPendingReviews) const _PendingReviewsCard(),
             ],
           ),
           const SizedBox(height: 18),
@@ -216,6 +224,30 @@ class _DashboardStats extends ConsumerWidget {
   }
 }
 
+/// Company-wide count of reviews still awaiting a manager's/HR's
+/// completion — a separate async fetch from the (already-loaded) employee
+/// list, so it renders its own loading/error value rather than blocking the
+/// rest of the Overview stats.
+class _PendingReviewsCard extends ConsumerWidget {
+  const _PendingReviewsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reviewsAsync = ref.watch(allPendingPerformanceReviewsProvider);
+
+    return MetricCard(
+      label: 'Pending Performance Reviews',
+      value: reviewsAsync.when(
+        data: (reviews) => '${reviews.length}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.secondary,
+      icon: Icons.rate_review_outlined,
+    );
+  }
+}
+
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader(this.title);
 
@@ -259,18 +291,21 @@ class _PayrollStats extends ConsumerWidget {
             MetricCard(
               label: 'Monthly Payroll',
               value: 'PKR ${formatWholeAmount(payroll.totalMonthlyPayroll)}',
+              secondaryValue: formatUsdApprox(payroll.totalMonthlyPayroll),
               color: AppColors.primary,
               icon: Icons.account_balance_wallet_outlined,
             ),
             MetricCard(
               label: 'Daily Payroll',
               value: 'PKR ${formatWholeAmount(payroll.dailyPayroll)}',
+              secondaryValue: formatUsdApprox(payroll.dailyPayroll),
               color: AppColors.accentTeal,
               icon: Icons.today_outlined,
             ),
             MetricCard(
               label: 'Average Salary',
               value: 'PKR ${formatWholeAmount(averageSalary)}',
+              secondaryValue: formatUsdApprox(averageSalary),
               color: AppColors.secondary,
               icon: Icons.person_outline,
             ),

@@ -46,12 +46,17 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
 
   Widget _railIcon(AppNavDestination d, {bool selected = false}) {
     final icon = Icon(selected ? d.selectedIcon : d.icon);
-    if (!d.comingSoon) return icon;
-    return Badge(
-      backgroundColor: AppColors.error,
-      smallSize: 8,
-      child: icon,
-    );
+    if (d.comingSoon) {
+      return Badge(backgroundColor: AppColors.error, smallSize: 8, child: icon);
+    }
+    if (d.badgeCount > 0) {
+      return Badge(
+        label: Text('${d.badgeCount}'),
+        backgroundColor: AppColors.error,
+        child: icon,
+      );
+    }
+    return icon;
   }
 
   @override

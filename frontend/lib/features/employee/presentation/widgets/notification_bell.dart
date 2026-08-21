@@ -7,8 +7,13 @@ import '../../../authentication/application/auth_state.dart';
 import '../../../leave/application/leave_providers.dart';
 import '../../../leave/domain/entities/leave_request.dart';
 import '../../../notices/application/notice_providers.dart';
+import '../../../performance_reviews/application/performance_review_providers.dart';
+import '../../../performance_reviews/domain/entities/performance_review.dart';
 import '../../../requests/application/request_providers.dart';
 import '../../../requests/domain/entities/employee_request.dart';
+import '../../../tasks/application/task_providers.dart';
+import '../../../tasks/domain/entities/task.dart';
+import '../../../tasks/domain/entities/task_status.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/upcoming_birthday.dart';
 import '../../domain/entities/upcoming_work_anniversary.dart';
@@ -32,6 +37,19 @@ class _FocusNotice {
   const _FocusNotice(this.noticeId, this.target);
   final String noticeId;
   final NotificationLinkTarget target;
+}
+
+/// Tapping a performance-review notification opens that review's detail
+/// page directly.
+class _OpenPerformanceReview {
+  const _OpenPerformanceReview(this.reviewId);
+  final String reviewId;
+}
+
+/// Tapping a task notification opens that task's detail page directly.
+class _OpenTask {
+  const _OpenTask(this.taskId);
+  final String taskId;
 }
 
 // How many past (already-decided) items to keep per history list — a record
@@ -59,6 +77,8 @@ class NotificationBell extends ConsumerWidget {
     super.key,
     required this.onNavigate,
     required this.onOpenEmployeeProfile,
+    required this.onOpenPerformanceReview,
+    required this.onOpenTask,
   });
 
   final ValueChanged<NotificationLinkTarget> onNavigate;
@@ -66,6 +86,13 @@ class NotificationBell extends ConsumerWidget {
   /// Called with an employeeId when the viewer taps a birthday or
   /// work-anniversary notification.
   final ValueChanged<String> onOpenEmployeeProfile;
+
+  /// Called with a reviewId when the viewer taps a performance-review
+  /// notification.
+  final ValueChanged<String> onOpenPerformanceReview;
+
+  /// Called with a taskId when the viewer taps a task notification.
+  final ValueChanged<String> onOpenTask;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,6 +102,8 @@ class NotificationBell extends ConsumerWidget {
         authUser?.hasPermission('employees.manage') ?? false;
     final canSeeHrApprovals = authUser?.hasPermission('users.manage') ?? false;
     final canManageLeave = authUser?.hasPermission('leave.manage') ?? false;
+    final canFinalizeReviews =
+        authUser?.hasPermission('performance.manage') ?? false;
     final seesAdminDashboard =
         authUser?.role == 'Super Admin' || authUser?.role == 'HR/Manager';
     final noticeTarget = seesAdminDashboard
@@ -125,6 +154,44 @@ class NotificationBell extends ConsumerWidget {
       decidedAt: (r) => r.hrDecisionAt ?? r.managerDecisionAt,
     );
 
+    // No permission guard on the backend for these either — naturally empty
+    // for anyone without reviews of their own or direct reports.
+    final myReviews =
+        ref.watch(myPerformanceReviewsProvider).valueOrNull ??
+        const <PerformanceReview>[];
+    final reviewsNeedingSelfAssessment = myReviews
+        .where(
+          (r) =>
+              r.status != 'finalized' &&
+              (r.employeeComments == null || r.employeeComments!.isEmpty),
+        )
+        .toList();
+    final pendingManagerReviews =
+        ref.watch(pendingManagerActionReviewsProvider).valueOrNull ??
+        const <PerformanceReview>[];
+    final pendingHrReviews = canFinalizeReviews
+        ? ref.watch(pendingHrFinalizationReviewsProvider).valueOrNull ??
+              const <PerformanceReview>[]
+        : const <PerformanceReview>[];
+
+    // No permission guard on the backend for either of these — naturally
+    // empty for anyone without tasks assigned to them or a team to manage.
+    final myTasks =
+        ref.watch(myTasksProvider).valueOrNull ?? const <Task>[];
+    final teamTasks =
+        ref.watch(teamTasksProvider).valueOrNull ?? const <Task>[];
+    final newlyAssignedTasks = myTasks
+        .where((t) => t.status == TaskStatus.todo)
+        .toList();
+    final tasksDueSoon = _dedupeTasksById([...myTasks, ...teamTasks])
+        .where(
+          (t) =>
+              t.status != TaskStatus.completed &&
+              t.status != TaskStatus.cancelled &&
+              _isDueSoonOrOverdue(t.dueDate),
+        )
+        .toList();
+
     final totalCount =
         birthdays.length +
         anniversaries.length +
@@ -135,6 +202,11 @@ class NotificationBell extends ConsumerWidget {
         leaveManagerApprovals.length +
         myRecentLeaveDecisions.length +
         myRecentRequestDecisions.length +
+        reviewsNeedingSelfAssessment.length +
+        pendingManagerReviews.length +
+        pendingHrReviews.length +
+        newlyAssignedTasks.length +
+        tasksDueSoon.length +
         (needsLeaveReset ? 1 : 0);
 
     return PopupMenuButton<Object>(
@@ -151,6 +223,10 @@ class NotificationBell extends ConsumerWidget {
           case _FocusNotice(:final noticeId, :final target):
             ref.read(focusedNoticeIdProvider.notifier).state = noticeId;
             onNavigate(target);
+          case _OpenPerformanceReview(:final reviewId):
+            onOpenPerformanceReview(reviewId);
+          case _OpenTask(:final taskId):
+            onOpenTask(taskId);
         }
       },
       itemBuilder: (context) {
@@ -306,6 +382,74 @@ class NotificationBell extends ConsumerWidget {
             ),
         ]);
 
+        addSection('Reviews awaiting your self-assessment', [
+          for (final review in reviewsNeedingSelfAssessment)
+            PopupMenuItem<Object>(
+              value: _OpenPerformanceReview(review.id),
+              child: _NotificationTile(
+                icon: Icons.rate_review_outlined,
+                iconColor: AppColors.secondary,
+                title: 'Year ${review.reviewYear} Review',
+                caption: 'Add your self-assessment',
+                trailing: formatDisplayDate(review.dueDate),
+              ),
+            ),
+        ]);
+
+        addSection('Performance reviews awaiting your action', [
+          for (final review in pendingManagerReviews)
+            PopupMenuItem<Object>(
+              value: _OpenPerformanceReview(review.id),
+              child: _NotificationTile(
+                icon: Icons.rate_review_outlined,
+                iconColor: AppColors.warning,
+                title:
+                    'Year ${review.reviewYear} Review — ${review.employeeName}',
+                caption: 'Awaiting your review',
+                trailing: formatDisplayDate(review.dueDate),
+              ),
+            ),
+          for (final review in pendingHrReviews)
+            PopupMenuItem<Object>(
+              value: _OpenPerformanceReview(review.id),
+              child: _NotificationTile(
+                icon: Icons.rate_review_outlined,
+                iconColor: AppColors.warning,
+                title:
+                    'Year ${review.reviewYear} Review — ${review.employeeName}',
+                caption: 'Awaiting finalization',
+                trailing: formatDisplayDate(review.dueDate),
+              ),
+            ),
+        ]);
+
+        addSection('Newly assigned tasks', [
+          for (final task in newlyAssignedTasks)
+            PopupMenuItem<Object>(
+              value: _OpenTask(task.id),
+              child: _NotificationTile(
+                icon: Icons.checklist_outlined,
+                iconColor: AppColors.secondary,
+                title: task.title,
+                caption: 'Assigned by ${task.assignedByName}',
+                trailing: formatRelativeTime(task.createdAt),
+              ),
+            ),
+        ]);
+
+        addSection('Tasks due soon', [
+          for (final task in tasksDueSoon)
+            PopupMenuItem<Object>(
+              value: _OpenTask(task.id),
+              child: _NotificationTile(
+                icon: Icons.event_busy_outlined,
+                iconColor: AppColors.warning,
+                title: '${task.title} — ${task.assigneeName}',
+                caption: 'Due ${formatDisplayDate(task.dueDate)}',
+              ),
+            ),
+        ]);
+
         addSection('Recent updates', [
           // Already-decided — old news the viewer has effectively already
           // seen play out, so these fade rather than compete with the
@@ -396,6 +540,30 @@ List<T> _recentlyDecided<T>(
       return bAt.compareTo(aAt);
     });
   return decided.take(_maxDecidedHistory).toList();
+}
+
+/// Merges two task lists (My Tasks + Team Tasks can overlap for a
+/// department head who is also their own assignee) keyed by id.
+List<Task> _dedupeTasksById(List<Task> tasks) {
+  final seen = <String>{};
+  final result = <Task>[];
+  for (final task in tasks) {
+    if (seen.add(task.id)) result.add(task);
+  }
+  return result;
+}
+
+/// True if [dueDate] (an ISO date) is already overdue or falls within the
+/// next 3 days — the "needs attention soon" window for the bell.
+bool _isDueSoonOrOverdue(String dueDate) {
+  final due = DateTime.parse(dueDate);
+  final now = DateTime.now();
+  final threshold = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).add(const Duration(days: 3));
+  return !due.isAfter(threshold);
 }
 
 /// 0 means today; negative means it already happened this many days ago;

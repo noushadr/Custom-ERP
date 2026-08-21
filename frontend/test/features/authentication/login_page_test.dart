@@ -8,16 +8,22 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/authentication/domain/exceptions/auth_exception.dart';
 import 'package:zera_erp/features/authentication/presentation/pages/login_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
+import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
+import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/main.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_knowledge_base.dart';
 import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
+import '../../helpers/fake_performance_review.dart';
 import '../../helpers/fake_request.dart';
+import '../../helpers/fake_task.dart';
 
 class _DelayedAuthRepository extends FakeAuthRepository {
   _DelayedAuthRepository(this.completer);
@@ -40,6 +46,13 @@ Widget _appWith(FakeAuthRepository repository) {
       noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
       requestRepositoryProvider.overrideWithValue(FakeRequestRepository()),
       leaveRepositoryProvider.overrideWithValue(FakeLeaveRepository()),
+      performanceReviewRepositoryProvider.overrideWithValue(
+        FakePerformanceReviewRepository(),
+      ),
+      knowledgeBaseRepositoryProvider.overrideWithValue(
+        FakeKnowledgeBaseRepository(),
+      ),
+      taskRepositoryProvider.overrideWithValue(FakeTaskRepository()),
     ],
     child: const ZeraApp(),
   );
