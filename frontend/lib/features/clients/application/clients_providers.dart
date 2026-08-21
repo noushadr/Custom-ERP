@@ -3,6 +3,8 @@ import '../../authentication/application/auth_providers.dart';
 import '../data/datasources/clients_remote_data_source.dart';
 import '../data/repositories/clients_repository_impl.dart';
 import '../domain/entities/client.dart';
+import '../domain/entities/client_health_history_entry.dart';
+import '../domain/entities/client_health_summary.dart';
 import '../domain/entities/project.dart';
 import '../domain/entities/projects_summary.dart';
 import '../domain/entities/service.dart';
@@ -72,3 +74,17 @@ final projectsSummaryProvider = FutureProvider.autoDispose<ProjectsSummary>((
   ref.watch(authControllerProvider);
   return ref.watch(clientsRepositoryProvider).getProjectsSummary();
 });
+
+final clientHealthSummaryProvider =
+    FutureProvider.autoDispose<ClientHealthSummary>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(clientsRepositoryProvider).getClientHealthSummary();
+    });
+
+final clientHealthHistoryProvider = FutureProvider.autoDispose
+    .family<List<ClientHealthHistoryEntry>, String>((ref, clientId) {
+      ref.watch(authControllerProvider);
+      return ref
+          .watch(clientsRepositoryProvider)
+          .getClientHealthHistory(clientId);
+    });

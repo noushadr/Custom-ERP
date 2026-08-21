@@ -10,6 +10,9 @@ class Client {
     required this.primaryContactPhone,
     required this.notes,
     required this.isArchived,
+    required this.healthStatus,
+    required this.healthFactors,
+    required this.healthNotes,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -24,6 +27,14 @@ class Client {
   final String? primaryContactPhone;
   final String? notes;
   final bool isArchived;
+
+  /// One of ClientHealthStatus's values.
+  final String healthStatus;
+
+  /// Zero or more of ClientHealthFactor's values.
+  final List<String> healthFactors;
+  final String? healthNotes;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 }

@@ -12,6 +12,9 @@ class ClientModel extends Client {
     required super.primaryContactPhone,
     required super.notes,
     required super.isArchived,
+    required super.healthStatus,
+    required super.healthFactors,
+    required super.healthNotes,
     required super.createdAt,
     required super.updatedAt,
   });
@@ -27,6 +30,9 @@ class ClientModel extends Client {
     primaryContactPhone: json['primaryContactPhone'] as String?,
     notes: json['notes'] as String?,
     isArchived: json['isArchived'] as bool,
+    healthStatus: json['healthStatus'] as String,
+    healthFactors: (json['healthFactors'] as List<dynamic>).cast<String>(),
+    healthNotes: json['healthNotes'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String),
     updatedAt: DateTime.parse(json['updatedAt'] as String),
   );

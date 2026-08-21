@@ -1,5 +1,10 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util';
+import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
+import {
+  USER_REPOSITORY,
+  type UserRepository,
+} from '../../authentication/domain/repositories/user-repository.interface';
 import {
   DEPARTMENT_REPOSITORY,
   type DepartmentRepository,
@@ -14,17 +19,24 @@ import { CreateClientDto } from './dto/create-client.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { UpdateClientHealthDto } from './dto/update-client-health.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { Client } from '../domain/entities/client.entity';
+import { ClientHealthHistory } from '../domain/entities/client-health-history.entity';
 import { Project } from '../domain/entities/project.entity';
 import { Service } from '../domain/entities/service.entity';
+import { ClientHealthStatus } from '../domain/enums/client-health-status.enum';
 import { ProjectStatus } from '../domain/enums/project-status.enum';
 import { ProjectType } from '../domain/enums/project-type.enum';
 import {
   CLIENT_REPOSITORY,
   type ClientRepository,
 } from '../domain/repositories/client-repository.interface';
+import {
+  CLIENT_HEALTH_HISTORY_REPOSITORY,
+  type ClientHealthHistoryRepository,
+} from '../domain/repositories/client-health-history-repository.interface';
 import {
   PROJECT_REPOSITORY,
   type ProjectRepository,
@@ -34,12 +46,15 @@ import {
   type ServiceRepository,
 } from '../domain/repositories/service-repository.interface';
 import {
+  ClientHealthHistoryResponseDto,
+  ClientHealthSummaryDto,
   ClientResponseDto,
   ProjectResponseDto,
   ProjectsSummaryDto,
   ServiceResponseDto,
 } from './client-response.interface';
 import {
+  toClientHealthHistoryResponse,
   toClientResponse,
   toProjectResponse,
   toServiceResponse,
@@ -58,6 +73,10 @@ export class ClientsService {
     private readonly employeeRepository: EmployeeRepository,
     @Inject(DEPARTMENT_REPOSITORY)
     private readonly departmentRepository: DepartmentRepository,
+    @Inject(CLIENT_HEALTH_HISTORY_REPOSITORY)
+    private readonly clientHealthHistoryRepository: ClientHealthHistoryRepository,
+    @Inject(USER_REPOSITORY)
+    private readonly userRepository: UserRepository,
   ) {}
 
   // ---- Clients ----
@@ -82,6 +101,8 @@ export class ClientsService {
     client.primaryContactPhone = dto.primaryContactPhone;
     client.notes = dto.notes;
     client.isArchived = false;
+    client.healthStatus = ClientHealthStatus.HEALTHY;
+    client.healthFactors = [];
 
     const saved = await this.clientRepository.save(client);
     return toClientResponse(saved);
@@ -101,6 +122,70 @@ export class ClientsService {
     const client = await this.clientRepository.findById(id);
     if (!client) throw new NotFoundException('Client not found');
     return client;
+  }
+
+  // ---- Client Health ----
+
+  async updateClientHealth(
+    id: string,
+    actorUserId: string,
+    dto: UpdateClientHealthDto,
+  ): Promise<ClientResponseDto> {
+    const client = await this.getClientOrThrow(id);
+    const previousStatus = client.healthStatus;
+
+    client.healthStatus = dto.status;
+    client.healthFactors = dto.factors ?? [];
+    client.healthNotes = dto.notes;
+    const saved = await this.clientRepository.save(client);
+
+    const actorName = await resolveActorName(
+      this.employeeRepository,
+      this.userRepository,
+      actorUserId,
+    );
+    const history = new ClientHealthHistory();
+    history.clientId = id;
+    history.previousStatus = previousStatus;
+    history.newStatus = dto.status;
+    history.factors = dto.factors ?? [];
+    history.notes = dto.notes ?? null;
+    history.actorUserId = actorUserId;
+    history.actorName = actorName;
+    await this.clientHealthHistoryRepository.save(history);
+
+    return toClientResponse(saved);
+  }
+
+  async getClientHealthHistory(
+    id: string,
+  ): Promise<ClientHealthHistoryResponseDto[]> {
+    const history = await this.clientHealthHistoryRepository.findByClientId(id);
+    return history.map(toClientHealthHistoryResponse);
+  }
+
+  async getClientHealthSummary(): Promise<ClientHealthSummaryDto> {
+    const clients = await this.clientRepository.findAll(false);
+
+    let healthyCount = 0;
+    let attentionRequiredCount = 0;
+    let atRiskCount = 0;
+
+    for (const client of clients) {
+      switch (client.healthStatus) {
+        case ClientHealthStatus.HEALTHY:
+          healthyCount += 1;
+          break;
+        case ClientHealthStatus.ATTENTION_REQUIRED:
+          attentionRequiredCount += 1;
+          break;
+        case ClientHealthStatus.AT_RISK:
+          atRiskCount += 1;
+          break;
+      }
+    }
+
+    return { healthyCount, attentionRequiredCount, atRiskCount };
   }
 
   // ---- Services ----

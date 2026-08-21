@@ -1,4 +1,6 @@
 import '../entities/client.dart';
+import '../entities/client_health_history_entry.dart';
+import '../entities/client_health_summary.dart';
 import '../entities/project.dart';
 import '../entities/projects_summary.dart';
 import '../entities/service.dart';
@@ -29,6 +31,15 @@ abstract interface class ClientsRepository {
     String? notes,
     bool? isArchived,
   });
+
+  Future<ClientHealthSummary> getClientHealthSummary();
+  Future<Client> updateClientHealth(
+    String id, {
+    required String status,
+    List<String>? factors,
+    String? notes,
+  });
+  Future<List<ClientHealthHistoryEntry>> getClientHealthHistory(String id);
 
   Future<List<Service>> getServices({bool includeArchived = false});
   Future<Service> createService({required String name, String? description});

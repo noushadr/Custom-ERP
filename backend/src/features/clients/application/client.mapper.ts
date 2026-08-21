@@ -1,7 +1,9 @@
 import { Client } from '../domain/entities/client.entity';
+import { ClientHealthHistory } from '../domain/entities/client-health-history.entity';
 import { Project } from '../domain/entities/project.entity';
 import { Service } from '../domain/entities/service.entity';
 import {
+  ClientHealthHistoryResponseDto,
   ClientResponseDto,
   ProjectResponseDto,
   ServiceResponseDto,
@@ -19,8 +21,26 @@ export function toClientResponse(client: Client): ClientResponseDto {
     primaryContactPhone: client.primaryContactPhone ?? null,
     notes: client.notes ?? null,
     isArchived: client.isArchived,
+    healthStatus: client.healthStatus,
+    healthFactors: client.healthFactors,
+    healthNotes: client.healthNotes ?? null,
     createdAt: client.createdAt.toISOString(),
     updatedAt: client.updatedAt.toISOString(),
+  };
+}
+
+export function toClientHealthHistoryResponse(
+  entry: ClientHealthHistory,
+): ClientHealthHistoryResponseDto {
+  return {
+    id: entry.id,
+    clientId: entry.clientId,
+    previousStatus: entry.previousStatus,
+    newStatus: entry.newStatus,
+    factors: entry.factors,
+    notes: entry.notes ?? null,
+    actorName: entry.actorName,
+    createdAt: entry.createdAt.toISOString(),
   };
 }
 

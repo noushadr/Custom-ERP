@@ -1,4 +1,7 @@
 import 'package:zera_erp/features/clients/domain/entities/client.dart';
+import 'package:zera_erp/features/clients/domain/entities/client_health_history_entry.dart';
+import 'package:zera_erp/features/clients/domain/entities/client_health_status.dart';
+import 'package:zera_erp/features/clients/domain/entities/client_health_summary.dart';
 import 'package:zera_erp/features/clients/domain/entities/project.dart';
 import 'package:zera_erp/features/clients/domain/entities/project_refs.dart';
 import 'package:zera_erp/features/clients/domain/entities/projects_summary.dart';
@@ -16,6 +19,9 @@ Client buildTestClient({
   String? primaryContactPhone,
   String? notes,
   bool isArchived = false,
+  String healthStatus = ClientHealthStatus.healthy,
+  List<String> healthFactors = const [],
+  String? healthNotes,
   DateTime? createdAt,
   DateTime? updatedAt,
 }) {
@@ -30,8 +36,45 @@ Client buildTestClient({
     primaryContactPhone: primaryContactPhone,
     notes: notes,
     isArchived: isArchived,
+    healthStatus: healthStatus,
+    healthFactors: healthFactors,
+    healthNotes: healthNotes,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
     updatedAt: updatedAt ?? DateTime(2026, 1, 1),
+  );
+}
+
+ClientHealthHistoryEntry buildTestClientHealthHistoryEntry({
+  String id = 'health-entry-1',
+  String clientId = 'client-1',
+  String previousStatus = ClientHealthStatus.healthy,
+  String newStatus = ClientHealthStatus.atRisk,
+  List<String> factors = const [],
+  String? notes,
+  String actorName = 'Jane Admin',
+  DateTime? createdAt,
+}) {
+  return ClientHealthHistoryEntry(
+    id: id,
+    clientId: clientId,
+    previousStatus: previousStatus,
+    newStatus: newStatus,
+    factors: factors,
+    notes: notes,
+    actorName: actorName,
+    createdAt: createdAt ?? DateTime(2026, 1, 1),
+  );
+}
+
+ClientHealthSummary buildTestClientHealthSummary({
+  int healthyCount = 0,
+  int attentionRequiredCount = 0,
+  int atRiskCount = 0,
+}) {
+  return ClientHealthSummary(
+    healthyCount: healthyCount,
+    attentionRequiredCount: attentionRequiredCount,
+    atRiskCount: atRiskCount,
   );
 }
 
@@ -125,12 +168,16 @@ class FakeClientsRepository implements ClientsRepository {
     this.services = const [],
     this.projects = const [],
     this.projectsSummary,
+    this.clientHealthSummary,
+    this.clientHealthHistory = const [],
   });
 
   final List<Client> clients;
   final List<Service> services;
   final List<Project> projects;
   final ProjectsSummary? projectsSummary;
+  final ClientHealthSummary? clientHealthSummary;
+  final List<ClientHealthHistoryEntry> clientHealthHistory;
 
   /// The `companyName` passed to the most recent [createClient] call.
   String? lastCreatedCompanyName;
@@ -142,9 +189,24 @@ class FakeClientsRepository implements ClientsRepository {
   String? lastCreatedProjectName;
   double? lastCreatedProjectPrice;
 
+  /// The arguments passed to the most recent [updateClientHealth] call.
+  String? lastHealthUpdateClientId;
+  String? lastHealthUpdateStatus;
+  List<String>? lastHealthUpdateFactors;
+  String? lastHealthUpdateNotes;
+
+  /// Incremented on every [getClients] call — used to confirm a mutation
+  /// actually invalidated and re-fetched the client list/detail providers,
+  /// not just that the mutation call itself succeeded.
+  int getClientsCallCount = 0;
+
   @override
-  Future<List<Client>> getClients({bool includeArchived = false}) async =>
-      includeArchived ? clients : clients.where((c) => !c.isArchived).toList();
+  Future<List<Client>> getClients({bool includeArchived = false}) async {
+    getClientsCallCount++;
+    return includeArchived
+        ? clients
+        : clients.where((c) => !c.isArchived).toList();
+  }
 
   @override
   Future<Client> createClient({
@@ -174,6 +236,34 @@ class FakeClientsRepository implements ClientsRepository {
     String? notes,
     bool? isArchived,
   }) async => buildTestClient(id: id, isArchived: isArchived ?? false);
+
+  @override
+  Future<ClientHealthSummary> getClientHealthSummary() async =>
+      clientHealthSummary ?? buildTestClientHealthSummary();
+
+  @override
+  Future<Client> updateClientHealth(
+    String id, {
+    required String status,
+    List<String>? factors,
+    String? notes,
+  }) async {
+    lastHealthUpdateClientId = id;
+    lastHealthUpdateStatus = status;
+    lastHealthUpdateFactors = factors;
+    lastHealthUpdateNotes = notes;
+    return buildTestClient(
+      id: id,
+      healthStatus: status,
+      healthFactors: factors ?? const [],
+      healthNotes: notes,
+    );
+  }
+
+  @override
+  Future<List<ClientHealthHistoryEntry>> getClientHealthHistory(
+    String id,
+  ) async => clientHealthHistory;
 
   @override
   Future<List<Service>> getServices({bool includeArchived = false}) async =>

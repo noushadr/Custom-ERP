@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../domain/entities/client.dart';
+import '../../domain/entities/client_health_history_entry.dart';
+import '../../domain/entities/client_health_summary.dart';
 import '../../domain/entities/project.dart';
 import '../../domain/entities/projects_summary.dart';
 import '../../domain/entities/service.dart';
@@ -65,6 +67,29 @@ class ClientsRepositoryImpl implements ClientsRepository {
       isArchived: isArchived,
     ),
   );
+
+  @override
+  Future<ClientHealthSummary> getClientHealthSummary() =>
+      _guard(() => _remoteDataSource.getClientHealthSummary());
+
+  @override
+  Future<Client> updateClientHealth(
+    String id, {
+    required String status,
+    List<String>? factors,
+    String? notes,
+  }) => _guard(
+    () => _remoteDataSource.updateClientHealth(
+      id,
+      status: status,
+      factors: factors,
+      notes: notes,
+    ),
+  );
+
+  @override
+  Future<List<ClientHealthHistoryEntry>> getClientHealthHistory(String id) =>
+      _guard(() => _remoteDataSource.getClientHealthHistory(id));
 
   @override
   Future<List<Service>> getServices({bool includeArchived = false}) => _guard(

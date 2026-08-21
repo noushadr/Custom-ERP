@@ -4,7 +4,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/client.dart';
+import '../../domain/entities/client_health_status.dart';
 import '../../domain/entities/project.dart';
+import '../widgets/client_health_badges.dart';
 import '../widgets/project_badges.dart';
 import 'client_detail_page.dart';
 import 'client_editor_page.dart';
@@ -21,7 +23,7 @@ class ClientsProjectsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Center(
@@ -43,6 +45,7 @@ class ClientsProjectsPage extends ConsumerWidget {
                         tabs: [
                           Tab(text: 'Projects'),
                           Tab(text: 'Clients'),
+                          Tab(text: 'Health'),
                         ],
                       ),
                     ),
@@ -52,7 +55,7 @@ class ClientsProjectsPage extends ConsumerWidget {
                 const SizedBox(height: 16),
                 const Expanded(
                   child: TabBarView(
-                    children: [_ProjectsTab(), _ClientsTab()],
+                    children: [_ProjectsTab(), _ClientsTab(), _HealthTab()],
                   ),
                 ),
               ],
@@ -366,10 +369,111 @@ class _ClientRow extends StatelessWidget {
                 ],
               ),
             ),
+            ClientHealthBadge(status: client.healthStatus, dense: true),
+            const SizedBox(width: 8),
             const Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ],
         ),
       ),
     );
+  }
+}
+
+class _HealthTab extends ConsumerWidget {
+  const _HealthTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(clientHealthSummaryProvider);
+    final clientsAsync = ref.watch(clientsListProvider(false));
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          summaryAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(),
+            ),
+            error: (_, _) => Text(
+              'Could not load the health summary.',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            data: (summary) => Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _StatTile(
+                  label: 'Healthy',
+                  value: '${summary.healthyCount}',
+                  color: AppColors.success,
+                  icon: Icons.favorite_border,
+                ),
+                _StatTile(
+                  label: 'Attention Required',
+                  value: '${summary.attentionRequiredCount}',
+                  color: AppColors.warning,
+                  icon: Icons.warning_amber_outlined,
+                ),
+                _StatTile(
+                  label: 'At Risk',
+                  value: '${summary.atRiskCount}',
+                  color: AppColors.error,
+                  icon: Icons.error_outline,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Needs Attention',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          clientsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, _) => Text(
+              'Could not load clients.',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            data: (clients) {
+              final atRisk = _sortedByWorstHealth(clients);
+              if (atRisk.isEmpty) {
+                return Text(
+                  'No clients need attention right now.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                );
+              }
+              return Column(
+                children: [
+                  for (var i = 0; i < atRisk.length; i++) ...[
+                    _ClientRow(client: atRisk[i]),
+                    if (i < atRisk.length - 1)
+                      const Divider(height: 1, color: AppColors.borderSubtle),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Client> _sortedByWorstHealth(List<Client> clients) {
+    const severity = {
+      ClientHealthStatus.atRisk: 0,
+      ClientHealthStatus.attentionRequired: 1,
+    };
+    final needsAttention = clients
+        .where((c) => severity.containsKey(c.healthStatus))
+        .toList();
+    needsAttention.sort(
+      (a, b) => severity[a.healthStatus]!.compareTo(severity[b.healthStatus]!),
+    );
+    return needsAttention;
   }
 }

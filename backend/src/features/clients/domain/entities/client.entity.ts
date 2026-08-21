@@ -1,5 +1,6 @@
 import { Column, Entity } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
+import { ClientHealthStatus } from '../enums/client-health-status.enum';
 
 /** A single primary contact per client is enough for v1 — a separate
  * multi-contact entity can be added later if needed. */
@@ -31,4 +32,22 @@ export class Client extends BaseEntity {
 
   @Column({ default: false })
   isArchived: boolean;
+
+  /** Current health snapshot — the source of truth for badges/dashboards.
+   * `ClientHealthHistory` holds the trail of how it got here; this column is
+   * never derived/recomputed from that trail, only set directly by
+   * `updateClientHealth`. */
+  @Column({
+    type: 'enum',
+    enum: ClientHealthStatus,
+    enumName: 'client_health_status_enum',
+    default: ClientHealthStatus.HEALTHY,
+  })
+  healthStatus: ClientHealthStatus;
+
+  @Column({ type: 'text', array: true, default: () => "'{}'" })
+  healthFactors: string[];
+
+  @Column({ type: 'text', nullable: true })
+  healthNotes?: string;
 }

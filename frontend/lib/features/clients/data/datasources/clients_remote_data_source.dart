@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import '../models/client_health_history_entry_model.dart';
+import '../models/client_health_summary_model.dart';
 import '../models/client_model.dart';
 import '../models/project_model.dart';
 import '../models/projects_summary_model.dart';
@@ -73,6 +75,38 @@ class ClientsRemoteDataSource {
       },
     );
     return ClientModel.fromJson(response.data!);
+  }
+
+  Future<ClientHealthSummaryModel> getClientHealthSummary() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/clients/health-summary',
+    );
+    return ClientHealthSummaryModel.fromJson(response.data!);
+  }
+
+  Future<ClientModel> updateClientHealth(
+    String id, {
+    required String status,
+    List<String>? factors,
+    String? notes,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/clients/$id/health',
+      data: {'status': status, 'factors': ?factors, 'notes': ?notes},
+    );
+    return ClientModel.fromJson(response.data!);
+  }
+
+  Future<List<ClientHealthHistoryEntryModel>> getClientHealthHistory(
+    String id,
+  ) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/clients/$id/health-history',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(ClientHealthHistoryEntryModel.fromJson)
+        .toList();
   }
 
   Future<List<ServiceModel>> getServices({

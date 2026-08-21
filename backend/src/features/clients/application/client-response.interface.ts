@@ -9,8 +9,28 @@ export interface ClientResponseDto {
   primaryContactPhone: string | null;
   notes: string | null;
   isArchived: boolean;
+  healthStatus: string;
+  healthFactors: string[];
+  healthNotes: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ClientHealthHistoryResponseDto {
+  id: string;
+  clientId: string;
+  previousStatus: string;
+  newStatus: string;
+  factors: string[];
+  notes: string | null;
+  actorName: string;
+  createdAt: string;
+}
+
+export interface ClientHealthSummaryDto {
+  healthyCount: number;
+  attentionRequiredCount: number;
+  atRiskCount: number;
 }
 
 export interface ServiceResponseDto {

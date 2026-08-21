@@ -1,13 +1,18 @@
 import { NotFoundException } from '@nestjs/common';
+import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
 import { Department } from '../../departments/domain/entities/department.entity';
 import type { DepartmentRepository } from '../../departments/domain/repositories/department-repository.interface';
 import { Employee } from '../../employee/domain/entities/employee.entity';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
 import { Client } from '../domain/entities/client.entity';
+import { ClientHealthHistory } from '../domain/entities/client-health-history.entity';
 import { Project } from '../domain/entities/project.entity';
 import { Service } from '../domain/entities/service.entity';
+import { ClientHealthFactor } from '../domain/enums/client-health-factor.enum';
+import { ClientHealthStatus } from '../domain/enums/client-health-status.enum';
 import { ProjectStatus } from '../domain/enums/project-status.enum';
 import { ProjectType } from '../domain/enums/project-type.enum';
+import type { ClientHealthHistoryRepository } from '../domain/repositories/client-health-history-repository.interface';
 import type { ClientRepository } from '../domain/repositories/client-repository.interface';
 import type { ProjectRepository } from '../domain/repositories/project-repository.interface';
 import type { ServiceRepository } from '../domain/repositories/service-repository.interface';
@@ -18,6 +23,8 @@ function buildClient(overrides: Partial<Client> = {}): Client {
     id: 'client-1',
     companyName: 'Acme Inc',
     isArchived: false,
+    healthStatus: ClientHealthStatus.HEALTHY,
+    healthFactors: [],
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
@@ -77,6 +84,8 @@ describe('ClientsService', () => {
   let projectRepository: jest.Mocked<ProjectRepository>;
   let employeeRepository: jest.Mocked<EmployeeRepository>;
   let departmentRepository: jest.Mocked<DepartmentRepository>;
+  let clientHealthHistoryRepository: jest.Mocked<ClientHealthHistoryRepository>;
+  let userRepository: jest.Mocked<UserRepository>;
 
   beforeEach(() => {
     const stampTimestamps = (item: {
@@ -121,6 +130,18 @@ describe('ClientsService', () => {
       save: jest.fn(),
       remove: jest.fn(),
     };
+    clientHealthHistoryRepository = {
+      findByClientId: jest.fn().mockResolvedValue([]),
+      save: jest.fn((item) =>
+        Promise.resolve(stampTimestamps(item) as ClientHealthHistory),
+      ),
+    };
+    userRepository = {
+      findByEmail: jest.fn(),
+      findById: jest.fn().mockResolvedValue(null),
+      findAll: jest.fn(),
+      save: jest.fn(),
+    };
 
     service = new ClientsService(
       clientRepository,
@@ -128,6 +149,8 @@ describe('ClientsService', () => {
       projectRepository,
       employeeRepository,
       departmentRepository,
+      clientHealthHistoryRepository,
+      userRepository,
     );
   });
 
@@ -158,6 +181,123 @@ describe('ClientsService', () => {
       await expect(
         service.updateClient('missing', { companyName: 'X' }),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('client health', () => {
+    it('defaults a new client to Healthy with no factors or notes', async () => {
+      const result = await service.createClient({ companyName: 'Acme Inc' });
+      expect(result.healthStatus).toBe(ClientHealthStatus.HEALTHY);
+      expect(result.healthFactors).toEqual([]);
+      expect(result.healthNotes).toBeNull();
+    });
+
+    it('updates the client row and writes a history row on a health update', async () => {
+      clientRepository.findById.mockResolvedValue(
+        buildClient({ healthStatus: ClientHealthStatus.HEALTHY }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ firstName: 'Jane', lastName: 'Admin' }),
+      );
+
+      const result = await service.updateClientHealth('client-1', 'user-1', {
+        status: ClientHealthStatus.AT_RISK,
+        factors: [ClientHealthFactor.PAYMENT, ClientHealthFactor.DELAYS],
+        notes: 'Invoice overdue 30 days',
+      });
+
+      expect(result.healthStatus).toBe(ClientHealthStatus.AT_RISK);
+      expect(result.healthFactors).toEqual([
+        ClientHealthFactor.PAYMENT,
+        ClientHealthFactor.DELAYS,
+      ]);
+      expect(result.healthNotes).toBe('Invoice overdue 30 days');
+
+      expect(clientHealthHistoryRepository.save).toHaveBeenCalledTimes(1);
+      const savedHistory = clientHealthHistoryRepository.save.mock
+        .calls[0][0];
+      expect(savedHistory.previousStatus).toBe(ClientHealthStatus.HEALTHY);
+      expect(savedHistory.newStatus).toBe(ClientHealthStatus.AT_RISK);
+      expect(savedHistory.factors).toEqual([
+        ClientHealthFactor.PAYMENT,
+        ClientHealthFactor.DELAYS,
+      ]);
+      expect(savedHistory.actorUserId).toBe('user-1');
+      expect(savedHistory.actorName).toBe('Jane Admin');
+    });
+
+    it('defaults factors to an empty array and notes to null when omitted', async () => {
+      clientRepository.findById.mockResolvedValue(buildClient());
+
+      await service.updateClientHealth('client-1', 'user-1', {
+        status: ClientHealthStatus.ATTENTION_REQUIRED,
+      });
+
+      const savedHistory = clientHealthHistoryRepository.save.mock
+        .calls[0][0];
+      expect(savedHistory.factors).toEqual([]);
+      expect(savedHistory.notes).toBeNull();
+    });
+
+    it('falls back to a name derived from the email when there is no employee profile', async () => {
+      clientRepository.findById.mockResolvedValue(buildClient());
+      userRepository.findById.mockResolvedValue({
+        email: 'noushad.ranani@zeracreative.com',
+      } as any);
+
+      await service.updateClientHealth('client-1', 'admin-user', {
+        status: ClientHealthStatus.AT_RISK,
+      });
+
+      const savedHistory = clientHealthHistoryRepository.save.mock
+        .calls[0][0];
+      expect(savedHistory.actorName).toBe('Noushad Ranani');
+    });
+
+    it('returns health history newest-first', async () => {
+      clientHealthHistoryRepository.findByClientId.mockResolvedValue([
+        {
+          id: 'h2',
+          clientId: 'client-1',
+          previousStatus: ClientHealthStatus.ATTENTION_REQUIRED,
+          newStatus: ClientHealthStatus.AT_RISK,
+          factors: [],
+          notes: null,
+          actorUserId: 'user-1',
+          actorName: 'Jane Admin',
+          createdAt: new Date('2026-02-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+        } as unknown as ClientHealthHistory,
+      ]);
+
+      const history = await service.getClientHealthHistory('client-1');
+
+      expect(clientHealthHistoryRepository.findByClientId).toHaveBeenCalledWith(
+        'client-1',
+      );
+      expect(history).toHaveLength(1);
+      expect(history[0].newStatus).toBe(ClientHealthStatus.AT_RISK);
+    });
+
+    it('summarizes health counts across non-archived clients', async () => {
+      clientRepository.findAll.mockResolvedValue([
+        buildClient({ id: 'c1', healthStatus: ClientHealthStatus.HEALTHY }),
+        buildClient({ id: 'c2', healthStatus: ClientHealthStatus.HEALTHY }),
+        buildClient({
+          id: 'c3',
+          healthStatus: ClientHealthStatus.ATTENTION_REQUIRED,
+        }),
+        buildClient({ id: 'c4', healthStatus: ClientHealthStatus.AT_RISK }),
+      ]);
+
+      const summary = await service.getClientHealthSummary();
+
+      expect(clientRepository.findAll).toHaveBeenCalledWith(false);
+      expect(summary).toEqual({
+        healthyCount: 2,
+        attentionRequiredCount: 1,
+        atRiskCount: 1,
+      });
     });
   });
 

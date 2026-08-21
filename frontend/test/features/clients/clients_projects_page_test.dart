@@ -5,6 +5,7 @@ import 'package:zera_erp/features/authentication/application/auth_providers.dart
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
+import 'package:zera_erp/features/clients/domain/entities/client_health_status.dart';
 import 'package:zera_erp/features/clients/presentation/pages/clients_projects_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 
@@ -18,6 +19,17 @@ const _superAdmin = AuthUser(
   role: 'Super Admin',
   permissions: ['clients.manage'],
 );
+
+/// The tab bar (Projects/Clients/Health) sits next to the New Client/New
+/// Project buttons in one row — on the default 800x600 test surface that
+/// combination doesn't fit and the last tab overlaps the buttons instead of
+/// scrolling, so tests that need to reach the Health tab use a wider one.
+Future<void> _useWideSurface(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(1400, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
 
 Widget _app({FakeClientsRepository? repository}) {
   return ProviderScope(
@@ -103,5 +115,104 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No projects yet.'), findsOneWidget);
+  });
+
+  testWidgets('shows a health badge on each row in the Clients tab', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakeClientsRepository(
+          clients: [
+            buildTestClient(
+              companyName: 'Acme Co',
+              healthStatus: ClientHealthStatus.atRisk,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Clients'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('At Risk'), findsOneWidget);
+  });
+
+  testWidgets('the Health tab shows counts and a worst-first at-risk list', (
+    tester,
+  ) async {
+    await _useWideSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        repository: FakeClientsRepository(
+          clients: [
+            buildTestClient(
+              id: 'c1',
+              companyName: 'Healthy Co',
+              healthStatus: ClientHealthStatus.healthy,
+            ),
+            buildTestClient(
+              id: 'c2',
+              companyName: 'Attention Co',
+              healthStatus: ClientHealthStatus.attentionRequired,
+            ),
+            buildTestClient(
+              id: 'c3',
+              companyName: 'Risky Co',
+              healthStatus: ClientHealthStatus.atRisk,
+            ),
+          ],
+          clientHealthSummary: buildTestClientHealthSummary(
+            healthyCount: 1,
+            attentionRequiredCount: 1,
+            atRiskCount: 1,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Health'));
+    await tester.pumpAndSettle();
+
+    // "Attention Required"/"At Risk" each appear twice: once as a stat tile
+    // label, once as the health badge on the matching client's row.
+    expect(find.text('Healthy'), findsOneWidget);
+    expect(find.text('Attention Required'), findsNWidgets(2));
+    expect(find.text('At Risk'), findsNWidgets(2));
+    expect(find.text('Healthy Co'), findsNothing);
+    expect(find.text('Attention Co'), findsOneWidget);
+    expect(find.text('Risky Co'), findsOneWidget);
+
+    // Worst-first: "Risky Co" (At Risk) must appear above "Attention Co".
+    final riskyPosition = tester.getTopLeft(find.text('Risky Co')).dy;
+    final attentionPosition = tester.getTopLeft(find.text('Attention Co')).dy;
+    expect(riskyPosition, lessThan(attentionPosition));
+  });
+
+  testWidgets('the Health tab shows an empty state when nothing needs attention', (
+    tester,
+  ) async {
+    await _useWideSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        repository: FakeClientsRepository(
+          clients: [
+            buildTestClient(
+              companyName: 'Healthy Co',
+              healthStatus: ClientHealthStatus.healthy,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Health'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No clients need attention right now.'), findsOneWidget);
   });
 }
