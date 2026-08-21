@@ -8,6 +8,7 @@ import '../../../authentication/application/auth_state.dart';
 import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../checklists/presentation/widgets/employee_checklist_section.dart';
+import '../../../performance_reviews/presentation/widgets/employee_performance_reviews_section.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/employee_assets_section.dart';
@@ -272,6 +273,15 @@ class _ProfileBody extends ConsumerWidget {
             canManage: canManage,
           ),
         ],
+        // Not nested under showAuditLog (which gates on employees.manage) —
+        // this section gates itself on the separate performance.manage
+        // permission, so it stays visible to a custom role that holds
+        // performance.manage without employees.manage too.
+        const SizedBox(height: 16),
+        EmployeePerformanceReviewsSection(
+          employeeId: employee.id,
+          isSelf: isOwnProfile,
+        ),
         const SizedBox(height: 16),
         _Section(
           title: 'Contact',

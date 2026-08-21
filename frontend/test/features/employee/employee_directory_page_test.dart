@@ -6,14 +6,19 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/presentation/pages/employee_directory_page.dart';
+import 'package:zera_erp/features/employee/presentation/widgets/employee_status_badges.dart';
+import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/shared/models/named_ref.dart';
+import 'package:zera_erp/shared/utils/date_format.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_performance_review.dart';
 
 Widget _app({
   required List<String> permissions,
   required FakeEmployeeRepository repository,
+  FakePerformanceReviewRepository? performanceReviewRepository,
 }) {
   final user = AuthUser(
     id: 'user-1',
@@ -28,9 +33,27 @@ Widget _app({
         (ref) => PresetAuthController(AuthAuthenticated(user)),
       ),
       employeeRepositoryProvider.overrideWithValue(repository),
+      performanceReviewRepositoryProvider.overrideWithValue(
+        performanceReviewRepository ?? FakePerformanceReviewRepository(),
+      ),
     ],
     child: const MaterialApp(home: Scaffold(body: EmployeeDirectoryPage())),
   );
+}
+
+/// An ISO 'YYYY-MM-DD' exactly [years] years (and, optionally, [months])
+/// before today — so tenure assertions stay correct no matter when the test
+/// suite actually runs.
+String _joinedAgo(int years, {int months = 0}) {
+  final now = DateTime.now();
+  var year = now.year - years;
+  var month = now.month - months;
+  if (month < 1) {
+    year -= 1;
+    month += 12;
+  }
+  final date = DateTime(year, month, now.day);
+  return date.toIso8601String().substring(0, 10);
 }
 
 void main() {
@@ -295,6 +318,145 @@ void main() {
       expect(find.text('On-site: 0'), findsOneWidget);
       expect(find.text('Remote: 1'), findsOneWidget);
       expect(find.text('Hybrid: 0'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'renders employment status and work mode badges in the dense size',
+    (tester) async {
+      final repository = FakeEmployeeRepository(
+        employees: [buildTestEmployee()],
+      );
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      final badge = tester.widget<EmploymentStatusBadge>(
+        find.byType(EmploymentStatusBadge),
+      );
+      final workModeBadge = tester.widget<WorkModeBadge>(
+        find.byType(WorkModeBadge),
+      );
+      expect(badge.dense, isTrue);
+      expect(workModeBadge.dense, isTrue);
+    },
+  );
+
+  testWidgets('shows each employee\'s tenure since joining', (tester) async {
+    final repository = FakeEmployeeRepository(
+      employees: [
+        buildTestEmployee(joiningDate: _joinedAgo(2)),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _app(permissions: ['employees.read'], repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 yrs'), findsOneWidget);
+  });
+
+  testWidgets(
+    'hides the last-review chip without performance.manage',
+    (tester) async {
+      final repository = FakeEmployeeRepository(
+        employees: [buildTestEmployee()],
+      );
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Last Review'), findsNothing);
+      expect(find.textContaining('No review yet'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'shows a pending last-review status for a performance.manage holder',
+    (tester) async {
+      final repository = FakeEmployeeRepository(
+        employees: [buildTestEmployee(id: 'employee-1')],
+      );
+      final reviewRepository = FakePerformanceReviewRepository(
+        latestReviewSummaries: [
+          buildTestPerformanceReviewSummary(
+            employeeId: 'employee-1',
+            status: 'pending',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: ['employees.read', 'performance.manage'],
+          repository: repository,
+          performanceReviewRepository: reviewRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Last Review: Pending'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows the finalized date for a completed last review',
+    (tester) async {
+      final repository = FakeEmployeeRepository(
+        employees: [buildTestEmployee(id: 'employee-1')],
+      );
+      final finalizedAt = DateTime.utc(2026, 2, 1, 12);
+      final reviewRepository = FakePerformanceReviewRepository(
+        latestReviewSummaries: [
+          buildTestPerformanceReviewSummary(
+            employeeId: 'employee-1',
+            status: 'finalized',
+            finalizedAt: finalizedAt,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: ['employees.read', 'performance.manage'],
+          repository: repository,
+          performanceReviewRepository: reviewRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Last Review: ${formatDisplayDateOnly(finalizedAt)}'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'shows "No review yet" for an employee with no reviews at all',
+    (tester) async {
+      final repository = FakeEmployeeRepository(
+        employees: [buildTestEmployee(id: 'employee-1')],
+      );
+      final reviewRepository = FakePerformanceReviewRepository(
+        latestReviewSummaries: const [],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          permissions: ['employees.read', 'performance.manage'],
+          repository: repository,
+          performanceReviewRepository: reviewRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No review yet'), findsOneWidget);
     },
   );
 }
