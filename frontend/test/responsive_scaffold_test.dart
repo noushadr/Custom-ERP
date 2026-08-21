@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_providers.dart
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/finances/application/finances_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
@@ -18,6 +19,7 @@ import 'helpers/fake_agency_reporting.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
+import 'helpers/fake_finances.dart';
 import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leave.dart';
 import 'helpers/fake_notice.dart';
@@ -53,6 +55,7 @@ Widget _authenticatedApp() {
       agencyReportingRepositoryProvider.overrideWithValue(
         FakeAgencyReportingRepository(),
       ),
+      financesRepositoryProvider.overrideWithValue(FakeFinancesRepository()),
     ],
     child: const ZeraApp(),
   );

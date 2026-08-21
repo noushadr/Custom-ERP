@@ -10,6 +10,7 @@ import { Project } from '../domain/entities/project.entity';
 import { Service } from '../domain/entities/service.entity';
 import { ClientHealthFactor } from '../domain/enums/client-health-factor.enum';
 import { ClientHealthStatus } from '../domain/enums/client-health-status.enum';
+import { ProjectPaymentStatus } from '../domain/enums/project-payment-status.enum';
 import { ProjectStatus } from '../domain/enums/project-status.enum';
 import { ProjectType } from '../domain/enums/project-type.enum';
 import type { ClientHealthHistoryRepository } from '../domain/repositories/client-health-history-repository.interface';
@@ -68,6 +69,8 @@ function buildProject(overrides: Partial<Project> = {}): Project {
     originalClientPrice: '1000.00',
     deductionRate: '20.00',
     cost: '0.00',
+    paymentStatus: ProjectPaymentStatus.UNPAID,
+    amountPaid: '0.00',
     assignedEmployees: [],
     targetDepartments: [],
     services: [],
@@ -392,6 +395,36 @@ describe('ClientsService', () => {
       });
 
       expect(result.netPrice).toBe(1500);
+    });
+
+    it('defaults a new project to unpaid with nothing paid yet', async () => {
+      projectRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildProject({ id })),
+      );
+
+      const result = await service.createProject({
+        clientId: 'client-1',
+        name: 'Website Revamp',
+        type: ProjectType.ONE_TIME,
+        startDate: '2026-01-01',
+        originalClientPrice: 1000,
+      });
+
+      expect(result.paymentStatus).toBe(ProjectPaymentStatus.UNPAID);
+      expect(result.amountPaid).toBe(0);
+    });
+
+    it('updates payment status and amount paid', async () => {
+      const project = buildProject();
+      projectRepository.findById.mockResolvedValue(project);
+
+      const result = await service.updateProject('project-1', {
+        paymentStatus: ProjectPaymentStatus.PARTIAL,
+        amountPaid: 300,
+      });
+
+      expect(result.paymentStatus).toBe(ProjectPaymentStatus.PARTIAL);
+      expect(result.amountPaid).toBe(300);
     });
   });
 

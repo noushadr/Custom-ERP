@@ -19,6 +19,8 @@ class ProjectModel extends Project {
     required super.cost,
     required super.profit,
     required super.notes,
+    required super.paymentStatus,
+    required super.amountPaid,
     required super.assignedEmployees,
     required super.targetDepartments,
     required super.services,
@@ -42,6 +44,8 @@ class ProjectModel extends Project {
     cost: (json['cost'] as num).toDouble(),
     profit: (json['profit'] as num).toDouble(),
     notes: json['notes'] as String?,
+    paymentStatus: json['paymentStatus'] as String,
+    amountPaid: (json['amountPaid'] as num).toDouble(),
     assignedEmployees: (json['assignedEmployees'] as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(

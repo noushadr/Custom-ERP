@@ -81,6 +81,8 @@ abstract interface class ClientsRepository {
     double? deductionRate,
     double? cost,
     String? notes,
+    String? paymentStatus,
+    double? amountPaid,
     List<String>? assignedEmployeeIds,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,

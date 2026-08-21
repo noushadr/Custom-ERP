@@ -19,6 +19,7 @@ import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
+import 'features/finances/presentation/pages/finances_page.dart';
 import 'features/knowledge_base/presentation/pages/knowledge_base_page.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
 import 'features/performance_reviews/presentation/pages/performance_review_detail_page.dart';
@@ -144,6 +145,11 @@ const _allDestinations = [
     icon: Icons.query_stats_outlined,
     selectedIcon: Icons.query_stats_outlined,
   ),
+  AppNavDestination(
+    label: 'Finances',
+    icon: Icons.account_balance_wallet_outlined,
+    selectedIcon: Icons.account_balance_wallet_outlined,
+  ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
@@ -155,6 +161,7 @@ const _adminOnlyLabels = {
   'Settings',
   'Clients & Projects',
   'Agency Reporting',
+  'Finances',
 };
 
 // Hidden from Super Admin/HR/Manager — they use Admin Dashboard instead.
@@ -165,7 +172,11 @@ const _nonAdminOnlyLabels = {'User Dashboard'};
 // are Super Admin only — Employees, Team Leads, and HR/Manager must not even
 // see the nav entry, unlike every other admin-tier feature (which HR/Manager
 // shares with Super Admin).
-const _superAdminOnlyLabels = {'Clients & Projects', 'Agency Reporting'};
+const _superAdminOnlyLabels = {
+  'Clients & Projects',
+  'Agency Reporting',
+  'Finances',
+};
 
 bool _isAdminOrHr(WidgetRef ref) {
   final authState = ref.watch(authControllerProvider);
@@ -280,6 +291,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const ClientsProjectsPage();
       case 'Agency Reporting':
         return const AgencyReportingPage();
+      case 'Finances':
+        return const FinancesPage();
       default:
         return _ComingSoon(destination: destination);
     }

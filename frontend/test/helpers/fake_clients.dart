@@ -3,6 +3,7 @@ import 'package:zera_erp/features/clients/domain/entities/client_health_history_
 import 'package:zera_erp/features/clients/domain/entities/client_health_status.dart';
 import 'package:zera_erp/features/clients/domain/entities/client_health_summary.dart';
 import 'package:zera_erp/features/clients/domain/entities/project.dart';
+import 'package:zera_erp/features/clients/domain/entities/project_payment_status.dart';
 import 'package:zera_erp/features/clients/domain/entities/project_refs.dart';
 import 'package:zera_erp/features/clients/domain/entities/projects_summary.dart';
 import 'package:zera_erp/features/clients/domain/entities/service.dart';
@@ -112,6 +113,8 @@ Project buildTestProject({
   double cost = 200,
   double? profit,
   String? notes,
+  String paymentStatus = ProjectPaymentStatus.unpaid,
+  double amountPaid = 0,
   List<ProjectEmployeeRef> assignedEmployees = const [],
   List<ProjectDepartmentRef> targetDepartments = const [],
   List<ProjectServiceRef> services = const [],
@@ -136,6 +139,8 @@ Project buildTestProject({
     cost: cost,
     profit: profit ?? (resolvedNetPrice - cost),
     notes: notes,
+    paymentStatus: paymentStatus,
+    amountPaid: amountPaid,
     assignedEmployees: assignedEmployees,
     targetDepartments: targetDepartments,
     services: services,
@@ -188,6 +193,11 @@ class FakeClientsRepository implements ClientsRepository {
   /// The arguments passed to the most recent [createProject] call.
   String? lastCreatedProjectName;
   double? lastCreatedProjectPrice;
+
+  /// The arguments passed to the most recent [updateProject] call's payment
+  /// fields.
+  String? lastUpdatedProjectPaymentStatus;
+  double? lastUpdatedProjectAmountPaid;
 
   /// The arguments passed to the most recent [updateClientHealth] call.
   String? lastHealthUpdateClientId;
@@ -343,10 +353,20 @@ class FakeClientsRepository implements ClientsRepository {
     double? deductionRate,
     double? cost,
     String? notes,
+    String? paymentStatus,
+    double? amountPaid,
     List<String>? assignedEmployeeIds,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
-  }) async => buildTestProject(id: id);
+  }) async {
+    lastUpdatedProjectPaymentStatus = paymentStatus;
+    lastUpdatedProjectAmountPaid = amountPaid;
+    return buildTestProject(
+      id: id,
+      paymentStatus: paymentStatus ?? ProjectPaymentStatus.unpaid,
+      amountPaid: amountPaid ?? 0,
+    );
+  }
 
   @override
   Future<ProjectsSummary> getProjectsSummary() async =>

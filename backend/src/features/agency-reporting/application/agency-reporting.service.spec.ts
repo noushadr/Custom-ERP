@@ -1,6 +1,7 @@
 import { ClientResponseDto, ProjectResponseDto } from '../../clients/application/client-response.interface';
 import { ClientsService } from '../../clients/application/clients.service';
 import { ClientHealthStatus } from '../../clients/domain/enums/client-health-status.enum';
+import { ProjectPaymentStatus } from '../../clients/domain/enums/project-payment-status.enum';
 import { ProjectStatus } from '../../clients/domain/enums/project-status.enum';
 import { ProjectType } from '../../clients/domain/enums/project-type.enum';
 import { AgencyReportingService } from './agency-reporting.service';
@@ -44,6 +45,8 @@ function buildProject(overrides: Partial<ProjectResponseDto> = {}): ProjectRespo
     cost: 100,
     profit: 700,
     notes: null,
+    paymentStatus: ProjectPaymentStatus.UNPAID,
+    amountPaid: 0,
     assignedEmployees: [],
     targetDepartments: [],
     services: [],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../employee/presentation/widgets/employee_status_badges.dart';
+import '../../domain/entities/project_payment_status.dart';
 import '../../domain/entities/project_status.dart';
 import '../../domain/entities/project_type.dart';
 
@@ -44,6 +45,35 @@ class ProjectTypeBadge extends StatelessWidget {
     );
   }
 }
+
+class ProjectPaymentStatusBadge extends StatelessWidget {
+  const ProjectPaymentStatusBadge({
+    super.key,
+    required this.status,
+    this.dense = false,
+  });
+
+  final String status;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (status) {
+      ProjectPaymentStatus.unpaid => ('Unpaid', AppColors.error),
+      ProjectPaymentStatus.partial => ('Partial', AppColors.warning),
+      ProjectPaymentStatus.paid => ('Paid', AppColors.success),
+      _ => (status, AppColors.textSecondary),
+    };
+    return StatusBadge(label: label, color: color, dense: dense);
+  }
+}
+
+String formatProjectPaymentStatusLabel(String status) => switch (status) {
+  ProjectPaymentStatus.unpaid => 'Unpaid',
+  ProjectPaymentStatus.partial => 'Partial',
+  ProjectPaymentStatus.paid => 'Paid',
+  _ => status,
+};
 
 String formatProjectStatusLabel(String status) => switch (status) {
   ProjectStatus.active => 'Active',

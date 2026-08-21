@@ -80,6 +80,8 @@ export function toProjectResponse(project: Project): ProjectResponseDto {
     cost,
     profit: netPrice - cost,
     notes: project.notes ?? null,
+    paymentStatus: project.paymentStatus,
+    amountPaid: Number(project.amountPaid),
     assignedEmployees: project.assignedEmployees.map((employee) => ({
       id: employee.id,
       fullName: `${employee.firstName} ${employee.lastName}`,

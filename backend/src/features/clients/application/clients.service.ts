@@ -27,6 +27,7 @@ import { ClientHealthHistory } from '../domain/entities/client-health-history.en
 import { Project } from '../domain/entities/project.entity';
 import { Service } from '../domain/entities/service.entity';
 import { ClientHealthStatus } from '../domain/enums/client-health-status.enum';
+import { ProjectPaymentStatus } from '../domain/enums/project-payment-status.enum';
 import { ProjectStatus } from '../domain/enums/project-status.enum';
 import { ProjectType } from '../domain/enums/project-type.enum';
 import {
@@ -252,6 +253,8 @@ export class ClientsService {
     project.deductionRate = (dto.deductionRate ?? 20).toFixed(2);
     project.cost = (dto.cost ?? 0).toFixed(2);
     project.notes = dto.notes;
+    project.paymentStatus = ProjectPaymentStatus.UNPAID;
+    project.amountPaid = '0.00';
     project.assignedEmployees = await this.resolveEmployees(
       dto.assignedEmployeeIds,
     );
@@ -304,6 +307,10 @@ export class ClientsService {
       project.renewalDate = changes.renewalDate;
     }
     if (changes.notes !== undefined) project.notes = changes.notes;
+    project.paymentStatus = changes.paymentStatus ?? project.paymentStatus;
+    if (changes.amountPaid !== undefined) {
+      project.amountPaid = changes.amountPaid.toFixed(2);
+    }
 
     const saved = await this.projectRepository.save(project);
     return toProjectResponse(await this.getProjectOrThrow(saved.id));

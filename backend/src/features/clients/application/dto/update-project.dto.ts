@@ -8,6 +8,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { ProjectPaymentStatus } from '../../domain/enums/project-payment-status.enum';
 import { ProjectStatus } from '../../domain/enums/project-status.enum';
 import { ProjectType } from '../../domain/enums/project-type.enum';
 
@@ -59,6 +60,15 @@ export class UpdateProjectDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsEnum(ProjectPaymentStatus)
+  paymentStatus?: ProjectPaymentStatus;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amountPaid?: number;
 
   @IsOptional()
   @IsArray()

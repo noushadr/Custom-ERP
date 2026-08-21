@@ -31,11 +31,13 @@ const DEFAULT_PERMISSIONS = [
   'tasks.manage',
   'clients.manage',
   'reports.view',
+  'finances.manage',
 ];
 
-// 'clients.manage' and 'reports.view' (Admin Business Management: Clients &
-// Projects / Client Health / Agency Reporting) are deliberately absent from
-// every role below except Super Admin's implicit "every known permission"
+// 'clients.manage', 'reports.view', and 'finances.manage' (Admin Business
+// Management: Clients & Projects / Client Health / Agency Reporting /
+// Finances) are deliberately absent from every role below except Super
+// Admin's implicit "every known permission"
 // grant — Employees, Team Leads, and HR/Manager must not see or touch these
 // modules at all.
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [

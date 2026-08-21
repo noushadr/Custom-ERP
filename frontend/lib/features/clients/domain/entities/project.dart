@@ -19,6 +19,8 @@ class Project {
     required this.cost,
     required this.profit,
     required this.notes,
+    required this.paymentStatus,
+    required this.amountPaid,
     required this.assignedEmployees,
     required this.targetDepartments,
     required this.services,
@@ -48,6 +50,12 @@ class Project {
   final double cost;
   final double profit;
   final String? notes;
+
+  /// One of ProjectPaymentStatus's values.
+  final String paymentStatus;
+
+  /// Only meaningful when [paymentStatus] is `partial`.
+  final double amountPaid;
 
   final List<ProjectEmployeeRef> assignedEmployees;
   final List<ProjectDepartmentRef> targetDepartments;

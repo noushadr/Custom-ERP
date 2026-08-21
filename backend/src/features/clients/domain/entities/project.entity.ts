@@ -9,6 +9,7 @@ import {
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { Department } from '../../../departments/domain/entities/department.entity';
 import { Employee } from '../../../employee/domain/entities/employee.entity';
+import { ProjectPaymentStatus } from '../enums/project-payment-status.enum';
 import { ProjectStatus } from '../enums/project-status.enum';
 import { ProjectType } from '../enums/project-type.enum';
 import { Client } from './client.entity';
@@ -68,6 +69,24 @@ export class Project extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   notes?: string;
+
+  /** A simple current-state flag, not a per-invoice ledger — a retainer
+   * billed monthly only has one status at a time, reset manually by the
+   * admin. Finances' "outstanding invoices" is a live snapshot built from
+   * this, not a historical reconstruction. */
+  @Column({
+    type: 'enum',
+    enum: ProjectPaymentStatus,
+    enumName: 'project_payment_status_enum',
+    default: ProjectPaymentStatus.UNPAID,
+  })
+  paymentStatus: ProjectPaymentStatus;
+
+  /** Only meaningful when `paymentStatus` is PARTIAL — how much of
+   * `netPrice` has been paid so far. Manually entered alongside
+   * `paymentStatus`, never auto-derived. */
+  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
+  amountPaid: string;
 
   @ManyToMany(() => Employee, { eager: true })
   @JoinTable({

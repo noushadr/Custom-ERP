@@ -78,6 +78,8 @@ export interface ProjectResponseDto {
   /** Computed: netPrice - cost. */
   profit: number;
   notes: string | null;
+  paymentStatus: string;
+  amountPaid: number;
   assignedEmployees: ProjectEmployeeRef[];
   targetDepartments: ProjectDepartmentRef[];
   services: ProjectServiceRef[];
