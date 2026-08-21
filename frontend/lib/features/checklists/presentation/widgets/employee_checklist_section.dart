@@ -50,13 +50,11 @@ class _EmployeeChecklistSectionState
     if (widget.isSelf) ref.invalidate(myChecklistProvider(type));
   }
 
-  Future<void> _completeItem(EmployeeChecklistItem item, String type) async {
-    final note = await showDialog<String>(
-      context: context,
-      builder: (_) => _CompleteItemDialog(title: item.title),
-    );
-    if (note == null) return;
-
+  Future<void> _toggleItem(
+    EmployeeChecklistItem item,
+    String type,
+    bool isCompleted,
+  ) async {
     setState(() => _workingItemId = item.id);
     try {
       await ref
@@ -64,26 +62,7 @@ class _EmployeeChecklistSectionState
           .setChecklistItemCompleted(
             widget.employeeId,
             item.id,
-            isCompleted: true,
-            note: note.isEmpty ? null : note,
-          );
-      _invalidate(type);
-    } on ChecklistException catch (error) {
-      _showError(error.message);
-    } finally {
-      if (mounted) setState(() => _workingItemId = null);
-    }
-  }
-
-  Future<void> _uncompleteItem(EmployeeChecklistItem item, String type) async {
-    setState(() => _workingItemId = item.id);
-    try {
-      await ref
-          .read(checklistRepositoryProvider)
-          .setChecklistItemCompleted(
-            widget.employeeId,
-            item.id,
-            isCompleted: false,
+            isCompleted: isCompleted,
           );
       _invalidate(type);
     } on ChecklistException catch (error) {
@@ -118,20 +97,20 @@ class _EmployeeChecklistSectionState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _ChecklistBlock(
-            label: 'Onboarding',
+            label: 'Onboarding Checklist',
             async: onboardingAsync,
             canManage: widget.canManage,
             workingItemId: _workingItemId,
-            onComplete: (item) => _completeItem(item, _onboarding),
-            onUncomplete: (item) => _uncompleteItem(item, _onboarding),
+            onToggle: (item, isCompleted) =>
+                _toggleItem(item, _onboarding, isCompleted),
           ),
           _ChecklistBlock(
-            label: 'Offboarding',
+            label: 'Offboarding Checklist',
             async: offboardingAsync,
             canManage: widget.canManage,
             workingItemId: _workingItemId,
-            onComplete: (item) => _completeItem(item, _offboarding),
-            onUncomplete: (item) => _uncompleteItem(item, _offboarding),
+            onToggle: (item, isCompleted) =>
+                _toggleItem(item, _offboarding, isCompleted),
           ),
         ],
       ),
@@ -139,22 +118,22 @@ class _EmployeeChecklistSectionState
   }
 }
 
+typedef _ToggleCallback = void Function(EmployeeChecklistItem item, bool isCompleted);
+
 class _ChecklistBlock extends StatelessWidget {
   const _ChecklistBlock({
     required this.label,
     required this.async,
     required this.canManage,
     required this.workingItemId,
-    required this.onComplete,
-    required this.onUncomplete,
+    required this.onToggle,
   });
 
   final String label;
   final AsyncValue<List<EmployeeChecklistItem>> async;
   final bool canManage;
   final String? workingItemId;
-  final ValueChanged<EmployeeChecklistItem> onComplete;
-  final ValueChanged<EmployeeChecklistItem> onUncomplete;
+  final _ToggleCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -191,8 +170,7 @@ class _ChecklistBlock extends StatelessWidget {
                   item: items[i],
                   canManage: canManage,
                   isWorking: workingItemId == items[i].id,
-                  onComplete: () => onComplete(items[i]),
-                  onUncomplete: () => onUncomplete(items[i]),
+                  onToggle: (isCompleted) => onToggle(items[i], isCompleted),
                 ),
                 if (i < items.length - 1)
                   const Divider(height: 16, color: AppColors.borderSubtle),
@@ -210,45 +188,37 @@ class _ChecklistItemRow extends StatelessWidget {
     required this.item,
     required this.canManage,
     required this.isWorking,
-    required this.onComplete,
-    required this.onUncomplete,
+    required this.onToggle,
   });
 
   final EmployeeChecklistItem item;
   final bool canManage;
   final bool isWorking;
-  final VoidCallback onComplete;
-  final VoidCallback onUncomplete;
+  final ValueChanged<bool> onToggle;
 
   @override
   Widget build(BuildContext context) {
-    final icon = Icon(
-      item.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-      size: 20,
-      color: item.isCompleted ? AppColors.success : AppColors.textSecondary,
-    );
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (isWorking)
           const Padding(
-            padding: EdgeInsets.all(1),
+            padding: EdgeInsets.all(9),
             child: SizedBox(
               height: 18,
               width: 18,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
           )
-        else if (canManage)
-          InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: item.isCompleted ? onUncomplete : onComplete,
-            child: Padding(padding: const EdgeInsets.all(1), child: icon),
-          )
         else
-          icon,
-        const SizedBox(width: 10),
+          Checkbox(
+            value: item.isCompleted,
+            activeColor: AppColors.success,
+            onChanged: canManage
+                ? (value) => onToggle(value ?? false)
+                : null,
+          ),
+        const SizedBox(width: 4),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,60 +248,6 @@ class _ChecklistItemRow extends StatelessWidget {
               ],
             ],
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CompleteItemDialog extends StatefulWidget {
-  const _CompleteItemDialog({required this.title});
-
-  final String title;
-
-  @override
-  State<_CompleteItemDialog> createState() => _CompleteItemDialogState();
-}
-
-class _CompleteItemDialogState extends State<_CompleteItemDialog> {
-  final _noteController = TextEditingController();
-
-  @override
-  void dispose() {
-    _noteController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Mark as done?'),
-      content: SizedBox(
-        width: 380,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.title),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _noteController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Note (optional)',
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_noteController.text),
-          child: const Text('Mark as done'),
         ),
       ],
     );

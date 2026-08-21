@@ -105,11 +105,18 @@ export class ChecklistsService {
    * [employeeId] — applicable meaning `appliesToWorkMode` is unset or matches
    * [workMode]. Idempotent: a no-op if this employee already has any items of
    * this type, so it's safe to call on every relevant employment-status
-   * transition without duplicating an already-started checklist. */
+   * transition without duplicating an already-started checklist.
+   *
+   * [markCompleted] pre-marks every created item as already done — used by
+   * the one-time backfill for employees who existed before this feature
+   * shipped, since they already went through onboarding/offboarding in
+   * reality. New instances created via the normal invite/status-change hooks
+   * leave this false, so new employees start unchecked. */
   async createInstance(
     employeeId: string,
     type: ChecklistType,
     workMode: WorkMode,
+    markCompleted = false,
   ): Promise<EmployeeChecklistItem[]> {
     const existing = await this.instanceRepository.findByEmployeeAndType(
       employeeId,
@@ -124,6 +131,7 @@ export class ChecklistsService {
     );
     if (applicable.length === 0) return [];
 
+    const now = new Date();
     const instances = applicable.map((templateItem) => {
       const instance = new EmployeeChecklistItem();
       instance.employeeId = employeeId;
@@ -131,7 +139,8 @@ export class ChecklistsService {
       instance.type = type;
       instance.title = templateItem.title;
       instance.sortOrder = templateItem.sortOrder;
-      instance.isCompleted = false;
+      instance.isCompleted = markCompleted;
+      if (markCompleted) instance.completedAt = now;
       return instance;
     });
     return this.instanceRepository.saveMany(instances);

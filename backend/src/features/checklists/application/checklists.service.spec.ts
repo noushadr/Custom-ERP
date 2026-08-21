@@ -231,6 +231,23 @@ describe('ChecklistsService', () => {
       expect(templateRepository.findAll).not.toHaveBeenCalled();
       expect(instanceRepository.saveMany).not.toHaveBeenCalled();
     });
+
+    it('pre-marks every item complete when markCompleted is true', async () => {
+      templateRepository.findAll.mockResolvedValue([
+        buildTemplateItem({ id: 't1', title: 'Everyone item', sortOrder: 0 }),
+      ]);
+
+      const result = await service.createInstance(
+        'employee-1',
+        ChecklistType.ONBOARDING,
+        WorkMode.ON_SITE,
+        true,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].isCompleted).toBe(true);
+      expect(result[0].completedAt).toBeInstanceOf(Date);
+    });
   });
 
   describe('setItemCompleted', () => {
