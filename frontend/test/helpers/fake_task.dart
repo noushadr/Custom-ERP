@@ -21,6 +21,7 @@ Task buildTestTask({
   String dueDate = '2026-12-01',
   String status = TaskStatus.todo,
   DateTime? completedAt,
+  String? projectId,
   DateTime? createdAt,
   DateTime? updatedAt,
 }) {
@@ -40,6 +41,7 @@ Task buildTestTask({
     dueDate: dueDate,
     status: status,
     completedAt: completedAt,
+    projectId: projectId,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
     updatedAt: updatedAt ?? DateTime(2026, 1, 1),
   );
@@ -93,11 +95,13 @@ class FakeTaskRepository implements TaskRepository {
     this.updateTaskError,
     this.updateStatusError,
     this.getTaskError,
+    this.tasksByProject = const [],
   });
 
   final List<Task> myTasks;
   final List<Task> tasksAssignedByMe;
   final List<Task> teamTasks;
+  final List<Task> tasksByProject;
   final Task? taskById;
   final List<TaskAuditLogEntry> history;
   final List<TaskComment> comments;
@@ -154,19 +158,24 @@ class FakeTaskRepository implements TaskRepository {
   }
 
   @override
+  Future<List<Task>> getTasksByProject(String projectId) async =>
+      tasksByProject;
+
+  @override
   Future<Task> createTask({
     required String title,
     String? description,
     required String assigneeEmployeeId,
     String? priority,
     required String dueDate,
+    String? projectId,
   }) async {
     lastCreatedTitle = title;
     lastCreatedAssigneeEmployeeId = assigneeEmployeeId;
     lastCreatedPriority = priority;
     lastCreatedDueDate = dueDate;
     if (createTaskError != null) throw createTaskError!;
-    return createTaskResult ?? buildTestTask(title: title);
+    return createTaskResult ?? buildTestTask(title: title, projectId: projectId);
   }
 
   @override
@@ -177,12 +186,13 @@ class FakeTaskRepository implements TaskRepository {
     String? assigneeEmployeeId,
     String? priority,
     String? dueDate,
+    String? projectId,
   }) async {
     lastUpdatedId = id;
     lastUpdatedTitle = title;
     lastUpdatedAssigneeEmployeeId = assigneeEmployeeId;
     if (updateTaskError != null) throw updateTaskError!;
-    return updateTaskResult ?? buildTestTask(id: id);
+    return updateTaskResult ?? buildTestTask(id: id, projectId: projectId);
   }
 
   @override

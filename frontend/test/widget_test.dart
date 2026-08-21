@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
+import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
@@ -18,6 +19,7 @@ import 'package:zera_erp/shared/widgets/metric_card.dart';
 
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_auth.dart';
+import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
 import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leave.dart';
@@ -61,6 +63,7 @@ Widget _authenticatedApp({
       taskRepositoryProvider.overrideWithValue(
         taskRepository ?? FakeTaskRepository(),
       ),
+      clientsRepositoryProvider.overrideWithValue(FakeClientsRepository()),
     ],
     child: const ZeraApp(),
   );
@@ -300,6 +303,57 @@ void main() {
 
       expect(find.text('Employees'), findsOneWidget);
       expect(find.text('Settings'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows Clients & Projects in the nav for a Super Admin only',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: const AuthUser(
+            id: 'admin-1',
+            email: 'admin@zeracreative.com',
+            role: 'Super Admin',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Clients & Projects'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'hides Clients & Projects from the nav for HR/Manager',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: const AuthUser(
+            id: 'hr-1',
+            email: 'hr@zeracreative.com',
+            role: 'HR/Manager',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // HR/Manager still sees the other admin-tier destinations, just not
+      // this Super-Admin-only one.
+      expect(find.text('Employees'), findsOneWidget);
+      expect(find.text('Clients & Projects'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'hides Clients & Projects from the nav for a plain employee',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(_authenticatedApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Clients & Projects'), findsNothing);
     },
   );
 

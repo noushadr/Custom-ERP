@@ -45,6 +45,7 @@ function buildTask(overrides: Partial<Task> = {}): Task {
     dueDate: '2026-12-01',
     status: TaskStatus.TODO,
     completedAt: null,
+    projectId: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
@@ -64,6 +65,7 @@ describe('TasksService', () => {
     taskRepository = {
       findAll: jest.fn().mockResolvedValue([]),
       findById: jest.fn(),
+      findByProjectId: jest.fn().mockResolvedValue([]),
       save: jest.fn((item) => Promise.resolve(item)),
     };
     commentRepository = {
@@ -548,6 +550,65 @@ describe('TasksService', () => {
         (call) => call[0].fieldLabel,
       );
       expect(labels).toEqual(['Created', 'Status']);
+    });
+  });
+
+  describe('getTasksByProject', () => {
+    it("returns a project's linked tasks", async () => {
+      taskRepository.findByProjectId.mockResolvedValue([
+        buildTask({ id: 'task-1', projectId: 'project-1' }),
+      ]);
+
+      const result = await service.getTasksByProject('project-1');
+
+      expect(taskRepository.findByProjectId).toHaveBeenCalledWith(
+        'project-1',
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].projectId).toBe('project-1');
+    });
+  });
+
+  describe('project linking', () => {
+    it('links a new task to a project on create', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ firstName: 'Admin', lastName: 'Person' }),
+      );
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ id: 'employee-2' }),
+      );
+      taskRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildTask({ id, projectId: 'project-1' })),
+      );
+
+      const result = await service.createTask(
+        {
+          title: 'New task',
+          assigneeEmployeeId: 'employee-2',
+          dueDate: '2026-12-01',
+          projectId: 'project-1',
+        },
+        'admin-user-1',
+        true,
+      );
+
+      const savedTask = taskRepository.save.mock.calls[0][0];
+      expect(savedTask.projectId).toBe('project-1');
+      expect(result.projectId).toBe('project-1');
+    });
+
+    it('links an existing task to a project on update', async () => {
+      const task = buildTask({ projectId: null });
+      taskRepository.findById.mockResolvedValue(task);
+
+      await service.updateTask(
+        'task-1',
+        { projectId: 'project-1' },
+        'manager-user-1',
+        false,
+      );
+
+      expect(task.projectId).toBe('project-1');
     });
   });
 });

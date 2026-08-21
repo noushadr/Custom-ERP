@@ -11,6 +11,7 @@ import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
 import 'features/authentication/presentation/widgets/impersonation_banner.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
+import 'features/clients/presentation/pages/clients_projects_page.dart';
 import 'features/employee/application/employee_providers.dart';
 import 'features/employee/presentation/pages/admin_dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
@@ -132,22 +133,43 @@ const _allDestinations = [
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings_outlined,
   ),
+  AppNavDestination(
+    label: 'Clients & Projects',
+    icon: Icons.business_center_outlined,
+    selectedIcon: Icons.business_center_outlined,
+  ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
 // entirely from User Dashboard and Requests. Notifications live in the top
 // bar (see NotificationBell), not the nav.
-const _adminOnlyLabels = {'Admin Dashboard', 'Employees', 'Settings'};
+const _adminOnlyLabels = {
+  'Admin Dashboard',
+  'Employees',
+  'Settings',
+  'Clients & Projects',
+};
 
 // Hidden from Super Admin/HR/Manager — they use Admin Dashboard instead.
 // Visible to everyone else.
 const _nonAdminOnlyLabels = {'User Dashboard'};
+
+// Stricter than _adminOnlyLabels: these Admin Business Management modules
+// are Super Admin only — Employees, Team Leads, and HR/Manager must not even
+// see the nav entry, unlike every other admin-tier feature (which HR/Manager
+// shares with Super Admin).
+const _superAdminOnlyLabels = {'Clients & Projects'};
 
 bool _isAdminOrHr(WidgetRef ref) {
   final authState = ref.watch(authControllerProvider);
   return authState is AuthAuthenticated &&
       (authState.user.role == 'Super Admin' ||
           authState.user.role == 'HR/Manager');
+}
+
+bool _isSuperAdmin(WidgetRef ref) {
+  final authState = ref.watch(authControllerProvider);
+  return authState is AuthAuthenticated && authState.user.role == 'Super Admin';
 }
 
 /// How many pending items each nav destination should badge for the current
@@ -247,6 +269,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const KnowledgeBasePage();
       case 'Settings':
         return const SettingsPage();
+      case 'Clients & Projects':
+        return const ClientsProjectsPage();
       default:
         return _ComingSoon(destination: destination);
     }
@@ -302,13 +326,16 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
   @override
   Widget build(BuildContext context) {
     final isAdminOrHr = _isAdminOrHr(ref);
+    final isSuperAdmin = _isSuperAdmin(ref);
     final badgeCounts = _navBadgeCounts(ref);
 
     final visibleOriginalIndices = [
       for (var i = 0; i < _allDestinations.length; i++)
-        if (isAdminOrHr
-            ? !_nonAdminOnlyLabels.contains(_allDestinations[i].label)
-            : !_adminOnlyLabels.contains(_allDestinations[i].label))
+        if ((isAdminOrHr
+                ? !_nonAdminOnlyLabels.contains(_allDestinations[i].label)
+                : !_adminOnlyLabels.contains(_allDestinations[i].label)) &&
+            (!_superAdminOnlyLabels.contains(_allDestinations[i].label) ||
+                isSuperAdmin))
           i,
     ];
     final visibleDestinations = [

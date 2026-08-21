@@ -22,6 +22,10 @@ abstract interface class TaskRepository {
 
   Future<TaskComment> addComment(String id, String body);
 
+  /// Clients & Projects' view of "which tasks belong to this project" —
+  /// requires `clients.manage`.
+  Future<List<Task>> getTasksByProject(String projectId);
+
   /// Requires `tasks.manage` or headship of the assignee's department.
   Future<Task> createTask({
     required String title,
@@ -29,6 +33,7 @@ abstract interface class TaskRepository {
     required String assigneeEmployeeId,
     String? priority,
     required String dueDate,
+    String? projectId,
   });
 
   /// Requires `tasks.manage`, being the assigner, or headship of the task's
@@ -40,6 +45,7 @@ abstract interface class TaskRepository {
     String? assigneeEmployeeId,
     String? priority,
     String? dueDate,
+    String? projectId,
   });
 
   /// The assignee, the assigner, a department head, or a `tasks.manage`

@@ -7,6 +7,7 @@ import 'package:zera_erp/features/authentication/application/auth_providers.dart
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/authentication/domain/exceptions/auth_exception.dart';
 import 'package:zera_erp/features/authentication/presentation/pages/login_page.dart';
+import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
@@ -17,6 +18,7 @@ import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/main.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_clients.dart';
 import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_knowledge_base.dart';
 import '../../helpers/fake_leave.dart';
@@ -53,6 +55,7 @@ Widget _appWith(FakeAuthRepository repository) {
         FakeKnowledgeBaseRepository(),
       ),
       taskRepositoryProvider.overrideWithValue(FakeTaskRepository()),
+      clientsRepositoryProvider.overrideWithValue(FakeClientsRepository()),
     ],
     child: const ZeraApp(),
   );

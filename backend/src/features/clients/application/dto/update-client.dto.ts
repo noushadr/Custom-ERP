@@ -1,0 +1,46 @@
+import {
+  IsBoolean,
+  IsEmail,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
+
+export class UpdateClientDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  companyName?: string;
+
+  @IsOptional()
+  @IsString()
+  industry?: string;
+
+  @IsOptional()
+  @IsString()
+  website?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  primaryContactName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  primaryContactEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  primaryContactPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isArchived?: boolean;
+}

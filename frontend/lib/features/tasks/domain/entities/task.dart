@@ -18,6 +18,7 @@ class Task {
     required this.dueDate,
     required this.status,
     required this.completedAt,
+    required this.projectId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -43,6 +44,9 @@ class Task {
   /// One of TaskStatus's values.
   final String status;
   final DateTime? completedAt;
+
+  /// Optional link to a Clients & Projects project.
+  final String? projectId;
   final DateTime createdAt;
   final DateTime updatedAt;
 }

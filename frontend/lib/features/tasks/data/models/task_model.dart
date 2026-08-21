@@ -18,6 +18,7 @@ class TaskModel extends Task {
     required super.dueDate,
     required super.status,
     required super.completedAt,
+    required super.projectId,
     required super.createdAt,
     required super.updatedAt,
   });
@@ -42,6 +43,7 @@ class TaskModel extends Task {
     completedAt: json['completedAt'] == null
         ? null
         : DateTime.parse(json['completedAt'] as String),
+    projectId: json['projectId'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String),
     updatedAt: DateTime.parse(json['updatedAt'] as String),
   );

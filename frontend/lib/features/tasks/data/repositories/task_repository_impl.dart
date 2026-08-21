@@ -37,12 +37,17 @@ class TaskRepositoryImpl implements TaskRepository {
       _guard(() => _remoteDataSource.addComment(id, body));
 
   @override
+  Future<List<Task>> getTasksByProject(String projectId) =>
+      _guard(() => _remoteDataSource.getTasksByProject(projectId));
+
+  @override
   Future<Task> createTask({
     required String title,
     String? description,
     required String assigneeEmployeeId,
     String? priority,
     required String dueDate,
+    String? projectId,
   }) => _guard(
     () => _remoteDataSource.createTask(
       title: title,
@@ -50,6 +55,7 @@ class TaskRepositoryImpl implements TaskRepository {
       assigneeEmployeeId: assigneeEmployeeId,
       priority: priority,
       dueDate: dueDate,
+      projectId: projectId,
     ),
   );
 
@@ -61,6 +67,7 @@ class TaskRepositoryImpl implements TaskRepository {
     String? assigneeEmployeeId,
     String? priority,
     String? dueDate,
+    String? projectId,
   }) => _guard(
     () => _remoteDataSource.updateTask(
       id,
@@ -69,6 +76,7 @@ class TaskRepositoryImpl implements TaskRepository {
       assigneeEmployeeId: assigneeEmployeeId,
       priority: priority,
       dueDate: dueDate,
+      projectId: projectId,
     ),
   );
 

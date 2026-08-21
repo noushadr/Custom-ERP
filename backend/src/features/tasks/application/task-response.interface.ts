@@ -14,6 +14,7 @@ export interface TaskResponseDto {
   dueDate: string;
   status: string;
   completedAt: string | null;
+  projectId: string | null;
   createdAt: string;
   updatedAt: string;
 }

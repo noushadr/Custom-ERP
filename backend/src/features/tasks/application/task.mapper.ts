@@ -28,6 +28,7 @@ export function toTaskResponse(task: Task): TaskResponseDto {
     dueDate: task.dueDate,
     status: task.status,
     completedAt: task.completedAt?.toISOString() ?? null,
+    projectId: task.projectId ?? null,
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
   };

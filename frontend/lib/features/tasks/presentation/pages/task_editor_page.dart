@@ -49,10 +49,14 @@ List<Employee> _authorizedAssignees({
 /// Create or edit a task: title, description, assignee (restricted to the
 /// viewer's authorized pool), priority, and due date.
 class TaskEditorPage extends ConsumerStatefulWidget {
-  const TaskEditorPage({super.key, this.existingTask});
+  const TaskEditorPage({super.key, this.existingTask, this.initialProjectId});
 
   /// Null when creating a new task; the current task when editing.
   final Task? existingTask;
+
+  /// Pre-fills the new task's project link — set when created from a
+  /// project's detail page. Ignored when editing an existing task.
+  final String? initialProjectId;
 
   @override
   ConsumerState<TaskEditorPage> createState() => _TaskEditorPageState();
@@ -137,7 +141,12 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
               assigneeEmployeeId: _assigneeEmployeeId!,
               priority: _priority,
               dueDate: _isoDate(_dueDate!),
+              projectId: widget.initialProjectId,
             );
+
+      if (widget.initialProjectId != null) {
+        ref.invalidate(tasksByProjectProvider(widget.initialProjectId!));
+      }
 
       ref.invalidate(myTasksProvider);
       ref.invalidate(tasksAssignedByMeProvider);

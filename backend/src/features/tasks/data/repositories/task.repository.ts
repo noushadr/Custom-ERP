@@ -19,6 +19,13 @@ export class TypeOrmTaskRepository implements TaskRepository {
     return this.repository.findOne({ where: { id } });
   }
 
+  findByProjectId(projectId: string): Promise<Task[]> {
+    return this.repository.find({
+      where: { projectId },
+      order: { dueDate: 'ASC' },
+    });
+  }
+
   save(task: Task): Promise<Task> {
     return this.repository.save(task);
   }

@@ -1,5 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
+import { Project } from '../../../clients/domain/entities/project.entity';
 import { Employee } from '../../../employee/domain/entities/employee.entity';
 import { TaskPriority } from '../enums/task-priority.enum';
 import { TaskStatus } from '../enums/task-status.enum';
@@ -49,4 +50,15 @@ export class Task extends BaseEntity {
 
   @Column({ type: 'timestamptz', nullable: true })
   completedAt: Date | null;
+
+  /** Optional link to a Clients & Projects project — set only by a
+   * `clients.manage` holder (see TasksService.linkToProject). Unrelated to
+   * this task's own visibility/authorization for its assignee, which stays
+   * exactly the same whether or not it's linked to a project. */
+  @Column({ type: 'varchar', nullable: true })
+  projectId: string | null;
+
+  @ManyToOne(() => Project, { nullable: true })
+  @JoinColumn({ name: 'projectId' })
+  project?: Project;
 }

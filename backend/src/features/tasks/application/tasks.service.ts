@@ -111,6 +111,14 @@ export class TasksService {
       .map(toTaskResponse);
   }
 
+  /** Clients & Projects' view of "which tasks belong to this project" —
+   * controller-gated to clients.manage; unrelated to a linked task's own
+   * visibility for its assignee. */
+  async getTasksByProject(projectId: string): Promise<TaskResponseDto[]> {
+    const tasks = await this.taskRepository.findByProjectId(projectId);
+    return tasks.map(toTaskResponse);
+  }
+
   // ---- Single task ----
 
   async getTaskForActor(
@@ -211,6 +219,7 @@ export class TasksService {
     task.priority = dto.priority ?? TaskPriority.MEDIUM;
     task.dueDate = dto.dueDate;
     task.status = TaskStatus.TODO;
+    task.projectId = dto.projectId ?? null;
 
     const saved = await this.taskRepository.save(task);
     const assigneeName = await this.employeeName(dto.assigneeEmployeeId);
@@ -313,6 +322,10 @@ export class TasksService {
         changes.dueDate,
       );
       task.dueDate = changes.dueDate;
+    }
+
+    if (changes.projectId !== undefined) {
+      task.projectId = changes.projectId;
     }
 
     await this.taskRepository.save(task);

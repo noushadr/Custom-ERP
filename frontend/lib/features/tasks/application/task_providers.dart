@@ -55,3 +55,10 @@ final taskCommentsProvider = FutureProvider.autoDispose
       ref.watch(authControllerProvider);
       return ref.watch(taskRepositoryProvider).getComments(id);
     });
+
+/// Clients & Projects' view of "which tasks belong to this project".
+final tasksByProjectProvider = FutureProvider.autoDispose
+    .family<List<Task>, String>((ref, projectId) {
+      ref.watch(authControllerProvider);
+      return ref.watch(taskRepositoryProvider).getTasksByProject(projectId);
+    });

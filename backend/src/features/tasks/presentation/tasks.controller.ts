@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
+import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
 import { CreateTaskCommentDto } from '../application/dto/create-task-comment.dto';
 import { CreateTaskDto } from '../application/dto/create-task.dto';
@@ -32,6 +33,16 @@ export class TasksController {
   getTeamTasks(@CurrentUser() user: JwtPayload) {
     const actorHasOverride = user.permissions.includes(PERMISSION);
     return this.tasksService.getTeamTasks(user.sub, actorHasOverride);
+  }
+
+  /** Clients & Projects module's view of "which tasks belong to this
+   * project" — gated to clients.manage, unrelated to a linked task's own
+   * visibility for its assignee (unchanged, still governed by the normal
+   * three-tier rules above). */
+  @Get('by-project/:projectId')
+  @Permissions('clients.manage')
+  getTasksByProject(@Param('projectId') projectId: string) {
+    return this.tasksService.getTasksByProject(projectId);
   }
 
   @Post()

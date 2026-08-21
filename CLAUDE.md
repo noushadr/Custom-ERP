@@ -64,6 +64,18 @@ AI Assistant/Chat/Suggestions/Automation/generated content. Storage usage dashbo
 ## Future Modules (design for, don't build yet)
 CRM, Client Portal, Project Management, Attendance, Payroll, Recruitment, OKRs, Internal Chat, Time Tracking, Expense Claims, Finance, SEO Dashboard, Automation Engine, Company Calendar, Training Portal, Rewards & Recognition, Company Wiki.
 
+## Admin Business Management (Super Admin only)
+A separate section of six modules, gated stricter than every other admin-tier feature: Employees, Team Leads, and HR/Manager must not view, access, or modify any of them — Super Admin only. Enforced via a dedicated permission per module (e.g. `clients.manage`) that is granted to no role's explicit array and only reaches a user through Super Admin's implicit "every known permission" grant — never a hardcoded role check, so a custom role could still be granted it later without code changes. Frontend nav visibility additionally checks `role == 'Super Admin'` directly (`_isSuperAdmin` in `main.dart`), since HR/Manager must not even see the nav entry.
+
+**Built one at a time, in this order** (per explicit instruction — do not start the next until the current one meets the Definition of Done):
+
+1. **Clients & Projects** — done. `backend/src/features/clients/`, `frontend/lib/features/clients/`. Client (company + contact info, archivable) and Service (admin-managed catalog, archivable, modeled on `LeaveType`) and Project (client + type One-time/Retainer + status Active/On Hold/Completed/Cancelled + dates + pricing + assigned employees/departments/services). Pricing: `originalClientPrice`, a single combined `deductionRate` % (default 20%, override per project), `cost` — `netPrice` and `profit` are computed in the mapper on every read, never stored. "Teams" on a project means Departments (no separate Teams concept, per this file's RBAC/Departments rule) — a distinct, coarser concept from the project's individually assigned employees. Tasks link to a project via `Task.projectId` (nullable) — reuses the existing Tasks module rather than a parallel task system; a linked task's own assignee visibility/authorization is unchanged. `Settings > Services` manages the service catalog. Nav entry "Clients & Projects".
+2. **Client Health** — not started.
+3. **Agency Reporting** — not started.
+4. **Finances** — not started.
+5. **Automations** — not started.
+6. **Payroll** — not started.
+
 ## Development Workflow
 1. Understand the requirement.
 2. Design the architecture.

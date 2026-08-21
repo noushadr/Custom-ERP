@@ -25,4 +25,11 @@ export class CreateTaskDto {
 
   @IsDateString()
   dueDate: string;
+
+  /** Optional link to a Clients & Projects project — gated by the same
+   * create authority as the rest of this DTO (override or dept-head of the
+   * assignee's department), not a separate clients.manage check. */
+  @IsOptional()
+  @IsString()
+  projectId?: string;
 }

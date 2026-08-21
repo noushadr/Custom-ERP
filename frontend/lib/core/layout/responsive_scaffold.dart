@@ -78,18 +78,32 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
                 right: BorderSide(color: AppColors.borderSubtle),
               ),
             ),
-            child: NavigationRail(
-              extended: true,
-              selectedIndex: widget.selectedIndex,
-              onDestinationSelected: widget.onDestinationSelected,
-              leading: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: const ZeraLogo(height: 24),
+            // NavigationRail doesn't scroll on its own, so on a short window
+            // (or a role with many visible destinations) it would otherwise
+            // overflow rather than clip — this lets it grow past the
+            // viewport and scroll instead, while still filling the full
+            // height on a normal-size window (the minHeight floor).
+            child: SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.sizeOf(context).height,
+                ),
+                child: IntrinsicHeight(
+                  child: NavigationRail(
+                    extended: true,
+                    selectedIndex: widget.selectedIndex,
+                    onDestinationSelected: widget.onDestinationSelected,
+                    leading: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: const ZeraLogo(height: 24),
+                      ),
+                    ),
+                    destinations: _railDestinations,
+                  ),
                 ),
               ),
-              destinations: _railDestinations,
             ),
           ),
           Expanded(
@@ -119,14 +133,23 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
       ),
       body: Row(
         children: [
-          NavigationRail(
-            extended: _railExpanded,
-            labelType: _railExpanded
-                ? NavigationRailLabelType.none
-                : NavigationRailLabelType.all,
-            selectedIndex: widget.selectedIndex,
-            onDestinationSelected: widget.onDestinationSelected,
-            destinations: _railDestinations,
+          SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.sizeOf(context).height,
+              ),
+              child: IntrinsicHeight(
+                child: NavigationRail(
+                  extended: _railExpanded,
+                  labelType: _railExpanded
+                      ? NavigationRailLabelType.none
+                      : NavigationRailLabelType.all,
+                  selectedIndex: widget.selectedIndex,
+                  onDestinationSelected: widget.onDestinationSelected,
+                  destinations: _railDestinations,
+                ),
+              ),
+            ),
           ),
           Expanded(child: _contentWithFooter(widget.body)),
         ],

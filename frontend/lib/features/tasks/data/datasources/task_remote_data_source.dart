@@ -61,12 +61,23 @@ class TaskRemoteDataSource {
     return TaskCommentModel.fromJson(response.data!);
   }
 
+  Future<List<TaskModel>> getTasksByProject(String projectId) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/tasks/by-project/$projectId',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(TaskModel.fromJson)
+        .toList();
+  }
+
   Future<TaskModel> createTask({
     required String title,
     String? description,
     required String assigneeEmployeeId,
     String? priority,
     required String dueDate,
+    String? projectId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/tasks',
@@ -76,6 +87,7 @@ class TaskRemoteDataSource {
         'assigneeEmployeeId': assigneeEmployeeId,
         'priority': ?priority,
         'dueDate': dueDate,
+        'projectId': ?projectId,
       },
     );
     return TaskModel.fromJson(response.data!);
@@ -88,6 +100,7 @@ class TaskRemoteDataSource {
     String? assigneeEmployeeId,
     String? priority,
     String? dueDate,
+    String? projectId,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/tasks/$id',
@@ -97,6 +110,7 @@ class TaskRemoteDataSource {
         'assigneeEmployeeId': ?assigneeEmployeeId,
         'priority': ?priority,
         'dueDate': ?dueDate,
+        'projectId': ?projectId,
       },
     );
     return TaskModel.fromJson(response.data!);

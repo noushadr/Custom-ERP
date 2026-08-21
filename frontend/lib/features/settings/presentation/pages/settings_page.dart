@@ -5,6 +5,7 @@ import '../../../authentication/application/auth_state.dart';
 import '../../../authentication/presentation/pages/role_permissions_page.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../checklists/presentation/pages/checklist_templates_page.dart';
+import '../../../clients/presentation/pages/services_settings_page.dart';
 import '../../../employee/presentation/pages/departments_page.dart';
 import '../../../holidays/presentation/pages/holidays_page.dart';
 import '../../../leave/presentation/pages/leave_settings_page.dart';
@@ -30,6 +31,7 @@ class SettingsPage extends ConsumerWidget {
         authUser?.hasPermission('employees.manage') ?? false;
     final canManagePerformanceReviews =
         authUser?.hasPermission('performance.manage') ?? false;
+    final canManageClients = authUser?.hasPermission('clients.manage') ?? false;
 
     final entries = [
       if (canManageDepartments)
@@ -73,6 +75,13 @@ class SettingsPage extends ConsumerWidget {
           title: 'Roles & Permissions',
           subtitle: 'Define custom roles and what they can access',
           builder: (_) => const RolePermissionsPage(),
+        ),
+      if (canManageClients)
+        _SettingsEntry(
+          icon: Icons.design_services_outlined,
+          title: 'Services',
+          subtitle: 'Catalog of services offered to clients on projects',
+          builder: (_) => const ServicesSettingsPage(),
         ),
     ];
 

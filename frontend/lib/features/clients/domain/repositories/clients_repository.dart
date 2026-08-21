@@ -1,0 +1,78 @@
+import '../entities/client.dart';
+import '../entities/project.dart';
+import '../entities/projects_summary.dart';
+import '../entities/service.dart';
+
+/// Covers Client + Service + Project — tightly coupled entities, one
+/// repository, same convention as Leave bundling LeaveType+LeaveRequest.
+abstract interface class ClientsRepository {
+  Future<List<Client>> getClients({bool includeArchived = false});
+  Future<Client> createClient({
+    required String companyName,
+    String? industry,
+    String? website,
+    String? address,
+    String? primaryContactName,
+    String? primaryContactEmail,
+    String? primaryContactPhone,
+    String? notes,
+  });
+  Future<Client> updateClient(
+    String id, {
+    String? companyName,
+    String? industry,
+    String? website,
+    String? address,
+    String? primaryContactName,
+    String? primaryContactEmail,
+    String? primaryContactPhone,
+    String? notes,
+    bool? isArchived,
+  });
+
+  Future<List<Service>> getServices({bool includeArchived = false});
+  Future<Service> createService({required String name, String? description});
+  Future<Service> updateService(
+    String id, {
+    String? name,
+    String? description,
+    bool? isArchived,
+  });
+
+  Future<List<Project>> getProjects({String? status, String? clientId});
+  Future<Project> getProject(String id);
+  Future<Project> createProject({
+    required String clientId,
+    required String name,
+    required String type,
+    String? status,
+    required String startDate,
+    String? endDate,
+    String? renewalDate,
+    required double originalClientPrice,
+    double? deductionRate,
+    double? cost,
+    String? notes,
+    List<String>? assignedEmployeeIds,
+    List<String>? targetDepartmentIds,
+    List<String>? serviceIds,
+  });
+  Future<Project> updateProject(
+    String id, {
+    String? clientId,
+    String? name,
+    String? type,
+    String? status,
+    String? startDate,
+    String? endDate,
+    String? renewalDate,
+    double? originalClientPrice,
+    double? deductionRate,
+    double? cost,
+    String? notes,
+    List<String>? assignedEmployeeIds,
+    List<String>? targetDepartmentIds,
+    List<String>? serviceIds,
+  });
+  Future<ProjectsSummary> getProjectsSummary();
+}

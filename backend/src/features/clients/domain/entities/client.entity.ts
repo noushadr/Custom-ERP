@@ -1,0 +1,34 @@
+import { Column, Entity } from 'typeorm';
+import { BaseEntity } from '../../../../core/database/base.entity';
+
+/** A single primary contact per client is enough for v1 — a separate
+ * multi-contact entity can be added later if needed. */
+@Entity('clients')
+export class Client extends BaseEntity {
+  @Column()
+  companyName: string;
+
+  @Column({ nullable: true })
+  industry?: string;
+
+  @Column({ nullable: true })
+  website?: string;
+
+  @Column({ nullable: true })
+  address?: string;
+
+  @Column({ nullable: true })
+  primaryContactName?: string;
+
+  @Column({ nullable: true })
+  primaryContactEmail?: string;
+
+  @Column({ nullable: true })
+  primaryContactPhone?: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes?: string;
+
+  @Column({ default: false })
+  isArchived: boolean;
+}

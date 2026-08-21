@@ -8,6 +8,7 @@ import { validate } from './core/config/env.validation';
 import { DatabaseModule } from './core/database/database.module';
 import { AuthenticationModule } from './features/authentication/authentication.module';
 import { ChecklistsModule } from './features/checklists/checklists.module';
+import { ClientsModule } from './features/clients/clients.module';
 import { DepartmentsModule } from './features/departments/departments.module';
 import { EmployeeModule } from './features/employee/employee.module';
 import { HolidaysModule } from './features/holidays/holidays.module';
@@ -38,6 +39,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     PerformanceReviewsModule,
     KnowledgeBaseModule,
     TasksModule,
+    ClientsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
