@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../employee/application/employee_providers.dart';
+import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
 
@@ -17,7 +19,12 @@ class UserMenu extends ConsumerWidget {
     final state = ref.watch(authControllerProvider);
     final email = state is AuthAuthenticated ? state.user.email : '';
     final role = state is AuthAuthenticated ? state.user.role : '';
-    final initial = email.isNotEmpty ? email[0].toUpperCase() : '?';
+    // Not every login is linked to an employee profile (e.g. a bootstrap
+    // admin account) — valueOrNull falls back to initials-from-email below
+    // whether that's because there's no linked profile, or it just hasn't
+    // loaded yet.
+    final profile = ref.watch(myProfileProvider).valueOrNull;
+    final displayName = profile?.fullName ?? email;
 
     return PopupMenuButton<_UserMenuAction>(
       tooltip: 'Account menu',
@@ -57,16 +64,10 @@ class UserMenu extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircleAvatar(
+          EmployeeAvatar(
+            fullName: displayName,
+            photoUrl: profile?.profilePhotoUrl,
             radius: 16,
-            backgroundColor: AppColors.primarySoft,
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ),
           const SizedBox(width: 4),
           const Icon(Icons.expand_more, size: 18, color: AppColors.textSecondary),

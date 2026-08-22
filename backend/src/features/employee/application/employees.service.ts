@@ -8,6 +8,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { ChecklistsService } from '../../checklists/application/checklists.service';
+import { SetChecklistItemCompletedDto } from '../../checklists/application/dto/set-checklist-item-completed.dto';
+import { EmployeeChecklistItem } from '../../checklists/domain/entities/employee-checklist-item.entity';
+import { ChecklistType } from '../../checklists/domain/enums/checklist-type.enum';
 import { User } from '../../authentication/domain/entities/user.entity';
 import { UserStatus } from '../../authentication/domain/enums/user-status.enum';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
@@ -28,6 +32,7 @@ import { SalaryRecord } from '../domain/entities/salary-record.entity';
 import { AssetStatus } from '../domain/enums/asset-status.enum';
 import { DocumentType } from '../domain/enums/document-type.enum';
 import { EmploymentStatus } from '../domain/enums/employment-status.enum';
+import { WorkMode } from '../domain/enums/work-mode.enum';
 import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
@@ -144,6 +149,7 @@ export class EmployeesService {
     private readonly educationRecordRepository: EducationRecordRepository,
     @Inject(ASSET_REPOSITORY)
     private readonly assetRepository: AssetRepository,
+    private readonly checklistsService: ChecklistsService,
   ) {}
 
   async invite(
@@ -185,11 +191,18 @@ export class EmployeesService {
     employee.reportingManagerId = dto.reportingManagerId;
     employee.joiningDate =
       dto.joiningDate ?? new Date().toISOString().slice(0, 10);
+    employee.workMode = dto.workMode ?? WorkMode.ON_SITE;
     employee.skills = [];
     employee.certifications = [];
 
     const savedEmployee = await this.employeeRepository.save(employee);
     const reloaded = await this.employeeRepository.findById(savedEmployee.id);
+
+    await this.checklistsService.createInstance(
+      savedEmployee.id,
+      ChecklistType.ONBOARDING,
+      reloaded!.workMode,
+    );
 
     return {
       employee: toEmployeeResponse(reloaded!),
@@ -344,6 +357,26 @@ export class EmployeesService {
     };
   }
 
+  /** The salary in effect as of [asOfIsoDate] — the latest record whose
+   * `effectiveDate` is on or before it (records are chronological, so this
+   * is the last one that qualifies) — 0 if the employee has no salary
+   * records yet, or none had taken effect by that date. Plain string
+   * comparison is safe here since `effectiveDate` is already 'YYYY-MM-DD'.
+   * Used by Payroll to compute a run's baseSalary for a specific month. */
+  async getSalaryAsOf(
+    employeeId: string,
+    asOfIsoDate: string,
+  ): Promise<number> {
+    const records = await this.salaryRecordRepository.findByEmployeeId(
+      employeeId,
+    );
+    const eligible = records.filter(
+      (record) => record.effectiveDate <= asOfIsoDate,
+    );
+    const latest = eligible[eligible.length - 1];
+    return latest ? Number(latest.amount) : 0;
+  }
+
   async findById(id: string, viewer: JwtPayload): Promise<EmployeeResponse> {
     const employee = await this.employeeRepository.findById(id);
     if (!employee) throw new NotFoundException('Employee not found');
@@ -385,13 +418,15 @@ export class EmployeesService {
     return toEmployeeResponse(employee);
   }
 
-  async getMyDirectReports(userId: string): Promise<EmployeeResponse[]> {
-    const employee = await this.employeeRepository.findByUserId(userId);
+  async getMyDirectReports(viewer: JwtPayload): Promise<EmployeeResponse[]> {
+    const employee = await this.employeeRepository.findByUserId(viewer.sub);
     if (!employee) throw new NotFoundException('Employee profile not found');
     const reports = await this.employeeRepository.findByReportingManagerId(
       employee.id,
     );
-    return reports.map(toEmployeeResponse);
+    return reports.map((report) =>
+      this.applyFieldVisibility(toEmployeeResponse(report), report, viewer),
+    );
   }
 
   async updateSelf(
@@ -536,6 +571,26 @@ export class EmployeesService {
       diffs,
     );
 
+    // The first time an employee moves from a currently-working status into
+    // a leaving one, kick off their offboarding checklist. createInstance is
+    // idempotent, so a later transition (e.g. notice_period -> resigned)
+    // won't duplicate it — but this condition also just skips those calls
+    // outright, since `before.employmentStatus` is no longer a working status.
+    const wasWorking =
+      before.employmentStatus === EmploymentStatus.ACTIVE ||
+      before.employmentStatus === EmploymentStatus.ON_LEAVE;
+    const isNowLeaving =
+      reloaded!.employmentStatus === EmploymentStatus.NOTICE_PERIOD ||
+      reloaded!.employmentStatus === EmploymentStatus.RESIGNED ||
+      reloaded!.employmentStatus === EmploymentStatus.TERMINATED;
+    if (wasWorking && isNowLeaving) {
+      await this.checklistsService.createInstance(
+        reloaded!.id,
+        ChecklistType.OFFBOARDING,
+        reloaded!.workMode,
+      );
+    }
+
     return toEmployeeResponse(reloaded!);
   }
 
@@ -667,6 +722,37 @@ export class EmployeesService {
     const employee = await this.employeeRepository.findByUserId(userId);
     if (!employee) throw new NotFoundException('Employee profile not found');
     return this.getSalaryHistory(employee.id);
+  }
+
+  async getEmployeeChecklist(
+    employeeId: string,
+    type: ChecklistType,
+  ): Promise<EmployeeChecklistItem[]> {
+    await this.ensureEmployeeExists(employeeId);
+    return this.checklistsService.getEmployeeChecklist(employeeId, type);
+  }
+
+  async getMyChecklist(
+    userId: string,
+    type: ChecklistType,
+  ): Promise<EmployeeChecklistItem[]> {
+    const employee = await this.employeeRepository.findByUserId(userId);
+    if (!employee) throw new NotFoundException('Employee profile not found');
+    return this.checklistsService.getEmployeeChecklist(employee.id, type);
+  }
+
+  async setChecklistItemCompleted(
+    itemId: string,
+    dto: SetChecklistItemCompletedDto,
+    actorUserId: string,
+  ): Promise<EmployeeChecklistItem> {
+    const actorName = await this.resolveActorName(actorUserId);
+    return this.checklistsService.setItemCompleted(
+      itemId,
+      dto,
+      actorUserId,
+      actorName,
+    );
   }
 
   async addSalaryRecord(

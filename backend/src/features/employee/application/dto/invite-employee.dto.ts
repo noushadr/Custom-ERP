@@ -1,12 +1,14 @@
 import {
   IsDateString,
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
   MinLength,
 } from 'class-validator';
+import { WorkMode } from '../../domain/enums/work-mode.enum';
 
 export class InviteEmployeeDto {
   @IsEmail()
@@ -39,6 +41,12 @@ export class InviteEmployeeDto {
   @IsOptional()
   @IsDateString()
   joiningDate?: string;
+
+  /** Determines which onboarding checklist items apply — defaults to
+   * on-site, matching the Employee entity's own column default. */
+  @IsOptional()
+  @IsEnum(WorkMode)
+  workMode?: WorkMode;
 
   /** Overrides the auto-generated sequence — used only when importing
    * historical records that must keep a pre-existing employee code. */

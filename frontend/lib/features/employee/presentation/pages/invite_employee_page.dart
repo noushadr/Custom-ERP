@@ -8,6 +8,12 @@ import '../../domain/entities/invite_employee_input.dart';
 
 final _companyEmailRegExp = RegExp(r'^[a-z]+\.[a-z]+@zeracreative\.com$');
 
+const _workModes = {
+  'on_site': 'On-site',
+  'remote': 'Remote',
+  'hybrid': 'Hybrid',
+};
+
 class InviteEmployeePage extends ConsumerStatefulWidget {
   const InviteEmployeePage({super.key});
 
@@ -23,6 +29,7 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
   final _lastNameController = TextEditingController();
   final _designationController = TextEditingController();
   String? _departmentId;
+  String _workMode = 'on_site';
 
   @override
   void dispose() {
@@ -47,6 +54,7 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
                 ? null
                 : _designationController.text.trim(),
             departmentId: _departmentId,
+            workMode: _workMode,
           ),
         );
   }
@@ -152,6 +160,21 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
                         ? null
                         : (value) => setState(() => _departmentId = value),
                   ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _workMode,
+                  decoration: const InputDecoration(labelText: 'Work mode'),
+                  items: [
+                    for (final entry in _workModes.entries)
+                      DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(entry.value),
+                      ),
+                  ],
+                  onChanged: isSubmitting
+                      ? null
+                      : (value) => setState(() => _workMode = value!),
                 ),
                 const SizedBox(height: 22),
                 ElevatedButton(

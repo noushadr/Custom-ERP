@@ -82,6 +82,19 @@ void main() {
     expect(find.text('Sup3rSecret'), findsOneWidget);
   });
 
+  testWidgets('defaults the work mode dropdown to On-site', (tester) async {
+    await tester.pumpWidget(_app(FakeEmployeeRepository()));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.widgetWithText(DropdownButtonFormField<String>, 'Work mode'),
+        matching: find.text('On-site'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('shows an error message when the invite fails', (tester) async {
     final repository = FakeEmployeeRepository(
       inviteError: const EmployeeException(

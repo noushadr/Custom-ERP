@@ -4,6 +4,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../performance_reviews/application/performance_review_providers.dart';
+import '../../../performance_reviews/domain/entities/performance_review_summary.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/employee_avatar.dart';
@@ -121,6 +123,17 @@ class _DirectoryBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final employeesAsync = ref.watch(employeeListProvider);
+    final authState = ref.watch(authControllerProvider);
+    final authUser = authState is AuthAuthenticated ? authState.user : null;
+    final canViewPerformance =
+        authUser?.hasPermission('performance.manage') ?? false;
+    // Loading/error states here just mean the review chip stays absent
+    // until it resolves — never block the (already-loaded) employee list on
+    // this secondary fetch.
+    final reviewSummaries = canViewPerformance
+        ? ref.watch(latestPerformanceReviewsByEmployeeProvider).valueOrNull ??
+              const <String, PerformanceReviewSummary>{}
+        : const <String, PerformanceReviewSummary>{};
 
     return employeesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -160,7 +173,11 @@ class _DirectoryBody extends ConsumerWidget {
                   ? const Center(
                       child: Text('No employees match your search.'),
                     )
-                  : _EmployeeList(employees: filtered),
+                  : _EmployeeList(
+                      employees: filtered,
+                      canViewPerformance: canViewPerformance,
+                      reviewSummaries: reviewSummaries,
+                    ),
             ),
           ],
         );
@@ -363,9 +380,15 @@ class _DirectorySummary extends StatelessWidget {
 }
 
 class _EmployeeList extends StatelessWidget {
-  const _EmployeeList({required this.employees});
+  const _EmployeeList({
+    required this.employees,
+    required this.canViewPerformance,
+    required this.reviewSummaries,
+  });
 
   final List<Employee> employees;
+  final bool canViewPerformance;
+  final Map<String, PerformanceReviewSummary> reviewSummaries;
 
   @override
   Widget build(BuildContext context) {
@@ -406,6 +429,8 @@ class _EmployeeList extends StatelessWidget {
                           child: _EmployeeCard(
                             employee: row[i],
                             width: cardWidth,
+                            canViewPerformance: canViewPerformance,
+                            reviewSummary: reviewSummaries[row[i].id],
                           ),
                         ),
                         if (i != row.length - 1)
@@ -425,10 +450,17 @@ class _EmployeeList extends StatelessWidget {
 }
 
 class _EmployeeCard extends StatelessWidget {
-  const _EmployeeCard({required this.employee, required this.width});
+  const _EmployeeCard({
+    required this.employee,
+    required this.width,
+    required this.canViewPerformance,
+    required this.reviewSummary,
+  });
 
   final Employee employee;
   final double width;
+  final bool canViewPerformance;
+  final PerformanceReviewSummary? reviewSummary;
 
   @override
   Widget build(BuildContext context) {
@@ -520,8 +552,11 @@ class _EmployeeCard extends StatelessWidget {
                 spacing: 12,
                 runSpacing: 8,
                 children: [
-                  EmploymentStatusBadge(status: employee.employmentStatus),
-                  WorkModeBadge(workMode: employee.workMode),
+                  EmploymentStatusBadge(
+                    status: employee.employmentStatus,
+                    dense: true,
+                  ),
+                  WorkModeBadge(workMode: employee.workMode, dense: true),
                   InfoChip(
                     icon: Icons.email_outlined,
                     label: employee.email,
@@ -539,12 +574,23 @@ class _EmployeeCard extends StatelessWidget {
                     maxWidth: contentWidth,
                   ),
                   InfoChip(
+                    icon: Icons.timelapse_outlined,
+                    label: formatTenure(employee.joiningDate),
+                    maxWidth: contentWidth,
+                  ),
+                  InfoChip(
                     icon: Icons.cake_outlined,
                     label: employee.dateOfBirth == null
                         ? '—'
                         : formatDisplayDate(employee.dateOfBirth!),
                     maxWidth: contentWidth,
                   ),
+                  if (canViewPerformance)
+                    InfoChip(
+                      icon: Icons.fact_check_outlined,
+                      label: _reviewLabel(reviewSummary),
+                      maxWidth: contentWidth,
+                    ),
                 ],
               ),
             ],
@@ -552,6 +598,17 @@ class _EmployeeCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// "Last Review: Pending" while awaiting completion/finalization, the
+  /// finalized (or, failing that, completed) date once done, or "No review
+  /// yet" for someone who hasn't hit their first work anniversary.
+  String _reviewLabel(PerformanceReviewSummary? summary) {
+    if (summary == null) return 'No review yet';
+    if (summary.status == 'pending') return 'Last Review: Pending';
+    final doneAt = summary.finalizedAt ?? summary.completedAt;
+    if (doneAt == null) return 'Last Review: Pending';
+    return 'Last Review: ${formatDisplayDateOnly(doneAt)}';
   }
 }
 

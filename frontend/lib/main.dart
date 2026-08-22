@@ -1,22 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/layout/app_nav_destination.dart';
 import 'core/layout/responsive_scaffold.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'features/agency_reporting/presentation/pages/agency_reporting_page.dart';
 import 'features/authentication/application/auth_providers.dart';
 import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
 import 'features/authentication/presentation/widgets/impersonation_banner.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
+import 'features/clients/presentation/pages/clients_projects_page.dart';
+import 'features/clients/presentation/pages/project_detail_page.dart';
+import 'features/employee/application/employee_providers.dart';
 import 'features/employee/presentation/pages/admin_dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
+import 'features/finances/presentation/pages/finances_page.dart';
+import 'features/knowledge_base/presentation/pages/knowledge_base_page.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
+import 'features/payroll/presentation/pages/payroll_page.dart';
+import 'features/performance_reviews/presentation/pages/performance_review_detail_page.dart';
+import 'features/performance_reviews/presentation/pages/performance_reviews_page.dart';
+import 'features/requests/application/request_providers.dart';
 import 'features/requests/presentation/pages/requests_page.dart';
 import 'features/settings/presentation/pages/settings_page.dart';
+import 'features/tasks/application/task_providers.dart';
+import 'features/tasks/domain/entities/task_status.dart';
+import 'features/tasks/presentation/pages/task_detail_page.dart';
+import 'features/tasks/presentation/pages/tasks_page.dart';
 
 void main() {
   runApp(const ProviderScope(child: ZeraApp()));
@@ -30,6 +46,16 @@ class ZeraApp extends StatelessWidget {
     return MaterialApp(
       title: 'Zera Creative ERP',
       theme: AppTheme.light,
+      // Required by the Knowledge Base rich-text editor's toolbar
+      // (flutter_quill), which looks up its tooltip strings via
+      // FlutterQuillLocalizations.of(context).
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en')],
       home: const _AuthGate(),
     );
   }
@@ -67,7 +93,7 @@ class _SplashScreen extends StatelessWidget {
 // selected state.
 const _allDestinations = [
   AppNavDestination(
-    label: 'Admin Dashboard',
+    label: 'Dashboard',
     icon: Icons.dashboard_outlined,
     selectedIcon: Icons.dashboard_outlined,
   ),
@@ -92,26 +118,140 @@ const _allDestinations = [
     selectedIcon: Icons.beach_access_outlined,
   ),
   AppNavDestination(
+    label: 'Tasks',
+    icon: Icons.checklist_outlined,
+    selectedIcon: Icons.checklist_outlined,
+  ),
+  AppNavDestination(
+    label: 'Performance Reviews',
+    icon: Icons.rate_review_outlined,
+    selectedIcon: Icons.rate_review_outlined,
+  ),
+  AppNavDestination(
+    label: 'Knowledge Base',
+    icon: Icons.menu_book_outlined,
+    selectedIcon: Icons.menu_book_outlined,
+  ),
+  AppNavDestination(
     label: 'Settings',
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings_outlined,
+  ),
+  AppNavDestination(
+    label: 'Clients & Projects',
+    icon: Icons.business_center_outlined,
+    selectedIcon: Icons.business_center_outlined,
+  ),
+  AppNavDestination(
+    label: 'Agency Reporting',
+    icon: Icons.query_stats_outlined,
+    selectedIcon: Icons.query_stats_outlined,
+  ),
+  AppNavDestination(
+    label: 'Finances',
+    icon: Icons.account_balance_wallet_outlined,
+    selectedIcon: Icons.account_balance_wallet_outlined,
+  ),
+  AppNavDestination(
+    label: 'Payroll',
+    icon: Icons.receipt_long_outlined,
+    selectedIcon: Icons.receipt_long_outlined,
   ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
 // entirely from User Dashboard and Requests. Notifications live in the top
 // bar (see NotificationBell), not the nav.
-const _adminOnlyLabels = {'Admin Dashboard', 'Employees', 'Settings'};
+const _adminOnlyLabels = {
+  'Dashboard',
+  'Employees',
+  'Settings',
+  'Clients & Projects',
+  'Agency Reporting',
+  'Finances',
+  'Payroll',
+};
 
-// Hidden from Super Admin/HR/Manager — they use Admin Dashboard instead.
+// Hidden from Super Admin/HR/Manager — they use Dashboard instead.
 // Visible to everyone else.
 const _nonAdminOnlyLabels = {'User Dashboard'};
+
+// Stricter than _adminOnlyLabels: these two Admin Business Management
+// modules are Super Admin only — Employees, Team Leads, and HR/Manager must
+// not even see the nav entry. Clients & Projects and Payroll are a
+// deliberate exception within Admin Business Management — HR/Manager shares
+// those two with Super Admin, so they're intentionally absent from this set.
+const _superAdminOnlyLabels = {
+  'Agency Reporting',
+  'Finances',
+};
 
 bool _isAdminOrHr(WidgetRef ref) {
   final authState = ref.watch(authControllerProvider);
   return authState is AuthAuthenticated &&
       (authState.user.role == 'Super Admin' ||
           authState.user.role == 'HR/Manager');
+}
+
+bool _isSuperAdmin(WidgetRef ref) {
+  final authState = ref.watch(authControllerProvider);
+  return authState is AuthAuthenticated && authState.user.role == 'Super Admin';
+}
+
+/// How many pending items each nav destination should badge for the current
+/// viewer — reusing the same "pending" signals the notification bell already
+/// aggregates, so the nav and the bell never disagree. No permission guard on
+/// the backend for most of these (mirrors NotificationBell) — naturally zero
+/// for anyone the signal doesn't apply to.
+Map<String, int> _navBadgeCounts(WidgetRef ref) {
+  final authState = ref.watch(authControllerProvider);
+  final authUser = authState is AuthAuthenticated ? authState.user : null;
+
+  final myRequests = ref.watch(myRequestsProvider).valueOrNull ?? const [];
+  final myOpenRequests = myRequests
+      .where((r) => r.status != 'completed' && r.status != 'rejected')
+      .length;
+  final managerApprovals =
+      ref.watch(pendingManagerApprovalRequestsProvider).valueOrNull ?? const [];
+  final canSeeHrApprovals = authUser?.hasPermission('users.manage') ?? false;
+  final hrApprovals = canSeeHrApprovals
+      ? ref.watch(pendingHrApprovalRequestsProvider).valueOrNull ?? const []
+      : const [];
+  final requestsBadge =
+      myOpenRequests + managerApprovals.length + hrApprovals.length;
+
+  final myTasks = ref.watch(myTasksProvider).valueOrNull ?? const [];
+  final tasksBadge = myTasks
+      .where(
+        (t) =>
+            t.status != TaskStatus.completed &&
+            t.status != TaskStatus.cancelled,
+      )
+      .length;
+
+  final myProfile = ref.watch(myProfileProvider).valueOrNull;
+  final profileIncomplete =
+      myProfile != null && myProfile.profileCompletionPercentage < 100;
+
+  return {
+    'Requests': requestsBadge,
+    'Tasks': tasksBadge,
+    // Whichever of these two is actually visible depends on role — badging
+    // both is harmless since only one is ever rendered at a time.
+    if (profileIncomplete) 'Dashboard': 1,
+    if (profileIncomplete) 'User Dashboard': 1,
+  };
+}
+
+AppNavDestination _withBadge(AppNavDestination destination, int badgeCount) {
+  if (badgeCount <= 0) return destination;
+  return AppNavDestination(
+    label: destination.label,
+    icon: destination.icon,
+    selectedIcon: destination.selectedIcon,
+    comingSoon: destination.comingSoon,
+    badgeCount: badgeCount,
+  );
 }
 
 class _HomeShell extends ConsumerStatefulWidget {
@@ -137,7 +277,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
 
   Widget _sectionRootFor(AppNavDestination destination) {
     switch (destination.label) {
-      case 'Admin Dashboard':
+      case 'Dashboard':
         return const AdminDashboardPage();
       case 'User Dashboard':
         return const UserDashboardPage();
@@ -147,8 +287,22 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const RequestsPage();
       case 'Leaves':
         return const LeavePage();
+      case 'Tasks':
+        return const TasksPage();
+      case 'Performance Reviews':
+        return const PerformanceReviewsPage();
+      case 'Knowledge Base':
+        return const KnowledgeBasePage();
       case 'Settings':
         return const SettingsPage();
+      case 'Clients & Projects':
+        return const ClientsProjectsPage();
+      case 'Agency Reporting':
+        return const AgencyReportingPage();
+      case 'Finances':
+        return const FinancesPage();
+      case 'Payroll':
+        return const PayrollPage();
       default:
         return _ComingSoon(destination: destination);
     }
@@ -175,19 +329,117 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
     setState(() => _selectedIndex = index);
   }
 
+  void _openPerformanceReview(String reviewId) {
+    final index = _allDestinations.indexWhere(
+      (d) => d.label == 'Performance Reviews',
+    );
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    navigatorState?.push(
+      MaterialPageRoute(
+        builder: (_) => PerformanceReviewDetailPage(reviewId: reviewId),
+      ),
+    );
+    setState(() => _selectedIndex = index);
+  }
+
+  void _openTask(String taskId) {
+    final index = _allDestinations.indexWhere((d) => d.label == 'Tasks');
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    navigatorState?.push(
+      MaterialPageRoute(builder: (_) => TaskDetailPage(taskId: taskId)),
+    );
+    setState(() => _selectedIndex = index);
+  }
+
+  void _openProject(String projectId) {
+    final index = _allDestinations.indexWhere(
+      (d) => d.label == 'Clients & Projects',
+    );
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    navigatorState?.push(
+      MaterialPageRoute(builder: (_) => ProjectDetailPage(projectId: projectId)),
+    );
+    setState(() => _selectedIndex = index);
+  }
+
+  /// Routes a persisted notification's raw backend `linkTarget`/
+  /// `linkEntityId` to a concrete destination — falls back to just
+  /// switching to the relevant section when there's no specific entity to
+  /// deep-link into.
+  void _openNotification(String? linkTarget, String? linkEntityId) {
+    switch (linkTarget) {
+      case 'clients_projects':
+        if (linkEntityId != null) {
+          _openProject(linkEntityId);
+        } else {
+          _goToDestination('Clients & Projects');
+        }
+      case 'tasks':
+        if (linkEntityId != null) {
+          _openTask(linkEntityId);
+        } else {
+          _goToDestination('Tasks');
+        }
+      case 'leave':
+        _goToDestination('Leaves');
+      case 'performance_reviews':
+        _goToDestination('Performance Reviews');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdminOrHr = _isAdminOrHr(ref);
+    final isSuperAdmin = _isSuperAdmin(ref);
+    final badgeCounts = _navBadgeCounts(ref);
 
-    final visibleOriginalIndices = [
+    final unsortedVisibleIndices = [
       for (var i = 0; i < _allDestinations.length; i++)
-        if (isAdminOrHr
-            ? !_nonAdminOnlyLabels.contains(_allDestinations[i].label)
-            : !_adminOnlyLabels.contains(_allDestinations[i].label))
+        if ((isAdminOrHr
+                ? !_nonAdminOnlyLabels.contains(_allDestinations[i].label)
+                : !_adminOnlyLabels.contains(_allDestinations[i].label)) &&
+            (!_superAdminOnlyLabels.contains(_allDestinations[i].label) ||
+                isSuperAdmin))
           i,
     ];
+    // Only a Super Admin ever sees a mix of both tiers (every other role
+    // either sees none of the Super-Admin-exclusive modules, or none of
+    // the admin-tier ones at all) — so only for them, group the
+    // Super-Admin-exclusive modules first with their own section heading,
+    // ahead of everything shared with HR/Manager and below. Reordering the
+    // VISIBLE list here is safe and doesn't touch `_allDestinations`'
+    // stable order, which `_sectionNavigatorKeys`/`IndexedStack` below key
+    // off directly — only the nav's on-screen order changes.
+    final visibleOriginalIndices = isSuperAdmin
+        ? [
+            ...unsortedVisibleIndices.where(
+              (i) => _superAdminOnlyLabels.contains(_allDestinations[i].label),
+            ),
+            ...unsortedVisibleIndices.where(
+              (i) => !_superAdminOnlyLabels.contains(_allDestinations[i].label),
+            ),
+          ]
+        : unsortedVisibleIndices;
+    final adminSectionCount = isSuperAdmin
+        ? unsortedVisibleIndices
+              .where(
+                (i) =>
+                    _superAdminOnlyLabels.contains(_allDestinations[i].label),
+              )
+              .length
+        : 0;
     final visibleDestinations = [
-      for (final i in visibleOriginalIndices) _allDestinations[i],
+      for (final i in visibleOriginalIndices)
+        _withBadge(
+          _allDestinations[i],
+          badgeCounts[_allDestinations[i].label] ?? 0,
+        ),
     ];
     // Falls back to the first visible section if the previously-selected one
     // just disappeared (e.g. role changed via impersonation while on Admin
@@ -206,14 +458,18 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
             onDestinationSelected: (visiblePosition) => setState(
               () => _selectedIndex = visibleOriginalIndices[visiblePosition],
             ),
+            adminSectionCount: adminSectionCount,
             actions: [
               NotificationBell(
                 onNavigate: (target) => _goToDestination(switch (target) {
-                  NotificationLinkTarget.adminDashboard => 'Admin Dashboard',
+                  NotificationLinkTarget.adminDashboard => 'Dashboard',
                   NotificationLinkTarget.userDashboard => 'User Dashboard',
                   NotificationLinkTarget.leavePage => 'Leaves',
                 }),
                 onOpenEmployeeProfile: _openEmployeeProfile,
+                onOpenPerformanceReview: _openPerformanceReview,
+                onOpenTask: _openTask,
+                onOpenNotification: _openNotification,
               ),
               const SizedBox(width: 16),
               UserMenu(

@@ -7,6 +7,7 @@ class InviteEmployeeInput {
     this.departmentId,
     this.reportingManagerId,
     this.joiningDate,
+    this.workMode,
   });
 
   final String companyEmail;
@@ -17,6 +18,10 @@ class InviteEmployeeInput {
   final String? reportingManagerId;
   final String? joiningDate;
 
+  /// 'on_site', 'remote', or 'hybrid' — determines which onboarding
+  /// checklist items apply. Defaults to on-site when omitted.
+  final String? workMode;
+
   Map<String, dynamic> toJson() => {
     'companyEmail': companyEmail,
     'firstName': firstName,
@@ -25,5 +30,6 @@ class InviteEmployeeInput {
     if (departmentId != null) 'departmentId': departmentId,
     if (reportingManagerId != null) 'reportingManagerId': reportingManagerId,
     if (joiningDate != null) 'joiningDate': joiningDate,
+    if (workMode != null) 'workMode': workMode,
   };
 }

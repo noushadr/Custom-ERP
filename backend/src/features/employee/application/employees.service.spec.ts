@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { ChecklistsService } from '../../checklists/application/checklists.service';
+import { ChecklistType } from '../../checklists/domain/enums/checklist-type.enum';
 import { Role } from '../../authentication/domain/entities/role.entity';
 import { User } from '../../authentication/domain/entities/user.entity';
 import { UserStatus } from '../../authentication/domain/enums/user-status.enum';
@@ -17,6 +19,7 @@ import { SalaryRecord } from '../domain/entities/salary-record.entity';
 import { AssetStatus } from '../domain/enums/asset-status.enum';
 import { EmploymentStatus } from '../domain/enums/employment-status.enum';
 import { EmploymentType } from '../domain/enums/employment-type.enum';
+import { WorkMode } from '../domain/enums/work-mode.enum';
 import type { AssetRepository } from '../domain/repositories/asset-repository.interface';
 import type { AuditLogRepository } from '../domain/repositories/audit-log-repository.interface';
 import type { DocumentRepository } from '../domain/repositories/document-repository.interface';
@@ -129,6 +132,7 @@ describe('EmployeesService', () => {
   let salaryRecordRepository: jest.Mocked<SalaryRecordRepository>;
   let educationRecordRepository: jest.Mocked<EducationRecordRepository>;
   let assetRepository: jest.Mocked<AssetRepository>;
+  let checklistsService: jest.Mocked<ChecklistsService>;
 
   beforeEach(() => {
     employeeRepository = {
@@ -177,6 +181,11 @@ describe('EmployeesService', () => {
       save: jest.fn(),
       remove: jest.fn(),
     };
+    checklistsService = {
+      createInstance: jest.fn().mockResolvedValue([]),
+      getEmployeeChecklist: jest.fn(),
+      setItemCompleted: jest.fn(),
+    } as unknown as jest.Mocked<ChecklistsService>;
 
     service = new EmployeesService(
       employeeRepository,
@@ -187,6 +196,7 @@ describe('EmployeesService', () => {
       salaryRecordRepository,
       educationRecordRepository,
       assetRepository,
+      checklistsService,
     );
 
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-temp-password');
@@ -248,6 +258,67 @@ describe('EmployeesService', () => {
       );
       expect(result.temporaryPassword).toHaveLength(12);
       expect(result.employee.employeeCode).toBe('ZC-00005');
+    });
+
+    it('creates an onboarding checklist instance for the new employee', async () => {
+      userRepository.findByEmail.mockResolvedValue(null);
+      roleRepository.findByName.mockResolvedValue(buildRole());
+      userRepository.save.mockImplementation(
+        (user) =>
+          Promise.resolve({ ...user, id: 'new-user-id' }) as Promise<User>,
+      );
+      employeeRepository.save.mockImplementation((employee) =>
+        Promise.resolve({ ...employee, id: 'new-employee-id' }),
+      );
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ id: 'new-employee-id', workMode: WorkMode.REMOTE }),
+      );
+
+      await service.invite(dto);
+
+      expect(checklistsService.createInstance).toHaveBeenCalledWith(
+        'new-employee-id',
+        ChecklistType.ONBOARDING,
+        WorkMode.REMOTE,
+      );
+    });
+
+    it('saves the invited employee with the given work mode', async () => {
+      userRepository.findByEmail.mockResolvedValue(null);
+      roleRepository.findByName.mockResolvedValue(buildRole());
+      userRepository.save.mockImplementation(
+        (user) =>
+          Promise.resolve({ ...user, id: 'new-user-id' }) as Promise<User>,
+      );
+      employeeRepository.save.mockImplementation((employee) =>
+        Promise.resolve({ ...employee, id: 'new-employee-id' }),
+      );
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+
+      await service.invite({ ...dto, workMode: WorkMode.REMOTE });
+
+      expect(employeeRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ workMode: WorkMode.REMOTE }),
+      );
+    });
+
+    it('defaults the work mode to on-site when not specified', async () => {
+      userRepository.findByEmail.mockResolvedValue(null);
+      roleRepository.findByName.mockResolvedValue(buildRole());
+      userRepository.save.mockImplementation(
+        (user) =>
+          Promise.resolve({ ...user, id: 'new-user-id' }) as Promise<User>,
+      );
+      employeeRepository.save.mockImplementation((employee) =>
+        Promise.resolve({ ...employee, id: 'new-employee-id' }),
+      );
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+
+      await service.invite(dto);
+
+      expect(employeeRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ workMode: WorkMode.ON_SITE }),
+      );
     });
 
     it('uses a provided employeeCode instead of generating one, for imports that must keep a legacy code', async () => {
@@ -355,6 +426,65 @@ describe('EmployeesService', () => {
 
       expect(userRepository.findByEmail).not.toHaveBeenCalled();
       expect(userRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('creates an offboarding checklist when employmentStatus moves from active to resigned', async () => {
+      const employee = buildEmployee({
+        employmentStatus: EmploymentStatus.ACTIVE,
+        workMode: WorkMode.ON_SITE,
+      });
+      employeeRepository.findById
+        .mockResolvedValueOnce(employee)
+        .mockResolvedValueOnce({
+          ...employee,
+          employmentStatus: EmploymentStatus.RESIGNED,
+        });
+      employeeRepository.save.mockResolvedValue(employee);
+
+      await service.update(
+        employee.id,
+        { employmentStatus: EmploymentStatus.RESIGNED },
+        'actor-1',
+      );
+
+      expect(checklistsService.createInstance).toHaveBeenCalledWith(
+        employee.id,
+        ChecklistType.OFFBOARDING,
+        WorkMode.ON_SITE,
+      );
+    });
+
+    it('does not re-create an offboarding checklist on a later transition between leaving statuses', async () => {
+      const employee = buildEmployee({
+        employmentStatus: EmploymentStatus.NOTICE_PERIOD,
+      });
+      employeeRepository.findById
+        .mockResolvedValueOnce(employee)
+        .mockResolvedValueOnce({
+          ...employee,
+          employmentStatus: EmploymentStatus.RESIGNED,
+        });
+      employeeRepository.save.mockResolvedValue(employee);
+
+      await service.update(
+        employee.id,
+        { employmentStatus: EmploymentStatus.RESIGNED },
+        'actor-1',
+      );
+
+      expect(checklistsService.createInstance).not.toHaveBeenCalled();
+    });
+
+    it('does not touch the offboarding checklist when employmentStatus is unchanged', async () => {
+      const employee = buildEmployee();
+      employeeRepository.findById
+        .mockResolvedValueOnce(employee)
+        .mockResolvedValueOnce({ ...employee, designation: 'Team Lead' });
+      employeeRepository.save.mockResolvedValue(employee);
+
+      await service.update(employee.id, { designation: 'Team Lead' }, 'actor-1');
+
+      expect(checklistsService.createInstance).not.toHaveBeenCalled();
     });
   });
 
@@ -470,9 +600,9 @@ describe('EmployeesService', () => {
     it('throws NotFoundException when the caller has no employee profile', async () => {
       employeeRepository.findByUserId.mockResolvedValue(null);
 
-      await expect(service.getMyDirectReports('user-1')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.getMyDirectReports(buildViewer({ sub: 'user-1' })),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('returns the mapped direct reports for the caller', async () => {
@@ -482,13 +612,37 @@ describe('EmployeesService', () => {
         buildEmployee({ id: 'report-1', firstName: 'Ravi' }),
       ]);
 
-      const result = await service.getMyDirectReports('user-1');
+      const result = await service.getMyDirectReports(
+        buildViewer({ sub: 'user-1', permissions: ['employees.manage'] }),
+      );
 
       expect(employeeRepository.findByReportingManagerId).toHaveBeenCalledWith(
         'manager-1',
       );
       expect(result).toHaveLength(1);
       expect(result[0].fullName).toBe('Ravi Doe');
+    });
+
+    it("strips bank/personal fields from a report when the manager lacks employees.manage — regression: this endpoint previously returned every direct report's bank details, IBAN, DOB, and personal contact info completely unmasked to any manager (e.g. a Team Lead), since it skipped the same field-visibility check findAll/findById already apply", async () => {
+      const manager = buildEmployee({ id: 'manager-1', userId: 'user-1' });
+      employeeRepository.findByUserId.mockResolvedValue(manager);
+      employeeRepository.findByReportingManagerId.mockResolvedValue([
+        buildEmployee({
+          id: 'report-1',
+          userId: 'report-user-1',
+          bankName: 'Meezan Bank',
+          accountNumber: '12345',
+          dateOfBirth: '1998-01-01',
+        }),
+      ]);
+
+      const result = await service.getMyDirectReports(
+        buildViewer({ sub: 'user-1', permissions: ['employees.read'] }),
+      );
+
+      expect(result[0].bankName).toBeNull();
+      expect(result[0].accountNumber).toBeNull();
+      expect(result[0].dateOfBirth).toBeNull();
     });
   });
 
@@ -811,6 +965,38 @@ describe('EmployeesService', () => {
       const result = await service.getPayrollSummary();
 
       expect(result.dailyPayroll).toBeCloseTo(62000 / daysInMonth);
+    });
+  });
+
+  describe('getSalaryAsOf', () => {
+    it('returns the latest record whose effectiveDate is on or before the given date', async () => {
+      salaryRecordRepository.findByEmployeeId.mockResolvedValue([
+        buildSalaryRecord({ amount: '40000.00', effectiveDate: '2025-01-01' }),
+        buildSalaryRecord({ amount: '50000.00', effectiveDate: '2026-01-01' }),
+        buildSalaryRecord({ amount: '60000.00', effectiveDate: '2026-12-01' }),
+      ]);
+
+      const result = await service.getSalaryAsOf('employee-1', '2026-08-31');
+
+      expect(result).toBe(50000);
+    });
+
+    it('returns 0 when no record has taken effect by that date', async () => {
+      salaryRecordRepository.findByEmployeeId.mockResolvedValue([
+        buildSalaryRecord({ amount: '50000.00', effectiveDate: '2027-01-01' }),
+      ]);
+
+      const result = await service.getSalaryAsOf('employee-1', '2026-08-31');
+
+      expect(result).toBe(0);
+    });
+
+    it('returns 0 for an employee with no salary records at all', async () => {
+      salaryRecordRepository.findByEmployeeId.mockResolvedValue([]);
+
+      const result = await service.getSalaryAsOf('employee-1', '2026-08-31');
+
+      expect(result).toBe(0);
     });
   });
 

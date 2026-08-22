@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import type { RolesService } from '../../authentication/application/roles.service';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
 import { Department } from '../../departments/domain/entities/department.entity';
 import type { DepartmentRepository } from '../../departments/domain/repositories/department-repository.interface';
@@ -10,6 +11,7 @@ import { Employee } from '../../employee/domain/entities/employee.entity';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
 import type { HolidaysService } from '../../holidays/application/holidays.service';
+import type { NotificationsService } from '../../notifications/application/notifications.service';
 import { LeaveBalance } from '../domain/entities/leave-balance.entity';
 import { LeaveBalanceAdjustment } from '../domain/entities/leave-balance-adjustment.entity';
 import { LeaveRequest } from '../domain/entities/leave-request.entity';
@@ -95,6 +97,8 @@ describe('LeaveService', () => {
   let userRepository: jest.Mocked<UserRepository>;
   let departmentRepository: jest.Mocked<DepartmentRepository>;
   let holidaysService: jest.Mocked<HolidaysService>;
+  let notificationsService: jest.Mocked<NotificationsService>;
+  let rolesService: jest.Mocked<RolesService>;
 
   beforeEach(() => {
     leaveTypeRepository = {
@@ -151,6 +155,12 @@ describe('LeaveService', () => {
     holidaysService = {
       getDatesInRange: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<HolidaysService>;
+    notificationsService = {
+      create: jest.fn(),
+    } as unknown as jest.Mocked<NotificationsService>;
+    rolesService = {
+      findUsersWithPermission: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<RolesService>;
 
     service = new LeaveService(
       leaveTypeRepository,
@@ -161,6 +171,8 @@ describe('LeaveService', () => {
       userRepository,
       departmentRepository,
       holidaysService,
+      notificationsService,
+      rolesService,
     );
   });
 
@@ -553,6 +565,7 @@ describe('LeaveService', () => {
         'team',
         3,
         2026,
+        false,
       );
 
       expect(result.map((r) => r.employeeId)).toEqual(['member-1']);
@@ -569,7 +582,13 @@ describe('LeaveService', () => {
         buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
       ]);
 
-      const result = await service.getLeaveCalendar('user-1', 'team', 3, 2026);
+      const result = await service.getLeaveCalendar(
+        'user-1',
+        'team',
+        3,
+        2026,
+        false,
+      );
 
       expect(result).toHaveLength(0);
     });
@@ -585,6 +604,7 @@ describe('LeaveService', () => {
         'company',
         3,
         2026,
+        false,
       );
 
       expect(result).toHaveLength(2);
@@ -600,9 +620,76 @@ describe('LeaveService', () => {
         'company',
         3,
         2026,
+        false,
       );
 
       expect(result).toHaveLength(0);
+    });
+
+    it("genericizes the leave type on company scope for a viewer without leave.manage — regression: the company-wide calendar previously revealed every coworker's specific leave type (e.g. 'Sick Leave'), which is health-adjacent personal information, to any authenticated user", async () => {
+      leaveRequestRepository.findByStatuses.mockResolvedValue([
+        buildLeaveRequest({
+          employee: buildEmployee({ id: 'employee-a' }),
+          leaveType: buildLeaveType({ id: 'type-1', name: 'Sick Leave', colorHex: '#ff0000' }),
+        }),
+      ]);
+
+      const result = await service.getLeaveCalendar(
+        'user-1',
+        'company',
+        3,
+        2026,
+        false,
+      );
+
+      expect(result[0].leaveTypeName).toBe('On Leave');
+      expect(result[0].colorHex).toBeNull();
+    });
+
+    it('shows the real leave type on company scope to a leave.manage holder', async () => {
+      leaveRequestRepository.findByStatuses.mockResolvedValue([
+        buildLeaveRequest({
+          employee: buildEmployee({ id: 'employee-a' }),
+          leaveType: buildLeaveType({ id: 'type-1', name: 'Sick Leave', colorHex: '#ff0000' }),
+        }),
+      ]);
+
+      const result = await service.getLeaveCalendar(
+        'user-1',
+        'company',
+        3,
+        2026,
+        true,
+      );
+
+      expect(result[0].leaveTypeName).toBe('Sick Leave');
+      expect(result[0].colorHex).toBe('#ff0000');
+    });
+
+    it('shows the real leave type on team scope even without leave.manage, since that scope is already restricted to the department head', async () => {
+      leaveRequestRepository.findByStatuses.mockResolvedValue([
+        buildLeaveRequest({
+          employeeId: 'member-1',
+          employee: buildEmployee({ id: 'member-1', departmentId: 'dept-1' }),
+          leaveType: buildLeaveType({ id: 'type-1', name: 'Sick Leave', colorHex: '#ff0000' }),
+        }),
+      ]);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'head-1' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+      ]);
+
+      const result = await service.getLeaveCalendar(
+        'user-1',
+        'team',
+        3,
+        2026,
+        false,
+      );
+
+      expect(result[0].leaveTypeName).toBe('Sick Leave');
     });
   });
 
@@ -652,6 +739,48 @@ describe('LeaveService', () => {
 
       expect(leaveBalanceRepository.saveMany).not.toHaveBeenCalled();
       expect(result.balancesCreated).toBe(0);
+    });
+  });
+
+  describe('handleDailyAnnualResetCheck', () => {
+    it('does nothing when the year is already initialized', async () => {
+      leaveBalanceRepository.findByYear.mockResolvedValue([buildBalance()]);
+
+      await service.handleDailyAnnualResetCheck();
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('notifies every active employee directly and every leave.manage holder once the reset runs, skipping non-active employees', async () => {
+      const employeeA = buildEmployee({
+        id: 'employee-a',
+        userId: 'user-a',
+        employmentStatus: EmploymentStatus.ACTIVE,
+      });
+      const employeeB = buildEmployee({
+        id: 'employee-b',
+        userId: 'user-b',
+        employmentStatus: EmploymentStatus.RESIGNED,
+      });
+      leaveBalanceRepository.findByYear
+        .mockResolvedValueOnce([]) // getResetStatus: not yet initialized
+        .mockResolvedValueOnce([]); // inside runAnnualReset: no existing balances
+      employeeRepository.findAll.mockResolvedValue([employeeA, employeeB]);
+      leaveTypeRepository.findAll.mockResolvedValue([buildLeaveType({ id: 'type-1' })]);
+      leaveBalanceRepository.saveMany.mockImplementation((b) => Promise.resolve(b));
+      rolesService.findUsersWithPermission.mockResolvedValue([{ id: 'admin-1' } as never]);
+
+      await service.handleDailyAnnualResetCheck();
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'user-a' }),
+      );
+      expect(notificationsService.create).not.toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'user-b' }),
+      );
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'admin-1' }),
+      );
     });
   });
 });

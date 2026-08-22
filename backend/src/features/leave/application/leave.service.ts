@@ -6,7 +6,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
+import { RolesService } from '../../authentication/application/roles.service';
 import {
   USER_REPOSITORY,
   type UserRepository,
@@ -21,6 +23,8 @@ import {
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { HolidaysService } from '../../holidays/application/holidays.service';
+import { NotificationsService } from '../../notifications/application/notifications.service';
+import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CreateLeaveTypeDto } from './dto/create-leave-type.dto';
 import { SubmitLeaveRequestDto } from './dto/submit-leave-request.dto';
@@ -71,6 +75,8 @@ export class LeaveService {
     @Inject(DEPARTMENT_REPOSITORY)
     private readonly departmentRepository: DepartmentRepository,
     private readonly holidaysService: HolidaysService,
+    private readonly notificationsService: NotificationsService,
+    private readonly rolesService: RolesService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -486,6 +492,40 @@ export class LeaveService {
     return { year, balancesCreated: toCreate.length };
   }
 
+  /** Unconditional daily check — runs the reset automatically once due, with
+   * no admin on/off toggle. `getResetStatus` already makes this idempotent
+   * (a no-op once the year is initialized). Notifies every active employee
+   * directly (it's their own leave balance that changed), plus every
+   * `leave.manage` holder with the run's summary count. */
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  async handleDailyAnnualResetCheck(): Promise<void> {
+    const status = await this.getResetStatus();
+    if (status.isInitialized) return;
+
+    const result = await this.runAnnualReset();
+    if (result.balancesCreated === 0) return;
+
+    const activeEmployees = (await this.employeeRepository.findAll()).filter(
+      (employee) => employee.employmentStatus === EmploymentStatus.ACTIVE,
+    );
+    for (const employee of activeEmployees) {
+      await this.notificationsService.create({
+        recipientUserId: employee.userId,
+        message: `Your annual leave balances for ${result.year} have been reset.`,
+        linkTarget: NotificationLinkTarget.LEAVE,
+      });
+    }
+
+    const admins = await this.rolesService.findUsersWithPermission('leave.manage');
+    for (const admin of admins) {
+      await this.notificationsService.create({
+        recipientUserId: admin.id,
+        message: `Annual leave balances for ${result.year} were reset automatically (${result.balancesCreated} balance(s) created).`,
+        linkTarget: NotificationLinkTarget.LEAVE,
+      });
+    }
+  }
+
   // ---------------------------------------------------------------------
   // Calendar
   // ---------------------------------------------------------------------
@@ -495,6 +535,7 @@ export class LeaveService {
     scope: 'team' | 'company',
     month: number,
     year: number,
+    canManageLeave: boolean,
   ): Promise<LeaveCalendarEntry[]> {
     const rangeStart = new Date(Date.UTC(year, month - 1, 1));
     const rangeEnd = new Date(Date.UTC(year, month, 0));
@@ -530,8 +571,19 @@ export class LeaveService {
         employeeName: `${request.employee.firstName} ${request.employee.lastName}`,
         employeePhotoUrl: request.employee.profilePhotoUrl ?? null,
         leaveTypeId: request.leaveTypeId,
-        leaveTypeName: request.leaveType.name,
-        colorHex: request.leaveType.colorHex ?? null,
+        // Which category of leave (e.g. "Sick Leave") is health-adjacent
+        // personal information about a coworker — shown as a specific type
+        // only to a leave.manage holder or on the "team" scope (which is
+        // already restricted to that department's own head); the
+        // company-wide "who's out" view genericizes it for everyone else.
+        leaveTypeName:
+          scope === 'company' && !canManageLeave
+            ? 'On Leave'
+            : request.leaveType.name,
+        colorHex:
+          scope === 'company' && !canManageLeave
+            ? null
+            : (request.leaveType.colorHex ?? null),
         startDate: request.startDate,
         endDate: request.endDate,
         isPending: request.status === LeaveRequestStatus.MANAGER_APPROVED,

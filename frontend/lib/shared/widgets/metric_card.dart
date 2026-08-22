@@ -11,12 +11,17 @@ class MetricCard extends StatelessWidget {
     required this.value,
     required this.color,
     this.icon,
+    this.secondaryValue,
   });
 
   final String label;
   final String value;
   final Color color;
   final IconData? icon;
+
+  /// An optional smaller line shown right below [value] — e.g. an
+  /// approximate USD figure below a PKR headline amount.
+  final String? secondaryValue;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +54,15 @@ class MetricCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          if (secondaryValue != null) ...[
+            const SizedBox(height: 1),
+            Text(
+              secondaryValue!,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
           const SizedBox(height: 2),
           Text(
             label,
