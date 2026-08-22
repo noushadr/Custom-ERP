@@ -611,4 +611,69 @@ describe('TasksService', () => {
       expect(task.projectId).toBe('project-1');
     });
   });
+
+  describe('getTasksNeedingDeadlineReminder', () => {
+    function isoDaysFromNow(days: number): string {
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    it('matches an open task due within the window', async () => {
+      taskRepository.findAll.mockResolvedValue([
+        buildTask({ status: TaskStatus.TODO, dueDate: isoDaysFromNow(2) }),
+      ]);
+
+      const result = await service.getTasksNeedingDeadlineReminder(7);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].assigneeUserId).toBe('user-1');
+    });
+
+    it('excludes completed and cancelled tasks', async () => {
+      taskRepository.findAll.mockResolvedValue([
+        buildTask({ id: 't1', status: TaskStatus.COMPLETED, dueDate: isoDaysFromNow(2) }),
+        buildTask({ id: 't2', status: TaskStatus.CANCELLED, dueDate: isoDaysFromNow(2) }),
+      ]);
+
+      const result = await service.getTasksNeedingDeadlineReminder(7);
+      expect(result).toHaveLength(0);
+    });
+
+    it('excludes a task already reminded for this exact dueDate', async () => {
+      const dueDate = isoDaysFromNow(2);
+      taskRepository.findAll.mockResolvedValue([
+        buildTask({
+          dueDate,
+          lastDeadlineReminderSentFor: dueDate,
+        }),
+      ]);
+
+      const result = await service.getTasksNeedingDeadlineReminder(7);
+      expect(result).toHaveLength(0);
+    });
+
+    it('excludes a due date outside the daysBefore window', async () => {
+      taskRepository.findAll.mockResolvedValue([
+        buildTask({ dueDate: isoDaysFromNow(30) }),
+      ]);
+
+      const result = await service.getTasksNeedingDeadlineReminder(7);
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('markDeadlineReminderSent', () => {
+    it('stamps lastDeadlineReminderSentFor with the task\'s current dueDate', async () => {
+      taskRepository.findById.mockResolvedValue(
+        buildTask({ id: 't1', dueDate: '2026-09-01' }),
+      );
+
+      await service.markDeadlineReminderSent('t1');
+
+      expect(taskRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ lastDeadlineReminderSentFor: '2026-09-01' }),
+      );
+    });
+  });
 });

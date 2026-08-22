@@ -7,6 +7,8 @@ import '../../../authentication/application/auth_state.dart';
 import '../../../leave/application/leave_providers.dart';
 import '../../../leave/domain/entities/leave_request.dart';
 import '../../../notices/application/notice_providers.dart';
+import '../../../notifications/application/notifications_providers.dart';
+import '../../../notifications/domain/entities/app_notification.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../../performance_reviews/domain/entities/performance_review.dart';
 import '../../../requests/application/request_providers.dart';
@@ -52,6 +54,14 @@ class _OpenTask {
   final String taskId;
 }
 
+/// Tapping a persisted (Automations-created) notification marks it read and
+/// navigates per its own `linkTarget`/`linkEntityId`, rather than a fixed
+/// destination baked into a case class.
+class _TapAppNotification {
+  const _TapAppNotification(this.notification);
+  final AppNotification notification;
+}
+
 // How many past (already-decided) items to keep per history list — a record
 // of what happened, not just what's still pending, but bounded so the list
 // doesn't grow forever for a long-tenured employee. Unlike the old 7-day
@@ -69,7 +79,8 @@ const _maxNoticeHistory = 5;
 /// reminders (Super Admin/HR-Manager only, recently-passed or upcoming,
 /// active employees only), company notices, requests/leave awaiting the
 /// viewer's approval, a leave-balance-reset reminder (Super Admin/HR only),
-/// and the viewer's own recently-decided requests/leave — grouped under
+/// persisted Reminders from the Automations module, and the viewer's own
+/// recently-decided requests/leave — grouped under
 /// category labels, with every notification's full text readable (no
 /// truncation) rather than clipped to a single ellipsized line.
 class NotificationBell extends ConsumerWidget {
@@ -79,6 +90,7 @@ class NotificationBell extends ConsumerWidget {
     required this.onOpenEmployeeProfile,
     required this.onOpenPerformanceReview,
     required this.onOpenTask,
+    required this.onOpenNotification,
   });
 
   final ValueChanged<NotificationLinkTarget> onNavigate;
@@ -93,6 +105,13 @@ class NotificationBell extends ConsumerWidget {
 
   /// Called with a taskId when the viewer taps a task notification.
   final ValueChanged<String> onOpenTask;
+
+  /// Called with a persisted notification's raw `linkTarget`
+  /// ('clients_projects' | 'tasks' | 'leave' | null) and `linkEntityId`
+  /// when the viewer taps it — separate from [onNavigate] since these
+  /// values come from the backend, not a fixed local enum.
+  final void Function(String? linkTarget, String? linkEntityId)
+  onOpenNotification;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -192,6 +211,12 @@ class NotificationBell extends ConsumerWidget {
         )
         .toList();
 
+    // No permission guard on the backend — this is always just the viewer's
+    // own notifications (currently created only by the Automations module).
+    final appNotifications =
+        ref.watch(myNotificationsProvider).valueOrNull ??
+        const <AppNotification>[];
+
     final totalCount =
         birthdays.length +
         anniversaries.length +
@@ -207,6 +232,7 @@ class NotificationBell extends ConsumerWidget {
         pendingHrReviews.length +
         newlyAssignedTasks.length +
         tasksDueSoon.length +
+        appNotifications.length +
         (needsLeaveReset ? 1 : 0);
 
     return PopupMenuButton<Object>(
@@ -227,6 +253,12 @@ class NotificationBell extends ConsumerWidget {
             onOpenPerformanceReview(reviewId);
           case _OpenTask(:final taskId):
             onOpenTask(taskId);
+          case _TapAppNotification(:final notification):
+            ref
+                .read(notificationsRepositoryProvider)
+                .markRead(notification.id)
+                .then((_) => ref.invalidate(myNotificationsProvider));
+            onOpenNotification(notification.linkTarget, notification.linkEntityId);
         }
       },
       itemBuilder: (context) {
@@ -378,6 +410,19 @@ class NotificationBell extends ConsumerWidget {
                 title: '${request.leaveTypeName} — ${request.requesterName}',
                 caption: 'Leave awaiting your approval',
                 trailing: formatRelativeTime(request.createdAt),
+              ),
+            ),
+        ]);
+
+        addSection('Reminders', [
+          for (final notification in appNotifications)
+            PopupMenuItem<Object>(
+              value: _TapAppNotification(notification),
+              child: _NotificationTile(
+                icon: Icons.notifications_active_outlined,
+                iconColor: AppColors.primary,
+                title: notification.message,
+                trailing: formatRelativeTime(notification.createdAt),
               ),
             ),
         ]);

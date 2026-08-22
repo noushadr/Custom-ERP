@@ -49,5 +49,6 @@ import { LeaveController } from './presentation/leave.controller';
       useClass: TypeOrmLeaveBalanceAdjustmentRepository,
     },
   ],
+  exports: [LeaveService],
 })
 export class LeaveModule {}

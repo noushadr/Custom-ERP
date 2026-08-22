@@ -45,6 +45,12 @@ export class Task extends BaseEntity {
   @Column({ type: 'date' })
   dueDate: string;
 
+  /** Which `dueDate` value the Automations module's "Task Deadline
+   * Reminder" last notified for — same idempotency pattern as
+   * `Project.lastRenewalReminderSentFor`. */
+  @Column({ type: 'date', nullable: true })
+  lastDeadlineReminderSentFor?: string | null;
+
   @Column({ type: 'enum', enum: TaskStatus, default: TaskStatus.TODO })
   status: TaskStatus;
 

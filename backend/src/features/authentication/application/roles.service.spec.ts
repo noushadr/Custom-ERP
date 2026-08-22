@@ -317,4 +317,41 @@ describe('RolesService', () => {
       expect(roleRepository.remove).not.toHaveBeenCalled();
     });
   });
+
+  describe('findUsersWithPermission', () => {
+    it('returns only active users whose role carries the permission', async () => {
+      const rolePermission = buildRole({
+        id: 'role-with-perm',
+        permissions: [buildPermission({ key: 'clients.manage' })],
+      });
+      const roleWithout = buildRole({
+        id: 'role-without-perm',
+        permissions: [buildPermission({ key: 'employees.read' })],
+      });
+      userRepository.findAll.mockResolvedValue([
+        buildUser({ id: 'user-active-match', roleId: 'role-with-perm', role: rolePermission } as never),
+        buildUser({ id: 'user-inactive-match', roleId: 'role-with-perm', role: rolePermission, status: UserStatus.DISABLED } as never),
+        buildUser({ id: 'user-no-match', roleId: 'role-without-perm', role: roleWithout } as never),
+      ]);
+
+      const result = await service.findUsersWithPermission('clients.manage');
+
+      expect(result).toEqual([{ id: 'user-active-match' }]);
+    });
+
+    it('naturally includes Super Admin, since its role carries every permission at seed time', async () => {
+      const superAdminRole = buildRole({
+        id: 'super-admin-role',
+        name: 'Super Admin',
+        permissions: [buildPermission({ key: 'finances.manage' })],
+      });
+      userRepository.findAll.mockResolvedValue([
+        buildUser({ id: 'super-admin-1', roleId: 'super-admin-role', role: superAdminRole } as never),
+      ]);
+
+      const result = await service.findUsersWithPermission('finances.manage');
+
+      expect(result).toEqual([{ id: 'super-admin-1' }]);
+    });
+  });
 });

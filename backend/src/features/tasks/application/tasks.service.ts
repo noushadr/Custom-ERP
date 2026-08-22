@@ -50,6 +50,22 @@ import {
   toTaskResponse,
 } from './task.mapper';
 
+// Local-Y/M/D formatting, never .toISOString() — see AgencyReportingService
+// for why: it silently rolls back a calendar day on a server running ahead
+// of UTC.
+function toIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -489,5 +505,41 @@ export class TasksService {
     const task = await this.taskRepository.findById(id);
     if (!task) throw new NotFoundException('Task not found');
     return task;
+  }
+
+  /** Open (not completed/cancelled) tasks whose `dueDate` falls within the
+   * next `daysBefore` days and haven't already been notified for that
+   * specific date — used by the Automations module's "Task Deadline
+   * Reminder". Pair with `markDeadlineReminderSent` after notifying, so a
+   * repeated check (daily cron or a manual "Run Now") never double-sends. */
+  async getTasksNeedingDeadlineReminder(
+    daysBefore: number,
+  ): Promise<{ id: string; title: string; assigneeUserId: string }[]> {
+    const tasks = await this.taskRepository.findAll();
+    const today = new Date();
+    const todayIso = toIsoDate(today);
+    const windowEndIso = toIsoDate(addDays(today, daysBefore));
+
+    return tasks
+      .filter(
+        (task) =>
+          task.status !== TaskStatus.COMPLETED &&
+          task.status !== TaskStatus.CANCELLED &&
+          task.dueDate >= todayIso &&
+          task.dueDate <= windowEndIso &&
+          task.dueDate !== task.lastDeadlineReminderSentFor,
+      )
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        assigneeUserId: task.assignee.userId,
+      }));
+  }
+
+  async markDeadlineReminderSent(taskId: string): Promise<void> {
+    const task = await this.taskRepository.findById(taskId);
+    if (!task) return;
+    task.lastDeadlineReminderSentFor = task.dueDate;
+    await this.taskRepository.save(task);
   }
 }

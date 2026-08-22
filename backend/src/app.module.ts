@@ -8,6 +8,7 @@ import { validate } from './core/config/env.validation';
 import { DatabaseModule } from './core/database/database.module';
 import { AgencyReportingModule } from './features/agency-reporting/agency-reporting.module';
 import { AuthenticationModule } from './features/authentication/authentication.module';
+import { AutomationsModule } from './features/automations/automations.module';
 import { ChecklistsModule } from './features/checklists/checklists.module';
 import { ClientsModule } from './features/clients/clients.module';
 import { DepartmentsModule } from './features/departments/departments.module';
@@ -17,6 +18,7 @@ import { HolidaysModule } from './features/holidays/holidays.module';
 import { KnowledgeBaseModule } from './features/knowledge-base/knowledge-base.module';
 import { LeaveModule } from './features/leave/leave.module';
 import { NoticesModule } from './features/notices/notices.module';
+import { NotificationsModule } from './features/notifications/notifications.module';
 import { PerformanceReviewsModule } from './features/performance-reviews/performance-reviews.module';
 import { RequestsModule } from './features/requests/requests.module';
 import { TasksModule } from './features/tasks/tasks.module';
@@ -44,6 +46,8 @@ import { TasksModule } from './features/tasks/tasks.module';
     ClientsModule,
     AgencyReportingModule,
     FinancesModule,
+    NotificationsModule,
+    AutomationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

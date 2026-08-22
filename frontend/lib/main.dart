@@ -12,7 +12,9 @@ import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
 import 'features/authentication/presentation/widgets/impersonation_banner.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
+import 'features/automations/presentation/pages/automations_page.dart';
 import 'features/clients/presentation/pages/clients_projects_page.dart';
+import 'features/clients/presentation/pages/project_detail_page.dart';
 import 'features/employee/application/employee_providers.dart';
 import 'features/employee/presentation/pages/admin_dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
@@ -150,6 +152,11 @@ const _allDestinations = [
     icon: Icons.account_balance_wallet_outlined,
     selectedIcon: Icons.account_balance_wallet_outlined,
   ),
+  AppNavDestination(
+    label: 'Automations',
+    icon: Icons.bolt_outlined,
+    selectedIcon: Icons.bolt_outlined,
+  ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
@@ -162,6 +169,7 @@ const _adminOnlyLabels = {
   'Clients & Projects',
   'Agency Reporting',
   'Finances',
+  'Automations',
 };
 
 // Hidden from Super Admin/HR/Manager — they use Admin Dashboard instead.
@@ -176,6 +184,7 @@ const _superAdminOnlyLabels = {
   'Clients & Projects',
   'Agency Reporting',
   'Finances',
+  'Automations',
 };
 
 bool _isAdminOrHr(WidgetRef ref) {
@@ -293,6 +302,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const AgencyReportingPage();
       case 'Finances':
         return const FinancesPage();
+      case 'Automations':
+        return const AutomationsPage();
       default:
         return _ComingSoon(destination: destination);
     }
@@ -345,6 +356,42 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
     setState(() => _selectedIndex = index);
   }
 
+  void _openProject(String projectId) {
+    final index = _allDestinations.indexWhere(
+      (d) => d.label == 'Clients & Projects',
+    );
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    navigatorState?.push(
+      MaterialPageRoute(builder: (_) => ProjectDetailPage(projectId: projectId)),
+    );
+    setState(() => _selectedIndex = index);
+  }
+
+  /// Routes a persisted (Automations-created) notification's raw backend
+  /// `linkTarget`/`linkEntityId` to a concrete destination — falls back to
+  /// just switching to the relevant section when there's no specific
+  /// entity to deep-link into.
+  void _openNotification(String? linkTarget, String? linkEntityId) {
+    switch (linkTarget) {
+      case 'clients_projects':
+        if (linkEntityId != null) {
+          _openProject(linkEntityId);
+        } else {
+          _goToDestination('Clients & Projects');
+        }
+      case 'tasks':
+        if (linkEntityId != null) {
+          _openTask(linkEntityId);
+        } else {
+          _goToDestination('Tasks');
+        }
+      case 'leave':
+        _goToDestination('Leaves');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdminOrHr = _isAdminOrHr(ref);
@@ -394,6 +441,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
                 onOpenEmployeeProfile: _openEmployeeProfile,
                 onOpenPerformanceReview: _openPerformanceReview,
                 onOpenTask: _openTask,
+                onOpenNotification: _openNotification,
               ),
               const SizedBox(width: 16),
               UserMenu(

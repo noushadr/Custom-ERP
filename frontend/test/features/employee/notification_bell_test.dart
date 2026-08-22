@@ -12,6 +12,7 @@ import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/leave/domain/repositories/leave_repository.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notices/domain/entities/notice.dart';
+import 'package:zera_erp/features/notifications/application/notifications_providers.dart';
 import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/requests/domain/entities/employee_request.dart';
@@ -22,6 +23,7 @@ import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
+import '../../helpers/fake_notifications.dart';
 import '../../helpers/fake_performance_review.dart';
 import '../../helpers/fake_request.dart';
 import '../../helpers/fake_task.dart';
@@ -49,11 +51,13 @@ Widget _app({
   FakeNoticeRepository? noticeRepository,
   FakePerformanceReviewRepository? performanceReviewRepository,
   FakeTaskRepository? taskRepository,
+  FakeNotificationsRepository? notificationsRepository,
   String role = 'HR/Manager',
   ValueChanged<NotificationLinkTarget>? onNavigate,
   ValueChanged<String>? onOpenEmployeeProfile,
   ValueChanged<String>? onOpenPerformanceReview,
   ValueChanged<String>? onOpenTask,
+  void Function(String? linkTarget, String? linkEntityId)? onOpenNotification,
 }) {
   final user = AuthUser(
     id: 'user-1',
@@ -81,6 +85,9 @@ Widget _app({
       taskRepositoryProvider.overrideWithValue(
         taskRepository ?? FakeTaskRepository(),
       ),
+      notificationsRepositoryProvider.overrideWithValue(
+        notificationsRepository ?? FakeNotificationsRepository(),
+      ),
     ],
     child: MaterialApp(
       home: Scaffold(
@@ -89,6 +96,7 @@ Widget _app({
           onOpenEmployeeProfile: onOpenEmployeeProfile ?? (_) {},
           onOpenPerformanceReview: onOpenPerformanceReview ?? (_) {},
           onOpenTask: onOpenTask ?? (_) {},
+          onOpenNotification: onOpenNotification ?? (_, _) {},
         ),
       ),
     ),
@@ -751,6 +759,9 @@ void main() {
             FakePerformanceReviewRepository(),
           ),
           taskRepositoryProvider.overrideWithValue(FakeTaskRepository()),
+          notificationsRepositoryProvider.overrideWithValue(
+            FakeNotificationsRepository(),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -765,6 +776,7 @@ void main() {
                 onOpenEmployeeProfile: (_) {},
                 onOpenPerformanceReview: (_) {},
                 onOpenTask: (_) {},
+                onOpenNotification: (_, _) {},
               ),
             ),
           ),

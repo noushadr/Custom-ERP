@@ -61,6 +61,22 @@ import {
   toServiceResponse,
 } from './client.mapper';
 
+// Local-Y/M/D formatting, never .toISOString() — see AgencyReportingService
+// for why: it silently rolls back a calendar day on a server running ahead
+// of UTC.
+function toIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
 @Injectable()
 export class ClientsService {
   constructor(
@@ -369,6 +385,44 @@ export class ClientsService {
       activeMonthlyRecurringRevenue,
       oneTimeRevenueThisYear,
     };
+  }
+
+  /** Active retainers whose `renewalDate` falls within the next
+   * `daysBefore` days and haven't already been notified for that specific
+   * date — used by the Automations module's "Project Renewal Reminder".
+   * Pair with `markRenewalReminderSent` after notifying, so a repeated
+   * check (daily cron or a manual "Run Now") never double-sends. */
+  async getProjectsNeedingRenewalReminder(daysBefore: number): Promise<
+    { id: string; name: string; clientName: string; renewalDate: string }[]
+  > {
+    const projects = await this.projectRepository.findAll();
+    const today = new Date();
+    const todayIso = toIsoDate(today);
+    const windowEndIso = toIsoDate(addDays(today, daysBefore));
+
+    return projects
+      .filter(
+        (project) =>
+          project.type === ProjectType.RETAINER &&
+          project.status === ProjectStatus.ACTIVE &&
+          !!project.renewalDate &&
+          project.renewalDate >= todayIso &&
+          project.renewalDate <= windowEndIso &&
+          project.renewalDate !== project.lastRenewalReminderSentFor,
+      )
+      .map((project) => ({
+        id: project.id,
+        name: project.name,
+        clientName: project.client.companyName,
+        renewalDate: project.renewalDate!,
+      }));
+  }
+
+  async markRenewalReminderSent(projectId: string): Promise<void> {
+    const project = await this.projectRepository.findById(projectId);
+    if (!project || !project.renewalDate) return;
+    project.lastRenewalReminderSentFor = project.renewalDate;
+    await this.projectRepository.save(project);
   }
 
   private async getProjectOrThrow(id: string): Promise<Project> {
