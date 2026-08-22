@@ -16,6 +16,7 @@ class ResponsiveScaffold extends StatefulWidget {
     required this.onDestinationSelected,
     required this.body,
     this.actions,
+    this.adminSectionCount = 0,
   });
 
   final List<AppNavDestination> destinations;
@@ -25,6 +26,16 @@ class ResponsiveScaffold extends StatefulWidget {
 
   /// Shown at the right edge of the top bar (e.g. an account menu).
   final List<Widget>? actions;
+
+  /// How many destinations, counted from the start of [destinations], form
+  /// the "admin only" group — shown under its own heading, above a
+  /// divider, before the rest ("General Features") on the extended
+  /// sidebar (desktop always; tablet only while expanded — the compact
+  /// rail and mobile's bottom nav have no room for section headings and
+  /// always render as one plain list). 0 renders a single unlabeled list
+  /// exactly as before, the case for every role except Super Admin, since
+  /// only Super Admin ever sees a mix of both tiers at once.
+  final int adminSectionCount;
 
   @override
   State<ResponsiveScaffold> createState() => _ResponsiveScaffoldState();
@@ -89,19 +100,29 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
                   minHeight: MediaQuery.sizeOf(context).height,
                 ),
                 child: IntrinsicHeight(
-                  child: NavigationRail(
-                    extended: true,
-                    selectedIndex: widget.selectedIndex,
-                    onDestinationSelected: widget.onDestinationSelected,
-                    leading: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: const ZeraLogo(height: 24),
-                      ),
-                    ),
-                    destinations: _railDestinations,
-                  ),
+                  child: widget.adminSectionCount > 0
+                      ? _GroupedNavRail(
+                          key: const Key('groupedNavRail'),
+                          destinations: widget.destinations,
+                          railIcon: _railIcon,
+                          adminSectionCount: widget.adminSectionCount,
+                          selectedIndex: widget.selectedIndex,
+                          onDestinationSelected: widget.onDestinationSelected,
+                          leading: const ZeraLogo(height: 24),
+                        )
+                      : NavigationRail(
+                          extended: true,
+                          selectedIndex: widget.selectedIndex,
+                          onDestinationSelected: widget.onDestinationSelected,
+                          leading: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: const ZeraLogo(height: 24),
+                            ),
+                          ),
+                          destinations: _railDestinations,
+                        ),
                 ),
               ),
             ),
@@ -139,15 +160,24 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
                 minHeight: MediaQuery.sizeOf(context).height,
               ),
               child: IntrinsicHeight(
-                child: NavigationRail(
-                  extended: _railExpanded,
-                  labelType: _railExpanded
-                      ? NavigationRailLabelType.none
-                      : NavigationRailLabelType.all,
-                  selectedIndex: widget.selectedIndex,
-                  onDestinationSelected: widget.onDestinationSelected,
-                  destinations: _railDestinations,
-                ),
+                child: _railExpanded && widget.adminSectionCount > 0
+                    ? _GroupedNavRail(
+                        key: const Key('groupedNavRail'),
+                        destinations: widget.destinations,
+                        railIcon: _railIcon,
+                        adminSectionCount: widget.adminSectionCount,
+                        selectedIndex: widget.selectedIndex,
+                        onDestinationSelected: widget.onDestinationSelected,
+                      )
+                    : NavigationRail(
+                        extended: _railExpanded,
+                        labelType: _railExpanded
+                            ? NavigationRailLabelType.none
+                            : NavigationRailLabelType.all,
+                        selectedIndex: widget.selectedIndex,
+                        onDestinationSelected: widget.onDestinationSelected,
+                        destinations: _railDestinations,
+                      ),
               ),
             ),
           ),
@@ -190,6 +220,167 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
 
   Widget _canvas(Widget body) {
     return ColoredBox(color: AppColors.canvasBackground, child: body);
+  }
+}
+
+/// Splits the extended sidebar into two labeled groups with a divider
+/// between them, so a Super Admin can see at a glance which sidebar items
+/// are Super-Admin-exclusive versus shared with other roles — see
+/// [ResponsiveScaffold.adminSectionCount].
+///
+/// A hand-built list of rows rather than [NavigationRail] (even two
+/// instances of it, one per group): stacking two [NavigationRail]s inside
+/// a shared layout hits a genuine Flutter framework bug
+/// (`_RenderObjectSemantics.debugCheckForParentData`'s
+/// `!semantics.parentDataDirty` assertion firing on every frame) — likely
+/// from two instances of a widget with as much internal animated/semantics
+/// machinery as NavigationRail sharing one layout pass. Reusing the rail's
+/// own theme tokens (`NavigationRailThemeData`) for indicator color/shape
+/// and icon/label styling keeps this visually identical to the plain
+/// single-rail case used everywhere else.
+class _GroupedNavRail extends StatelessWidget {
+  const _GroupedNavRail({
+    super.key,
+    required this.destinations,
+    required this.railIcon,
+    required this.adminSectionCount,
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+    this.leading,
+  });
+
+  final List<AppNavDestination> destinations;
+  final Widget Function(AppNavDestination, {bool selected}) railIcon;
+  final int adminSectionCount;
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    final railTheme = Theme.of(context).navigationRailTheme;
+
+    return Container(
+      width: railTheme.minExtendedWidth ?? 200,
+      color: railTheme.backgroundColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (leading != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Align(alignment: Alignment.centerLeft, child: leading),
+            ),
+          const _NavSectionLabel('Admin Only Features'),
+          for (var i = 0; i < adminSectionCount; i++)
+            _NavRow(
+              destination: destinations[i],
+              icon: railIcon,
+              selected: i == selectedIndex,
+              onTap: () => onDestinationSelected(i),
+            ),
+          const Divider(
+            height: 24,
+            indent: 16,
+            endIndent: 16,
+            color: AppColors.borderSubtle,
+          ),
+          const _NavSectionLabel('General Features'),
+          for (var i = adminSectionCount; i < destinations.length; i++)
+            _NavRow(
+              destination: destinations[i],
+              icon: railIcon,
+              selected: i == selectedIndex,
+              onTap: () => onDestinationSelected(i),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavRow extends StatelessWidget {
+  const _NavRow({
+    required this.destination,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppNavDestination destination;
+  final Widget Function(AppNavDestination, {bool selected}) icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final railTheme = Theme.of(context).navigationRailTheme;
+    final labelStyle = selected
+        ? railTheme.selectedLabelTextStyle
+        : railTheme.unselectedLabelTextStyle;
+    final iconTheme = selected
+        ? railTheme.selectedIconTheme
+        : railTheme.unselectedIconTheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      child: Material(
+        color: selected
+            ? (railTheme.indicatorColor ?? AppColors.primarySoft)
+            : Colors.transparent,
+        shape:
+            railTheme.indicatorShape ??
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: InkWell(
+          customBorder:
+              railTheme.indicatorShape ??
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                IconTheme(
+                  data: iconTheme ?? const IconThemeData(),
+                  child: icon(destination, selected: selected),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    destination.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: labelStyle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavSectionLabel extends StatelessWidget {
+  const _NavSectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 16, 8),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
   }
 }
 

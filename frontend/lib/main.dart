@@ -408,7 +408,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
     final isSuperAdmin = _isSuperAdmin(ref);
     final badgeCounts = _navBadgeCounts(ref);
 
-    final visibleOriginalIndices = [
+    final unsortedVisibleIndices = [
       for (var i = 0; i < _allDestinations.length; i++)
         if ((isAdminOrHr
                 ? !_nonAdminOnlyLabels.contains(_allDestinations[i].label)
@@ -417,6 +417,32 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
                 isSuperAdmin))
           i,
     ];
+    // Only a Super Admin ever sees a mix of both tiers (every other role
+    // either sees none of the Super-Admin-exclusive modules, or none of
+    // the admin-tier ones at all) — so only for them, group the
+    // Super-Admin-exclusive modules first with their own section heading,
+    // ahead of everything shared with HR/Manager and below. Reordering the
+    // VISIBLE list here is safe and doesn't touch `_allDestinations`'
+    // stable order, which `_sectionNavigatorKeys`/`IndexedStack` below key
+    // off directly — only the nav's on-screen order changes.
+    final visibleOriginalIndices = isSuperAdmin
+        ? [
+            ...unsortedVisibleIndices.where(
+              (i) => _superAdminOnlyLabels.contains(_allDestinations[i].label),
+            ),
+            ...unsortedVisibleIndices.where(
+              (i) => !_superAdminOnlyLabels.contains(_allDestinations[i].label),
+            ),
+          ]
+        : unsortedVisibleIndices;
+    final adminSectionCount = isSuperAdmin
+        ? unsortedVisibleIndices
+              .where(
+                (i) =>
+                    _superAdminOnlyLabels.contains(_allDestinations[i].label),
+              )
+              .length
+        : 0;
     final visibleDestinations = [
       for (final i in visibleOriginalIndices)
         _withBadge(
@@ -441,6 +467,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
             onDestinationSelected: (visiblePosition) => setState(
               () => _selectedIndex = visibleOriginalIndices[visiblePosition],
             ),
+            adminSectionCount: adminSectionCount,
             actions: [
               NotificationBell(
                 onNavigate: (target) => _goToDestination(switch (target) {

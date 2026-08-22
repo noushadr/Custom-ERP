@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/agency_reporting/application/agency_reporting_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
+import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/automations/application/automations_providers.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
@@ -40,11 +41,11 @@ Future<void> _setSurfaceWidth(WidgetTester tester, double width) async {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-Widget _authenticatedApp() {
+Widget _authenticatedApp({AuthUser? user}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
-        (ref) => PresetAuthController(const AuthAuthenticated(testAuthUser)),
+        (ref) => PresetAuthController(AuthAuthenticated(user ?? testAuthUser)),
       ),
       employeeRepositoryProvider.overrideWithValue(FakeEmployeeRepository()),
       noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
@@ -107,5 +108,144 @@ void main() {
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
     expect(rail.extended, isTrue);
     expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  group('grouped nav for Super Admin', () {
+    const superAdmin = AuthUser(
+      id: 'admin-1',
+      email: 'admin@zeracreative.com',
+      role: 'Super Admin',
+      permissions: [
+        'employees.manage',
+        'clients.manage',
+        'reports.view',
+        'finances.manage',
+        'automations.manage',
+        'payroll.manage',
+      ],
+    );
+
+    testWidgets(
+      'shows both section headings, with the admin-only group above the '
+      'general group, at desktop width',
+      (tester) async {
+        await _setSurfaceWidth(tester, 1280);
+        await tester.pumpWidget(_authenticatedApp(user: superAdmin));
+        await tester.pumpAndSettle();
+
+        expect(find.text('ADMIN ONLY FEATURES'), findsOneWidget);
+        expect(find.text('GENERAL FEATURES'), findsOneWidget);
+
+        final navRail = find.byKey(const Key('groupedNavRail'));
+        final adminItemY = tester
+            .getTopLeft(
+              find.descendant(
+                of: navRail,
+                matching: find.text('Clients & Projects'),
+              ),
+            )
+            .dy;
+        final generalItemY = tester
+            .getTopLeft(
+              find.descendant(
+                of: navRail,
+                matching: find.text('Admin Dashboard'),
+              ),
+            )
+            .dy;
+        expect(adminItemY, lessThan(generalItemY));
+      },
+    );
+
+    testWidgets(
+      'does not show section headings for a non-Super-Admin role, even at '
+      'desktop width',
+      (tester) async {
+        await _setSurfaceWidth(tester, 1280);
+        await tester.pumpWidget(
+          _authenticatedApp(
+            user: const AuthUser(
+              id: 'hr-1',
+              email: 'hr@zeracreative.com',
+              role: 'HR/Manager',
+              permissions: [],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
+        expect(find.text('GENERAL FEATURES'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'does not show section headings at compact tablet width',
+      (tester) async {
+        await _setSurfaceWidth(tester, 800);
+        await tester.pumpWidget(_authenticatedApp(user: superAdmin));
+        await tester.pumpAndSettle();
+
+        expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
+        expect(find.text('GENERAL FEATURES'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'shows section headings once the tablet rail is expanded',
+      (tester) async {
+        await _setSurfaceWidth(tester, 800);
+        await tester.pumpWidget(_authenticatedApp(user: superAdmin));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.menu));
+        await tester.pumpAndSettle();
+
+        expect(find.text('ADMIN ONLY FEATURES'), findsOneWidget);
+        expect(find.text('GENERAL FEATURES'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'tapping a destination in the admin-only group switches to it',
+      (tester) async {
+        await _setSurfaceWidth(tester, 1280);
+        await tester.pumpWidget(_authenticatedApp(user: superAdmin));
+        await tester.pumpAndSettle();
+
+        final navRail = find.byKey(const Key('groupedNavRail'));
+        await tester.tap(
+          find.descendant(of: navRail, matching: find.text('Finances')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Payroll Runs'), findsNothing);
+        expect(find.text('Generate Payroll'), findsNothing);
+        expect(find.text('Gross Revenue'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'tapping a destination in the general group switches to it',
+      (tester) async {
+        await _setSurfaceWidth(tester, 1280);
+        await tester.pumpWidget(_authenticatedApp(user: superAdmin));
+        await tester.pumpAndSettle();
+
+        final navRail = find.byKey(const Key('groupedNavRail'));
+        // Start on an admin-only destination, then switch to a general one,
+        // to exercise both halves of the selectedIndex round-trip.
+        await tester.tap(
+          find.descendant(of: navRail, matching: find.text('Payroll')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(of: navRail, matching: find.text('Employees')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Invite Employee'), findsOneWidget);
+      },
+    );
   });
 }
