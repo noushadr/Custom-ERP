@@ -6,7 +6,6 @@ import 'core/layout/app_nav_destination.dart';
 import 'core/layout/responsive_scaffold.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
-import 'features/agency_reporting/presentation/pages/agency_reporting_page.dart';
 import 'features/authentication/application/auth_providers.dart';
 import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
@@ -20,7 +19,6 @@ import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
-import 'features/finances/presentation/pages/finances_page.dart';
 import 'features/knowledge_base/presentation/pages/knowledge_base_page.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
 import 'features/payroll/presentation/pages/payroll_page.dart';
@@ -143,16 +141,6 @@ const _allDestinations = [
     selectedIcon: Icons.business_center_outlined,
   ),
   AppNavDestination(
-    label: 'Agency Reporting',
-    icon: Icons.query_stats_outlined,
-    selectedIcon: Icons.query_stats_outlined,
-  ),
-  AppNavDestination(
-    label: 'Finances',
-    icon: Icons.account_balance_wallet_outlined,
-    selectedIcon: Icons.account_balance_wallet_outlined,
-  ),
-  AppNavDestination(
     label: 'Payroll',
     icon: Icons.receipt_long_outlined,
     selectedIcon: Icons.receipt_long_outlined,
@@ -167,8 +155,6 @@ const _adminOnlyLabels = {
   'Employees',
   'Settings',
   'Clients & Projects',
-  'Agency Reporting',
-  'Finances',
   'Payroll',
 };
 
@@ -176,14 +162,26 @@ const _adminOnlyLabels = {
 // Visible to everyone else.
 const _nonAdminOnlyLabels = {'User Dashboard'};
 
-// Stricter than _adminOnlyLabels: these two Admin Business Management
-// modules are Super Admin only — Employees, Team Leads, and HR/Manager must
-// not even see the nav entry. Clients & Projects and Payroll are a
-// deliberate exception within Admin Business Management — HR/Manager shares
-// those two with Super Admin, so they're intentionally absent from this set.
-const _superAdminOnlyLabels = {
-  'Agency Reporting',
-  'Finances',
+// Stricter than _adminOnlyLabels: modules in this set would be Super Admin
+// only — Employees, Team Leads, and HR/Manager would not even see the nav
+// entry. Currently empty: Agency Reporting and Finances (the only two
+// modules that were ever Super-Admin-exclusive) were removed 2026-08-23;
+// both remaining Admin Business Management modules (Clients & Projects,
+// Payroll) are shared with HR/Manager instead — see
+// _hrAndAdminOnlyLabels below. Left in place (rather than deleted) so a
+// future Super-Admin-exclusive module has somewhere to go without touching
+// the grouping mechanism in ResponsiveScaffold.adminSectionCount.
+const _superAdminOnlyLabels = <String>{};
+
+// The other half of Admin Business Management: shared between Super Admin
+// and HR/Manager, but still off-limits to Team Lead/Employee (who are
+// already excluded via _adminOnlyLabels above). Used only to give the
+// Super Admin's own sidebar a third, distinctly-labeled group — see
+// ResponsiveScaffold.hrAdminSectionCount — so it's obvious at a glance which
+// modules are Super-Admin-exclusive vs. shared with HR/Manager vs. general.
+const _hrAndAdminOnlyLabels = {
+  'Clients & Projects',
+  'Payroll',
 };
 
 bool _isAdminOrHr(WidgetRef ref) {
@@ -297,10 +295,6 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const SettingsPage();
       case 'Clients & Projects':
         return const ClientsProjectsPage();
-      case 'Agency Reporting':
-        return const AgencyReportingPage();
-      case 'Finances':
-        return const FinancesPage();
       case 'Payroll':
         return const PayrollPage();
       default:
@@ -408,21 +402,27 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
                 isSuperAdmin))
           i,
     ];
-    // Only a Super Admin ever sees a mix of both tiers (every other role
-    // either sees none of the Super-Admin-exclusive modules, or none of
-    // the admin-tier ones at all) — so only for them, group the
-    // Super-Admin-exclusive modules first with their own section heading,
-    // ahead of everything shared with HR/Manager and below. Reordering the
-    // VISIBLE list here is safe and doesn't touch `_allDestinations`'
-    // stable order, which `_sectionNavigatorKeys`/`IndexedStack` below key
-    // off directly — only the nav's on-screen order changes.
+    // Only a Super Admin ever sees a mix of tiers (every other role either
+    // sees none of the Super-Admin-exclusive modules, none of the
+    // HR-and-admin ones, or neither) — so only for them, group the
+    // Super-Admin-exclusive modules first, then the ones shared with
+    // HR/Manager, then everything general — each with its own section
+    // heading. Reordering the VISIBLE list here is safe and doesn't touch
+    // `_allDestinations`'s stable order, which
+    // `_sectionNavigatorKeys`/`IndexedStack` below key off directly — only
+    // the nav's on-screen order changes.
     final visibleOriginalIndices = isSuperAdmin
         ? [
             ...unsortedVisibleIndices.where(
               (i) => _superAdminOnlyLabels.contains(_allDestinations[i].label),
             ),
             ...unsortedVisibleIndices.where(
-              (i) => !_superAdminOnlyLabels.contains(_allDestinations[i].label),
+              (i) => _hrAndAdminOnlyLabels.contains(_allDestinations[i].label),
+            ),
+            ...unsortedVisibleIndices.where(
+              (i) =>
+                  !_superAdminOnlyLabels.contains(_allDestinations[i].label) &&
+                  !_hrAndAdminOnlyLabels.contains(_allDestinations[i].label),
             ),
           ]
         : unsortedVisibleIndices;
@@ -431,6 +431,14 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
               .where(
                 (i) =>
                     _superAdminOnlyLabels.contains(_allDestinations[i].label),
+              )
+              .length
+        : 0;
+    final hrAdminSectionCount = isSuperAdmin
+        ? unsortedVisibleIndices
+              .where(
+                (i) =>
+                    _hrAndAdminOnlyLabels.contains(_allDestinations[i].label),
               )
               .length
         : 0;
@@ -459,6 +467,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
               () => _selectedIndex = visibleOriginalIndices[visiblePosition],
             ),
             adminSectionCount: adminSectionCount,
+            hrAdminSectionCount: hrAdminSectionCount,
             actions: [
               NotificationBell(
                 onNavigate: (target) => _goToDestination(switch (target) {

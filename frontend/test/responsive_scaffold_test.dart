@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zera_erp/features/agency_reporting/application/agency_reporting_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
-import 'package:zera_erp/features/finances/application/finances_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
@@ -18,11 +16,9 @@ import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
 
 import 'package:zera_erp/main.dart';
-import 'helpers/fake_agency_reporting.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
-import 'helpers/fake_finances.dart';
 import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leave.dart';
 import 'helpers/fake_notice.dart';
@@ -57,10 +53,6 @@ Widget _authenticatedApp({AuthUser? user}) {
       ),
       taskRepositoryProvider.overrideWithValue(FakeTaskRepository()),
       clientsRepositoryProvider.overrideWithValue(FakeClientsRepository()),
-      agencyReportingRepositoryProvider.overrideWithValue(
-        FakeAgencyReportingRepository(),
-      ),
-      financesRepositoryProvider.overrideWithValue(FakeFinancesRepository()),
       notificationsRepositoryProvider.overrideWithValue(
         FakeNotificationsRepository(),
       ),
@@ -113,41 +105,33 @@ void main() {
       permissions: [
         'employees.manage',
         'clients.manage',
-        'reports.view',
-        'finances.manage',
         'payroll.manage',
       ],
     );
 
     testWidgets(
-      'shows both section headings, with the admin-only group above the '
-      'general group, at desktop width',
+      'shows the HR & admin and general section headings, ordered HR & '
+      'admin above general, at desktop width — no admin-only group exists '
+      'since Agency Reporting/Finances were removed',
       (tester) async {
         await _setSurfaceWidth(tester, 1280);
         await tester.pumpWidget(_authenticatedApp(user: superAdmin));
         await tester.pumpAndSettle();
 
-        expect(find.text('ADMIN ONLY FEATURES'), findsOneWidget);
+        expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
+        expect(find.text('HR & ADMIN FEATURES'), findsOneWidget);
         expect(find.text('GENERAL FEATURES'), findsOneWidget);
 
         final navRail = find.byKey(const Key('navRail'));
-        final adminItemY = tester
+        double topOf(String label) => tester
             .getTopLeft(
-              find.descendant(
-                of: navRail,
-                matching: find.text('Agency Reporting'),
-              ),
+              find.descendant(of: navRail, matching: find.text(label)),
             )
             .dy;
-        final generalItemY = tester
-            .getTopLeft(
-              find.descendant(
-                of: navRail,
-                matching: find.text('Dashboard'),
-              ),
-            )
-            .dy;
-        expect(adminItemY, lessThan(generalItemY));
+
+        final hrAdminItemY = topOf('Clients & Projects');
+        final generalItemY = topOf('Dashboard');
+        expect(hrAdminItemY, lessThan(generalItemY));
       },
     );
 
@@ -169,6 +153,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
+        expect(find.text('HR & ADMIN FEATURES'), findsNothing);
         expect(find.text('GENERAL FEATURES'), findsNothing);
       },
     );
@@ -181,6 +166,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
+        expect(find.text('HR & ADMIN FEATURES'), findsNothing);
         expect(find.text('GENERAL FEATURES'), findsNothing);
       },
     );
@@ -195,13 +181,14 @@ void main() {
         await tester.tap(find.byIcon(Icons.menu));
         await tester.pumpAndSettle();
 
-        expect(find.text('ADMIN ONLY FEATURES'), findsOneWidget);
+        expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
+        expect(find.text('HR & ADMIN FEATURES'), findsOneWidget);
         expect(find.text('GENERAL FEATURES'), findsOneWidget);
       },
     );
 
     testWidgets(
-      'tapping a destination in the admin-only group switches to it',
+      'tapping a destination in the HR & Admin group switches to it',
       (tester) async {
         await _setSurfaceWidth(tester, 1280);
         await tester.pumpWidget(_authenticatedApp(user: superAdmin));
@@ -209,13 +196,12 @@ void main() {
 
         final navRail = find.byKey(const Key('navRail'));
         await tester.tap(
-          find.descendant(of: navRail, matching: find.text('Finances')),
+          find.descendant(of: navRail, matching: find.text('Payroll')),
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Payroll Runs'), findsNothing);
-        expect(find.text('Generate Payroll'), findsNothing);
-        expect(find.text('Deductions'), findsOneWidget);
+        expect(find.text('Payroll Runs'), findsOneWidget);
+        expect(find.text('Invite Employee'), findsNothing);
       },
     );
 
@@ -230,7 +216,7 @@ void main() {
         // Start on one general-group destination, then switch to another,
         // to exercise both halves of the selectedIndex round-trip.
         await tester.tap(
-          find.descendant(of: navRail, matching: find.text('Payroll')),
+          find.descendant(of: navRail, matching: find.text('Dashboard')),
         );
         await tester.pumpAndSettle();
         await tester.tap(

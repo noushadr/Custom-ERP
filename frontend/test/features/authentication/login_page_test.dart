@@ -3,14 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zera_erp/features/agency_reporting/application/agency_reporting_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/authentication/domain/exceptions/auth_exception.dart';
 import 'package:zera_erp/features/authentication/presentation/pages/login_page.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
-import 'package:zera_erp/features/finances/application/finances_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
@@ -21,11 +19,9 @@ import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/main.dart';
 
-import '../../helpers/fake_agency_reporting.dart';
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_clients.dart';
 import '../../helpers/fake_employee.dart';
-import '../../helpers/fake_finances.dart';
 import '../../helpers/fake_knowledge_base.dart';
 import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
@@ -64,10 +60,6 @@ Widget _appWith(FakeAuthRepository repository) {
       ),
       taskRepositoryProvider.overrideWithValue(FakeTaskRepository()),
       clientsRepositoryProvider.overrideWithValue(FakeClientsRepository()),
-      agencyReportingRepositoryProvider.overrideWithValue(
-        FakeAgencyReportingRepository(),
-      ),
-      financesRepositoryProvider.overrideWithValue(FakeFinancesRepository()),
       notificationsRepositoryProvider.overrideWithValue(
         FakeNotificationsRepository(),
       ),

@@ -17,6 +17,7 @@ class ResponsiveScaffold extends StatefulWidget {
     required this.body,
     this.actions,
     this.adminSectionCount = 0,
+    this.hrAdminSectionCount = 0,
   });
 
   final List<AppNavDestination> destinations;
@@ -28,14 +29,23 @@ class ResponsiveScaffold extends StatefulWidget {
   final List<Widget>? actions;
 
   /// How many destinations, counted from the start of [destinations], form
-  /// the "admin only" group — shown under its own heading, above a
-  /// divider, before the rest ("General Features") on the extended
-  /// sidebar (desktop always; tablet only while expanded — the compact
-  /// rail and mobile's bottom nav have no room for section headings and
-  /// always render as one plain list). 0 renders a single unlabeled list
-  /// exactly as before, the case for every role except Super Admin, since
-  /// only Super Admin ever sees a mix of both tiers at once.
+  /// the "admin only" group — shown under its own heading, above a divider,
+  /// before [hrAdminSectionCount]'s group and then the rest ("General
+  /// Features") on the extended sidebar (desktop always; tablet only while
+  /// expanded — the compact rail and mobile's bottom nav have no room for
+  /// section headings and always render as one plain list). 0 renders a
+  /// single unlabeled list exactly as before, the case for every role
+  /// except Super Admin, since only Super Admin ever sees a mix of tiers at
+  /// once.
   final int adminSectionCount;
+
+  /// How many destinations immediately after [adminSectionCount]'s group
+  /// form the "HR & Admin" group — shared between Super Admin and
+  /// HR/Manager, but still distinct from both the Super-Admin-exclusive
+  /// group above and the general group below. 0 skips this middle group
+  /// entirely (just admin-only + general, or a single flat list if
+  /// [adminSectionCount] is also 0).
+  final int hrAdminSectionCount;
 
   @override
   State<ResponsiveScaffold> createState() => _ResponsiveScaffoldState();
@@ -105,6 +115,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
                     destinations: widget.destinations,
                     railIcon: _railIcon,
                     adminSectionCount: widget.adminSectionCount,
+                    hrAdminSectionCount: widget.hrAdminSectionCount,
                     selectedIndex: widget.selectedIndex,
                     onDestinationSelected: widget.onDestinationSelected,
                     leading: const ZeraLogo(height: 24),
@@ -152,6 +163,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
                         destinations: widget.destinations,
                         railIcon: _railIcon,
                         adminSectionCount: widget.adminSectionCount,
+                        hrAdminSectionCount: widget.hrAdminSectionCount,
                         selectedIndex: widget.selectedIndex,
                         onDestinationSelected: widget.onDestinationSelected,
                       )
@@ -211,14 +223,15 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
 
 /// The extended sidebar's rows, hand-built rather than [NavigationRail] so
 /// row spacing is fully under our control (see [_NavRow]'s tight padding)
-/// and, when [adminSectionCount] is positive, so the list can split into two
-/// labeled groups with a divider between them — letting a Super Admin see
-/// at a glance which sidebar items are Super-Admin-exclusive versus shared
-/// with other roles. See [ResponsiveScaffold.adminSectionCount].
+/// and, when [adminSectionCount] and/or [hrAdminSectionCount] are positive,
+/// so the list can split into up to three labeled groups with dividers
+/// between them — letting a Super Admin see at a glance which sidebar items
+/// are Super-Admin-exclusive, shared with HR/Manager, or general. See
+/// [ResponsiveScaffold.adminSectionCount]/[ResponsiveScaffold.hrAdminSectionCount].
 ///
-/// Not [NavigationRail] (even two stacked instances, one per group, for the
-/// grouped case): stacking two [NavigationRail]s inside a shared layout hits
-/// a genuine Flutter framework bug (`_RenderObjectSemantics.
+/// Not [NavigationRail] (even several stacked instances, one per group, for
+/// the grouped case): stacking two [NavigationRail]s inside a shared layout
+/// hits a genuine Flutter framework bug (`_RenderObjectSemantics.
 /// debugCheckForParentData`'s `!semantics.parentDataDirty` assertion firing
 /// on every frame) — likely from two instances of a widget with as much
 /// internal animated/semantics machinery as NavigationRail sharing one
@@ -233,12 +246,14 @@ class _NavRail extends StatelessWidget {
     required this.adminSectionCount,
     required this.selectedIndex,
     required this.onDestinationSelected,
+    this.hrAdminSectionCount = 0,
     this.leading,
   });
 
   final List<AppNavDestination> destinations;
   final Widget Function(AppNavDestination, {bool selected}) railIcon;
   final int adminSectionCount;
+  final int hrAdminSectionCount;
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final Widget? leading;
@@ -246,7 +261,7 @@ class _NavRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final railTheme = Theme.of(context).navigationRailTheme;
-    final grouped = adminSectionCount > 0;
+    final grouped = adminSectionCount > 0 || hrAdminSectionCount > 0;
 
     Widget rowFor(int i) => _NavRow(
       destination: destinations[i],
@@ -254,6 +269,15 @@ class _NavRail extends StatelessWidget {
       selected: i == selectedIndex,
       onTap: () => onDestinationSelected(i),
     );
+
+    Widget divider() => const Divider(
+      height: 16,
+      indent: 16,
+      endIndent: 16,
+      color: AppColors.borderSubtle,
+    );
+
+    final generalStart = adminSectionCount + hrAdminSectionCount;
 
     return Container(
       width: railTheme.minExtendedWidth ?? 200,
@@ -267,19 +291,21 @@ class _NavRail extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               child: Align(alignment: Alignment.centerLeft, child: leading),
             ),
-          if (grouped) const _NavSectionLabel('Admin Only Features'),
-          for (var i = 0; i < (grouped ? adminSectionCount : destinations.length); i++)
-            rowFor(i),
-          if (grouped) ...[
-            const Divider(
-              height: 16,
-              indent: 16,
-              endIndent: 16,
-              color: AppColors.borderSubtle,
-            ),
+          if (!grouped) ...[
+            for (var i = 0; i < destinations.length; i++) rowFor(i),
+          ] else ...[
+            if (adminSectionCount > 0) ...[
+              const _NavSectionLabel('Admin Only Features'),
+              for (var i = 0; i < adminSectionCount; i++) rowFor(i),
+            ],
+            if (hrAdminSectionCount > 0) ...[
+              if (adminSectionCount > 0) divider(),
+              const _NavSectionLabel('HR & Admin Features'),
+              for (var i = adminSectionCount; i < generalStart; i++) rowFor(i),
+            ],
+            divider(),
             const _NavSectionLabel('General Features'),
-            for (var i = adminSectionCount; i < destinations.length; i++)
-              rowFor(i),
+            for (var i = generalStart; i < destinations.length; i++) rowFor(i),
           ],
         ],
       ),

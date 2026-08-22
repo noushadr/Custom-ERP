@@ -3,11 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/widgets/metric_card.dart';
-import '../../../agency_reporting/application/agency_reporting_providers.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../clients/application/clients_providers.dart';
-import '../../../finances/application/finances_providers.dart';
 import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
 import '../../../payroll/application/payroll_providers.dart';
@@ -38,12 +36,6 @@ class AdminDashboardPage extends ConsumerWidget {
     final canViewClients =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('clients.manage');
-    final canViewReports =
-        authState is AuthAuthenticated &&
-        authState.user.hasPermission('reports.view');
-    final canViewFinances =
-        authState is AuthAuthenticated &&
-        authState.user.hasPermission('finances.manage');
     final canViewPayrollRuns =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('payroll.manage');
@@ -67,8 +59,6 @@ class AdminDashboardPage extends ConsumerWidget {
               showPayroll: canViewPayroll,
               showPendingReviews: canViewPerformance,
               showClients: canViewClients,
-              showReports: canViewReports,
-              showFinances: canViewFinances,
               showPayrollRuns: canViewPayrollRuns,
             ),
           ),
@@ -85,8 +75,6 @@ class _DashboardStats extends ConsumerWidget {
     required this.showPayroll,
     required this.showPendingReviews,
     required this.showClients,
-    required this.showReports,
-    required this.showFinances,
     required this.showPayrollRuns,
   });
 
@@ -95,8 +83,6 @@ class _DashboardStats extends ConsumerWidget {
   final bool showPayroll;
   final bool showPendingReviews;
   final bool showClients;
-  final bool showReports;
-  final bool showFinances;
   final bool showPayrollRuns;
 
   @override
@@ -243,10 +229,7 @@ class _DashboardStats extends ConsumerWidget {
             const _PayrollStats(),
             const SizedBox(height: 18),
           ],
-          if (showClients ||
-              showReports ||
-              showFinances ||
-              showPayrollRuns) ...[
+          if (showClients || showPayrollRuns) ...[
             const _SectionHeader('Admin Business Management'),
             const SizedBox(height: 10),
             Wrap(
@@ -257,8 +240,6 @@ class _DashboardStats extends ConsumerWidget {
                   const _ActiveProjectsCard(),
                   const _ClientsAtRiskCard(),
                 ],
-                if (showReports) const _NetProfitCard(),
-                if (showFinances) const _OutstandingInvoicesCard(),
                 if (showPayrollRuns) const _LatestPayrollRunCard(),
               ],
             ),
@@ -409,59 +390,6 @@ class _ClientsAtRiskCard extends ConsumerWidget {
       ),
       color: AppColors.error,
       icon: Icons.warning_amber_outlined,
-    );
-  }
-}
-
-/// This month's net profit from Agency Reporting. Calling the provider with
-/// null from/to lets the backend apply its own current-month default, so
-/// this tile needs no date-range picker.
-class _NetProfitCard extends ConsumerWidget {
-  const _NetProfitCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final reportAsync = ref.watch(
-      agencyReportProvider((from: null, to: null)),
-    );
-
-    return MetricCard(
-      label: 'Net Profit (This Month)',
-      value: reportAsync.when(
-        data: (report) => 'PKR ${formatWholeAmount(report.netProfit)}',
-        loading: () => '…',
-        error: (_, _) => '—',
-      ),
-      color: AppColors.accentTeal,
-      icon: Icons.trending_up_outlined,
-    );
-  }
-}
-
-/// Outstanding invoices from Finances — a live snapshot, not scoped to a
-/// date range, so (like [_NetProfitCard]) this needs no picker.
-class _OutstandingInvoicesCard extends ConsumerWidget {
-  const _OutstandingInvoicesCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final summaryAsync = ref.watch(
-      financialSummaryProvider((from: null, to: null)),
-    );
-
-    return MetricCard(
-      label: 'Outstanding Invoices',
-      value: summaryAsync.when(
-        data: (summary) =>
-            'PKR ${formatWholeAmount(summary.outstandingInvoicesTotal)}',
-        loading: () => '…',
-        error: (_, _) => '—',
-      ),
-      secondaryValue: summaryAsync.whenOrNull(
-        data: (summary) => '${summary.outstandingInvoicesCount} invoice(s)',
-      ),
-      color: AppColors.secondary,
-      icon: Icons.receipt_long_outlined,
     );
   }
 }

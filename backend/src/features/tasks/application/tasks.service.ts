@@ -53,9 +53,8 @@ import {
   toTaskResponse,
 } from './task.mapper';
 
-// Local-Y/M/D formatting, never .toISOString() — see AgencyReportingService
-// for why: it silently rolls back a calendar day on a server running ahead
-// of UTC.
+// Local-Y/M/D formatting, never .toISOString() — the latter silently rolls
+// back a calendar day on a server running ahead of UTC.
 function toIsoDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zera_erp/features/agency_reporting/application/agency_reporting_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
@@ -9,7 +8,6 @@ import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
-import 'package:zera_erp/features/finances/application/finances_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
@@ -22,11 +20,9 @@ import 'package:zera_erp/features/tasks/domain/entities/task_status.dart';
 import 'package:zera_erp/shared/widgets/metric_card.dart';
 
 import 'package:zera_erp/main.dart';
-import 'helpers/fake_agency_reporting.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
-import 'helpers/fake_finances.dart';
 import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leave.dart';
 import 'helpers/fake_notice.dart';
@@ -72,10 +68,6 @@ Widget _authenticatedApp({
         taskRepository ?? FakeTaskRepository(),
       ),
       clientsRepositoryProvider.overrideWithValue(FakeClientsRepository()),
-      agencyReportingRepositoryProvider.overrideWithValue(
-        FakeAgencyReportingRepository(),
-      ),
-      financesRepositoryProvider.overrideWithValue(FakeFinancesRepository()),
       notificationsRepositoryProvider.overrideWithValue(
         FakeNotificationsRepository(),
       ),
@@ -358,8 +350,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // HR/Manager shares Clients & Projects with Super Admin, unlike
-      // Agency Reporting/Finances which stay Super-Admin-only.
+      // HR/Manager shares Clients & Projects with Super Admin.
       expect(find.text('Employees'), findsOneWidget);
       expect(find.text('Clients & Projects'), findsOneWidget);
     },
@@ -372,104 +363,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Clients & Projects'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'shows Agency Reporting in the nav for a Super Admin only',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: [],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Agency Reporting'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'hides Agency Reporting from the nav for HR/Manager',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'hr-1',
-            email: 'hr@zeracreative.com',
-            role: 'HR/Manager',
-            permissions: [],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Employees'), findsOneWidget);
-      expect(find.text('Agency Reporting'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'hides Agency Reporting from the nav for a plain employee',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(_authenticatedApp());
-      await tester.pumpAndSettle();
-
-      expect(find.text('Agency Reporting'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'shows Finances in the nav for a Super Admin only',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: [],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Finances'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'hides Finances from the nav for HR/Manager',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'hr-1',
-            email: 'hr@zeracreative.com',
-            role: 'HR/Manager',
-            permissions: [],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Employees'), findsOneWidget);
-      expect(find.text('Finances'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'hides Finances from the nav for a plain employee',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(_authenticatedApp());
-      await tester.pumpAndSettle();
-
-      expect(find.text('Finances'), findsNothing);
     },
   );
 
@@ -534,8 +427,6 @@ void main() {
             role: 'Super Admin',
             permissions: [
               'clients.manage',
-              'reports.view',
-              'finances.manage',
               'payroll.manage',
             ],
           ),
@@ -546,8 +437,6 @@ void main() {
       expect(find.text('Admin Business Management'), findsOneWidget);
       expect(find.text('Active Projects'), findsOneWidget);
       expect(find.text('Clients At Risk'), findsOneWidget);
-      expect(find.text('Net Profit (This Month)'), findsOneWidget);
-      expect(find.text('Outstanding Invoices'), findsOneWidget);
       expect(find.text('Latest Payroll Run'), findsOneWidget);
       expect(find.text('Draft'), findsOneWidget);
     },
