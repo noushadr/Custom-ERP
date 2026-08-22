@@ -4,6 +4,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../../../shared/widgets/permission_gate.dart';
+import '../../../authentication/application/auth_providers.dart';
+import '../../../authentication/application/auth_state.dart';
 import '../../application/finances_providers.dart';
 import '../../domain/entities/expense.dart';
 import '../../domain/entities/expense_category.dart';
@@ -39,8 +42,11 @@ DateTimeRange _lastYearRange(DateTime now) => DateTimeRange(
   end: DateTime(now.year - 1, 12, 31),
 );
 
-/// Company-wide P&L dashboard — Super-Admin-only (gated by nav visibility in
-/// main.dart, and by `finances.manage` on the backend routes).
+/// Company-wide P&L dashboard — Super-Admin-only: gated by nav visibility in
+/// main.dart, by `finances.manage` on the backend routes, and by its own
+/// `hasPermission` check at the top of `build()` below (so this page's data
+/// providers are never even watched for an unauthorized viewer, regardless
+/// of nav — see `AccessDeniedView`'s doc comment for why that matters).
 class FinancesPage extends ConsumerStatefulWidget {
   const FinancesPage({super.key});
 
@@ -91,6 +97,12 @@ class _FinancesPageState extends ConsumerState<FinancesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authControllerProvider);
+    if (authState is! AuthAuthenticated ||
+        !authState.user.hasPermission('finances.manage')) {
+      return const AccessDeniedView();
+    }
+
     final summaryAsync = ref.watch(financialSummaryProvider(_rangeArgs));
     final expensesAsync = ref.watch(expensesListProvider(_rangeArgs));
 

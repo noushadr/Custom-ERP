@@ -114,8 +114,15 @@ class FakePayrollRepository implements PayrollRepository {
   String? lastFinalizedRunId;
   String? lastPaidRunId;
 
+  /// Incremented on every [getRuns] call — used to confirm an unauthorized
+  /// viewer's page never even fetches the list.
+  int getRunsCallCount = 0;
+
   @override
-  Future<List<PayrollRunSummary>> getRuns() async => runs;
+  Future<List<PayrollRunSummary>> getRuns() async {
+    getRunsCallCount++;
+    return runs;
+  }
 
   @override
   Future<PayrollRunDetail> generateRun({

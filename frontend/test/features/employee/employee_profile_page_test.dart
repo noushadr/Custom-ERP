@@ -158,6 +158,49 @@ void main() {
   );
 
   testWidgets(
+    'hides Bank Information, personal contact fields, and Emergency contact '
+    'from a viewer without employees.manage — a frontend-side second line '
+    'of defense on top of the backend already stripping these fields, so a '
+    'regression there would not also render a real leaked value here',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+        // The backend would normally null these out for this viewer, but
+        // set them here anyway to prove the frontend also hides the
+        // section rather than relying solely on the value being null.
+        personalEmail: 'other.personal@example.com',
+        phoneNumber: '+92 300 0000000',
+        bankName: 'Meezan Bank',
+        emergencyContactName: 'Someone',
+      );
+      final viewer = AuthUser(
+        id: 'user-3',
+        email: 'coworker@zeracreative.com',
+        role: 'Employee',
+        permissions: const ['employees.read'],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bank Information'), findsNothing);
+      expect(find.text('Meezan Bank'), findsNothing);
+      expect(find.text('Emergency contact'), findsNothing);
+      expect(find.text('Someone'), findsNothing);
+      expect(find.text('Personal email'), findsNothing);
+      expect(find.text('other.personal@example.com'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'shows "Login as" for a Super Admin viewing someone else\'s profile',
     (tester) async {
       final other = buildTestEmployee(

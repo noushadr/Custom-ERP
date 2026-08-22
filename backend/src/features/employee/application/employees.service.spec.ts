@@ -600,9 +600,9 @@ describe('EmployeesService', () => {
     it('throws NotFoundException when the caller has no employee profile', async () => {
       employeeRepository.findByUserId.mockResolvedValue(null);
 
-      await expect(service.getMyDirectReports('user-1')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.getMyDirectReports(buildViewer({ sub: 'user-1' })),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('returns the mapped direct reports for the caller', async () => {
@@ -612,13 +612,37 @@ describe('EmployeesService', () => {
         buildEmployee({ id: 'report-1', firstName: 'Ravi' }),
       ]);
 
-      const result = await service.getMyDirectReports('user-1');
+      const result = await service.getMyDirectReports(
+        buildViewer({ sub: 'user-1', permissions: ['employees.manage'] }),
+      );
 
       expect(employeeRepository.findByReportingManagerId).toHaveBeenCalledWith(
         'manager-1',
       );
       expect(result).toHaveLength(1);
       expect(result[0].fullName).toBe('Ravi Doe');
+    });
+
+    it("strips bank/personal fields from a report when the manager lacks employees.manage — regression: this endpoint previously returned every direct report's bank details, IBAN, DOB, and personal contact info completely unmasked to any manager (e.g. a Team Lead), since it skipped the same field-visibility check findAll/findById already apply", async () => {
+      const manager = buildEmployee({ id: 'manager-1', userId: 'user-1' });
+      employeeRepository.findByUserId.mockResolvedValue(manager);
+      employeeRepository.findByReportingManagerId.mockResolvedValue([
+        buildEmployee({
+          id: 'report-1',
+          userId: 'report-user-1',
+          bankName: 'Meezan Bank',
+          accountNumber: '12345',
+          dateOfBirth: '1998-01-01',
+        }),
+      ]);
+
+      const result = await service.getMyDirectReports(
+        buildViewer({ sub: 'user-1', permissions: ['employees.read'] }),
+      );
+
+      expect(result[0].bankName).toBeNull();
+      expect(result[0].accountNumber).toBeNull();
+      expect(result[0].dateOfBirth).toBeNull();
     });
   });
 

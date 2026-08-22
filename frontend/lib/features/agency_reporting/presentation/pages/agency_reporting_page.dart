@@ -4,6 +4,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../../../shared/widgets/permission_gate.dart';
+import '../../../authentication/application/auth_providers.dart';
+import '../../../authentication/application/auth_state.dart';
 import '../../application/agency_reporting_providers.dart';
 import '../../domain/entities/agency_report.dart';
 
@@ -90,6 +93,12 @@ class _AgencyReportingPageState extends ConsumerState<AgencyReportingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authControllerProvider);
+    if (authState is! AuthAuthenticated ||
+        !authState.user.hasPermission('reports.view')) {
+      return const AccessDeniedView();
+    }
+
     final reportAsync = ref.watch(
       agencyReportProvider((from: _isoDate(_range.start), to: _isoDate(_range.end))),
     );

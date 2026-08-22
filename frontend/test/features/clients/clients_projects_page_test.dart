@@ -31,11 +31,11 @@ Future<void> _useWideSurface(WidgetTester tester) async {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-Widget _app({FakeClientsRepository? repository}) {
+Widget _app({FakeClientsRepository? repository, AuthUser? viewer}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
-        (ref) => PresetAuthController(AuthAuthenticated(_superAdmin)),
+        (ref) => PresetAuthController(AuthAuthenticated(viewer ?? _superAdmin)),
       ),
       employeeRepositoryProvider.overrideWithValue(FakeEmployeeRepository()),
       clientsRepositoryProvider.overrideWithValue(
@@ -215,4 +215,38 @@ void main() {
 
     expect(find.text('No clients need attention right now.'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows an access-denied message instead of any client/project data for '
+    'a viewer without clients.manage — a frontend-side second line of '
+    'defense on top of the backend already rejecting the request, since '
+    "this app's IndexedStack-based nav keeps every page mounted regardless "
+    'of which tab is visible',
+    (tester) async {
+      final repository = FakeClientsRepository(
+        clients: [buildTestClient(companyName: 'Should Not Be Visible')],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          viewer: const AuthUser(
+            id: 'employee-1',
+            email: 'employee@zeracreative.com',
+            role: 'Employee',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text("You don't have permission to view this page."),
+        findsOneWidget,
+      );
+      expect(find.text('Should Not Be Visible'), findsNothing);
+      expect(find.text('Projects'), findsNothing);
+      expect(repository.getClientsCallCount, 0);
+    },
+  );
 }

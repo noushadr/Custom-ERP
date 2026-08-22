@@ -553,6 +553,7 @@ describe('LeaveService', () => {
         'team',
         3,
         2026,
+        false,
       );
 
       expect(result.map((r) => r.employeeId)).toEqual(['member-1']);
@@ -569,7 +570,13 @@ describe('LeaveService', () => {
         buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
       ]);
 
-      const result = await service.getLeaveCalendar('user-1', 'team', 3, 2026);
+      const result = await service.getLeaveCalendar(
+        'user-1',
+        'team',
+        3,
+        2026,
+        false,
+      );
 
       expect(result).toHaveLength(0);
     });
@@ -585,6 +592,7 @@ describe('LeaveService', () => {
         'company',
         3,
         2026,
+        false,
       );
 
       expect(result).toHaveLength(2);
@@ -600,9 +608,76 @@ describe('LeaveService', () => {
         'company',
         3,
         2026,
+        false,
       );
 
       expect(result).toHaveLength(0);
+    });
+
+    it("genericizes the leave type on company scope for a viewer without leave.manage — regression: the company-wide calendar previously revealed every coworker's specific leave type (e.g. 'Sick Leave'), which is health-adjacent personal information, to any authenticated user", async () => {
+      leaveRequestRepository.findByStatuses.mockResolvedValue([
+        buildLeaveRequest({
+          employee: buildEmployee({ id: 'employee-a' }),
+          leaveType: buildLeaveType({ id: 'type-1', name: 'Sick Leave', colorHex: '#ff0000' }),
+        }),
+      ]);
+
+      const result = await service.getLeaveCalendar(
+        'user-1',
+        'company',
+        3,
+        2026,
+        false,
+      );
+
+      expect(result[0].leaveTypeName).toBe('On Leave');
+      expect(result[0].colorHex).toBeNull();
+    });
+
+    it('shows the real leave type on company scope to a leave.manage holder', async () => {
+      leaveRequestRepository.findByStatuses.mockResolvedValue([
+        buildLeaveRequest({
+          employee: buildEmployee({ id: 'employee-a' }),
+          leaveType: buildLeaveType({ id: 'type-1', name: 'Sick Leave', colorHex: '#ff0000' }),
+        }),
+      ]);
+
+      const result = await service.getLeaveCalendar(
+        'user-1',
+        'company',
+        3,
+        2026,
+        true,
+      );
+
+      expect(result[0].leaveTypeName).toBe('Sick Leave');
+      expect(result[0].colorHex).toBe('#ff0000');
+    });
+
+    it('shows the real leave type on team scope even without leave.manage, since that scope is already restricted to the department head', async () => {
+      leaveRequestRepository.findByStatuses.mockResolvedValue([
+        buildLeaveRequest({
+          employeeId: 'member-1',
+          employee: buildEmployee({ id: 'member-1', departmentId: 'dept-1' }),
+          leaveType: buildLeaveType({ id: 'type-1', name: 'Sick Leave', colorHex: '#ff0000' }),
+        }),
+      ]);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'head-1' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+      ]);
+
+      const result = await service.getLeaveCalendar(
+        'user-1',
+        'team',
+        3,
+        2026,
+        false,
+      );
+
+      expect(result[0].leaveTypeName).toBe('Sick Leave');
     });
   });
 

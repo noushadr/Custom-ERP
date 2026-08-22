@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../../../shared/widgets/permission_gate.dart';
+import '../../../authentication/application/auth_providers.dart';
+import '../../../authentication/application/auth_state.dart';
 import '../../application/automations_providers.dart';
 import '../../domain/entities/automation.dart';
 import '../../domain/entities/automation_execution_history_entry.dart';
@@ -18,6 +21,12 @@ class AutomationsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    if (authState is! AuthAuthenticated ||
+        !authState.user.hasPermission('automations.manage')) {
+      return const AccessDeniedView();
+    }
+
     final automationsAsync = ref.watch(automationsListProvider);
 
     return Padding(

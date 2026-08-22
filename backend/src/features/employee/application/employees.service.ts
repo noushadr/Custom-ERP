@@ -418,13 +418,15 @@ export class EmployeesService {
     return toEmployeeResponse(employee);
   }
 
-  async getMyDirectReports(userId: string): Promise<EmployeeResponse[]> {
-    const employee = await this.employeeRepository.findByUserId(userId);
+  async getMyDirectReports(viewer: JwtPayload): Promise<EmployeeResponse[]> {
+    const employee = await this.employeeRepository.findByUserId(viewer.sub);
     if (!employee) throw new NotFoundException('Employee profile not found');
     const reports = await this.employeeRepository.findByReportingManagerId(
       employee.id,
     );
-    return reports.map(toEmployeeResponse);
+    return reports.map((report) =>
+      this.applyFieldVisibility(toEmployeeResponse(report), report, viewer),
+    );
   }
 
   async updateSelf(

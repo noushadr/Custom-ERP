@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
+import '../../../../shared/widgets/permission_gate.dart';
+import '../../../authentication/application/auth_providers.dart';
+import '../../../authentication/application/auth_state.dart';
 import '../../application/payroll_providers.dart';
 import '../../domain/entities/payroll_run_summary.dart';
 import '../../domain/exceptions/payroll_exception.dart';
@@ -15,6 +18,12 @@ class PayrollPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    if (authState is! AuthAuthenticated ||
+        !authState.user.hasPermission('payroll.manage')) {
+      return const AccessDeniedView();
+    }
+
     final runsAsync = ref.watch(payrollRunsListProvider);
 
     return Padding(

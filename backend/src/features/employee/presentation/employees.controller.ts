@@ -110,7 +110,7 @@ export class EmployeesController {
 
   @Get('me/direct-reports')
   getMyDirectReports(@CurrentUser() user: JwtPayload) {
-    return this.employeesService.getMyDirectReports(user.sub);
+    return this.employeesService.getMyDirectReports(user);
   }
 
   @Get('me/salary-history')

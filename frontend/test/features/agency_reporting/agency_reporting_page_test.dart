@@ -18,11 +18,11 @@ const _superAdmin = AuthUser(
   permissions: ['reports.view'],
 );
 
-Widget _app({FakeAgencyReportingRepository? repository}) {
+Widget _app({FakeAgencyReportingRepository? repository, AuthUser? viewer}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
-        (ref) => PresetAuthController(AuthAuthenticated(_superAdmin)),
+        (ref) => PresetAuthController(AuthAuthenticated(viewer ?? _superAdmin)),
       ),
       agencyReportingRepositoryProvider.overrideWithValue(
         repository ?? FakeAgencyReportingRepository(),
@@ -179,4 +179,34 @@ void main() {
     // delta-badge code path without asserting on a specific percentage.
     expect(find.textContaining('%'), findsWidgets);
   });
+
+  testWidgets(
+    'shows an access-denied message and never fetches the report for a '
+    'viewer without reports.view — a frontend-side second line of defense, '
+    "since this app's IndexedStack-based nav keeps every page mounted "
+    'regardless of which tab is visible',
+    (tester) async {
+      final repository = FakeAgencyReportingRepository();
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          viewer: const AuthUser(
+            id: 'employee-1',
+            email: 'employee@zeracreative.com',
+            role: 'Employee',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text("You don't have permission to view this page."),
+        findsOneWidget,
+      );
+      expect(find.text('Total Revenue'), findsNothing);
+      expect(repository.callCount, 0);
+    },
+  );
 }

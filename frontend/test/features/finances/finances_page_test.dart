@@ -18,11 +18,11 @@ const _superAdmin = AuthUser(
   permissions: ['finances.manage'],
 );
 
-Widget _app({FakeFinancesRepository? repository}) {
+Widget _app({FakeFinancesRepository? repository, AuthUser? viewer}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
-        (ref) => PresetAuthController(AuthAuthenticated(_superAdmin)),
+        (ref) => PresetAuthController(AuthAuthenticated(viewer ?? _superAdmin)),
       ),
       financesRepositoryProvider.overrideWithValue(
         repository ?? FakeFinancesRepository(),
@@ -196,6 +196,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.getSummaryCallCount, greaterThan(callsBeforeRefresh));
+    },
+  );
+
+  testWidgets(
+    'shows an access-denied message and never fetches the summary for a '
+    'viewer without finances.manage — a frontend-side second line of '
+    "defense, since this app's IndexedStack-based nav keeps every page "
+    'mounted regardless of which tab is visible',
+    (tester) async {
+      final repository = FakeFinancesRepository();
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          viewer: const AuthUser(
+            id: 'employee-1',
+            email: 'employee@zeracreative.com',
+            role: 'Employee',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text("You don't have permission to view this page."),
+        findsOneWidget,
+      );
+      expect(find.text('Gross Revenue'), findsNothing);
+      expect(repository.getSummaryCallCount, 0);
     },
   );
 }

@@ -495,6 +495,7 @@ export class LeaveService {
     scope: 'team' | 'company',
     month: number,
     year: number,
+    canManageLeave: boolean,
   ): Promise<LeaveCalendarEntry[]> {
     const rangeStart = new Date(Date.UTC(year, month - 1, 1));
     const rangeEnd = new Date(Date.UTC(year, month, 0));
@@ -530,8 +531,19 @@ export class LeaveService {
         employeeName: `${request.employee.firstName} ${request.employee.lastName}`,
         employeePhotoUrl: request.employee.profilePhotoUrl ?? null,
         leaveTypeId: request.leaveTypeId,
-        leaveTypeName: request.leaveType.name,
-        colorHex: request.leaveType.colorHex ?? null,
+        // Which category of leave (e.g. "Sick Leave") is health-adjacent
+        // personal information about a coworker — shown as a specific type
+        // only to a leave.manage holder or on the "team" scope (which is
+        // already restricted to that department's own head); the
+        // company-wide "who's out" view genericizes it for everyone else.
+        leaveTypeName:
+          scope === 'company' && !canManageLeave
+            ? 'On Leave'
+            : request.leaveType.name,
+        colorHex:
+          scope === 'company' && !canManageLeave
+            ? null
+            : (request.leaveType.colorHex ?? null),
         startDate: request.startDate,
         endDate: request.endDate,
         isPending: request.status === LeaveRequestStatus.MANAGER_APPROVED,

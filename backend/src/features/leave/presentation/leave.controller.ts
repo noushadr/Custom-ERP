@@ -151,6 +151,7 @@ export class LeaveController {
       scope === 'company' ? 'company' : 'team',
       Number(month),
       Number(year),
+      user.permissions.includes('leave.manage'),
     );
   }
 

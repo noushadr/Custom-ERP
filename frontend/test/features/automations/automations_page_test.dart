@@ -18,11 +18,11 @@ const _superAdmin = AuthUser(
   permissions: ['automations.manage'],
 );
 
-Widget _app({FakeAutomationsRepository? repository}) {
+Widget _app({FakeAutomationsRepository? repository, AuthUser? viewer}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
-        (ref) => PresetAuthController(AuthAuthenticated(_superAdmin)),
+        (ref) => PresetAuthController(AuthAuthenticated(viewer ?? _superAdmin)),
       ),
       automationsRepositoryProvider.overrideWithValue(
         repository ?? FakeAutomationsRepository(),
@@ -180,4 +180,34 @@ void main() {
 
     expect(find.textContaining('Last changed by Jane Admin'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows an access-denied message and never fetches automations for a '
+    'viewer without automations.manage — a frontend-side second line of '
+    "defense, since this app's IndexedStack-based nav keeps every page "
+    'mounted regardless of which tab is visible',
+    (tester) async {
+      final repository = FakeAutomationsRepository();
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          viewer: const AuthUser(
+            id: 'employee-1',
+            email: 'employee@zeracreative.com',
+            role: 'Employee',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text("You don't have permission to view this page."),
+        findsOneWidget,
+      );
+      expect(find.text('Project Renewal Reminder'), findsNothing);
+      expect(repository.getAutomationsCallCount, 0);
+    },
+  );
 }

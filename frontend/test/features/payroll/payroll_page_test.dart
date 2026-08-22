@@ -18,11 +18,11 @@ const _superAdmin = AuthUser(
   permissions: ['payroll.manage'],
 );
 
-Widget _app({FakePayrollRepository? repository}) {
+Widget _app({FakePayrollRepository? repository, AuthUser? viewer}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
-        (ref) => PresetAuthController(AuthAuthenticated(_superAdmin)),
+        (ref) => PresetAuthController(AuthAuthenticated(viewer ?? _superAdmin)),
       ),
       payrollRepositoryProvider.overrideWithValue(
         repository ?? FakePayrollRepository(),
@@ -102,4 +102,36 @@ void main() {
 
     expect(find.text('Payroll Run'), findsOneWidget); // the detail AppBar
   });
+
+  testWidgets(
+    'shows an access-denied message and never fetches payroll runs for a '
+    'viewer without payroll.manage — a frontend-side second line of '
+    "defense, since this app's IndexedStack-based nav keeps every page "
+    'mounted regardless of which tab is visible',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runs: [buildTestPayrollRunSummary()],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          viewer: const AuthUser(
+            id: 'employee-1',
+            email: 'employee@zeracreative.com',
+            role: 'Employee',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text("You don't have permission to view this page."),
+        findsOneWidget,
+      );
+      expect(find.text('August 2026'), findsNothing);
+      expect(repository.getRunsCallCount, 0);
+    },
+  );
 }

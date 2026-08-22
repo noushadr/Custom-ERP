@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
+import '../../../../shared/widgets/permission_gate.dart';
+import '../../../authentication/application/auth_providers.dart';
+import '../../../authentication/application/auth_state.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/client.dart';
 import '../../domain/entities/client_health_status.dart';
@@ -14,14 +17,21 @@ import 'project_detail_page.dart';
 import 'project_editor_page.dart';
 
 /// The Admin Business Management "Clients & Projects" module's root page —
-/// Super-Admin-only (gated by nav visibility in main.dart, and by
-/// `clients.manage` on every backend route this page calls). A stats row up
-/// top, then Projects (default) / Clients tabs.
+/// Super-Admin-only: gated by nav visibility in main.dart, by
+/// `clients.manage` on every backend route this page calls, and by its own
+/// `hasPermission` check at the top of `build()` (see `AccessDeniedView`).
+/// A stats row up top, then Projects (default) / Clients tabs.
 class ClientsProjectsPage extends ConsumerWidget {
   const ClientsProjectsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    if (authState is! AuthAuthenticated ||
+        !authState.user.hasPermission('clients.manage')) {
+      return const AccessDeniedView();
+    }
+
     return DefaultTabController(
       length: 3,
       child: Padding(
