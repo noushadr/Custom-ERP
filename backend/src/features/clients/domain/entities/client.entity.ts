@@ -16,6 +16,9 @@ export class Client extends BaseEntity {
   website?: string;
 
   @Column({ nullable: true })
+  country?: string;
+
+  @Column({ nullable: true })
   address?: string;
 
   @Column({ nullable: true })

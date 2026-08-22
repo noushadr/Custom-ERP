@@ -3,6 +3,7 @@ export interface ClientResponseDto {
   companyName: string;
   industry: string | null;
   website: string | null;
+  country: string | null;
   address: string | null;
   primaryContactName: string | null;
   primaryContactEmail: string | null;
@@ -70,6 +71,12 @@ export interface ProjectResponseDto {
   endDate: string | null;
   renewalDate: string | null;
   notes: string | null;
+  packageName: string | null;
+  backlinksTarget: string | null;
+  seoSheetName: string | null;
+  projectFolderName: string | null;
+  workingEmailAccount: string | null;
+  ahrefsAccount: string | null;
   assignedEmployees: ProjectEmployeeRef[];
   targetDepartments: ProjectDepartmentRef[];
   services: ProjectServiceRef[];

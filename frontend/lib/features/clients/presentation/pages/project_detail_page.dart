@@ -125,6 +125,56 @@ class _ProjectDetailBody extends ConsumerWidget {
             const SizedBox(height: 16),
             FormSection(title: 'Notes', child: Text(project.notes!)),
           ],
+          if (_hasSeoDetails(project)) ...[
+            const SizedBox(height: 16),
+            FormSection(
+              title: 'SEO Details',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (project.packageName != null)
+                    _DetailLine(label: 'Package', value: project.packageName!),
+                  if (project.backlinksTarget != null)
+                    _DetailLine(
+                      label: 'Backlinks target',
+                      value: project.backlinksTarget!,
+                    ),
+                  if (project.seoSheetName != null)
+                    _DetailLine(
+                      label: 'SEO sheet',
+                      value: project.seoSheetName!,
+                    ),
+                  if (project.projectFolderName != null)
+                    _DetailLine(
+                      label: 'Project folder',
+                      value: project.projectFolderName!,
+                    ),
+                  if (project.workingEmailAccount != null)
+                    _DetailLine(
+                      label: 'Working email account',
+                      value: project.workingEmailAccount!,
+                    ),
+                  if (project.ahrefsAccount != null)
+                    _DetailLine(
+                      label: 'Ahrefs account',
+                      value: project.ahrefsAccount!,
+                    ),
+                  if (project.workingEmailAccount != null ||
+                      project.ahrefsAccount != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Passwords are kept in the team password manager, not '
+                      'stored here.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           FormSection(
             title: 'Services',
@@ -198,6 +248,45 @@ class _ProjectDetailBody extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _TasksSection(project: project),
+        ],
+      ),
+    );
+  }
+}
+
+bool _hasSeoDetails(Project project) =>
+    project.packageName != null ||
+    project.backlinksTarget != null ||
+    project.seoSheetName != null ||
+    project.projectFolderName != null ||
+    project.workingEmailAccount != null ||
+    project.ahrefsAccount != null;
+
+class _DetailLine extends StatelessWidget {
+  const _DetailLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 150,
+            child: Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
+          ),
         ],
       ),
     );

@@ -94,6 +94,7 @@ export class ClientsService {
     client.companyName = dto.companyName;
     client.industry = dto.industry;
     client.website = dto.website;
+    client.country = dto.country;
     client.address = dto.address;
     client.primaryContactName = dto.primaryContactName;
     client.primaryContactEmail = dto.primaryContactEmail;
@@ -248,6 +249,12 @@ export class ClientsService {
     project.endDate = dto.endDate;
     project.renewalDate = dto.renewalDate;
     project.notes = dto.notes;
+    project.packageName = dto.packageName;
+    project.backlinksTarget = dto.backlinksTarget;
+    project.seoSheetName = dto.seoSheetName;
+    project.projectFolderName = dto.projectFolderName;
+    project.workingEmailAccount = dto.workingEmailAccount;
+    project.ahrefsAccount = dto.ahrefsAccount;
     project.assignedEmployees = await this.resolveEmployees(
       dto.assignedEmployeeIds,
     );
@@ -291,6 +298,24 @@ export class ClientsService {
       project.renewalDate = changes.renewalDate;
     }
     if (changes.notes !== undefined) project.notes = changes.notes;
+    if (changes.packageName !== undefined) {
+      project.packageName = changes.packageName;
+    }
+    if (changes.backlinksTarget !== undefined) {
+      project.backlinksTarget = changes.backlinksTarget;
+    }
+    if (changes.seoSheetName !== undefined) {
+      project.seoSheetName = changes.seoSheetName;
+    }
+    if (changes.projectFolderName !== undefined) {
+      project.projectFolderName = changes.projectFolderName;
+    }
+    if (changes.workingEmailAccount !== undefined) {
+      project.workingEmailAccount = changes.workingEmailAccount;
+    }
+    if (changes.ahrefsAccount !== undefined) {
+      project.ahrefsAccount = changes.ahrefsAccount;
+    }
 
     const saved = await this.projectRepository.save(project);
     return toProjectResponse(await this.getProjectOrThrow(saved.id));

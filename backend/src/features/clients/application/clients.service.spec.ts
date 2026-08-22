@@ -205,6 +205,20 @@ describe('ClientsService', () => {
         service.updateClient('missing', { companyName: 'X' }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it('stores and updates the country field', async () => {
+      const created = await service.createClient({
+        companyName: 'Acme Inc',
+        country: 'PK',
+      });
+      expect(created.country).toBe('PK');
+
+      clientRepository.findById.mockResolvedValue(buildClient());
+      const updated = await service.updateClient('client-1', {
+        country: 'UK/US',
+      });
+      expect(updated.country).toBe('UK/US');
+    });
   });
 
   describe('client health', () => {
@@ -376,6 +390,74 @@ describe('ClientsService', () => {
       expect(result.assignedEmployees[0].id).toBe('employee-1');
       expect(result.targetDepartments[0].id).toBe('dept-1');
       expect(result.services[0].id).toBe('service-1');
+    });
+  });
+
+  describe('projects — SEO fields', () => {
+    it('stores package/backlinks/sheet/folder/account fields on create', async () => {
+      projectRepository.findById.mockImplementation((id) =>
+        Promise.resolve(
+          buildProject({
+            id,
+            packageName: 'GROWTH +',
+            backlinksTarget: '10/90',
+            seoSheetName: 'Acme - SEO Sheet',
+            projectFolderName: 'Acme Inc',
+            workingEmailAccount: 'work@example.com',
+            ahrefsAccount: 'ahrefs@example.com',
+          }),
+        ),
+      );
+
+      const result = await service.createProject({
+        clientId: 'client-1',
+        name: 'SEO Retainer',
+        type: ProjectType.RETAINER,
+        startDate: '2026-01-01',
+        packageName: 'GROWTH +',
+        backlinksTarget: '10/90',
+        seoSheetName: 'Acme - SEO Sheet',
+        projectFolderName: 'Acme Inc',
+        workingEmailAccount: 'work@example.com',
+        ahrefsAccount: 'ahrefs@example.com',
+      });
+
+      expect(result.packageName).toBe('GROWTH +');
+      expect(result.backlinksTarget).toBe('10/90');
+      expect(result.seoSheetName).toBe('Acme - SEO Sheet');
+      expect(result.projectFolderName).toBe('Acme Inc');
+      expect(result.workingEmailAccount).toBe('work@example.com');
+      expect(result.ahrefsAccount).toBe('ahrefs@example.com');
+    });
+
+    it('updates package/backlinks/sheet/folder/account fields', async () => {
+      const project = buildProject();
+      projectRepository.findById.mockResolvedValue(project);
+
+      const result = await service.updateProject('project-1', {
+        packageName: 'VALUE',
+        backlinksTarget: '20/40',
+      });
+
+      expect(result.packageName).toBe('VALUE');
+      expect(result.backlinksTarget).toBe('20/40');
+    });
+
+    it('defaults SEO fields to null when omitted', async () => {
+      projectRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildProject({ id })),
+      );
+
+      const result = await service.createProject({
+        clientId: 'client-1',
+        name: 'SEO Retainer',
+        type: ProjectType.RETAINER,
+        startDate: '2026-01-01',
+      });
+
+      expect(result.packageName).toBeNull();
+      expect(result.workingEmailAccount).toBeNull();
+      expect(result.ahrefsAccount).toBeNull();
     });
   });
 

@@ -17,8 +17,8 @@ String _isoDate(DateTime date) =>
     '${date.month.toString().padLeft(2, '0')}-'
     '${date.day.toString().padLeft(2, '0')}';
 
-/// Create or edit a project: client, type/status, dates, and
-/// employee/department/service assignment.
+/// Create or edit a project: client, type/status, dates, SEO
+/// package/tracking details, and employee/department/service assignment.
 class ProjectEditorPage extends ConsumerStatefulWidget {
   const ProjectEditorPage({super.key, this.existingProject});
 
@@ -33,6 +33,12 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _notesController;
+  late final TextEditingController _packageNameController;
+  late final TextEditingController _backlinksTargetController;
+  late final TextEditingController _seoSheetNameController;
+  late final TextEditingController _projectFolderNameController;
+  late final TextEditingController _workingEmailAccountController;
+  late final TextEditingController _ahrefsAccountController;
 
   String? _clientId;
   late String _type;
@@ -55,6 +61,24 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
     final existing = widget.existingProject;
     _nameController = TextEditingController(text: existing?.name ?? '');
     _notesController = TextEditingController(text: existing?.notes ?? '');
+    _packageNameController = TextEditingController(
+      text: existing?.packageName ?? '',
+    );
+    _backlinksTargetController = TextEditingController(
+      text: existing?.backlinksTarget ?? '',
+    );
+    _seoSheetNameController = TextEditingController(
+      text: existing?.seoSheetName ?? '',
+    );
+    _projectFolderNameController = TextEditingController(
+      text: existing?.projectFolderName ?? '',
+    );
+    _workingEmailAccountController = TextEditingController(
+      text: existing?.workingEmailAccount ?? '',
+    );
+    _ahrefsAccountController = TextEditingController(
+      text: existing?.ahrefsAccount ?? '',
+    );
     _clientId = existing?.clientId;
     _type = existing?.type ?? ProjectType.oneTime;
     _status = existing?.status ?? ProjectStatus.active;
@@ -80,6 +104,12 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   void dispose() {
     _nameController.dispose();
     _notesController.dispose();
+    _packageNameController.dispose();
+    _backlinksTargetController.dispose();
+    _seoSheetNameController.dispose();
+    _projectFolderNameController.dispose();
+    _workingEmailAccountController.dispose();
+    _ahrefsAccountController.dispose();
     super.dispose();
   }
 
@@ -126,6 +156,12 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               endDate: _endDate != null ? _isoDate(_endDate!) : null,
               renewalDate: _renewalDate != null ? _isoDate(_renewalDate!) : null,
               notes: _notesController.text.trim(),
+              packageName: _packageNameController.text.trim(),
+              backlinksTarget: _backlinksTargetController.text.trim(),
+              seoSheetName: _seoSheetNameController.text.trim(),
+              projectFolderName: _projectFolderNameController.text.trim(),
+              workingEmailAccount: _workingEmailAccountController.text.trim(),
+              ahrefsAccount: _ahrefsAccountController.text.trim(),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
               targetDepartmentIds: _selectedDepartmentIds.toList(),
               serviceIds: _selectedServiceIds.toList(),
@@ -141,6 +177,16 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               notes: _notesController.text.trim().isEmpty
                   ? null
                   : _notesController.text.trim(),
+              packageName: _emptyToNull(_packageNameController.text),
+              backlinksTarget: _emptyToNull(_backlinksTargetController.text),
+              seoSheetName: _emptyToNull(_seoSheetNameController.text),
+              projectFolderName: _emptyToNull(
+                _projectFolderNameController.text,
+              ),
+              workingEmailAccount: _emptyToNull(
+                _workingEmailAccountController.text,
+              ),
+              ahrefsAccount: _emptyToNull(_ahrefsAccountController.text),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
               targetDepartmentIds: _selectedDepartmentIds.toList(),
               serviceIds: _selectedServiceIds.toList(),
@@ -160,6 +206,9 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
       if (mounted) setState(() => _submitting = false);
     }
   }
+
+  String? _emptyToNull(String value) =>
+      value.trim().isEmpty ? null : value.trim();
 
   @override
   Widget build(BuildContext context) {
@@ -311,6 +360,76 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                       controller: _notesController,
                       decoration: const InputDecoration(labelText: 'Notes'),
                       maxLines: 3,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _packageNameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Package',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _backlinksTargetController,
+                            decoration: const InputDecoration(
+                              labelText: 'Backlinks target',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _seoSheetNameController,
+                            decoration: const InputDecoration(
+                              labelText: 'SEO sheet name',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _projectFolderNameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Project folder name',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _workingEmailAccountController,
+                            decoration: const InputDecoration(
+                              labelText: 'Working email account',
+                              helperText:
+                                  'Reference only — no passwords stored here.',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _ahrefsAccountController,
+                            decoration: const InputDecoration(
+                              labelText: 'Ahrefs account',
+                              helperText:
+                                  'Reference only — no passwords stored here.',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
                     Text(

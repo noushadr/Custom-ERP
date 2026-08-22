@@ -49,6 +49,37 @@ export class Project extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  /** Free-text tier label (e.g. "GROWTH +", "VALUE", "INTERNAL BRAND -
+   * NO LIMIT") — deliberately not an enum, since real-world packages carry
+   * one-off customizations (e.g. "GROWTH + 130 backlinks + 6 GP DA 30-50"). */
+  @Column({ nullable: true })
+  packageName?: string;
+
+  /** Free-text monthly backlink target — a plain number or a "min/max"
+   * range, kept as text since the source data isn't consistently numeric. */
+  @Column({ nullable: true })
+  backlinksTarget?: string;
+
+  /** Title of the external SEO tracking sheet for this project (e.g. a
+   * Google Sheet name) — not a real URL in the source data, just a label. */
+  @Column({ nullable: true })
+  seoSheetName?: string;
+
+  /** Name of the external project-details folder (e.g. a Drive folder). */
+  @Column({ nullable: true })
+  projectFolderName?: string;
+
+  /** Reference-only email/username for the account used to manage this
+   * client's SEO work — deliberately never paired with a password column;
+   * actual credentials live in the team's password manager. */
+  @Column({ nullable: true })
+  workingEmailAccount?: string;
+
+  /** Reference-only email/username for this project's Ahrefs account —
+   * same "no password stored" rule as workingEmailAccount. */
+  @Column({ nullable: true })
+  ahrefsAccount?: string;
+
   @ManyToMany(() => Employee, { eager: true })
   @JoinTable({
     name: 'project_assigned_employees',

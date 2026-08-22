@@ -19,6 +19,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
   late final TextEditingController _companyNameController;
   late final TextEditingController _industryController;
   late final TextEditingController _websiteController;
+  late final TextEditingController _countryController;
   late final TextEditingController _addressController;
   late final TextEditingController _contactNameController;
   late final TextEditingController _contactEmailController;
@@ -39,6 +40,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
     );
     _industryController = TextEditingController(text: existing?.industry ?? '');
     _websiteController = TextEditingController(text: existing?.website ?? '');
+    _countryController = TextEditingController(text: existing?.country ?? '');
     _addressController = TextEditingController(text: existing?.address ?? '');
     _contactNameController = TextEditingController(
       text: existing?.primaryContactName ?? '',
@@ -57,6 +59,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
     _companyNameController.dispose();
     _industryController.dispose();
     _websiteController.dispose();
+    _countryController.dispose();
     _addressController.dispose();
     _contactNameController.dispose();
     _contactEmailController.dispose();
@@ -81,6 +84,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
               companyName: _companyNameController.text.trim(),
               industry: _industryController.text.trim(),
               website: _websiteController.text.trim(),
+              country: _countryController.text.trim(),
               address: _addressController.text.trim(),
               primaryContactName: _contactNameController.text.trim(),
               primaryContactEmail: _contactEmailController.text.trim(),
@@ -91,6 +95,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
               companyName: _companyNameController.text.trim(),
               industry: _emptyToNull(_industryController.text),
               website: _emptyToNull(_websiteController.text),
+              country: _emptyToNull(_countryController.text),
               address: _emptyToNull(_addressController.text),
               primaryContactName: _emptyToNull(_contactNameController.text),
               primaryContactEmail: _emptyToNull(_contactEmailController.text),
@@ -154,6 +159,11 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
                     TextFormField(
                       controller: _websiteController,
                       decoration: const InputDecoration(labelText: 'Website'),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _countryController,
+                      decoration: const InputDecoration(labelText: 'Country'),
                     ),
                     const SizedBox(height: 16),
                     TextFormField(

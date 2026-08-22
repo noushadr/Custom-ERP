@@ -191,11 +191,13 @@ class _ClientDetailBody extends ConsumerWidget {
                 if (client.primaryContactPhone != null)
                   Text('Phone: ${client.primaryContactPhone}'),
                 if (client.website != null) Text('Website: ${client.website}'),
+                if (client.country != null) Text('Country: ${client.country}'),
                 if (client.address != null) Text('Address: ${client.address}'),
                 if (client.primaryContactName == null &&
                     client.primaryContactEmail == null &&
                     client.primaryContactPhone == null &&
                     client.website == null &&
+                    client.country == null &&
                     client.address == null)
                   Text(
                     'No contact details yet.',

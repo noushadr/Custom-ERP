@@ -40,6 +40,30 @@ export class CreateProjectDto {
   notes?: string;
 
   @IsOptional()
+  @IsString()
+  packageName?: string;
+
+  @IsOptional()
+  @IsString()
+  backlinksTarget?: string;
+
+  @IsOptional()
+  @IsString()
+  seoSheetName?: string;
+
+  @IsOptional()
+  @IsString()
+  projectFolderName?: string;
+
+  @IsOptional()
+  @IsString()
+  workingEmailAccount?: string;
+
+  @IsOptional()
+  @IsString()
+  ahrefsAccount?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   assignedEmployeeIds?: string[];

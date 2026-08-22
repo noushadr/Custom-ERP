@@ -22,6 +22,10 @@ export class UpdateClientDto {
 
   @IsOptional()
   @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsString()
   address?: string;
 
   @IsOptional()

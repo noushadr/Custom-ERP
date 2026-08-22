@@ -4,6 +4,7 @@ class Client {
     required this.companyName,
     required this.industry,
     required this.website,
+    required this.country,
     required this.address,
     required this.primaryContactName,
     required this.primaryContactEmail,
@@ -21,6 +22,7 @@ class Client {
   final String companyName;
   final String? industry;
   final String? website;
+  final String? country;
   final String? address;
   final String? primaryContactName;
   final String? primaryContactEmail;

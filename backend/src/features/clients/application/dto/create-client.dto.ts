@@ -15,6 +15,10 @@ export class CreateClientDto {
 
   @IsOptional()
   @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsString()
   address?: string;
 
   @IsOptional()

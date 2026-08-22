@@ -14,6 +14,12 @@ class ProjectModel extends Project {
     required super.endDate,
     required super.renewalDate,
     required super.notes,
+    required super.packageName,
+    required super.backlinksTarget,
+    required super.seoSheetName,
+    required super.projectFolderName,
+    required super.workingEmailAccount,
+    required super.ahrefsAccount,
     required super.assignedEmployees,
     required super.targetDepartments,
     required super.services,
@@ -32,6 +38,12 @@ class ProjectModel extends Project {
     endDate: json['endDate'] as String?,
     renewalDate: json['renewalDate'] as String?,
     notes: json['notes'] as String?,
+    packageName: json['packageName'] as String?,
+    backlinksTarget: json['backlinksTarget'] as String?,
+    seoSheetName: json['seoSheetName'] as String?,
+    projectFolderName: json['projectFolderName'] as String?,
+    workingEmailAccount: json['workingEmailAccount'] as String?,
+    ahrefsAccount: json['ahrefsAccount'] as String?,
     assignedEmployees: (json['assignedEmployees'] as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(
