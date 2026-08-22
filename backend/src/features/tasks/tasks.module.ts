@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthenticationModule } from '../authentication/authentication.module';
 import { DepartmentsModule } from '../departments/departments.module';
 import { EmployeeModule } from '../employee/employee.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { TasksService } from './application/tasks.service';
 import { TypeOrmTaskAuditLogRepository } from './data/repositories/task-audit-log.repository';
 import { TypeOrmTaskCommentRepository } from './data/repositories/task-comment.repository';
@@ -21,6 +22,7 @@ import { TasksController } from './presentation/tasks.controller';
     AuthenticationModule,
     EmployeeModule,
     DepartmentsModule,
+    NotificationsModule,
   ],
   controllers: [TasksController],
   providers: [

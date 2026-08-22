@@ -120,8 +120,8 @@ export class RolesService {
   /** Active users whose role carries `permissionKey` — since Super Admin's
    * role is seeded with every known permission explicitly (see seed.ts),
    * this naturally includes Super Admin without any special-casing. Used
-   * by the Automations module to resolve who should be notified by a
-   * given automation (e.g. everyone holding `clients.manage`). */
+   * to resolve who should be notified about something (e.g. everyone
+   * holding `leave.manage`). */
   async findUsersWithPermission(
     permissionKey: string,
   ): Promise<{ id: string }[]> {

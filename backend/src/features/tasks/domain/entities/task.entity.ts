@@ -45,9 +45,9 @@ export class Task extends BaseEntity {
   @Column({ type: 'date' })
   dueDate: string;
 
-  /** Which `dueDate` value the Automations module's "Task Deadline
-   * Reminder" last notified for — same idempotency pattern as
-   * `Project.lastRenewalReminderSentFor`. */
+  /** Which `dueDate` value the daily deadline-reminder check last notified
+   * for — not `dueDate` itself, so a repeated check never sends a duplicate
+   * reminder, while changing `dueDate` naturally makes it eligible again. */
   @Column({ type: 'date', nullable: true })
   lastDeadlineReminderSentFor?: string | null;
 

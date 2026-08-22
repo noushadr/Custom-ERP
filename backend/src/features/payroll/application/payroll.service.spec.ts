@@ -9,6 +9,7 @@ import { PayrollRun } from '../domain/entities/payroll-run.entity';
 import { PayrollRunStatus } from '../domain/enums/payroll-run-status.enum';
 import type { PayrollLineItemRepository } from '../domain/repositories/payroll-line-item-repository.interface';
 import type { PayrollRunRepository } from '../domain/repositories/payroll-run-repository.interface';
+import type { NotificationsService } from '../../notifications/application/notifications.service';
 import { PayrollService } from './payroll.service';
 
 function buildEmployee(overrides: Partial<Employee> = {}): Employee {
@@ -67,6 +68,7 @@ describe('PayrollService', () => {
   let employeeRepository: jest.Mocked<EmployeeRepository>;
   let userRepository: jest.Mocked<UserRepository>;
   let employeesService: jest.Mocked<EmployeesService>;
+  let notificationsService: jest.Mocked<NotificationsService>;
 
   beforeEach(() => {
     runRepository = {
@@ -119,6 +121,9 @@ describe('PayrollService', () => {
     employeesService = {
       getSalaryAsOf: jest.fn().mockResolvedValue(0),
     } as unknown as jest.Mocked<EmployeesService>;
+    notificationsService = {
+      create: jest.fn(),
+    } as unknown as jest.Mocked<NotificationsService>;
 
     service = new PayrollService(
       runRepository,
@@ -126,6 +131,7 @@ describe('PayrollService', () => {
       employeeRepository,
       userRepository,
       employeesService,
+      notificationsService,
     );
   });
 
@@ -249,6 +255,28 @@ describe('PayrollService', () => {
 
       await expect(service.payRun('run-1', 'admin-1')).rejects.toBeInstanceOf(
         BadRequestException,
+      );
+    });
+
+    it('notifies every employee with a line item in the run, unconditionally', async () => {
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.FINALIZED, month: 8, year: 2026 }),
+      );
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({ employee: buildEmployee({ userId: 'user-a' }) }),
+        buildLineItem({ id: 'item-2', employee: buildEmployee({ userId: 'user-b' }) }),
+      ]);
+
+      await service.payRun('run-1', 'admin-1');
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientUserId: 'user-a',
+          message: expect.stringContaining('August 2026'),
+        }),
+      );
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'user-b' }),
       );
     });
   });

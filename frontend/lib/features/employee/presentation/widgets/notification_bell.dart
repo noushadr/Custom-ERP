@@ -54,9 +54,9 @@ class _OpenTask {
   final String taskId;
 }
 
-/// Tapping a persisted (Automations-created) notification marks it read and
-/// navigates per its own `linkTarget`/`linkEntityId`, rather than a fixed
-/// destination baked into a case class.
+/// Tapping a persisted notification marks it read and navigates per its own
+/// `linkTarget`/`linkEntityId`, rather than a fixed destination baked into a
+/// case class.
 class _TapAppNotification {
   const _TapAppNotification(this.notification);
   final AppNotification notification;
@@ -79,7 +79,8 @@ const _maxNoticeHistory = 5;
 /// reminders (Super Admin/HR-Manager only, recently-passed or upcoming,
 /// active employees only), company notices, requests/leave awaiting the
 /// viewer's approval, a leave-balance-reset reminder (Super Admin/HR only),
-/// persisted Reminders from the Automations module, and the viewer's own
+/// persisted Reminders (task deadlines, payroll, annual leave, performance
+/// reviews), and the viewer's own
 /// recently-decided requests/leave — grouped under
 /// category labels, with every notification's full text readable (no
 /// truncation) rather than clipped to a single ellipsized line.
@@ -212,7 +213,7 @@ class NotificationBell extends ConsumerWidget {
         .toList();
 
     // No permission guard on the backend — this is always just the viewer's
-    // own notifications (currently created only by the Automations module).
+    // own notifications.
     final appNotifications =
         ref.watch(myNotificationsProvider).valueOrNull ??
         const <AppNotification>[];

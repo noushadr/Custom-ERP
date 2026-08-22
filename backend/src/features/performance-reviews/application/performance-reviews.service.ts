@@ -9,6 +9,7 @@ import {
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
+import { RolesService } from '../../authentication/application/roles.service';
 import {
   USER_REPOSITORY,
   type UserRepository,
@@ -18,6 +19,8 @@ import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
+import { NotificationsService } from '../../notifications/application/notifications.service';
+import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { CreatePerformanceReviewCriterionDto } from './dto/create-performance-review-criterion.dto';
 import { CreatePerformanceReviewDto } from './dto/create-performance-review.dto';
 import { ReorderPerformanceReviewCriteriaDto } from './dto/reorder-performance-review-criteria.dto';
@@ -68,6 +71,8 @@ export class PerformanceReviewsService {
     private readonly employeeRepository: EmployeeRepository,
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
+    private readonly notificationsService: NotificationsService,
+    private readonly rolesService: RolesService,
   ) {}
 
   // ---- Criteria (template) management, configurable by performance.manage holders ----
@@ -155,12 +160,46 @@ export class PerformanceReviewsService {
         item.reviewYear,
         item.dueDate,
       );
-      if (review) reviews.push(review);
+      if (review) {
+        reviews.push(review);
+        await this.notifyReviewCreated(review);
+      }
     }
     return {
       created: reviews.length,
       reviews: reviews.map(toPerformanceReviewResponse),
     };
+  }
+
+  /** Notifies the employee directly (their own review to self-assess) and
+   * whoever needs to act on it — their reporting manager, or every
+   * `performance.manage` holder if they don't have one set. */
+  private async notifyReviewCreated(review: PerformanceReview): Promise<void> {
+    const employee = await this.employeeRepository.findById(
+      review.employeeId,
+    );
+    if (!employee) return;
+
+    await this.notificationsService.create({
+      recipientUserId: employee.userId,
+      message: `Your ${review.reviewYear}-year performance review has been created.`,
+      linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
+      linkEntityId: review.id,
+    });
+
+    const actionRecipients = employee.reportingManager
+      ? [{ id: employee.reportingManager.userId }]
+      : await this.rolesService.findUsersWithPermission(
+          'performance.manage',
+        );
+    for (const recipient of actionRecipients) {
+      await this.notificationsService.create({
+        recipientUserId: recipient.id,
+        message: `A ${review.reviewYear}-year performance review for ${employee.firstName} ${employee.lastName} is ready to rate.`,
+        linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
+        linkEntityId: review.id,
+      });
+    }
   }
 
   /** Real automatic creation, once daily — `runDueCheck` is idempotent, so a

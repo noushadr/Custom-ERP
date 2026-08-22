@@ -12,7 +12,6 @@ import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
 import 'features/authentication/presentation/widgets/impersonation_banner.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
-import 'features/automations/presentation/pages/automations_page.dart';
 import 'features/clients/presentation/pages/clients_projects_page.dart';
 import 'features/clients/presentation/pages/project_detail_page.dart';
 import 'features/employee/application/employee_providers.dart';
@@ -154,11 +153,6 @@ const _allDestinations = [
     selectedIcon: Icons.account_balance_wallet_outlined,
   ),
   AppNavDestination(
-    label: 'Automations',
-    icon: Icons.bolt_outlined,
-    selectedIcon: Icons.bolt_outlined,
-  ),
-  AppNavDestination(
     label: 'Payroll',
     icon: Icons.receipt_long_outlined,
     selectedIcon: Icons.receipt_long_outlined,
@@ -175,7 +169,6 @@ const _adminOnlyLabels = {
   'Clients & Projects',
   'Agency Reporting',
   'Finances',
-  'Automations',
   'Payroll',
 };
 
@@ -191,7 +184,6 @@ const _superAdminOnlyLabels = {
   'Clients & Projects',
   'Agency Reporting',
   'Finances',
-  'Automations',
   'Payroll',
 };
 
@@ -310,8 +302,6 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const AgencyReportingPage();
       case 'Finances':
         return const FinancesPage();
-      case 'Automations':
-        return const AutomationsPage();
       case 'Payroll':
         return const PayrollPage();
       default:
@@ -379,10 +369,10 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
     setState(() => _selectedIndex = index);
   }
 
-  /// Routes a persisted (Automations-created) notification's raw backend
-  /// `linkTarget`/`linkEntityId` to a concrete destination — falls back to
-  /// just switching to the relevant section when there's no specific
-  /// entity to deep-link into.
+  /// Routes a persisted notification's raw backend `linkTarget`/
+  /// `linkEntityId` to a concrete destination — falls back to just
+  /// switching to the relevant section when there's no specific entity to
+  /// deep-link into.
   void _openNotification(String? linkTarget, String? linkEntityId) {
     switch (linkTarget) {
       case 'clients_projects':
@@ -399,6 +389,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         }
       case 'leave':
         _goToDestination('Leaves');
+      case 'performance_reviews':
+        _goToDestination('Performance Reviews');
     }
   }
 

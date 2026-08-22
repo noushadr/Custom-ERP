@@ -47,8 +47,8 @@ export class UsersController {
    * password, read the temporary password back from this response, and log
    * in as Super Admin — a full privilege escalation that would defeat every
    * "Super Admin only" module in the app (Clients & Projects, Agency
-   * Reporting, Finances, Automations, Payroll). Resetting a Super Admin's
-   * password is therefore restricted to another Super Admin. */
+   * Reporting, Finances, Payroll). Resetting a Super Admin's password is
+   * therefore restricted to another Super Admin. */
   @Permissions('users.manage')
   @HttpCode(HttpStatus.OK)
   @Post(':id/reset-password')

@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import type { RolesService } from '../../authentication/application/roles.service';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
 import { Department } from '../../departments/domain/entities/department.entity';
 import type { DepartmentRepository } from '../../departments/domain/repositories/department-repository.interface';
@@ -10,6 +11,7 @@ import { Employee } from '../../employee/domain/entities/employee.entity';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
 import type { HolidaysService } from '../../holidays/application/holidays.service';
+import type { NotificationsService } from '../../notifications/application/notifications.service';
 import { LeaveBalance } from '../domain/entities/leave-balance.entity';
 import { LeaveBalanceAdjustment } from '../domain/entities/leave-balance-adjustment.entity';
 import { LeaveRequest } from '../domain/entities/leave-request.entity';
@@ -95,6 +97,8 @@ describe('LeaveService', () => {
   let userRepository: jest.Mocked<UserRepository>;
   let departmentRepository: jest.Mocked<DepartmentRepository>;
   let holidaysService: jest.Mocked<HolidaysService>;
+  let notificationsService: jest.Mocked<NotificationsService>;
+  let rolesService: jest.Mocked<RolesService>;
 
   beforeEach(() => {
     leaveTypeRepository = {
@@ -151,6 +155,12 @@ describe('LeaveService', () => {
     holidaysService = {
       getDatesInRange: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<HolidaysService>;
+    notificationsService = {
+      create: jest.fn(),
+    } as unknown as jest.Mocked<NotificationsService>;
+    rolesService = {
+      findUsersWithPermission: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<RolesService>;
 
     service = new LeaveService(
       leaveTypeRepository,
@@ -161,6 +171,8 @@ describe('LeaveService', () => {
       userRepository,
       departmentRepository,
       holidaysService,
+      notificationsService,
+      rolesService,
     );
   });
 
@@ -727,6 +739,48 @@ describe('LeaveService', () => {
 
       expect(leaveBalanceRepository.saveMany).not.toHaveBeenCalled();
       expect(result.balancesCreated).toBe(0);
+    });
+  });
+
+  describe('handleDailyAnnualResetCheck', () => {
+    it('does nothing when the year is already initialized', async () => {
+      leaveBalanceRepository.findByYear.mockResolvedValue([buildBalance()]);
+
+      await service.handleDailyAnnualResetCheck();
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('notifies every active employee directly and every leave.manage holder once the reset runs, skipping non-active employees', async () => {
+      const employeeA = buildEmployee({
+        id: 'employee-a',
+        userId: 'user-a',
+        employmentStatus: EmploymentStatus.ACTIVE,
+      });
+      const employeeB = buildEmployee({
+        id: 'employee-b',
+        userId: 'user-b',
+        employmentStatus: EmploymentStatus.RESIGNED,
+      });
+      leaveBalanceRepository.findByYear
+        .mockResolvedValueOnce([]) // getResetStatus: not yet initialized
+        .mockResolvedValueOnce([]); // inside runAnnualReset: no existing balances
+      employeeRepository.findAll.mockResolvedValue([employeeA, employeeB]);
+      leaveTypeRepository.findAll.mockResolvedValue([buildLeaveType({ id: 'type-1' })]);
+      leaveBalanceRepository.saveMany.mockImplementation((b) => Promise.resolve(b));
+      rolesService.findUsersWithPermission.mockResolvedValue([{ id: 'admin-1' } as never]);
+
+      await service.handleDailyAnnualResetCheck();
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'user-a' }),
+      );
+      expect(notificationsService.create).not.toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'user-b' }),
+      );
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'admin-1' }),
+      );
     });
   });
 });

@@ -6,7 +6,6 @@ import '../../../../shared/widgets/metric_card.dart';
 import '../../../agency_reporting/application/agency_reporting_providers.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
-import '../../../automations/application/automations_providers.dart';
 import '../../../clients/application/clients_providers.dart';
 import '../../../finances/application/finances_providers.dart';
 import '../../../notices/application/notice_providers.dart';
@@ -45,9 +44,6 @@ class AdminDashboardPage extends ConsumerWidget {
     final canViewFinances =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('finances.manage');
-    final canViewAutomations =
-        authState is AuthAuthenticated &&
-        authState.user.hasPermission('automations.manage');
     final canViewPayrollRuns =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('payroll.manage');
@@ -73,7 +69,6 @@ class AdminDashboardPage extends ConsumerWidget {
               showClients: canViewClients,
               showReports: canViewReports,
               showFinances: canViewFinances,
-              showAutomations: canViewAutomations,
               showPayrollRuns: canViewPayrollRuns,
             ),
           ),
@@ -92,7 +87,6 @@ class _DashboardStats extends ConsumerWidget {
     required this.showClients,
     required this.showReports,
     required this.showFinances,
-    required this.showAutomations,
     required this.showPayrollRuns,
   });
 
@@ -103,7 +97,6 @@ class _DashboardStats extends ConsumerWidget {
   final bool showClients;
   final bool showReports;
   final bool showFinances;
-  final bool showAutomations;
   final bool showPayrollRuns;
 
   @override
@@ -253,7 +246,6 @@ class _DashboardStats extends ConsumerWidget {
           if (showClients ||
               showReports ||
               showFinances ||
-              showAutomations ||
               showPayrollRuns) ...[
             const _SectionHeader('Admin Business Management'),
             const SizedBox(height: 10),
@@ -267,7 +259,6 @@ class _DashboardStats extends ConsumerWidget {
                 ],
                 if (showReports) const _NetProfitCard(),
                 if (showFinances) const _OutstandingInvoicesCard(),
-                if (showAutomations) const _AutomationsActiveCard(),
                 if (showPayrollRuns) const _LatestPayrollRunCard(),
               ],
             ),
@@ -471,28 +462,6 @@ class _OutstandingInvoicesCard extends ConsumerWidget {
       ),
       color: AppColors.secondary,
       icon: Icons.receipt_long_outlined,
-    );
-  }
-}
-
-/// How many of the fixed 3-automation catalog are currently active.
-class _AutomationsActiveCard extends ConsumerWidget {
-  const _AutomationsActiveCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final automationsAsync = ref.watch(automationsListProvider);
-
-    return MetricCard(
-      label: 'Automations Active',
-      value: automationsAsync.when(
-        data: (automations) =>
-            '${automations.where((a) => a.isActive).length}/${automations.length}',
-        loading: () => '…',
-        error: (_, _) => '—',
-      ),
-      color: AppColors.textSecondary,
-      icon: Icons.bolt_outlined,
     );
   }
 }

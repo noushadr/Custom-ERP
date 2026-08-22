@@ -5,7 +5,6 @@ import 'package:zera_erp/features/agency_reporting/application/agency_reporting_
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
-import 'package:zera_erp/features/automations/application/automations_providers.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
@@ -25,7 +24,6 @@ import 'package:zera_erp/shared/widgets/metric_card.dart';
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_agency_reporting.dart';
 import 'helpers/fake_auth.dart';
-import 'helpers/fake_automations.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
 import 'helpers/fake_finances.dart';
@@ -80,9 +78,6 @@ Widget _authenticatedApp({
       financesRepositoryProvider.overrideWithValue(FakeFinancesRepository()),
       notificationsRepositoryProvider.overrideWithValue(
         FakeNotificationsRepository(),
-      ),
-      automationsRepositoryProvider.overrideWithValue(
-        FakeAutomationsRepository(),
       ),
       payrollRepositoryProvider.overrideWithValue(FakePayrollRepository()),
     ],
@@ -479,55 +474,6 @@ void main() {
   );
 
   testWidgets(
-    'shows Automations in the nav for a Super Admin only',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: [],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Automations'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'hides Automations from the nav for HR/Manager',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'hr-1',
-            email: 'hr@zeracreative.com',
-            role: 'HR/Manager',
-            permissions: [],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Employees'), findsOneWidget);
-      expect(find.text('Automations'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'hides Automations from the nav for a plain employee',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(_authenticatedApp());
-      await tester.pumpAndSettle();
-
-      expect(find.text('Automations'), findsNothing);
-    },
-  );
-
-  testWidgets(
     'shows Payroll in the nav for a Super Admin only',
     (WidgetTester tester) async {
       await tester.pumpWidget(
@@ -590,7 +536,6 @@ void main() {
               'clients.manage',
               'reports.view',
               'finances.manage',
-              'automations.manage',
               'payroll.manage',
             ],
           ),
@@ -603,8 +548,6 @@ void main() {
       expect(find.text('Clients At Risk'), findsOneWidget);
       expect(find.text('Net Profit (This Month)'), findsOneWidget);
       expect(find.text('Outstanding Invoices'), findsOneWidget);
-      expect(find.text('Automations Active'), findsOneWidget);
-      expect(find.text('0/3'), findsOneWidget);
       expect(find.text('Latest Payroll Run'), findsOneWidget);
       expect(find.text('Draft'), findsOneWidget);
     },

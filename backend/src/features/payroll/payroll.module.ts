@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthenticationModule } from '../authentication/authentication.module';
 import { EmployeeModule } from '../employee/employee.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PayrollService } from './application/payroll.service';
 import { TypeOrmPayrollLineItemRepository } from './data/repositories/payroll-line-item.repository';
 import { TypeOrmPayrollRunRepository } from './data/repositories/payroll-run.repository';
@@ -16,6 +17,7 @@ import { PayrollController } from './presentation/payroll.controller';
     TypeOrmModule.forFeature([PayrollRun, PayrollLineItem]),
     AuthenticationModule,
     EmployeeModule,
+    NotificationsModule,
   ],
   controllers: [PayrollController],
   providers: [

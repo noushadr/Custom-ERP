@@ -8,7 +8,6 @@ import { validate } from './core/config/env.validation';
 import { DatabaseModule } from './core/database/database.module';
 import { AgencyReportingModule } from './features/agency-reporting/agency-reporting.module';
 import { AuthenticationModule } from './features/authentication/authentication.module';
-import { AutomationsModule } from './features/automations/automations.module';
 import { ChecklistsModule } from './features/checklists/checklists.module';
 import { ClientsModule } from './features/clients/clients.module';
 import { DepartmentsModule } from './features/departments/departments.module';
@@ -48,7 +47,6 @@ import { TasksModule } from './features/tasks/tasks.module';
     AgencyReportingModule,
     FinancesModule,
     NotificationsModule,
-    AutomationsModule,
     PayrollModule,
   ],
   controllers: [AppController],

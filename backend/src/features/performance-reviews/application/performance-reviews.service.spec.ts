@@ -7,7 +7,9 @@ import {
 import { Employee } from '../../employee/domain/entities/employee.entity';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
+import type { RolesService } from '../../authentication/application/roles.service';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
+import type { NotificationsService } from '../../notifications/application/notifications.service';
 import { PerformanceReviewCriterion } from '../domain/entities/performance-review-criterion.entity';
 import { PerformanceReviewResponse } from '../domain/entities/performance-review-response.entity';
 import { PerformanceReview } from '../domain/entities/performance-review.entity';
@@ -79,6 +81,8 @@ describe('PerformanceReviewsService', () => {
   let responseRepository: jest.Mocked<PerformanceReviewResponseRepository>;
   let employeeRepository: jest.Mocked<EmployeeRepository>;
   let userRepository: jest.Mocked<UserRepository>;
+  let notificationsService: jest.Mocked<NotificationsService>;
+  let rolesService: jest.Mocked<RolesService>;
 
   beforeEach(() => {
     criterionRepository = {
@@ -116,6 +120,12 @@ describe('PerformanceReviewsService', () => {
       findAll: jest.fn(),
       save: jest.fn(),
     };
+    notificationsService = {
+      create: jest.fn(),
+    } as unknown as jest.Mocked<NotificationsService>;
+    rolesService = {
+      findUsersWithPermission: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<RolesService>;
 
     service = new PerformanceReviewsService(
       criterionRepository,
@@ -123,6 +133,8 @@ describe('PerformanceReviewsService', () => {
       responseRepository,
       employeeRepository,
       userRepository,
+      notificationsService,
+      rolesService,
     );
   });
 
@@ -256,6 +268,63 @@ describe('PerformanceReviewsService', () => {
       const result = await service.runDueCheck();
 
       expect(result.created).toBe(0);
+    });
+
+    it('notifies the employee directly and their reporting manager when a review is created', async () => {
+      const employee = buildEmployee({
+        id: 'employee-1',
+        userId: 'user-1',
+        joiningDate: joinedYearsAgo(3),
+        reportingManagerId: 'manager-1',
+        reportingManager: buildEmployee({
+          id: 'manager-1',
+          userId: 'manager-user-1',
+        }),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+      employeeRepository.findById.mockResolvedValue(employee);
+      criterionRepository.findAll.mockResolvedValue([buildCriterion()]);
+      reviewRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildReview({ id, employeeId: 'employee-1', reviewYear: 3 })),
+      );
+
+      await service.runDueCheck();
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'user-1' }),
+      );
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'manager-user-1' }),
+      );
+      expect(rolesService.findUsersWithPermission).not.toHaveBeenCalled();
+    });
+
+    it('falls back to notifying every performance.manage holder when the employee has no reporting manager', async () => {
+      const employee = buildEmployee({
+        id: 'employee-1',
+        userId: 'user-1',
+        joiningDate: joinedYearsAgo(3),
+        reportingManagerId: undefined,
+        reportingManager: undefined,
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+      employeeRepository.findById.mockResolvedValue(employee);
+      criterionRepository.findAll.mockResolvedValue([buildCriterion()]);
+      reviewRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildReview({ id, employeeId: 'employee-1', reviewYear: 3 })),
+      );
+      rolesService.findUsersWithPermission.mockResolvedValue([
+        { id: 'hr-admin-1' } as never,
+      ]);
+
+      await service.runDueCheck();
+
+      expect(rolesService.findUsersWithPermission).toHaveBeenCalledWith(
+        'performance.manage',
+      );
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'hr-admin-1' }),
+      );
     });
   });
 

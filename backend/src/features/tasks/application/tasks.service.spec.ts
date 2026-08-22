@@ -4,6 +4,7 @@ import { Department } from '../../departments/domain/entities/department.entity'
 import type { DepartmentRepository } from '../../departments/domain/repositories/department-repository.interface';
 import { Employee } from '../../employee/domain/entities/employee.entity';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
+import type { NotificationsService } from '../../notifications/application/notifications.service';
 import { Task } from '../domain/entities/task.entity';
 import { TaskAuditLog } from '../domain/entities/task-audit-log.entity';
 import { TaskComment } from '../domain/entities/task-comment.entity';
@@ -60,6 +61,7 @@ describe('TasksService', () => {
   let employeeRepository: jest.Mocked<EmployeeRepository>;
   let departmentRepository: jest.Mocked<DepartmentRepository>;
   let userRepository: jest.Mocked<UserRepository>;
+  let notificationsService: jest.Mocked<NotificationsService>;
 
   beforeEach(() => {
     taskRepository = {
@@ -101,6 +103,9 @@ describe('TasksService', () => {
       findAll: jest.fn(),
       save: jest.fn(),
     };
+    notificationsService = {
+      create: jest.fn(),
+    } as unknown as jest.Mocked<NotificationsService>;
 
     service = new TasksService(
       taskRepository,
@@ -109,6 +114,7 @@ describe('TasksService', () => {
       employeeRepository,
       departmentRepository,
       userRepository,
+      notificationsService,
     );
   });
 
@@ -674,6 +680,51 @@ describe('TasksService', () => {
       expect(taskRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ lastDeadlineReminderSentFor: '2026-09-01' }),
       );
+    });
+  });
+
+  describe('handleDailyDeadlineReminderCheck', () => {
+    function isoDaysFromNow(days: number): string {
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    it('notifies each matching task\'s assignee directly and marks it sent, with no admin toggle involved', async () => {
+      taskRepository.findAll.mockResolvedValue([
+        buildTask({
+          id: 't1',
+          title: 'Ship the report',
+          status: TaskStatus.TODO,
+          dueDate: isoDaysFromNow(2),
+        }),
+      ]);
+      taskRepository.findById.mockResolvedValue(
+        buildTask({ id: 't1', dueDate: isoDaysFromNow(2) }),
+      );
+
+      await service.handleDailyDeadlineReminderCheck();
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientUserId: 'user-1',
+          linkTarget: 'tasks',
+          linkEntityId: 't1',
+        }),
+      );
+      expect(taskRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ lastDeadlineReminderSentFor: isoDaysFromNow(2) }),
+      );
+    });
+
+    it('does nothing when no task is due soon', async () => {
+      taskRepository.findAll.mockResolvedValue([
+        buildTask({ dueDate: isoDaysFromNow(30) }),
+      ]);
+
+      await service.handleDailyDeadlineReminderCheck();
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
     });
   });
 });

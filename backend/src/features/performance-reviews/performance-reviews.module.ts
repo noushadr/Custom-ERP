@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthenticationModule } from '../authentication/authentication.module';
 import { EmployeeModule } from '../employee/employee.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PerformanceReviewsService } from './application/performance-reviews.service';
 import { TypeOrmPerformanceReviewCriterionRepository } from './data/repositories/performance-review-criterion.repository';
 import { TypeOrmPerformanceReviewResponseRepository } from './data/repositories/performance-review-response.repository';
@@ -23,6 +24,7 @@ import { PerformanceReviewsController } from './presentation/performance-reviews
     ]),
     AuthenticationModule,
     EmployeeModule,
+    NotificationsModule,
   ],
   controllers: [PerformanceReviewsController],
   providers: [

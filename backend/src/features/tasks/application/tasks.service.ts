@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import {
@@ -18,6 +19,8 @@ import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
+import { NotificationsService } from '../../notifications/application/notifications.service';
+import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
@@ -66,6 +69,8 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
+const DEADLINE_REMINDER_DAYS_BEFORE = 7;
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -81,6 +86,7 @@ export class TasksService {
     private readonly departmentRepository: DepartmentRepository,
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // ---- Lists ----
@@ -507,11 +513,30 @@ export class TasksService {
     return task;
   }
 
+  /** Unconditional daily check — every open task's own assignee is always
+   * notified 7 days before its due date, with no admin on/off toggle.
+   * Idempotent via `lastDeadlineReminderSentFor`, so a missed tick or a late
+   * deploy never duplicates a reminder. */
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  async handleDailyDeadlineReminderCheck(): Promise<void> {
+    const matches = await this.getTasksNeedingDeadlineReminder(
+      DEADLINE_REMINDER_DAYS_BEFORE,
+    );
+    for (const task of matches) {
+      await this.notificationsService.create({
+        recipientUserId: task.assigneeUserId,
+        message: `Task "${task.title}" is due soon.`,
+        linkTarget: NotificationLinkTarget.TASKS,
+        linkEntityId: task.id,
+      });
+      await this.markDeadlineReminderSent(task.id);
+    }
+  }
+
   /** Open (not completed/cancelled) tasks whose `dueDate` falls within the
    * next `daysBefore` days and haven't already been notified for that
-   * specific date — used by the Automations module's "Task Deadline
-   * Reminder". Pair with `markDeadlineReminderSent` after notifying, so a
-   * repeated check (daily cron or a manual "Run Now") never double-sends. */
+   * specific date. Pair with `markDeadlineReminderSent` after notifying, so
+   * a repeated check never double-sends. */
   async getTasksNeedingDeadlineReminder(
     daysBefore: number,
   ): Promise<{ id: string; title: string; assigneeUserId: string }[]> {

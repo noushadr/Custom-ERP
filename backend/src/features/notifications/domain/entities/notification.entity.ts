@@ -2,10 +2,10 @@ import { Column, Entity, Index } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { NotificationLinkTarget } from '../enums/notification-link-target.enum';
 
-/** A persisted, per-user notification — the first backend piece of the
- * (currently frontend-only, live-query-aggregated) Notifications module.
- * V1 is in-app only, created exclusively by the Automations module today;
- * no email/push delivery yet. */
+/** A persisted, per-user notification, created directly by whichever
+ * feature module (tasks, leave, payroll, performance reviews) has something
+ * worth telling a user about. V1 is in-app only, no email/push delivery
+ * yet. */
 @Entity('notifications')
 export class Notification extends BaseEntity {
   @Index()

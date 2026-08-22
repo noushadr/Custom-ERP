@@ -1,6 +1,5 @@
 /// A persisted, per-user notification — named AppNotification rather than
 /// Notification to avoid clashing with Flutter's own Notification class.
-/// Currently created only by the Automations module.
 class AppNotification {
   const AppNotification({
     required this.id,

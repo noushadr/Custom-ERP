@@ -311,7 +311,7 @@ class _NavRow extends StatelessWidget {
         : railTheme.unselectedIconTheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
       child: Material(
         color: selected
             ? (railTheme.indicatorColor ?? AppColors.primarySoft)
@@ -325,7 +325,7 @@ class _NavRow extends StatelessWidget {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Row(
               children: [
                 IconTheme(

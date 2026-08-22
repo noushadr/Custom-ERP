@@ -5,7 +5,6 @@ import 'package:zera_erp/features/agency_reporting/application/agency_reporting_
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
-import 'package:zera_erp/features/automations/application/automations_providers.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/finances/application/finances_providers.dart';
@@ -21,7 +20,6 @@ import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_agency_reporting.dart';
 import 'helpers/fake_auth.dart';
-import 'helpers/fake_automations.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
 import 'helpers/fake_finances.dart';
@@ -65,9 +63,6 @@ Widget _authenticatedApp({AuthUser? user}) {
       financesRepositoryProvider.overrideWithValue(FakeFinancesRepository()),
       notificationsRepositoryProvider.overrideWithValue(
         FakeNotificationsRepository(),
-      ),
-      automationsRepositoryProvider.overrideWithValue(
-        FakeAutomationsRepository(),
       ),
       payrollRepositoryProvider.overrideWithValue(FakePayrollRepository()),
     ],
@@ -120,7 +115,6 @@ void main() {
         'clients.manage',
         'reports.view',
         'finances.manage',
-        'automations.manage',
         'payroll.manage',
       ],
     );

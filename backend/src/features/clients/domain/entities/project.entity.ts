@@ -46,17 +46,9 @@ export class Project extends BaseEntity {
   @Column({ type: 'date', nullable: true })
   endDate?: string;
 
-  /** A retainer's next renewal/billing date — the Automations module's
-   * "Project Renewal Reminder" watches this. */
+  /** A retainer's next renewal/billing date. */
   @Column({ type: 'date', nullable: true })
   renewalDate?: string;
-
-  /** Which `renewalDate` value the "Project Renewal Reminder" automation
-   * last notified for — not `renewalDate` itself, so re-running the daily
-   * check (or a manual "Run Now") never sends a duplicate reminder, while
-   * changing `renewalDate` naturally makes it eligible to fire again. */
-  @Column({ type: 'date', nullable: true })
-  lastRenewalReminderSentFor?: string | null;
 
   /** The price charged to the client — the monthly amount for a retainer,
    * the total for a one-time project. */

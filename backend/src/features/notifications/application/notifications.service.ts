@@ -26,9 +26,10 @@ export class NotificationsService {
     return notifications.map(toNotificationResponse);
   }
 
-  /** Creates a notification for one recipient — the only way any
-   * notification comes into existence today (the Automations module calls
-   * this as its "action"). */
+  /** Creates a notification for one recipient — called directly by each
+   * feature module (tasks, leave, payroll, performance reviews) at the
+   * lifecycle event it cares about, rather than through a generic
+   * admin-toggleable automation layer. */
   async create(params: {
     recipientUserId: string;
     message: string;

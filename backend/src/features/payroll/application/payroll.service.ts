@@ -16,6 +16,7 @@ import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
+import { NotificationsService } from '../../notifications/application/notifications.service';
 import { GeneratePayrollRunDto } from './dto/generate-payroll-run.dto';
 import { UpdatePayrollLineItemDto } from './dto/update-payroll-line-item.dto';
 import { PayrollLineItem } from '../domain/entities/payroll-line-item.entity';
@@ -42,6 +43,11 @@ function endOfMonthIso(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 }
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
 @Injectable()
 export class PayrollService {
   constructor(
@@ -54,6 +60,7 @@ export class PayrollService {
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
     private readonly employeesService: EmployeesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async getRuns(): Promise<PayrollRunSummaryDto[]> {
@@ -216,11 +223,16 @@ export class PayrollService {
     );
     run.paidAt = new Date();
     const saved = await this.runRepository.save(run);
+    const lineItems = await this.lineItemRepository.findByRunId(saved.id);
 
-    return toPayrollRunSummary(
-      saved,
-      await this.lineItemRepository.findByRunId(saved.id),
-    );
+    for (const item of lineItems) {
+      await this.notificationsService.create({
+        recipientUserId: item.employee.userId,
+        message: `Your payroll for ${MONTH_NAMES[saved.month - 1]} ${saved.year} has been paid.`,
+      });
+    }
+
+    return toPayrollRunSummary(saved, lineItems);
   }
 
   private async getRunOrThrow(id: string): Promise<PayrollRun> {
