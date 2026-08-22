@@ -15,10 +15,13 @@ import '../widgets/performance_review_status_badge.dart';
 
 /// Shows one employee's performance review for one year of service: the
 /// manager/HR-filled ratings and feedback per criterion, the employee's
-/// optional self-assessment, and the complete/finalize workflow actions —
-/// gated per viewer role, resolved from who the caller actually is relative
-/// to this specific review (self / their reporting manager / HR-Admin),
-/// mirroring how the backend enforces the same checks server-side.
+/// optional self-assessment, and the complete/finalize/unfinalize workflow
+/// actions — gated per viewer role, resolved from who the caller actually
+/// is relative to this specific review (self / their reporting manager /
+/// HR-Admin), mirroring how the backend enforces the same checks
+/// server-side. Unfinalize (HR/Admin only, same as Finalize) reverts a
+/// finalized review back to Completed so a mistake can be fixed and it can
+/// be finalized again.
 class PerformanceReviewDetailPage extends ConsumerWidget {
   const PerformanceReviewDetailPage({super.key, required this.reviewId});
 
@@ -192,6 +195,23 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
     }
   }
 
+  Future<void> _unfinalize() async {
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+    try {
+      await ref
+          .read(performanceReviewRepositoryProvider)
+          .unfinalizeReview(widget.review.id);
+      _invalidate();
+    } on PerformanceReviewException catch (error) {
+      setState(() => _errorMessage = error.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final review = widget.review;
@@ -208,6 +228,7 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
         (widget.hasOverride ||
             (review.status == 'pending' && !widget.isSelf));
     final canFinalize = widget.hasOverride && review.status == 'completed';
+    final canUnfinalize = widget.hasOverride && isFinalized;
     final canEditSelfAssessment = widget.isSelf && !isFinalized;
 
     return SingleChildScrollView(
@@ -342,6 +363,17 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
                     backgroundColor: AppColors.success,
                   ),
                   child: const Text('Finalize'),
+                ),
+              ],
+              if (canUnfinalize) ...[
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: _saving ? null : _unfinalize,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.warning,
+                    side: const BorderSide(color: AppColors.warning),
+                  ),
+                  child: const Text('Unfinalize'),
                 ),
               ],
             ],

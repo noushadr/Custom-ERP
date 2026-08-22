@@ -7,10 +7,9 @@ import { UpdateClientDto } from '../application/dto/update-client.dto';
 import { UpdateClientHealthDto } from '../application/dto/update-client-health.dto';
 import { ClientsService } from '../application/clients.service';
 
-/** The entire module is Super-Admin-only by default: `clients.manage` is
- * granted only to Super Admin at seed time (see seed.ts) — no self-service
- * tier, unlike Tasks/Performance Reviews, since this whole module is meant
- * to be admin-only end to end. */
+/** Admin Business Management tier: `clients.manage` is granted to Super
+ * Admin and HR/Manager at seed time (see seed.ts) — no self-service tier
+ * for plain employees, unlike Tasks/Performance Reviews. */
 @Controller('clients')
 @Permissions('clients.manage')
 export class ClientsController {

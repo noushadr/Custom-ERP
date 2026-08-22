@@ -325,7 +325,7 @@ void main() {
   );
 
   testWidgets(
-    'shows Clients & Projects in the nav for a Super Admin only',
+    'shows Clients & Projects in the nav for a Super Admin',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         _authenticatedApp(
@@ -344,7 +344,7 @@ void main() {
   );
 
   testWidgets(
-    'hides Clients & Projects from the nav for HR/Manager',
+    'shows Clients & Projects in the nav for HR/Manager too',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         _authenticatedApp(
@@ -358,10 +358,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // HR/Manager still sees the other admin-tier destinations, just not
-      // this Super-Admin-only one.
+      // HR/Manager shares Clients & Projects with Super Admin, unlike
+      // Agency Reporting/Finances which stay Super-Admin-only.
       expect(find.text('Employees'), findsOneWidget);
-      expect(find.text('Clients & Projects'), findsNothing);
+      expect(find.text('Clients & Projects'), findsOneWidget);
     },
   );
 
@@ -474,7 +474,7 @@ void main() {
   );
 
   testWidgets(
-    'shows Payroll in the nav for a Super Admin only',
+    'shows Payroll in the nav for a Super Admin',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         _authenticatedApp(
@@ -493,7 +493,7 @@ void main() {
   );
 
   testWidgets(
-    'hides Payroll from the nav for HR/Manager',
+    'shows Payroll in the nav for HR/Manager too',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         _authenticatedApp(
@@ -508,7 +508,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Employees'), findsOneWidget);
-      expect(find.text('Payroll'), findsNothing);
+      expect(find.text('Payroll'), findsOneWidget);
     },
   );
 

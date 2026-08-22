@@ -170,6 +170,12 @@ export class PerformanceReviewsController {
     return this.performanceReviewsService.finalizeReview(id, user.sub);
   }
 
+  @Patch(':id/unfinalize')
+  @Permissions(PERMISSION)
+  unfinalizeReview(@Param('id') id: string) {
+    return this.performanceReviewsService.unfinalizeReview(id);
+  }
+
   @Patch(':id')
   @Permissions(PERMISSION)
   adminUpdateReview(

@@ -116,6 +116,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
     this.completeReviewError,
     this.setSelfAssessmentError,
     this.finalizeReviewError,
+    this.unfinalizeReviewError,
     this.adminUpdateReviewError,
   });
 
@@ -139,6 +140,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   final Object? completeReviewError;
   final Object? setSelfAssessmentError;
   final Object? finalizeReviewError;
+  final Object? unfinalizeReviewError;
   final Object? adminUpdateReviewError;
 
   List<String>? lastReorderedIds;
@@ -148,6 +150,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   String? lastSelfAssessmentReviewId;
   String? lastSelfAssessmentComments;
   String? lastFinalizedReviewId;
+  String? lastUnfinalizedReviewId;
 
   @override
   Future<List<PerformanceReviewCriterion>> getCriteria({
@@ -271,6 +274,13 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
     lastFinalizedReviewId = id;
     if (finalizeReviewError != null) throw finalizeReviewError!;
     return reviewById ?? buildTestPerformanceReview(id: id, status: 'finalized');
+  }
+
+  @override
+  Future<PerformanceReview> unfinalizeReview(String id) async {
+    lastUnfinalizedReviewId = id;
+    if (unfinalizeReviewError != null) throw unfinalizeReviewError!;
+    return reviewById ?? buildTestPerformanceReview(id: id, status: 'completed');
   }
 
   @override

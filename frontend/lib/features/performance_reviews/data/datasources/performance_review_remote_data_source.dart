@@ -198,6 +198,13 @@ class PerformanceReviewRemoteDataSource {
     return PerformanceReviewModel.fromJson(response.data!);
   }
 
+  Future<PerformanceReviewModel> unfinalizeReview(String id) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/performance-reviews/$id/unfinalize',
+    );
+    return PerformanceReviewModel.fromJson(response.data!);
+  }
+
   Future<PerformanceReviewModel> adminUpdateReview(
     String id, {
     String? employeeComments,

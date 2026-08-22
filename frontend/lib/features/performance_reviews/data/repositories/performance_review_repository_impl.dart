@@ -121,6 +121,10 @@ class PerformanceReviewRepositoryImpl implements PerformanceReviewRepository {
       _guard(() => _remoteDataSource.finalizeReview(id));
 
   @override
+  Future<PerformanceReview> unfinalizeReview(String id) =>
+      _guard(() => _remoteDataSource.unfinalizeReview(id));
+
+  @override
   Future<PerformanceReview> adminUpdateReview(
     String id, {
     String? employeeComments,

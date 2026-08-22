@@ -527,6 +527,26 @@ export class PerformanceReviewsService {
     return toPerformanceReviewResponse(await this.getReviewById(id));
   }
 
+  /** Reverts a finalized review back to Completed so HR/Admin can fix a
+   * mistake and finalize it again — same `performance.manage` gate as
+   * `finalizeReview` itself, not open to a review's own reporting manager.
+   * Clears the finalized-by/at fields rather than leaving them stale, since
+   * the review is no longer finalized; `finalizeReview` sets them fresh
+   * again whenever it's re-finalized. */
+  async unfinalizeReview(id: string): Promise<PerformanceReviewResponseDto> {
+    const review = await this.getReviewById(id);
+    if (review.status !== PerformanceReviewStatus.FINALIZED) {
+      throw new BadRequestException('This review has not been finalized');
+    }
+
+    review.status = PerformanceReviewStatus.COMPLETED;
+    review.finalizedByUserId = null;
+    review.finalizedByName = null;
+    review.finalizedAt = null;
+    await this.reviewRepository.save(review);
+    return toPerformanceReviewResponse(await this.getReviewById(id));
+  }
+
   async adminUpdateReview(
     id: string,
     dto: UpdatePerformanceReviewDto,

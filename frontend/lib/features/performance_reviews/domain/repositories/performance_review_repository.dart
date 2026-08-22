@@ -84,6 +84,10 @@ abstract interface class PerformanceReviewRepository {
   /// Requires `performance.manage`.
   Future<PerformanceReview> finalizeReview(String id);
 
+  /// Reverts a finalized review back to completed so it can be edited and
+  /// finalized again. Requires `performance.manage`.
+  Future<PerformanceReview> unfinalizeReview(String id);
+
   /// Requires `performance.manage`. Edits responses/comments regardless of
   /// status.
   Future<PerformanceReview> adminUpdateReview(

@@ -17,10 +17,11 @@ import 'project_detail_page.dart';
 import 'project_editor_page.dart';
 
 /// The Admin Business Management "Clients & Projects" module's root page —
-/// Super-Admin-only: gated by nav visibility in main.dart, by
-/// `clients.manage` on every backend route this page calls, and by its own
-/// `hasPermission` check at the top of `build()` (see `AccessDeniedView`).
-/// A stats row up top, then Projects (default) / Clients tabs.
+/// shared by Super Admin and HR/Manager: gated by nav visibility in
+/// main.dart, by `clients.manage` on every backend route this page calls,
+/// and by its own `hasPermission` check at the top of `build()` (see
+/// `AccessDeniedView`). A stats row up top, then Projects (default) /
+/// Clients tabs.
 class ClientsProjectsPage extends ConsumerWidget {
   const ClientsProjectsPage({super.key});
 

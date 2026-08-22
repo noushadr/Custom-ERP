@@ -35,12 +35,13 @@ const DEFAULT_PERMISSIONS = [
   'payroll.manage',
 ];
 
-// 'clients.manage', 'reports.view', 'finances.manage', and 'payroll.manage'
-// (Admin Business Management: Clients & Projects / Client Health / Agency
-// Reporting / Finances / Payroll) are deliberately absent from every role
-// below except Super Admin's implicit "every known permission"
-// grant — Employees, Team Leads, and HR/Manager must not see or touch these
-// modules at all.
+// 'reports.view' and 'finances.manage' (Agency Reporting / Finances) are
+// deliberately absent from every role below except Super Admin's implicit
+// "every known permission" grant — Employees, Team Leads, and HR/Manager
+// must not see or touch these two modules at all. 'clients.manage' and
+// 'payroll.manage' (Clients & Projects / Client Health / Payroll) are the
+// deliberate exception — HR/Manager shares those with Super Admin, unlike
+// the rest of Admin Business Management.
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
   { name: 'Super Admin', permissions: [] }, // always granted every known permission, see below
   {
@@ -55,6 +56,8 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'performance.manage',
       'knowledge_base.manage',
       'tasks.manage',
+      'clients.manage',
+      'payroll.manage',
     ],
   },
   { name: 'Team Lead', permissions: ['employees.read', 'knowledge_base.manage'] },

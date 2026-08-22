@@ -6,9 +6,9 @@ import '../../application/clients_providers.dart';
 import '../../domain/entities/service.dart';
 import '../../domain/exceptions/client_exception.dart';
 
-/// Lets Super Admin configure the catalog of services that projects can be
-/// tagged with. Requires `clients.manage`. Modeled on LeaveSettingsPage's
-/// list/create/edit/archive pattern.
+/// Lets Super Admin/HR-Manager configure the catalog of services that
+/// projects can be tagged with. Requires `clients.manage`. Modeled on
+/// LeaveSettingsPage's list/create/edit/archive pattern.
 class ServicesSettingsPage extends ConsumerStatefulWidget {
   const ServicesSettingsPage({super.key});
 

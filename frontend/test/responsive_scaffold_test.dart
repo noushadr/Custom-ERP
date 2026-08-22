@@ -135,7 +135,7 @@ void main() {
             .getTopLeft(
               find.descendant(
                 of: navRail,
-                matching: find.text('Clients & Projects'),
+                matching: find.text('Agency Reporting'),
               ),
             )
             .dy;
@@ -227,7 +227,7 @@ void main() {
         await tester.pumpAndSettle();
 
         final navRail = find.byKey(const Key('navRail'));
-        // Start on an admin-only destination, then switch to a general one,
+        // Start on one general-group destination, then switch to another,
         // to exercise both halves of the selectedIndex round-trip.
         await tester.tap(
           find.descendant(of: navRail, matching: find.text('Payroll')),

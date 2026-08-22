@@ -11,8 +11,9 @@ import '../../domain/exceptions/payroll_exception.dart';
 import '../widgets/payroll_run_status_badge.dart';
 import 'payroll_run_detail_page.dart';
 
-/// List of every generated payroll run — Super-Admin-only (gated by nav
-/// visibility in main.dart, and by `payroll.manage` on the backend routes).
+/// List of every generated payroll run — shared by Super Admin and
+/// HR/Manager (gated by nav visibility in main.dart, and by
+/// `payroll.manage` on the backend routes).
 class PayrollPage extends ConsumerWidget {
   const PayrollPage({super.key});
 

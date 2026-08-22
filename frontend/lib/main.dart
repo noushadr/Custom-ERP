@@ -176,15 +176,14 @@ const _adminOnlyLabels = {
 // Visible to everyone else.
 const _nonAdminOnlyLabels = {'User Dashboard'};
 
-// Stricter than _adminOnlyLabels: these Admin Business Management modules
-// are Super Admin only — Employees, Team Leads, and HR/Manager must not even
-// see the nav entry, unlike every other admin-tier feature (which HR/Manager
-// shares with Super Admin).
+// Stricter than _adminOnlyLabels: these two Admin Business Management
+// modules are Super Admin only — Employees, Team Leads, and HR/Manager must
+// not even see the nav entry. Clients & Projects and Payroll are a
+// deliberate exception within Admin Business Management — HR/Manager shares
+// those two with Super Admin, so they're intentionally absent from this set.
 const _superAdminOnlyLabels = {
-  'Clients & Projects',
   'Agency Reporting',
   'Finances',
-  'Payroll',
 };
 
 bool _isAdminOrHr(WidgetRef ref) {

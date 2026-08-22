@@ -151,6 +151,32 @@ void main() {
     expect(repository.lastFinalizedReviewId, 'review-1');
   });
 
+  testWidgets('HR/Admin can unfinalize a finalized review', (tester) async {
+    final review = buildTestPerformanceReview(
+      status: 'finalized',
+      finalizedByName: 'HR Person',
+    );
+    final repository = FakePerformanceReviewRepository(reviewById: review);
+
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        viewerProfile: buildTestEmployee(id: 'hr-1'),
+        performanceReviewRepository: repository,
+        permissions: const ['performance.manage'],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unfinalize'), findsOneWidget);
+    expect(find.text('Finalize'), findsNothing);
+
+    await tester.tap(find.text('Unfinalize'));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUnfinalizedReviewId, 'review-1');
+  });
+
   testWidgets('a finalized review shows no action buttons', (tester) async {
     final review = buildTestPerformanceReview(
       employeeId: 'employee-1',

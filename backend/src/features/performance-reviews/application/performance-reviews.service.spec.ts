@@ -561,4 +561,38 @@ describe('PerformanceReviewsService', () => {
       expect(result.finalizedByName).toBe('HR Person');
     });
   });
+
+  describe('unfinalizeReview', () => {
+    it('requires the review to already be finalized', async () => {
+      const review = buildReview({ status: PerformanceReviewStatus.COMPLETED });
+      reviewRepository.findById.mockResolvedValue(review);
+
+      await expect(
+        service.unfinalizeReview(review.id),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('reverts a finalized review to completed and clears the finalized-by fields', async () => {
+      const review = buildReview({
+        status: PerformanceReviewStatus.FINALIZED,
+        finalizedByUserId: 'hr-user-1',
+        finalizedByName: 'HR Person',
+        finalizedAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
+      reviewRepository.findById.mockResolvedValue(review);
+
+      const result = await service.unfinalizeReview(review.id);
+
+      expect(result.status).toBe(PerformanceReviewStatus.COMPLETED);
+      expect(result.finalizedByName).toBeNull();
+      expect(result.finalizedAt).toBeNull();
+      expect(reviewRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          finalizedByUserId: null,
+          finalizedByName: null,
+          finalizedAt: null,
+        }),
+      );
+    });
+  });
 });

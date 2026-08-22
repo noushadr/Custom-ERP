@@ -6,8 +6,8 @@ import { GeneratePayrollRunDto } from '../application/dto/generate-payroll-run.d
 import { UpdatePayrollLineItemDto } from '../application/dto/update-payroll-line-item.dto';
 import { PayrollService } from '../application/payroll.service';
 
-/** Super-Admin-only, like every Admin Business Management module —
- * `payroll.manage` is granted only to Super Admin at seed time. */
+/** Admin Business Management tier: `payroll.manage` is granted to Super
+ * Admin and HR/Manager at seed time. */
 @Controller('payroll')
 @Permissions('payroll.manage')
 export class PayrollController {

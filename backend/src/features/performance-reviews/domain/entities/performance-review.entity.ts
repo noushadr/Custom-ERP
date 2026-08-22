@@ -52,12 +52,15 @@ export class PerformanceReview extends BaseEntity {
   @Column({ type: 'boolean', nullable: true })
   completedAsManager?: boolean;
 
-  @Column({ nullable: true })
-  finalizedByUserId?: string;
+  /** Cleared back to null by `unfinalizeReview` — a `| null` union (not just
+   * optional) so TypeORM's `save()` actually nulls the column out, rather
+   * than leaving stale finalizer info once a review is un-finalized. */
+  @Column({ type: 'varchar', nullable: true })
+  finalizedByUserId?: string | null;
 
-  @Column({ nullable: true })
-  finalizedByName?: string;
+  @Column({ type: 'varchar', nullable: true })
+  finalizedByName?: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })
-  finalizedAt?: Date;
+  finalizedAt?: Date | null;
 }
