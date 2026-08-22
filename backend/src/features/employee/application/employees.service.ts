@@ -357,6 +357,26 @@ export class EmployeesService {
     };
   }
 
+  /** The salary in effect as of [asOfIsoDate] — the latest record whose
+   * `effectiveDate` is on or before it (records are chronological, so this
+   * is the last one that qualifies) — 0 if the employee has no salary
+   * records yet, or none had taken effect by that date. Plain string
+   * comparison is safe here since `effectiveDate` is already 'YYYY-MM-DD'.
+   * Used by Payroll to compute a run's baseSalary for a specific month. */
+  async getSalaryAsOf(
+    employeeId: string,
+    asOfIsoDate: string,
+  ): Promise<number> {
+    const records = await this.salaryRecordRepository.findByEmployeeId(
+      employeeId,
+    );
+    const eligible = records.filter(
+      (record) => record.effectiveDate <= asOfIsoDate,
+    );
+    const latest = eligible[eligible.length - 1];
+    return latest ? Number(latest.amount) : 0;
+  }
+
   async findById(id: string, viewer: JwtPayload): Promise<EmployeeResponse> {
     const employee = await this.employeeRepository.findById(id);
     if (!employee) throw new NotFoundException('Employee not found');

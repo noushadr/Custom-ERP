@@ -944,6 +944,38 @@ describe('EmployeesService', () => {
     });
   });
 
+  describe('getSalaryAsOf', () => {
+    it('returns the latest record whose effectiveDate is on or before the given date', async () => {
+      salaryRecordRepository.findByEmployeeId.mockResolvedValue([
+        buildSalaryRecord({ amount: '40000.00', effectiveDate: '2025-01-01' }),
+        buildSalaryRecord({ amount: '50000.00', effectiveDate: '2026-01-01' }),
+        buildSalaryRecord({ amount: '60000.00', effectiveDate: '2026-12-01' }),
+      ]);
+
+      const result = await service.getSalaryAsOf('employee-1', '2026-08-31');
+
+      expect(result).toBe(50000);
+    });
+
+    it('returns 0 when no record has taken effect by that date', async () => {
+      salaryRecordRepository.findByEmployeeId.mockResolvedValue([
+        buildSalaryRecord({ amount: '50000.00', effectiveDate: '2027-01-01' }),
+      ]);
+
+      const result = await service.getSalaryAsOf('employee-1', '2026-08-31');
+
+      expect(result).toBe(0);
+    });
+
+    it('returns 0 for an employee with no salary records at all', async () => {
+      salaryRecordRepository.findByEmployeeId.mockResolvedValue([]);
+
+      const result = await service.getSalaryAsOf('employee-1', '2026-08-31');
+
+      expect(result).toBe(0);
+    });
+  });
+
   describe('updateSelf', () => {
     it('throws NotFoundException when the caller has no employee profile', async () => {
       employeeRepository.findByUserId.mockResolvedValue(null);

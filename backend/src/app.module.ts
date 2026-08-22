@@ -19,6 +19,7 @@ import { KnowledgeBaseModule } from './features/knowledge-base/knowledge-base.mo
 import { LeaveModule } from './features/leave/leave.module';
 import { NoticesModule } from './features/notices/notices.module';
 import { NotificationsModule } from './features/notifications/notifications.module';
+import { PayrollModule } from './features/payroll/payroll.module';
 import { PerformanceReviewsModule } from './features/performance-reviews/performance-reviews.module';
 import { RequestsModule } from './features/requests/requests.module';
 import { TasksModule } from './features/tasks/tasks.module';
@@ -48,6 +49,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     FinancesModule,
     NotificationsModule,
     AutomationsModule,
+    PayrollModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -24,6 +24,7 @@ import 'features/employee/presentation/widgets/notification_bell.dart';
 import 'features/finances/presentation/pages/finances_page.dart';
 import 'features/knowledge_base/presentation/pages/knowledge_base_page.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
+import 'features/payroll/presentation/pages/payroll_page.dart';
 import 'features/performance_reviews/presentation/pages/performance_review_detail_page.dart';
 import 'features/performance_reviews/presentation/pages/performance_reviews_page.dart';
 import 'features/requests/application/request_providers.dart';
@@ -157,6 +158,11 @@ const _allDestinations = [
     icon: Icons.bolt_outlined,
     selectedIcon: Icons.bolt_outlined,
   ),
+  AppNavDestination(
+    label: 'Payroll',
+    icon: Icons.receipt_long_outlined,
+    selectedIcon: Icons.receipt_long_outlined,
+  ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
@@ -170,6 +176,7 @@ const _adminOnlyLabels = {
   'Agency Reporting',
   'Finances',
   'Automations',
+  'Payroll',
 };
 
 // Hidden from Super Admin/HR/Manager — they use Admin Dashboard instead.
@@ -185,6 +192,7 @@ const _superAdminOnlyLabels = {
   'Agency Reporting',
   'Finances',
   'Automations',
+  'Payroll',
 };
 
 bool _isAdminOrHr(WidgetRef ref) {
@@ -304,6 +312,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const FinancesPage();
       case 'Automations':
         return const AutomationsPage();
+      case 'Payroll':
+        return const PayrollPage();
       default:
         return _ComingSoon(destination: destination);
     }

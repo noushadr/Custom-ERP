@@ -15,6 +15,7 @@ import 'package:zera_erp/features/knowledge_base/application/knowledge_base_prov
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notifications/application/notifications_providers.dart';
+import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
 import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
@@ -32,6 +33,7 @@ import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leave.dart';
 import 'helpers/fake_notice.dart';
 import 'helpers/fake_notifications.dart';
+import 'helpers/fake_payroll.dart';
 import 'helpers/fake_performance_review.dart';
 import 'helpers/fake_request.dart';
 import 'helpers/fake_task.dart';
@@ -82,6 +84,7 @@ Widget _authenticatedApp({
       automationsRepositoryProvider.overrideWithValue(
         FakeAutomationsRepository(),
       ),
+      payrollRepositoryProvider.overrideWithValue(FakePayrollRepository()),
     ],
     child: const ZeraApp(),
   );
@@ -209,7 +212,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Payroll'), findsOneWidget);
+      // Not asserting on bare 'Payroll' here — the Admin Business
+      // Management "Payroll" nav item (Module 6) also renders that exact
+      // text for this Super Admin, so it's no longer unique to this
+      // dashboard section's own heading.
       expect(find.text('Monthly Payroll'), findsOneWidget);
       expect(find.text('PKR 250,000'), findsOneWidget);
       expect(find.text('≈ \$899'), findsOneWidget);
@@ -234,7 +240,6 @@ void main() {
       await tester.pumpWidget(_authenticatedApp(user: admin));
       await tester.pumpAndSettle();
 
-      expect(find.text('Payroll'), findsNothing);
       expect(find.text('Monthly Payroll'), findsNothing);
     },
   );
@@ -519,6 +524,55 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Automations'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'shows Payroll in the nav for a Super Admin only',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: const AuthUser(
+            id: 'admin-1',
+            email: 'admin@zeracreative.com',
+            role: 'Super Admin',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payroll'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'hides Payroll from the nav for HR/Manager',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: const AuthUser(
+            id: 'hr-1',
+            email: 'hr@zeracreative.com',
+            role: 'HR/Manager',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Employees'), findsOneWidget);
+      expect(find.text('Payroll'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'hides Payroll from the nav for a plain employee',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(_authenticatedApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payroll'), findsNothing);
     },
   );
 

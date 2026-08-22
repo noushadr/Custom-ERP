@@ -16,6 +16,7 @@ import 'package:zera_erp/features/knowledge_base/application/knowledge_base_prov
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notifications/application/notifications_providers.dart';
+import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
 import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
@@ -31,6 +32,7 @@ import '../../helpers/fake_knowledge_base.dart';
 import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
 import '../../helpers/fake_notifications.dart';
+import '../../helpers/fake_payroll.dart';
 import '../../helpers/fake_performance_review.dart';
 import '../../helpers/fake_request.dart';
 import '../../helpers/fake_task.dart';
@@ -74,6 +76,7 @@ Widget _appWith(FakeAuthRepository repository) {
       automationsRepositoryProvider.overrideWithValue(
         FakeAutomationsRepository(),
       ),
+      payrollRepositoryProvider.overrideWithValue(FakePayrollRepository()),
     ],
     child: const ZeraApp(),
   );
