@@ -262,34 +262,16 @@ class _SummaryBody extends StatelessWidget {
           runSpacing: 10,
           children: [
             _StatTile(
-              label: 'Gross Revenue',
-              value: 'PKR ${formatWholeAmount(summary.grossRevenue)}',
-              color: AppColors.primary,
-              icon: Icons.payments_outlined,
-            ),
-            _StatTile(
               label: 'Deductions',
               value: 'PKR ${formatWholeAmount(summary.deductions)}',
               color: AppColors.warning,
               icon: Icons.remove_circle_outline,
             ),
             _StatTile(
-              label: 'Project Costs',
-              value: 'PKR ${formatWholeAmount(summary.projectCosts)}',
-              color: AppColors.warning,
-              icon: Icons.money_off_outlined,
-            ),
-            _StatTile(
               label: 'Total Expenses',
               value: 'PKR ${formatWholeAmount(summary.totalExpenses)}',
               color: AppColors.error,
               icon: Icons.receipt_long_outlined,
-            ),
-            _StatTile(
-              label: 'Net Profit',
-              value: 'PKR ${formatWholeAmount(summary.netProfit)}',
-              color: AppColors.success,
-              icon: Icons.trending_up,
             ),
             _StatTile(
               label: 'Current Monthly Payroll',

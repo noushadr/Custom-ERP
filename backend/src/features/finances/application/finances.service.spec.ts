@@ -126,7 +126,7 @@ describe('FinancesService', () => {
   });
 
   describe('getFinancialSummary', () => {
-    it('computes gross revenue, deductions, project costs, and net profit for the range', async () => {
+    it('computes deductions and total expenses for the range', async () => {
       clientsService.getProjects.mockResolvedValue([
         buildProject({
           id: 'p1',
@@ -142,11 +142,8 @@ describe('FinancesService', () => {
 
       const summary = await service.getFinancialSummary('2026-03-01', '2026-03-31');
 
-      expect(summary.grossRevenue).toBe(800);
       expect(summary.deductions).toBe(200);
-      expect(summary.projectCosts).toBe(100);
       expect(summary.totalExpenses).toBe(50);
-      expect(summary.netProfit).toBe(650); // 800 - 100 - 50
     });
 
     it('groups expenses by category', async () => {
@@ -162,15 +159,25 @@ describe('FinancesService', () => {
       expect(summary.expensesByCategory[ExpenseCategory.TAXES]).toBe(75);
     });
 
-    it('excludes projects starting outside the range from revenue/costs', async () => {
+    it('excludes projects starting outside the range from deductions', async () => {
       clientsService.getProjects.mockResolvedValue([
-        buildProject({ id: 'p1', startDate: '2026-03-10', netPrice: 800 }),
-        buildProject({ id: 'p2', startDate: '2026-01-01', netPrice: 9999 }),
+        buildProject({
+          id: 'p1',
+          startDate: '2026-03-10',
+          originalClientPrice: 1000,
+          netPrice: 800,
+        }),
+        buildProject({
+          id: 'p2',
+          startDate: '2026-01-01',
+          originalClientPrice: 20000,
+          netPrice: 9999,
+        }),
       ]);
 
       const summary = await service.getFinancialSummary('2026-03-01', '2026-03-31');
 
-      expect(summary.grossRevenue).toBe(800);
+      expect(summary.deductions).toBe(200);
     });
 
     it('reports current monthly payroll as a live snapshot', async () => {

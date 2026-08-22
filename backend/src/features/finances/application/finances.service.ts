@@ -78,13 +78,9 @@ export class FinancesService {
     const projects = await this.clientsService.getProjects({});
     const projectsInRange = this.filterInRange(projects, resolvedFrom, resolvedTo, (p) => p.startDate);
 
-    let grossRevenue = 0;
     let deductions = 0;
-    let projectCosts = 0;
     for (const project of projectsInRange) {
-      grossRevenue += project.netPrice;
       deductions += project.originalClientPrice - project.netPrice;
-      projectCosts += project.cost;
     }
 
     const allExpenses = await this.expenseRepository.findAll();
@@ -96,8 +92,6 @@ export class FinancesService {
       totalExpenses += amount;
       expensesByCategory[expense.category] = (expensesByCategory[expense.category] ?? 0) + amount;
     }
-
-    const netProfit = grossRevenue - projectCosts - totalExpenses;
 
     const payrollSummary = await this.employeesService.getPayrollSummary();
 
@@ -115,12 +109,9 @@ export class FinancesService {
     return {
       from: resolvedFrom,
       to: resolvedTo,
-      grossRevenue,
       deductions,
-      projectCosts,
       totalExpenses,
       expensesByCategory,
-      netProfit,
       currentMonthlyPayroll: payrollSummary.totalMonthlyPayroll,
       outstandingInvoicesTotal,
       outstandingInvoicesCount,

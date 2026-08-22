@@ -215,7 +215,7 @@ void main() {
 
         expect(find.text('Payroll Runs'), findsNothing);
         expect(find.text('Generate Payroll'), findsNothing);
-        expect(find.text('Gross Revenue'), findsOneWidget);
+        expect(find.text('Deductions'), findsOneWidget);
       },
     );
 

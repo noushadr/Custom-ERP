@@ -38,11 +38,8 @@ void main() {
       _app(
         repository: FakeFinancesRepository(
           summary: buildTestFinancialSummary(
-            grossRevenue: 100000,
             deductions: 20000,
-            projectCosts: 15000,
             totalExpenses: 5000,
-            netProfit: 60000,
             currentMonthlyPayroll: 30000,
             outstandingInvoicesTotal: 8000,
             outstandingInvoicesCount: 2,
@@ -52,15 +49,29 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Gross Revenue'), findsOneWidget);
-    expect(find.text('PKR 100,000'), findsOneWidget);
-    expect(find.text('Net Profit'), findsOneWidget);
-    expect(find.text('PKR 60,000'), findsOneWidget);
+    expect(find.text('Deductions'), findsOneWidget);
+    expect(find.text('PKR 20,000'), findsOneWidget);
+    expect(find.text('Total Expenses'), findsOneWidget);
+    expect(find.text('PKR 5,000'), findsOneWidget);
     expect(find.text('Current Monthly Payroll'), findsOneWidget);
     expect(find.text('PKR 30,000'), findsOneWidget);
     expect(find.text('Outstanding Invoices'), findsOneWidget);
     expect(find.text('2 project(s)'), findsOneWidget);
   });
+
+  testWidgets(
+    'does not duplicate Agency Reporting\'s revenue/cost/profit stats',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(repository: FakeFinancesRepository(summary: buildTestFinancialSummary())),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Gross Revenue'), findsNothing);
+      expect(find.text('Project Costs'), findsNothing);
+      expect(find.text('Net Profit'), findsNothing);
+    },
+  );
 
   testWidgets('shows the expenses-by-category breakdown', (tester) async {
     await tester.pumpWidget(
@@ -224,7 +235,7 @@ void main() {
         find.text("You don't have permission to view this page."),
         findsOneWidget,
       );
-      expect(find.text('Gross Revenue'), findsNothing);
+      expect(find.text('Deductions'), findsNothing);
       expect(repository.getSummaryCallCount, 0);
     },
   );
