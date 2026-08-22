@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
@@ -12,8 +11,6 @@ import '../../../tasks/presentation/pages/task_editor_page.dart';
 import '../../../tasks/presentation/widgets/task_badges.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/project.dart';
-import '../../domain/entities/project_payment_status.dart';
-import '../../domain/exceptions/client_exception.dart';
 import '../widgets/project_badges.dart';
 import 'project_editor_page.dart';
 
@@ -124,66 +121,6 @@ class _ProjectDetailBody extends ConsumerWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          FormSection(
-            title: 'Pricing',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _PriceLine(
-                  label: 'Original client price',
-                  value: project.originalClientPrice,
-                ),
-                _PriceLine(
-                  label: 'Deduction (${project.deductionRate.toStringAsFixed(0)}%)',
-                  value: project.originalClientPrice - project.netPrice,
-                  isDeduction: true,
-                ),
-                _PriceLine(label: 'Net price', value: project.netPrice, bold: true),
-                const Divider(height: 20, color: AppColors.borderSubtle),
-                _PriceLine(label: 'Cost', value: project.cost, isDeduction: true),
-                _PriceLine(label: 'Profit', value: project.profit, bold: true),
-                const Divider(height: 20, color: AppColors.borderSubtle),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Payment status',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    ProjectPaymentStatusBadge(status: project.paymentStatus),
-                  ],
-                ),
-                if (project.paymentStatus == ProjectPaymentStatus.partial) ...[
-                  const SizedBox(height: 6),
-                  _PriceLine(label: 'Amount paid', value: project.amountPaid),
-                  _PriceLine(
-                    label: 'Outstanding',
-                    value: (project.netPrice - project.amountPaid).clamp(
-                      0,
-                      project.netPrice,
-                    ),
-                    isDeduction: true,
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await showDialog<void>(
-                        context: context,
-                        builder: (_) => _UpdatePaymentDialog(project: project),
-                      );
-                      ref.invalidate(projectProvider(project.id));
-                    },
-                    icon: const Icon(Icons.payments_outlined, size: 16),
-                    label: const Text('Update Payment'),
-                  ),
-                ),
-              ],
-            ),
-          ),
           if (project.notes != null && project.notes!.isNotEmpty) ...[
             const SizedBox(height: 16),
             FormSection(title: 'Notes', child: Text(project.notes!)),
@@ -261,45 +198,6 @@ class _ProjectDetailBody extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _TasksSection(project: project),
-        ],
-      ),
-    );
-  }
-}
-
-class _PriceLine extends StatelessWidget {
-  const _PriceLine({
-    required this.label,
-    required this.value,
-    this.isDeduction = false,
-    this.bold = false,
-  });
-
-  final String label;
-  final double value;
-  final bool isDeduction;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
-            ),
-          ),
-          Text(
-            '${isDeduction ? '- ' : ''}PKR ${formatAmount(value)}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
-              color: isDeduction ? AppColors.error : null,
-            ),
-          ),
         ],
       ),
     );
@@ -390,125 +288,6 @@ class _TaskRow extends StatelessWidget {
           const Icon(Icons.chevron_right, color: AppColors.textSecondary),
         ],
       ),
-    );
-  }
-}
-
-class _UpdatePaymentDialog extends ConsumerStatefulWidget {
-  const _UpdatePaymentDialog({required this.project});
-
-  final Project project;
-
-  @override
-  ConsumerState<_UpdatePaymentDialog> createState() =>
-      _UpdatePaymentDialogState();
-}
-
-class _UpdatePaymentDialogState extends ConsumerState<_UpdatePaymentDialog> {
-  late String _status;
-  late final TextEditingController _amountPaidController;
-  bool _saving = false;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _status = widget.project.paymentStatus;
-    _amountPaidController = TextEditingController(
-      text: widget.project.amountPaid.toStringAsFixed(2),
-    );
-  }
-
-  @override
-  void dispose() {
-    _amountPaidController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    setState(() {
-      _saving = true;
-      _errorMessage = null;
-    });
-    try {
-      await ref
-          .read(clientsRepositoryProvider)
-          .updateProject(
-            widget.project.id,
-            paymentStatus: _status,
-            amountPaid: double.tryParse(_amountPaidController.text) ?? 0,
-          );
-      ref.invalidate(projectProvider(widget.project.id));
-      ref.invalidate(projectsListProvider((status: null, clientId: null)));
-      if (mounted) Navigator.of(context).pop();
-    } on ClientException catch (error) {
-      setState(() => _errorMessage = error.message);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Update Payment'),
-      content: SizedBox(
-        width: 360,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_errorMessage != null) ...[
-              Text(
-                _errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-              const SizedBox(height: 12),
-            ],
-            DropdownButtonFormField<String>(
-              initialValue: _status,
-              decoration: const InputDecoration(labelText: 'Status'),
-              items: [
-                for (final status in ProjectPaymentStatus.values)
-                  DropdownMenuItem(
-                    value: status,
-                    child: Text(formatProjectPaymentStatusLabel(status)),
-                  ),
-              ],
-              onChanged: _saving
-                  ? null
-                  : (value) {
-                      if (value != null) setState(() => _status = value);
-                    },
-            ),
-            if (_status == ProjectPaymentStatus.partial) ...[
-              const SizedBox(height: 16),
-              TextField(
-                controller: _amountPaidController,
-                enabled: !_saving,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Amount paid (PKR)'),
-              ),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _saving ? null : _submit,
-          child: _saving
-              ? const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Save'),
-        ),
-      ],
     );
   }
 }

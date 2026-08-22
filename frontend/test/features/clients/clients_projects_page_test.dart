@@ -55,8 +55,6 @@ void main() {
             activeCount: 3,
             onHoldCount: 1,
             completedCount: 5,
-            activeMonthlyRecurringRevenue: 20000,
-            oneTimeRevenueThisYear: 50000,
           ),
         ),
       ),
@@ -65,8 +63,8 @@ void main() {
 
     expect(find.text('3'), findsOneWidget);
     expect(find.text('Active Projects'), findsOneWidget);
-    expect(find.text('Monthly Recurring Revenue'), findsOneWidget);
-    expect(find.text('One-time Revenue (This Year)'), findsOneWidget);
+    expect(find.text('On Hold'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget);
   });
 
   testWidgets('shows the Projects tab by default with New Project/New Client buttons', (
@@ -92,19 +90,22 @@ void main() {
     await tester.pumpWidget(
       _app(
         repository: FakeClientsRepository(
-          projects: [buildTestProject(name: 'Website Revamp')],
-          clients: [buildTestClient(companyName: 'Acme Co')],
+          projects: [
+            buildTestProject(name: 'Website Revamp', clientName: 'Acme Co'),
+          ],
+          clients: [buildTestClient(companyName: 'Beta LLC')],
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Acme Co'), findsNothing);
+    expect(find.text('Website Revamp'), findsOneWidget);
+    expect(find.text('Beta LLC'), findsNothing);
 
     await tester.tap(find.text('Clients'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Acme Co'), findsOneWidget);
+    expect(find.text('Beta LLC'), findsOneWidget);
     expect(find.text('Website Revamp'), findsNothing);
   });
 

@@ -11,7 +11,9 @@ import { PayrollRun } from './payroll-run.entity';
  * mapper from the other six figures on every read, same convention as
  * Project's netPrice/profit. Bonuses/allowances/overtime/deductions/
  * advances/tax are one-off amounts entered directly against this run —
- * there is no recurring-item or loan-ledger concept in V1. */
+ * there is no recurring-item or loan-ledger concept in V1. `netPay` here
+ * is computed the same way, but Project's own pricing fields have since
+ * been removed. */
 @Entity('payroll_line_items')
 export class PayrollLineItem extends BaseEntity {
   @Column()

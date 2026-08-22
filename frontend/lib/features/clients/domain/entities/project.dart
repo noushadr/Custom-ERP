@@ -1,7 +1,5 @@
 import 'project_refs.dart';
 
-/// `netPrice`/`profit` are computed server-side on every read, never
-/// stored — see the backend's Project entity doc comment.
 class Project {
   const Project({
     required this.id,
@@ -13,14 +11,7 @@ class Project {
     required this.startDate,
     required this.endDate,
     required this.renewalDate,
-    required this.originalClientPrice,
-    required this.deductionRate,
-    required this.netPrice,
-    required this.cost,
-    required this.profit,
     required this.notes,
-    required this.paymentStatus,
-    required this.amountPaid,
     required this.assignedEmployees,
     required this.targetDepartments,
     required this.services,
@@ -43,19 +34,7 @@ class Project {
   final String startDate;
   final String? endDate;
   final String? renewalDate;
-
-  final double originalClientPrice;
-  final double deductionRate;
-  final double netPrice;
-  final double cost;
-  final double profit;
   final String? notes;
-
-  /// One of ProjectPaymentStatus's values.
-  final String paymentStatus;
-
-  /// Only meaningful when [paymentStatus] is `partial`.
-  final double amountPaid;
 
   final List<ProjectEmployeeRef> assignedEmployees;
   final List<ProjectDepartmentRef> targetDepartments;

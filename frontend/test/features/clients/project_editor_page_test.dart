@@ -59,47 +59,6 @@ void main() {
     expect(find.text('Required'), findsWidgets);
   });
 
-  testWidgets('the net-price preview updates live as price/deduction change', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_app());
-    await tester.pumpAndSettle();
-
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Original client price (PKR)'),
-      '1000',
-    );
-    await tester.pumpAndSettle();
-
-    // Default deduction is 20%, so net price should be 800.00.
-    expect(
-      find.text('Net price: PKR 800.00 · Profit: PKR 800.00'),
-      findsOneWidget,
-    );
-
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Deduction %'),
-      '50',
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Net price: PKR 500.00 · Profit: PKR 500.00'),
-      findsOneWidget,
-    );
-
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Cost (PKR)'),
-      '100',
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Net price: PKR 500.00 · Profit: PKR 400.00'),
-      findsOneWidget,
-    );
-  });
-
   testWidgets('lets the admin toggle an employee, department, and service chip', (
     tester,
   ) async {
@@ -127,11 +86,7 @@ void main() {
   testWidgets('pre-fills fields when editing an existing project', (
     tester,
   ) async {
-    final existing = buildTestProject(
-      name: 'Existing Project',
-      originalClientPrice: 2000,
-      deductionRate: 10,
-    );
+    final existing = buildTestProject(name: 'Existing Project');
 
     await tester.pumpWidget(
       ProviderScope(

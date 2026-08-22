@@ -5,7 +5,6 @@ import 'package:zera_erp/features/authentication/application/auth_providers.dart
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
-import 'package:zera_erp/features/clients/domain/entities/project_payment_status.dart';
 import 'package:zera_erp/features/clients/domain/entities/project_refs.dart';
 import 'package:zera_erp/features/clients/presentation/pages/project_detail_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
@@ -44,18 +43,13 @@ Widget _app({
 }
 
 void main() {
-  testWidgets('shows the pricing breakdown, services, departments, and employees', (
-    tester,
-  ) async {
+  testWidgets('shows services, departments, and employees', (tester) async {
     await tester.pumpWidget(
       _app(
         repository: FakeClientsRepository(
           projects: [
             buildTestProject(
               name: 'Website Revamp',
-              originalClientPrice: 1000,
-              deductionRate: 20,
-              cost: 200,
               services: const [ProjectServiceRef(id: 's1', name: 'SEO')],
               targetDepartments: const [
                 ProjectDepartmentRef(id: 'd1', name: 'Engineering'),
@@ -75,8 +69,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Website Revamp'), findsOneWidget);
-    expect(find.text('PKR 1,000.00'), findsOneWidget); // original price
-    expect(find.text('PKR 800.00'), findsOneWidget); // net price
     expect(find.text('SEO'), findsOneWidget);
     expect(find.text('Engineering'), findsOneWidget);
     expect(find.text('Jane Doe'), findsOneWidget);
@@ -106,54 +98,5 @@ void main() {
 
     expect(find.text('Design homepage'), findsOneWidget);
     expect(find.text('New Task'), findsOneWidget);
-  });
-
-  testWidgets('shows the payment status badge and outstanding balance when partial', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _app(
-        repository: FakeClientsRepository(
-          projects: [
-            buildTestProject(
-              originalClientPrice: 1000,
-              deductionRate: 20,
-              paymentStatus: ProjectPaymentStatus.partial,
-              amountPaid: 300,
-            ),
-          ],
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Partial'), findsOneWidget);
-    expect(find.text('PKR 300.00'), findsOneWidget); // amount paid
-    expect(find.text('- PKR 500.00'), findsOneWidget); // outstanding (800-300)
-  });
-
-  testWidgets('updating payment submits the new status and amount', (
-    tester,
-  ) async {
-    final repository = FakeClientsRepository(
-      projects: [buildTestProject(paymentStatus: ProjectPaymentStatus.unpaid)],
-    );
-    await tester.pumpWidget(_app(repository: repository));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Update Payment'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.widgetWithText(DropdownButtonFormField<String>, 'Status'),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Paid').last);
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-    await tester.pumpAndSettle();
-
-    expect(repository.lastUpdatedProjectPaymentStatus, ProjectPaymentStatus.paid);
   });
 }

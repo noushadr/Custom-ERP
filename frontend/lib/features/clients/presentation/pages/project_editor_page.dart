@@ -17,8 +17,8 @@ String _isoDate(DateTime date) =>
     '${date.month.toString().padLeft(2, '0')}-'
     '${date.day.toString().padLeft(2, '0')}';
 
-/// Create or edit a project: client, type/status, dates, pricing (with a
-/// live net-price preview), and employee/department/service assignment.
+/// Create or edit a project: client, type/status, dates, and
+/// employee/department/service assignment.
 class ProjectEditorPage extends ConsumerStatefulWidget {
   const ProjectEditorPage({super.key, this.existingProject});
 
@@ -32,9 +32,6 @@ class ProjectEditorPage extends ConsumerStatefulWidget {
 class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
-  late final TextEditingController _priceController;
-  late final TextEditingController _deductionController;
-  late final TextEditingController _costController;
   late final TextEditingController _notesController;
 
   String? _clientId;
@@ -57,15 +54,6 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
     super.initState();
     final existing = widget.existingProject;
     _nameController = TextEditingController(text: existing?.name ?? '');
-    _priceController = TextEditingController(
-      text: existing != null ? existing.originalClientPrice.toStringAsFixed(2) : '',
-    );
-    _deductionController = TextEditingController(
-      text: existing != null ? existing.deductionRate.toStringAsFixed(2) : '20',
-    );
-    _costController = TextEditingController(
-      text: existing != null ? existing.cost.toStringAsFixed(2) : '0',
-    );
     _notesController = TextEditingController(text: existing?.notes ?? '');
     _clientId = existing?.clientId;
     _type = existing?.type ?? ProjectType.oneTime;
@@ -86,31 +74,14 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
     _selectedServiceIds = {
       ...(existing?.services.map((s) => s.id) ?? const []),
     };
-
-    for (final controller in [
-      _priceController,
-      _deductionController,
-      _costController,
-    ]) {
-      controller.addListener(() => setState(() {}));
-    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _priceController.dispose();
-    _deductionController.dispose();
-    _costController.dispose();
     _notesController.dispose();
     super.dispose();
   }
-
-  double get _previewPrice => double.tryParse(_priceController.text) ?? 0;
-  double get _previewDeduction => double.tryParse(_deductionController.text) ?? 0;
-  double get _previewCost => double.tryParse(_costController.text) ?? 0;
-  double get _previewNetPrice =>
-      _previewPrice * (1 - _previewDeduction / 100);
 
   Future<void> _pickDate({
     required DateTime? current,
@@ -154,9 +125,6 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               startDate: _isoDate(_startDate!),
               endDate: _endDate != null ? _isoDate(_endDate!) : null,
               renewalDate: _renewalDate != null ? _isoDate(_renewalDate!) : null,
-              originalClientPrice: _previewPrice,
-              deductionRate: _previewDeduction,
-              cost: _previewCost,
               notes: _notesController.text.trim(),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
               targetDepartmentIds: _selectedDepartmentIds.toList(),
@@ -170,9 +138,6 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               startDate: _isoDate(_startDate!),
               endDate: _endDate != null ? _isoDate(_endDate!) : null,
               renewalDate: _renewalDate != null ? _isoDate(_renewalDate!) : null,
-              originalClientPrice: _previewPrice,
-              deductionRate: _previewDeduction,
-              cost: _previewCost,
               notes: _notesController.text.trim().isEmpty
                   ? null
                   : _notesController.text.trim(),
@@ -339,60 +304,6 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                       onTap: () => _pickDate(
                         current: _renewalDate,
                         onPicked: (d) => setState(() => _renewalDate = d),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _priceController,
-                            decoration: const InputDecoration(
-                              labelText: 'Original client price (PKR)',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            validator: (value) =>
-                                (value == null ||
-                                    double.tryParse(value) == null)
-                                ? 'Required'
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _deductionController,
-                            decoration: const InputDecoration(
-                              labelText: 'Deduction %',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _costController,
-                            decoration: const InputDecoration(
-                              labelText: 'Cost (PKR)',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Net price: PKR ${_previewNetPrice.toStringAsFixed(2)}'
-                      ' · Profit: PKR ${(_previewNetPrice - _previewCost).toStringAsFixed(2)}',
-                      key: const Key('net-price-preview'),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 16),

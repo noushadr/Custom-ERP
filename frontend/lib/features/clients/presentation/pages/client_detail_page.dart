@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../employee/presentation/widgets/employee_status_badges.dart';
@@ -251,11 +250,6 @@ class _ClientDetailBody extends ConsumerWidget {
                                   ProjectStatusBadge(
                                     status: projects[i].status,
                                     dense: true,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'PKR ${formatWholeAmount(projects[i].netPrice)}',
-                                    style: Theme.of(context).textTheme.bodySmall,
                                   ),
                                 ],
                               ),

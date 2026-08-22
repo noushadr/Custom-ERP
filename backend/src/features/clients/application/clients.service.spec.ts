@@ -10,7 +10,6 @@ import { Project } from '../domain/entities/project.entity';
 import { Service } from '../domain/entities/service.entity';
 import { ClientHealthFactor } from '../domain/enums/client-health-factor.enum';
 import { ClientHealthStatus } from '../domain/enums/client-health-status.enum';
-import { ProjectPaymentStatus } from '../domain/enums/project-payment-status.enum';
 import { ProjectStatus } from '../domain/enums/project-status.enum';
 import { ProjectType } from '../domain/enums/project-type.enum';
 import type { ClientHealthHistoryRepository } from '../domain/repositories/client-health-history-repository.interface';
@@ -66,11 +65,6 @@ function buildProject(overrides: Partial<Project> = {}): Project {
     type: ProjectType.ONE_TIME,
     status: ProjectStatus.ACTIVE,
     startDate: '2026-01-01',
-    originalClientPrice: '1000.00',
-    deductionRate: '20.00',
-    cost: '0.00',
-    paymentStatus: ProjectPaymentStatus.UNPAID,
-    amountPaid: '0.00',
     assignedEmployees: [],
     targetDepartments: [],
     services: [],
@@ -345,89 +339,6 @@ describe('ClientsService', () => {
     });
   });
 
-  describe('projects — pricing', () => {
-    it('defaults the deduction rate to 20% and computes netPrice/profit', async () => {
-      projectRepository.findById.mockImplementation((id) =>
-        Promise.resolve(buildProject({ id })),
-      );
-
-      const result = await service.createProject({
-        clientId: 'client-1',
-        name: 'Website Revamp',
-        type: ProjectType.ONE_TIME,
-        startDate: '2026-01-01',
-        originalClientPrice: 1000,
-      });
-
-      expect(result.deductionRate).toBe(20);
-      expect(result.netPrice).toBe(800);
-      expect(result.profit).toBe(800);
-    });
-
-    it('honors a custom deduction rate and cost', async () => {
-      projectRepository.findById.mockImplementation((id) =>
-        Promise.resolve(
-          buildProject({ id, deductionRate: '10.00', cost: '200.00' }),
-        ),
-      );
-
-      const result = await service.createProject({
-        clientId: 'client-1',
-        name: 'Website Revamp',
-        type: ProjectType.ONE_TIME,
-        startDate: '2026-01-01',
-        originalClientPrice: 1000,
-        deductionRate: 10,
-        cost: 200,
-      });
-
-      expect(result.netPrice).toBe(900);
-      expect(result.profit).toBe(700);
-    });
-
-    it('recomputes netPrice/profit after an update', async () => {
-      const project = buildProject();
-      projectRepository.findById.mockResolvedValue(project);
-
-      const result = await service.updateProject('project-1', {
-        originalClientPrice: 2000,
-        deductionRate: 25,
-      });
-
-      expect(result.netPrice).toBe(1500);
-    });
-
-    it('defaults a new project to unpaid with nothing paid yet', async () => {
-      projectRepository.findById.mockImplementation((id) =>
-        Promise.resolve(buildProject({ id })),
-      );
-
-      const result = await service.createProject({
-        clientId: 'client-1',
-        name: 'Website Revamp',
-        type: ProjectType.ONE_TIME,
-        startDate: '2026-01-01',
-        originalClientPrice: 1000,
-      });
-
-      expect(result.paymentStatus).toBe(ProjectPaymentStatus.UNPAID);
-      expect(result.amountPaid).toBe(0);
-    });
-
-    it('updates payment status and amount paid', async () => {
-      const project = buildProject();
-      projectRepository.findById.mockResolvedValue(project);
-
-      const result = await service.updateProject('project-1', {
-        paymentStatus: ProjectPaymentStatus.PARTIAL,
-        amountPaid: 300,
-      });
-
-      expect(result.paymentStatus).toBe(ProjectPaymentStatus.PARTIAL);
-      expect(result.amountPaid).toBe(300);
-    });
-  });
-
   describe('projects — assignment resolution', () => {
     it('resolves assigned employees, departments, and services by id', async () => {
       employeeRepository.findAll.mockResolvedValue([
@@ -456,7 +367,6 @@ describe('ClientsService', () => {
         name: 'Website Revamp',
         type: ProjectType.ONE_TIME,
         startDate: '2026-01-01',
-        originalClientPrice: 1000,
         assignedEmployeeIds: ['employee-1'],
         targetDepartmentIds: ['dept-1'],
         serviceIds: ['service-1'],
@@ -496,46 +406,23 @@ describe('ClientsService', () => {
   });
 
   describe('getProjectsSummary', () => {
-    it('counts by status and totals active retainer MRR and this-year one-time revenue', async () => {
-      const thisYear = new Date().getFullYear();
+    it('counts projects by status', async () => {
       projectRepository.findAll.mockResolvedValue([
-        buildProject({
-          id: 'retainer-active',
-          type: ProjectType.RETAINER,
-          status: ProjectStatus.ACTIVE,
-          originalClientPrice: '1000.00',
-          deductionRate: '20.00',
-        }),
-        buildProject({
-          id: 'retainer-completed',
-          type: ProjectType.RETAINER,
-          status: ProjectStatus.COMPLETED,
-          originalClientPrice: '5000.00',
-        }),
-        buildProject({
-          id: 'one-time-this-year',
-          type: ProjectType.ONE_TIME,
-          status: ProjectStatus.ACTIVE,
-          startDate: `${thisYear}-03-01`,
-          originalClientPrice: '500.00',
-          deductionRate: '20.00',
-        }),
-        buildProject({
-          id: 'one-time-last-year',
-          type: ProjectType.ONE_TIME,
-          status: ProjectStatus.COMPLETED,
-          startDate: '2020-03-01',
-          originalClientPrice: '999999.00',
-        }),
+        buildProject({ id: 'p1', status: ProjectStatus.ACTIVE }),
+        buildProject({ id: 'p2', status: ProjectStatus.ACTIVE }),
+        buildProject({ id: 'p3', status: ProjectStatus.ON_HOLD }),
+        buildProject({ id: 'p4', status: ProjectStatus.COMPLETED }),
+        buildProject({ id: 'p5', status: ProjectStatus.CANCELLED }),
       ]);
 
       const summary = await service.getProjectsSummary();
 
-      expect(summary.activeCount).toBe(2);
-      expect(summary.completedCount).toBe(2);
-      expect(summary.activeMonthlyRecurringRevenue).toBe(800);
-      expect(summary.oneTimeRevenueThisYear).toBe(400);
+      expect(summary).toEqual({
+        activeCount: 2,
+        onHoldCount: 1,
+        completedCount: 1,
+        cancelledCount: 1,
+      });
     });
   });
-
 });

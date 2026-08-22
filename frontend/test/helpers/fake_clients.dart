@@ -3,7 +3,6 @@ import 'package:zera_erp/features/clients/domain/entities/client_health_history_
 import 'package:zera_erp/features/clients/domain/entities/client_health_status.dart';
 import 'package:zera_erp/features/clients/domain/entities/client_health_summary.dart';
 import 'package:zera_erp/features/clients/domain/entities/project.dart';
-import 'package:zera_erp/features/clients/domain/entities/project_payment_status.dart';
 import 'package:zera_erp/features/clients/domain/entities/project_refs.dart';
 import 'package:zera_erp/features/clients/domain/entities/projects_summary.dart';
 import 'package:zera_erp/features/clients/domain/entities/service.dart';
@@ -107,22 +106,13 @@ Project buildTestProject({
   String startDate = '2026-01-01',
   String? endDate,
   String? renewalDate,
-  double originalClientPrice = 1000,
-  double deductionRate = 20,
-  double? netPrice,
-  double cost = 200,
-  double? profit,
   String? notes,
-  String paymentStatus = ProjectPaymentStatus.unpaid,
-  double amountPaid = 0,
   List<ProjectEmployeeRef> assignedEmployees = const [],
   List<ProjectDepartmentRef> targetDepartments = const [],
   List<ProjectServiceRef> services = const [],
   DateTime? createdAt,
   DateTime? updatedAt,
 }) {
-  final resolvedNetPrice =
-      netPrice ?? originalClientPrice * (1 - deductionRate / 100);
   return Project(
     id: id,
     clientId: clientId,
@@ -133,14 +123,7 @@ Project buildTestProject({
     startDate: startDate,
     endDate: endDate,
     renewalDate: renewalDate,
-    originalClientPrice: originalClientPrice,
-    deductionRate: deductionRate,
-    netPrice: resolvedNetPrice,
-    cost: cost,
-    profit: profit ?? (resolvedNetPrice - cost),
     notes: notes,
-    paymentStatus: paymentStatus,
-    amountPaid: amountPaid,
     assignedEmployees: assignedEmployees,
     targetDepartments: targetDepartments,
     services: services,
@@ -154,16 +137,12 @@ ProjectsSummary buildTestProjectsSummary({
   int onHoldCount = 0,
   int completedCount = 0,
   int cancelledCount = 0,
-  double activeMonthlyRecurringRevenue = 0,
-  double oneTimeRevenueThisYear = 0,
 }) {
   return ProjectsSummary(
     activeCount: activeCount,
     onHoldCount: onHoldCount,
     completedCount: completedCount,
     cancelledCount: cancelledCount,
-    activeMonthlyRecurringRevenue: activeMonthlyRecurringRevenue,
-    oneTimeRevenueThisYear: oneTimeRevenueThisYear,
   );
 }
 
@@ -190,14 +169,8 @@ class FakeClientsRepository implements ClientsRepository {
   /// The `name` passed to the most recent [createService] call.
   String? lastCreatedServiceName;
 
-  /// The arguments passed to the most recent [createProject] call.
+  /// The `name` passed to the most recent [createProject] call.
   String? lastCreatedProjectName;
-  double? lastCreatedProjectPrice;
-
-  /// The arguments passed to the most recent [updateProject] call's payment
-  /// fields.
-  String? lastUpdatedProjectPaymentStatus;
-  double? lastUpdatedProjectAmountPaid;
 
   /// The arguments passed to the most recent [updateClientHealth] call.
   String? lastHealthUpdateClientId;
@@ -319,24 +292,13 @@ class FakeClientsRepository implements ClientsRepository {
     required String startDate,
     String? endDate,
     String? renewalDate,
-    required double originalClientPrice,
-    double? deductionRate,
-    double? cost,
     String? notes,
     List<String>? assignedEmployeeIds,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
   }) async {
     lastCreatedProjectName = name;
-    lastCreatedProjectPrice = originalClientPrice;
-    return buildTestProject(
-      clientId: clientId,
-      name: name,
-      type: type,
-      originalClientPrice: originalClientPrice,
-      deductionRate: deductionRate ?? 20,
-      cost: cost ?? 0,
-    );
+    return buildTestProject(clientId: clientId, name: name, type: type);
   }
 
   @override
@@ -349,23 +311,12 @@ class FakeClientsRepository implements ClientsRepository {
     String? startDate,
     String? endDate,
     String? renewalDate,
-    double? originalClientPrice,
-    double? deductionRate,
-    double? cost,
     String? notes,
-    String? paymentStatus,
-    double? amountPaid,
     List<String>? assignedEmployeeIds,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
   }) async {
-    lastUpdatedProjectPaymentStatus = paymentStatus;
-    lastUpdatedProjectAmountPaid = amountPaid;
-    return buildTestProject(
-      id: id,
-      paymentStatus: paymentStatus ?? ProjectPaymentStatus.unpaid,
-      amountPaid: amountPaid ?? 0,
-    );
+    return buildTestProject(id: id);
   }
 
   @override

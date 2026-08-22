@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/widgets/permission_gate.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
@@ -116,23 +115,6 @@ class _SummaryRow extends ConsumerWidget {
             color: AppColors.textSecondary,
             icon: Icons.check_circle_outline,
           ),
-          _StatTile(
-            label: 'Monthly Recurring Revenue',
-            value:
-                'PKR ${formatWholeAmount(summary.activeMonthlyRecurringRevenue)}',
-            secondaryValue: formatUsdApprox(
-              summary.activeMonthlyRecurringRevenue,
-            ),
-            color: AppColors.primary,
-            icon: Icons.autorenew,
-          ),
-          _StatTile(
-            label: 'One-time Revenue (This Year)',
-            value: 'PKR ${formatWholeAmount(summary.oneTimeRevenueThisYear)}',
-            secondaryValue: formatUsdApprox(summary.oneTimeRevenueThisYear),
-            color: AppColors.accentTeal,
-            icon: Icons.bolt_outlined,
-          ),
         ],
       ),
     );
@@ -145,12 +127,10 @@ class _StatTile extends StatelessWidget {
     required this.value,
     required this.color,
     required this.icon,
-    this.secondaryValue,
   });
 
   final String label;
   final String value;
-  final String? secondaryValue;
   final Color color;
   final IconData icon;
 
@@ -176,13 +156,6 @@ class _StatTile extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          if (secondaryValue != null)
-            Text(
-              secondaryValue!,
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
-            ),
           const SizedBox(height: 2),
           Text(
             label,
@@ -286,7 +259,7 @@ class _ProjectRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${project.clientName} · PKR ${formatWholeAmount(project.netPrice)} net',
+                    project.clientName,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),

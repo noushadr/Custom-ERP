@@ -27,9 +27,7 @@ import { ClientHealthHistory } from '../domain/entities/client-health-history.en
 import { Project } from '../domain/entities/project.entity';
 import { Service } from '../domain/entities/service.entity';
 import { ClientHealthStatus } from '../domain/enums/client-health-status.enum';
-import { ProjectPaymentStatus } from '../domain/enums/project-payment-status.enum';
 import { ProjectStatus } from '../domain/enums/project-status.enum';
-import { ProjectType } from '../domain/enums/project-type.enum';
 import {
   CLIENT_REPOSITORY,
   type ClientRepository,
@@ -249,12 +247,7 @@ export class ClientsService {
     project.startDate = dto.startDate;
     project.endDate = dto.endDate;
     project.renewalDate = dto.renewalDate;
-    project.originalClientPrice = dto.originalClientPrice.toFixed(2);
-    project.deductionRate = (dto.deductionRate ?? 20).toFixed(2);
-    project.cost = (dto.cost ?? 0).toFixed(2);
     project.notes = dto.notes;
-    project.paymentStatus = ProjectPaymentStatus.UNPAID;
-    project.amountPaid = '0.00';
     project.assignedEmployees = await this.resolveEmployees(
       dto.assignedEmployeeIds,
     );
@@ -274,15 +267,6 @@ export class ClientsService {
     const project = await this.getProjectOrThrow(id);
     const changes = definedFieldsOnly(dto);
 
-    if (changes.originalClientPrice !== undefined) {
-      project.originalClientPrice = changes.originalClientPrice.toFixed(2);
-    }
-    if (changes.deductionRate !== undefined) {
-      project.deductionRate = changes.deductionRate.toFixed(2);
-    }
-    if (changes.cost !== undefined) {
-      project.cost = changes.cost.toFixed(2);
-    }
     if (changes.assignedEmployeeIds !== undefined) {
       project.assignedEmployees = await this.resolveEmployees(
         changes.assignedEmployeeIds,
@@ -307,10 +291,6 @@ export class ClientsService {
       project.renewalDate = changes.renewalDate;
     }
     if (changes.notes !== undefined) project.notes = changes.notes;
-    project.paymentStatus = changes.paymentStatus ?? project.paymentStatus;
-    if (changes.amountPaid !== undefined) {
-      project.amountPaid = changes.amountPaid.toFixed(2);
-    }
 
     const saved = await this.projectRepository.save(project);
     return toProjectResponse(await this.getProjectOrThrow(saved.id));
@@ -318,10 +298,7 @@ export class ClientsService {
 
   async getProjectsSummary(): Promise<ProjectsSummaryDto> {
     const projects = await this.projectRepository.findAll();
-    const currentYear = new Date().getFullYear();
 
-    let activeMonthlyRecurringRevenue = 0;
-    let oneTimeRevenueThisYear = 0;
     let activeCount = 0;
     let onHoldCount = 0;
     let completedCount = 0;
@@ -342,23 +319,6 @@ export class ClientsService {
           cancelledCount += 1;
           break;
       }
-
-      const netPrice =
-        Number(project.originalClientPrice) *
-        (1 - Number(project.deductionRate) / 100);
-
-      if (
-        project.type === ProjectType.RETAINER &&
-        project.status === ProjectStatus.ACTIVE
-      ) {
-        activeMonthlyRecurringRevenue += netPrice;
-      }
-      if (
-        project.type === ProjectType.ONE_TIME &&
-        new Date(project.startDate).getFullYear() === currentYear
-      ) {
-        oneTimeRevenueThisYear += netPrice;
-      }
     }
 
     return {
@@ -366,8 +326,6 @@ export class ClientsService {
       onHoldCount,
       completedCount,
       cancelledCount,
-      activeMonthlyRecurringRevenue,
-      oneTimeRevenueThisYear,
     };
   }
 

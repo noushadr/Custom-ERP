@@ -56,14 +56,7 @@ export function toServiceResponse(service: Service): ServiceResponseDto {
   };
 }
 
-/** `netPrice`/`profit` are computed here, never stored — see Project entity
- * doc comment. */
 export function toProjectResponse(project: Project): ProjectResponseDto {
-  const originalClientPrice = Number(project.originalClientPrice);
-  const deductionRate = Number(project.deductionRate);
-  const cost = Number(project.cost);
-  const netPrice = originalClientPrice * (1 - deductionRate / 100);
-
   return {
     id: project.id,
     clientId: project.clientId,
@@ -74,14 +67,7 @@ export function toProjectResponse(project: Project): ProjectResponseDto {
     startDate: project.startDate,
     endDate: project.endDate ?? null,
     renewalDate: project.renewalDate ?? null,
-    originalClientPrice,
-    deductionRate,
-    netPrice,
-    cost,
-    profit: netPrice - cost,
     notes: project.notes ?? null,
-    paymentStatus: project.paymentStatus,
-    amountPaid: Number(project.amountPaid),
     assignedEmployees: project.assignedEmployees.map((employee) => ({
       id: employee.id,
       fullName: `${employee.firstName} ${employee.lastName}`,

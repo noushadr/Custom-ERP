@@ -2,10 +2,8 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
-  IsNumber,
   IsOptional,
   IsString,
-  Min,
   MinLength,
 } from 'class-validator';
 import { ProjectStatus } from '../../domain/enums/project-status.enum';
@@ -36,20 +34,6 @@ export class CreateProjectDto {
   @IsOptional()
   @IsDateString()
   renewalDate?: string;
-
-  @IsNumber()
-  @Min(0)
-  originalClientPrice: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  deductionRate?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  cost?: number;
 
   @IsOptional()
   @IsString()

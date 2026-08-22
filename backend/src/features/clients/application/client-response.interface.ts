@@ -69,17 +69,7 @@ export interface ProjectResponseDto {
   startDate: string;
   endDate: string | null;
   renewalDate: string | null;
-  originalClientPrice: number;
-  deductionRate: number;
-  /** Computed: originalClientPrice * (1 - deductionRate / 100) — never
-   * stored, always derived fresh. */
-  netPrice: number;
-  cost: number;
-  /** Computed: netPrice - cost. */
-  profit: number;
   notes: string | null;
-  paymentStatus: string;
-  amountPaid: number;
   assignedEmployees: ProjectEmployeeRef[];
   targetDepartments: ProjectDepartmentRef[];
   services: ProjectServiceRef[];
@@ -92,10 +82,4 @@ export interface ProjectsSummaryDto {
   onHoldCount: number;
   completedCount: number;
   cancelledCount: number;
-  /** Sum of netPrice for every active retainer project — a proxy for
-   * current monthly recurring revenue. */
-  activeMonthlyRecurringRevenue: number;
-  /** Sum of netPrice for every one-time project started this calendar
-   * year. */
-  oneTimeRevenueThisYear: number;
 }

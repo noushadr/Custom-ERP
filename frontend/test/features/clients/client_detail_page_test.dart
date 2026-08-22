@@ -53,12 +53,7 @@ void main() {
             ),
           ],
           projects: [
-            buildTestProject(
-              clientId: 'client-1',
-              name: 'Website Revamp',
-              originalClientPrice: 1000,
-              deductionRate: 20,
-            ),
+            buildTestProject(clientId: 'client-1', name: 'Website Revamp'),
           ],
         ),
       ),
