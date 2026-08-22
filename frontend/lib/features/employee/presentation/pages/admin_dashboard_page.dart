@@ -3,10 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/widgets/metric_card.dart';
+import '../../../agency_reporting/application/agency_reporting_providers.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
+import '../../../automations/application/automations_providers.dart';
+import '../../../clients/application/clients_providers.dart';
+import '../../../finances/application/finances_providers.dart';
 import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
+import '../../../payroll/application/payroll_providers.dart';
+import '../../../payroll/domain/entities/payroll_run_status.dart';
+import '../../../payroll/domain/entities/payroll_run_summary.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
@@ -29,6 +36,21 @@ class AdminDashboardPage extends ConsumerWidget {
     final canViewPerformance =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('performance.manage');
+    final canViewClients =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('clients.manage');
+    final canViewReports =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('reports.view');
+    final canViewFinances =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('finances.manage');
+    final canViewAutomations =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('automations.manage');
+    final canViewPayrollRuns =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('payroll.manage');
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -48,6 +70,11 @@ class AdminDashboardPage extends ConsumerWidget {
               showCompanyAuditLog: canViewAllAudit,
               showPayroll: canViewPayroll,
               showPendingReviews: canViewPerformance,
+              showClients: canViewClients,
+              showReports: canViewReports,
+              showFinances: canViewFinances,
+              showAutomations: canViewAutomations,
+              showPayrollRuns: canViewPayrollRuns,
             ),
           ),
         ),
@@ -62,12 +89,22 @@ class _DashboardStats extends ConsumerWidget {
     required this.showCompanyAuditLog,
     required this.showPayroll,
     required this.showPendingReviews,
+    required this.showClients,
+    required this.showReports,
+    required this.showFinances,
+    required this.showAutomations,
+    required this.showPayrollRuns,
   });
 
   final List<Employee> employees;
   final bool showCompanyAuditLog;
   final bool showPayroll;
   final bool showPendingReviews;
+  final bool showClients;
+  final bool showReports;
+  final bool showFinances;
+  final bool showAutomations;
+  final bool showPayrollRuns;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -213,6 +250,29 @@ class _DashboardStats extends ConsumerWidget {
             const _PayrollStats(),
             const SizedBox(height: 18),
           ],
+          if (showClients ||
+              showReports ||
+              showFinances ||
+              showAutomations ||
+              showPayrollRuns) ...[
+            const _SectionHeader('Admin Business Management'),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (showClients) ...[
+                  const _ActiveProjectsCard(),
+                  const _ClientsAtRiskCard(),
+                ],
+                if (showReports) const _NetProfitCard(),
+                if (showFinances) const _OutstandingInvoicesCard(),
+                if (showAutomations) const _AutomationsActiveCard(),
+                if (showPayrollRuns) const _LatestPayrollRunCard(),
+              ],
+            ),
+            const SizedBox(height: 18),
+          ],
           const CompanyNoticesSection(),
           if (showCompanyAuditLog) ...[
             const SizedBox(height: 18),
@@ -313,6 +373,173 @@ class _PayrollStats extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+/// Active project count from the Clients & Projects module — the cheapest
+/// available headline number, already computed by the same summary endpoint
+/// the module's own dashboard tab uses.
+class _ActiveProjectsCard extends ConsumerWidget {
+  const _ActiveProjectsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(projectsSummaryProvider);
+
+    return MetricCard(
+      label: 'Active Projects',
+      value: summaryAsync.when(
+        data: (summary) => '${summary.activeCount}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.primary,
+      icon: Icons.work_outline,
+    );
+  }
+}
+
+/// At-risk client count from Client Health — folded into the Clients &
+/// Projects module rather than a separate one, so it shares that module's
+/// permission and summary provider.
+class _ClientsAtRiskCard extends ConsumerWidget {
+  const _ClientsAtRiskCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(clientHealthSummaryProvider);
+
+    return MetricCard(
+      label: 'Clients At Risk',
+      value: summaryAsync.when(
+        data: (summary) => '${summary.atRiskCount}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.error,
+      icon: Icons.warning_amber_outlined,
+    );
+  }
+}
+
+/// This month's net profit from Agency Reporting. Calling the provider with
+/// null from/to lets the backend apply its own current-month default, so
+/// this tile needs no date-range picker.
+class _NetProfitCard extends ConsumerWidget {
+  const _NetProfitCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reportAsync = ref.watch(
+      agencyReportProvider((from: null, to: null)),
+    );
+
+    return MetricCard(
+      label: 'Net Profit (This Month)',
+      value: reportAsync.when(
+        data: (report) => 'PKR ${formatWholeAmount(report.netProfit)}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.accentTeal,
+      icon: Icons.trending_up_outlined,
+    );
+  }
+}
+
+/// Outstanding invoices from Finances — a live snapshot, not scoped to a
+/// date range, so (like [_NetProfitCard]) this needs no picker.
+class _OutstandingInvoicesCard extends ConsumerWidget {
+  const _OutstandingInvoicesCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(
+      financialSummaryProvider((from: null, to: null)),
+    );
+
+    return MetricCard(
+      label: 'Outstanding Invoices',
+      value: summaryAsync.when(
+        data: (summary) =>
+            'PKR ${formatWholeAmount(summary.outstandingInvoicesTotal)}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      secondaryValue: summaryAsync.whenOrNull(
+        data: (summary) => '${summary.outstandingInvoicesCount} invoice(s)',
+      ),
+      color: AppColors.secondary,
+      icon: Icons.receipt_long_outlined,
+    );
+  }
+}
+
+/// How many of the fixed 3-automation catalog are currently active.
+class _AutomationsActiveCard extends ConsumerWidget {
+  const _AutomationsActiveCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final automationsAsync = ref.watch(automationsListProvider);
+
+    return MetricCard(
+      label: 'Automations Active',
+      value: automationsAsync.when(
+        data: (automations) =>
+            '${automations.where((a) => a.isActive).length}/${automations.length}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.textSecondary,
+      icon: Icons.bolt_outlined,
+    );
+  }
+}
+
+/// The most recently generated payroll run's status and total, sorted
+/// client-side since there's no dedicated "latest run" endpoint.
+class _LatestPayrollRunCard extends ConsumerWidget {
+  const _LatestPayrollRunCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final runsAsync = ref.watch(payrollRunsListProvider);
+    final latest = runsAsync.whenOrNull(
+      data: (runs) => runs.isEmpty ? null : _latestOf(runs),
+    );
+
+    return MetricCard(
+      label: 'Latest Payroll Run',
+      value: runsAsync.when(
+        data: (runs) =>
+            runs.isEmpty ? 'None yet' : _formatRunStatus(latest!.status),
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      secondaryValue: latest == null
+          ? null
+          : 'PKR ${formatWholeAmount(latest.totalNetPay)}',
+      color: AppColors.primary,
+      icon: Icons.receipt_outlined,
+    );
+  }
+
+  PayrollRunSummary _latestOf(List<PayrollRunSummary> runs) => runs.reduce(
+    (a, b) => (a.year * 12 + a.month) >= (b.year * 12 + b.month) ? a : b,
+  );
+
+  String _formatRunStatus(String status) {
+    switch (status) {
+      case PayrollRunStatus.draft:
+        return 'Draft';
+      case PayrollRunStatus.finalized:
+        return 'Finalized';
+      case PayrollRunStatus.paid:
+        return 'Paid';
+      default:
+        return status;
+    }
   }
 }
 

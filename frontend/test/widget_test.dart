@@ -577,7 +577,42 @@ void main() {
   );
 
   testWidgets(
-    'a Super Admin sees only Admin Dashboard, never User Dashboard',
+    'shows Admin Business Management stats for a holder of every module '
+    'permission',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: const AuthUser(
+            id: 'admin-1',
+            email: 'admin@zeracreative.com',
+            role: 'Super Admin',
+            permissions: [
+              'clients.manage',
+              'reports.view',
+              'finances.manage',
+              'automations.manage',
+              'payroll.manage',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Admin Business Management'), findsOneWidget);
+      expect(find.text('Active Projects'), findsOneWidget);
+      expect(find.text('Clients At Risk'), findsOneWidget);
+      expect(find.text('Net Profit (This Month)'), findsOneWidget);
+      expect(find.text('Outstanding Invoices'), findsOneWidget);
+      expect(find.text('Automations Active'), findsOneWidget);
+      expect(find.text('0/3'), findsOneWidget);
+      expect(find.text('Latest Payroll Run'), findsOneWidget);
+      expect(find.text('Draft'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'hides Admin Business Management stats from an admin dashboard viewer '
+    'without any of those permissions',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         _authenticatedApp(
@@ -591,20 +626,41 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Admin Dashboard'), findsWidgets);
+      expect(find.text('Admin Business Management'), findsNothing);
+      expect(find.text('Active Projects'), findsNothing);
+      expect(find.text('Latest Payroll Run'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a Super Admin sees only Dashboard, never User Dashboard',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: const AuthUser(
+            id: 'admin-1',
+            email: 'admin@zeracreative.com',
+            role: 'Super Admin',
+            permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dashboard'), findsWidgets);
       expect(find.text('User Dashboard'), findsNothing);
       expect(find.text('Total Employees'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'a plain employee sees only User Dashboard, never Admin Dashboard',
+    'a plain employee sees only User Dashboard, never Dashboard',
     (WidgetTester tester) async {
       await tester.pumpWidget(_authenticatedApp());
       await tester.pumpAndSettle();
 
       expect(find.text('User Dashboard'), findsWidgets);
-      expect(find.text('Admin Dashboard'), findsNothing);
+      expect(find.text('Dashboard'), findsNothing);
       expect(find.text('Total Employees'), findsNothing);
     },
   );

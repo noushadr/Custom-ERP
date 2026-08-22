@@ -100,29 +100,15 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
                   minHeight: MediaQuery.sizeOf(context).height,
                 ),
                 child: IntrinsicHeight(
-                  child: widget.adminSectionCount > 0
-                      ? _GroupedNavRail(
-                          key: const Key('groupedNavRail'),
-                          destinations: widget.destinations,
-                          railIcon: _railIcon,
-                          adminSectionCount: widget.adminSectionCount,
-                          selectedIndex: widget.selectedIndex,
-                          onDestinationSelected: widget.onDestinationSelected,
-                          leading: const ZeraLogo(height: 24),
-                        )
-                      : NavigationRail(
-                          extended: true,
-                          selectedIndex: widget.selectedIndex,
-                          onDestinationSelected: widget.onDestinationSelected,
-                          leading: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: const ZeraLogo(height: 24),
-                            ),
-                          ),
-                          destinations: _railDestinations,
-                        ),
+                  child: _NavRail(
+                    key: const Key('navRail'),
+                    destinations: widget.destinations,
+                    railIcon: _railIcon,
+                    adminSectionCount: widget.adminSectionCount,
+                    selectedIndex: widget.selectedIndex,
+                    onDestinationSelected: widget.onDestinationSelected,
+                    leading: const ZeraLogo(height: 24),
+                  ),
                 ),
               ),
             ),
@@ -160,9 +146,9 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
                 minHeight: MediaQuery.sizeOf(context).height,
               ),
               child: IntrinsicHeight(
-                child: _railExpanded && widget.adminSectionCount > 0
-                    ? _GroupedNavRail(
-                        key: const Key('groupedNavRail'),
+                child: _railExpanded
+                    ? _NavRail(
+                        key: const Key('navRail'),
                         destinations: widget.destinations,
                         railIcon: _railIcon,
                         adminSectionCount: widget.adminSectionCount,
@@ -223,23 +209,24 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   }
 }
 
-/// Splits the extended sidebar into two labeled groups with a divider
-/// between them, so a Super Admin can see at a glance which sidebar items
-/// are Super-Admin-exclusive versus shared with other roles — see
-/// [ResponsiveScaffold.adminSectionCount].
+/// The extended sidebar's rows, hand-built rather than [NavigationRail] so
+/// row spacing is fully under our control (see [_NavRow]'s tight padding)
+/// and, when [adminSectionCount] is positive, so the list can split into two
+/// labeled groups with a divider between them — letting a Super Admin see
+/// at a glance which sidebar items are Super-Admin-exclusive versus shared
+/// with other roles. See [ResponsiveScaffold.adminSectionCount].
 ///
-/// A hand-built list of rows rather than [NavigationRail] (even two
-/// instances of it, one per group): stacking two [NavigationRail]s inside
-/// a shared layout hits a genuine Flutter framework bug
-/// (`_RenderObjectSemantics.debugCheckForParentData`'s
-/// `!semantics.parentDataDirty` assertion firing on every frame) — likely
-/// from two instances of a widget with as much internal animated/semantics
-/// machinery as NavigationRail sharing one layout pass. Reusing the rail's
-/// own theme tokens (`NavigationRailThemeData`) for indicator color/shape
-/// and icon/label styling keeps this visually identical to the plain
-/// single-rail case used everywhere else.
-class _GroupedNavRail extends StatelessWidget {
-  const _GroupedNavRail({
+/// Not [NavigationRail] (even two stacked instances, one per group, for the
+/// grouped case): stacking two [NavigationRail]s inside a shared layout hits
+/// a genuine Flutter framework bug (`_RenderObjectSemantics.
+/// debugCheckForParentData`'s `!semantics.parentDataDirty` assertion firing
+/// on every frame) — likely from two instances of a widget with as much
+/// internal animated/semantics machinery as NavigationRail sharing one
+/// layout pass. Reusing the rail's own theme tokens
+/// (`NavigationRailThemeData`) for indicator color/shape and icon/label
+/// styling keeps this visually identical to a plain rail otherwise.
+class _NavRail extends StatelessWidget {
+  const _NavRail({
     super.key,
     required this.destinations,
     required this.railIcon,
@@ -259,6 +246,14 @@ class _GroupedNavRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final railTheme = Theme.of(context).navigationRailTheme;
+    final grouped = adminSectionCount > 0;
+
+    Widget rowFor(int i) => _NavRow(
+      destination: destinations[i],
+      icon: railIcon,
+      selected: i == selectedIndex,
+      onTap: () => onDestinationSelected(i),
+    );
 
     return Container(
       width: railTheme.minExtendedWidth ?? 200,
@@ -272,28 +267,20 @@ class _GroupedNavRail extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               child: Align(alignment: Alignment.centerLeft, child: leading),
             ),
-          const _NavSectionLabel('Admin Only Features'),
-          for (var i = 0; i < adminSectionCount; i++)
-            _NavRow(
-              destination: destinations[i],
-              icon: railIcon,
-              selected: i == selectedIndex,
-              onTap: () => onDestinationSelected(i),
+          if (grouped) const _NavSectionLabel('Admin Only Features'),
+          for (var i = 0; i < (grouped ? adminSectionCount : destinations.length); i++)
+            rowFor(i),
+          if (grouped) ...[
+            const Divider(
+              height: 16,
+              indent: 16,
+              endIndent: 16,
+              color: AppColors.borderSubtle,
             ),
-          const Divider(
-            height: 24,
-            indent: 16,
-            endIndent: 16,
-            color: AppColors.borderSubtle,
-          ),
-          const _NavSectionLabel('General Features'),
-          for (var i = adminSectionCount; i < destinations.length; i++)
-            _NavRow(
-              destination: destinations[i],
-              icon: railIcon,
-              selected: i == selectedIndex,
-              onTap: () => onDestinationSelected(i),
-            ),
+            const _NavSectionLabel('General Features'),
+            for (var i = adminSectionCount; i < destinations.length; i++)
+              rowFor(i),
+          ],
         ],
       ),
     );
@@ -324,7 +311,7 @@ class _NavRow extends StatelessWidget {
         : railTheme.unselectedIconTheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
       child: Material(
         color: selected
             ? (railTheme.indicatorColor ?? AppColors.primarySoft)
@@ -338,7 +325,7 @@ class _NavRow extends StatelessWidget {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               children: [
                 IconTheme(

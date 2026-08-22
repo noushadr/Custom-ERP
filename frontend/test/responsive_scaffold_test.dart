@@ -105,8 +105,8 @@ void main() {
     await tester.pumpWidget(_authenticatedApp());
     await tester.pumpAndSettle();
 
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.extended, isTrue);
+    expect(find.byKey(const Key('navRail')), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
     expect(find.byType(NavigationBar), findsNothing);
   });
 
@@ -136,7 +136,7 @@ void main() {
         expect(find.text('ADMIN ONLY FEATURES'), findsOneWidget);
         expect(find.text('GENERAL FEATURES'), findsOneWidget);
 
-        final navRail = find.byKey(const Key('groupedNavRail'));
+        final navRail = find.byKey(const Key('navRail'));
         final adminItemY = tester
             .getTopLeft(
               find.descendant(
@@ -149,7 +149,7 @@ void main() {
             .getTopLeft(
               find.descendant(
                 of: navRail,
-                matching: find.text('Admin Dashboard'),
+                matching: find.text('Dashboard'),
               ),
             )
             .dy;
@@ -213,7 +213,7 @@ void main() {
         await tester.pumpWidget(_authenticatedApp(user: superAdmin));
         await tester.pumpAndSettle();
 
-        final navRail = find.byKey(const Key('groupedNavRail'));
+        final navRail = find.byKey(const Key('navRail'));
         await tester.tap(
           find.descendant(of: navRail, matching: find.text('Finances')),
         );
@@ -232,7 +232,7 @@ void main() {
         await tester.pumpWidget(_authenticatedApp(user: superAdmin));
         await tester.pumpAndSettle();
 
-        final navRail = find.byKey(const Key('groupedNavRail'));
+        final navRail = find.byKey(const Key('navRail'));
         // Start on an admin-only destination, then switch to a general one,
         // to exercise both halves of the selectedIndex round-trip.
         await tester.tap(

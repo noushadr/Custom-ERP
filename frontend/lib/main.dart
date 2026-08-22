@@ -94,7 +94,7 @@ class _SplashScreen extends StatelessWidget {
 // selected state.
 const _allDestinations = [
   AppNavDestination(
-    label: 'Admin Dashboard',
+    label: 'Dashboard',
     icon: Icons.dashboard_outlined,
     selectedIcon: Icons.dashboard_outlined,
   ),
@@ -169,7 +169,7 @@ const _allDestinations = [
 // entirely from User Dashboard and Requests. Notifications live in the top
 // bar (see NotificationBell), not the nav.
 const _adminOnlyLabels = {
-  'Admin Dashboard',
+  'Dashboard',
   'Employees',
   'Settings',
   'Clients & Projects',
@@ -179,7 +179,7 @@ const _adminOnlyLabels = {
   'Payroll',
 };
 
-// Hidden from Super Admin/HR/Manager — they use Admin Dashboard instead.
+// Hidden from Super Admin/HR/Manager — they use Dashboard instead.
 // Visible to everyone else.
 const _nonAdminOnlyLabels = {'User Dashboard'};
 
@@ -247,7 +247,7 @@ Map<String, int> _navBadgeCounts(WidgetRef ref) {
     'Tasks': tasksBadge,
     // Whichever of these two is actually visible depends on role — badging
     // both is harmless since only one is ever rendered at a time.
-    if (profileIncomplete) 'Admin Dashboard': 1,
+    if (profileIncomplete) 'Dashboard': 1,
     if (profileIncomplete) 'User Dashboard': 1,
   };
 }
@@ -286,7 +286,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
 
   Widget _sectionRootFor(AppNavDestination destination) {
     switch (destination.label) {
-      case 'Admin Dashboard':
+      case 'Dashboard':
         return const AdminDashboardPage();
       case 'User Dashboard':
         return const UserDashboardPage();
@@ -471,7 +471,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
             actions: [
               NotificationBell(
                 onNavigate: (target) => _goToDestination(switch (target) {
-                  NotificationLinkTarget.adminDashboard => 'Admin Dashboard',
+                  NotificationLinkTarget.adminDashboard => 'Dashboard',
                   NotificationLinkTarget.userDashboard => 'User Dashboard',
                   NotificationLinkTarget.leavePage => 'Leaves',
                 }),
