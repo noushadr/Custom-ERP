@@ -31,12 +31,13 @@ const DEFAULT_PERMISSIONS = [
   'tasks.manage',
   'clients.manage',
   'payroll.manage',
+  'leads.manage',
 ];
 
-// 'clients.manage' and 'payroll.manage' (Clients & Projects / Client Health /
-// Payroll — the only two Admin Business Management modules left; Agency
-// Reporting and Finances were removed 2026-08-23) are deliberately absent
-// from Team Lead/Employee below, but ARE granted to HR/Manager as a
+// 'clients.manage', 'payroll.manage', and 'leads.manage' (Clients & Projects /
+// Client Health / Payroll / Leads — the Admin Business Management modules;
+// Agency Reporting and Finances were removed 2026-08-23) are deliberately
+// absent from Team Lead/Employee below, but ARE granted to HR/Manager as a
 // deliberate exception, alongside Super Admin's implicit "every known
 // permission" grant.
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
@@ -55,6 +56,7 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'tasks.manage',
       'clients.manage',
       'payroll.manage',
+      'leads.manage',
     ],
   },
   { name: 'Team Lead', permissions: ['employees.read', 'knowledge_base.manage'] },

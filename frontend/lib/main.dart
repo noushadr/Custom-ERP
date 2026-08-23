@@ -20,6 +20,7 @@ import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
 import 'features/knowledge_base/presentation/pages/knowledge_base_page.dart';
+import 'features/leads/presentation/pages/leads_page.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
 import 'features/payroll/presentation/pages/payroll_page.dart';
 import 'features/performance_reviews/presentation/pages/performance_review_detail_page.dart';
@@ -145,6 +146,11 @@ const _allDestinations = [
     icon: Icons.receipt_long_outlined,
     selectedIcon: Icons.receipt_long_outlined,
   ),
+  AppNavDestination(
+    label: 'Leads',
+    icon: Icons.person_search_outlined,
+    selectedIcon: Icons.person_search_outlined,
+  ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
@@ -156,6 +162,7 @@ const _adminOnlyLabels = {
   'Settings',
   'Clients & Projects',
   'Payroll',
+  'Leads',
 };
 
 // Hidden from Super Admin/HR/Manager — they use Dashboard instead.
@@ -166,8 +173,8 @@ const _nonAdminOnlyLabels = {'User Dashboard'};
 // only — Employees, Team Leads, and HR/Manager would not even see the nav
 // entry. Currently empty: Agency Reporting and Finances (the only two
 // modules that were ever Super-Admin-exclusive) were removed 2026-08-23;
-// both remaining Admin Business Management modules (Clients & Projects,
-// Payroll) are shared with HR/Manager instead — see
+// every remaining Admin Business Management module (Clients & Projects,
+// Payroll, Leads) is shared with HR/Manager instead — see
 // _hrAndAdminOnlyLabels below. Left in place (rather than deleted) so a
 // future Super-Admin-exclusive module has somewhere to go without touching
 // the grouping mechanism in ResponsiveScaffold.adminSectionCount.
@@ -182,6 +189,7 @@ const _superAdminOnlyLabels = <String>{};
 const _hrAndAdminOnlyLabels = {
   'Clients & Projects',
   'Payroll',
+  'Leads',
 };
 
 bool _isAdminOrHr(WidgetRef ref) {
@@ -297,6 +305,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const ClientsProjectsPage();
       case 'Payroll':
         return const PayrollPage();
+      case 'Leads':
+        return const LeadsPage();
       default:
         return _ComingSoon(destination: destination);
     }

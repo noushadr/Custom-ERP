@@ -13,6 +13,7 @@ import { DepartmentsModule } from './features/departments/departments.module';
 import { EmployeeModule } from './features/employee/employee.module';
 import { HolidaysModule } from './features/holidays/holidays.module';
 import { KnowledgeBaseModule } from './features/knowledge-base/knowledge-base.module';
+import { LeadsModule } from './features/leads/leads.module';
 import { LeaveModule } from './features/leave/leave.module';
 import { NoticesModule } from './features/notices/notices.module';
 import { NotificationsModule } from './features/notifications/notifications.module';
@@ -44,6 +45,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     ClientsModule,
     NotificationsModule,
     PayrollModule,
+    LeadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
