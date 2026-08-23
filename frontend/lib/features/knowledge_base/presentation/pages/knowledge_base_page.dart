@@ -25,7 +25,7 @@ class KnowledgeBasePage extends ConsumerWidget {
         authState.user.hasPermission('knowledge_base.manage');
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1040),

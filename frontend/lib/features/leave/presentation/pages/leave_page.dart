@@ -31,7 +31,7 @@ class LeavePage extends ConsumerWidget {
     final isSuperAdmin = authUser?.role == 'Super Admin';
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1040),

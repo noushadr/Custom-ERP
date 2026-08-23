@@ -28,7 +28,7 @@ class PayrollPage extends ConsumerWidget {
     final runsAsync = ref.watch(payrollRunsListProvider);
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900),
