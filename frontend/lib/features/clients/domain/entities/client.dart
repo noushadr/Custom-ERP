@@ -9,6 +9,7 @@ class Client {
     required this.primaryContactName,
     required this.primaryContactEmail,
     required this.primaryContactPhone,
+    required this.leadSource,
     required this.notes,
     required this.isArchived,
     required this.healthStatus,
@@ -27,6 +28,9 @@ class Client {
   final String? primaryContactName;
   final String? primaryContactEmail;
   final String? primaryContactPhone;
+
+  /// How this client first came in (e.g. "Whatsapp", "Call", "Form").
+  final String? leadSource;
   final String? notes;
   final bool isArchived;
 

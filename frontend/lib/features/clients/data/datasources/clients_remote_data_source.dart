@@ -31,6 +31,7 @@ class ClientsRemoteDataSource {
     String? primaryContactName,
     String? primaryContactEmail,
     String? primaryContactPhone,
+    String? leadSource,
     String? notes,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
@@ -44,6 +45,7 @@ class ClientsRemoteDataSource {
         'primaryContactName': ?primaryContactName,
         'primaryContactEmail': ?primaryContactEmail,
         'primaryContactPhone': ?primaryContactPhone,
+        'leadSource': ?leadSource,
         'notes': ?notes,
       },
     );
@@ -60,6 +62,7 @@ class ClientsRemoteDataSource {
     String? primaryContactName,
     String? primaryContactEmail,
     String? primaryContactPhone,
+    String? leadSource,
     String? notes,
     bool? isArchived,
   }) async {
@@ -74,6 +77,7 @@ class ClientsRemoteDataSource {
         'primaryContactName': ?primaryContactName,
         'primaryContactEmail': ?primaryContactEmail,
         'primaryContactPhone': ?primaryContactPhone,
+        'leadSource': ?leadSource,
         'notes': ?notes,
         'isArchived': ?isArchived,
       },

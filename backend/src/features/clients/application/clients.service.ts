@@ -99,6 +99,7 @@ export class ClientsService {
     client.primaryContactName = dto.primaryContactName;
     client.primaryContactEmail = dto.primaryContactEmail;
     client.primaryContactPhone = dto.primaryContactPhone;
+    client.leadSource = dto.leadSource;
     client.notes = dto.notes;
     client.isArchived = false;
     client.archivedAt = null;

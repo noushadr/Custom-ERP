@@ -6,6 +6,8 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/clients/domain/entities/client_health_status.dart';
+import 'package:zera_erp/features/clients/domain/entities/project_status.dart';
+import 'package:zera_erp/features/clients/domain/entities/project_type.dart';
 import 'package:zera_erp/features/clients/presentation/pages/clients_projects_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 
@@ -51,20 +53,39 @@ void main() {
     await tester.pumpWidget(
       _app(
         repository: FakeClientsRepository(
-          projectsSummary: buildTestProjectsSummary(
-            activeCount: 3,
-            onHoldCount: 1,
-            completedCount: 5,
-          ),
+          clients: [
+            buildTestClient(id: 'c1', companyName: 'Acme Co'),
+            buildTestClient(id: 'c2', companyName: 'Beta LLC'),
+          ],
+          projects: [
+            buildTestProject(
+              id: 'p1',
+              clientId: 'c1',
+              clientName: 'Acme Co',
+              type: ProjectType.retainer,
+              status: ProjectStatus.active,
+            ),
+            buildTestProject(
+              id: 'p2',
+              clientId: 'c2',
+              clientName: 'Beta LLC',
+              type: ProjectType.oneTime,
+              status: ProjectStatus.completed,
+            ),
+          ],
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('3'), findsOneWidget);
-    expect(find.text('Active Projects'), findsOneWidget);
-    expect(find.text('On Hold'), findsOneWidget);
-    expect(find.text('Completed'), findsOneWidget);
+    expect(find.text('Total Clients'), findsOneWidget);
+    expect(find.text('Active Clients'), findsOneWidget);
+    expect(find.text('Monthly Retainers'), findsOneWidget);
+    expect(find.text('One-Time Projects'), findsOneWidget);
+    // Total Clients: 2, Active Clients: 1 (only Acme Co has an active
+    // project), Monthly Retainers: 1, One-Time Projects: 1.
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('1'), findsNWidgets(3));
   });
 
   testWidgets('shows the Projects tab by default with New Project/New Client buttons', (

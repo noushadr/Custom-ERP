@@ -8,6 +8,8 @@ import '../../application/clients_providers.dart';
 import '../../domain/entities/client.dart';
 import '../../domain/entities/client_health_status.dart';
 import '../../domain/entities/project.dart';
+import '../../domain/entities/project_status.dart';
+import '../../domain/entities/project_type.dart';
 import '../widgets/client_health_badges.dart';
 import '../widgets/project_badges.dart';
 import 'client_detail_page.dart';
@@ -82,41 +84,70 @@ class _SummaryRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summaryAsync = ref.watch(projectsSummaryProvider);
+    final clientsAsync = ref.watch(clientsListProvider(false));
+    final projectsAsync = ref.watch(
+      projectsListProvider((status: null, clientId: null)),
+    );
 
-    return summaryAsync.when(
-      loading: () => const Padding(
+    if (clientsAsync.isLoading || projectsAsync.isLoading) {
+      return const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: LinearProgressIndicator(),
-      ),
-      error: (_, _) => Text(
+      );
+    }
+    if (clientsAsync.hasError || projectsAsync.hasError) {
+      return Text(
         'Could not load the summary.',
         style: TextStyle(color: Theme.of(context).colorScheme.error),
-      ),
-      data: (summary) => Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: [
-          _StatTile(
-            label: 'Active Projects',
-            value: '${summary.activeCount}',
-            color: AppColors.success,
-            icon: Icons.play_circle_outline,
-          ),
-          _StatTile(
-            label: 'On Hold',
-            value: '${summary.onHoldCount}',
-            color: AppColors.warning,
-            icon: Icons.pause_circle_outline,
-          ),
-          _StatTile(
-            label: 'Completed',
-            value: '${summary.completedCount}',
-            color: AppColors.textSecondary,
-            icon: Icons.check_circle_outline,
-          ),
-        ],
-      ),
+      );
+    }
+
+    final clients = clientsAsync.value ?? const [];
+    final projects = projectsAsync.value ?? const [];
+
+    final activeClientIds = projects
+        .where((p) => p.status == ProjectStatus.active)
+        .map((p) => p.clientId)
+        .toSet();
+    final activeClientsCount = clients
+        .where((c) => activeClientIds.contains(c.id))
+        .length;
+    final retainerCount = projects
+        .where((p) => p.type == ProjectType.retainer)
+        .length;
+    final oneTimeCount = projects
+        .where((p) => p.type == ProjectType.oneTime)
+        .length;
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        _StatTile(
+          label: 'Total Clients',
+          value: '${clients.length}',
+          color: AppColors.primary,
+          icon: Icons.business_outlined,
+        ),
+        _StatTile(
+          label: 'Active Clients',
+          value: '$activeClientsCount',
+          color: AppColors.success,
+          icon: Icons.verified_outlined,
+        ),
+        _StatTile(
+          label: 'Monthly Retainers',
+          value: '$retainerCount',
+          color: AppColors.secondary,
+          icon: Icons.event_repeat_outlined,
+        ),
+        _StatTile(
+          label: 'One-Time Projects',
+          value: '$oneTimeCount',
+          color: AppColors.accentTeal,
+          icon: Icons.flash_on_outlined,
+        ),
+      ],
     );
   }
 }

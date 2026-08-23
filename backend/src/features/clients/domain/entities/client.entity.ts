@@ -30,6 +30,12 @@ export class Client extends BaseEntity {
   @Column({ nullable: true })
   primaryContactPhone?: string;
 
+  /** How this client first came in (e.g. "Whatsapp", "Call", "Form",
+   * "Email") — free text, deliberately not an enum since real lead
+   * channels vary and new ones show up over time. */
+  @Column({ nullable: true })
+  leadSource?: string;
+
   @Column({ type: 'text', nullable: true })
   notes?: string;
 

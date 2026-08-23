@@ -42,6 +42,10 @@ export class UpdateClientDto {
 
   @IsOptional()
   @IsString()
+  leadSource?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 
   @IsOptional()

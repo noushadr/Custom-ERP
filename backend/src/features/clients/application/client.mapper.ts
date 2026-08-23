@@ -20,6 +20,7 @@ export function toClientResponse(client: Client): ClientResponseDto {
     primaryContactName: client.primaryContactName ?? null,
     primaryContactEmail: client.primaryContactEmail ?? null,
     primaryContactPhone: client.primaryContactPhone ?? null,
+    leadSource: client.leadSource ?? null,
     notes: client.notes ?? null,
     isArchived: client.isArchived,
     archivedAt: client.archivedAt ? client.archivedAt.toISOString() : null,

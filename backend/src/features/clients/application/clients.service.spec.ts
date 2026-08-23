@@ -219,6 +219,20 @@ describe('ClientsService', () => {
       });
       expect(updated.country).toBe('UK/US');
     });
+
+    it('stores and updates the leadSource field', async () => {
+      const created = await service.createClient({
+        companyName: 'Acme Inc',
+        leadSource: 'Whatsapp',
+      });
+      expect(created.leadSource).toBe('Whatsapp');
+
+      clientRepository.findById.mockResolvedValue(buildClient());
+      const updated = await service.updateClient('client-1', {
+        leadSource: 'Call',
+      });
+      expect(updated.leadSource).toBe('Call');
+    });
   });
 
   describe('client health', () => {

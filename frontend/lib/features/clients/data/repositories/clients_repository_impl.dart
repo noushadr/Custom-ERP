@@ -28,6 +28,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
     String? primaryContactName,
     String? primaryContactEmail,
     String? primaryContactPhone,
+    String? leadSource,
     String? notes,
   }) => _guard(
     () => _remoteDataSource.createClient(
@@ -39,6 +40,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
       primaryContactName: primaryContactName,
       primaryContactEmail: primaryContactEmail,
       primaryContactPhone: primaryContactPhone,
+      leadSource: leadSource,
       notes: notes,
     ),
   );
@@ -54,6 +56,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
     String? primaryContactName,
     String? primaryContactEmail,
     String? primaryContactPhone,
+    String? leadSource,
     String? notes,
     bool? isArchived,
   }) => _guard(
@@ -67,6 +70,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
       primaryContactName: primaryContactName,
       primaryContactEmail: primaryContactEmail,
       primaryContactPhone: primaryContactPhone,
+      leadSource: leadSource,
       notes: notes,
       isArchived: isArchived,
     ),

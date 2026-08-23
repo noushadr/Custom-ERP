@@ -24,6 +24,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
   late final TextEditingController _contactNameController;
   late final TextEditingController _contactEmailController;
   late final TextEditingController _contactPhoneController;
+  late final TextEditingController _leadSourceController;
   late final TextEditingController _notesController;
 
   bool _submitting = false;
@@ -51,6 +52,9 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
     _contactPhoneController = TextEditingController(
       text: existing?.primaryContactPhone ?? '',
     );
+    _leadSourceController = TextEditingController(
+      text: existing?.leadSource ?? '',
+    );
     _notesController = TextEditingController(text: existing?.notes ?? '');
   }
 
@@ -64,6 +68,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
     _contactNameController.dispose();
     _contactEmailController.dispose();
     _contactPhoneController.dispose();
+    _leadSourceController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -89,6 +94,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
               primaryContactName: _contactNameController.text.trim(),
               primaryContactEmail: _contactEmailController.text.trim(),
               primaryContactPhone: _contactPhoneController.text.trim(),
+              leadSource: _leadSourceController.text.trim(),
               notes: _notesController.text.trim(),
             )
           : await repository.createClient(
@@ -100,6 +106,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
               primaryContactName: _emptyToNull(_contactNameController.text),
               primaryContactEmail: _emptyToNull(_contactEmailController.text),
               primaryContactPhone: _emptyToNull(_contactPhoneController.text),
+              leadSource: _emptyToNull(_leadSourceController.text),
               notes: _emptyToNull(_notesController.text),
             );
 
@@ -189,6 +196,13 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
                       controller: _contactPhoneController,
                       decoration: const InputDecoration(
                         labelText: 'Primary contact phone',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _leadSourceController,
+                      decoration: const InputDecoration(
+                        labelText: 'Lead source',
                       ),
                     ),
                     const SizedBox(height: 16),

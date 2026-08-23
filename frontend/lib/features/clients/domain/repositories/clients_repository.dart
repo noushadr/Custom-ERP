@@ -18,6 +18,7 @@ abstract interface class ClientsRepository {
     String? primaryContactName,
     String? primaryContactEmail,
     String? primaryContactPhone,
+    String? leadSource,
     String? notes,
   });
   Future<Client> updateClient(
@@ -30,6 +31,7 @@ abstract interface class ClientsRepository {
     String? primaryContactName,
     String? primaryContactEmail,
     String? primaryContactPhone,
+    String? leadSource,
     String? notes,
     bool? isArchived,
   });

@@ -35,5 +35,9 @@ export class CreateClientDto {
 
   @IsOptional()
   @IsString()
+  leadSource?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 }

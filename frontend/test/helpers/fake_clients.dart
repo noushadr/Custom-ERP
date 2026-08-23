@@ -18,6 +18,7 @@ Client buildTestClient({
   String? primaryContactName = 'Jane Client',
   String? primaryContactEmail,
   String? primaryContactPhone,
+  String? leadSource,
   String? notes,
   bool isArchived = false,
   String healthStatus = ClientHealthStatus.healthy,
@@ -36,6 +37,7 @@ Client buildTestClient({
     primaryContactName: primaryContactName,
     primaryContactEmail: primaryContactEmail,
     primaryContactPhone: primaryContactPhone,
+    leadSource: leadSource,
     notes: notes,
     isArchived: isArchived,
     healthStatus: healthStatus,
@@ -215,6 +217,7 @@ class FakeClientsRepository implements ClientsRepository {
     String? primaryContactName,
     String? primaryContactEmail,
     String? primaryContactPhone,
+    String? leadSource,
     String? notes,
   }) async {
     lastCreatedCompanyName = companyName;
@@ -232,6 +235,7 @@ class FakeClientsRepository implements ClientsRepository {
     String? primaryContactName,
     String? primaryContactEmail,
     String? primaryContactPhone,
+    String? leadSource,
     String? notes,
     bool? isArchived,
   }) async => buildTestClient(id: id, isArchived: isArchived ?? false);

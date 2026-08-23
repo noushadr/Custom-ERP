@@ -8,6 +8,7 @@ export interface ClientResponseDto {
   primaryContactName: string | null;
   primaryContactEmail: string | null;
   primaryContactPhone: string | null;
+  leadSource: string | null;
   notes: string | null;
   isArchived: boolean;
   archivedAt: string | null;
