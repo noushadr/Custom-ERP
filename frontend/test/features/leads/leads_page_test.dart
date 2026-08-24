@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/leads/application/leads_providers.dart';
 import 'package:zera_erp/features/leads/presentation/pages/leads_page.dart';
+import 'package:zera_erp/shared/widgets/metric_card.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_leads.dart';
@@ -87,10 +88,12 @@ void main() {
     expect(find.text('Jane Prospect'), findsOneWidget);
     expect(find.text('Acme Inc'), findsOneWidget);
     expect(find.text('+1 555 0100'), findsOneWidget);
-    expect(find.text('Pakistan'), findsOneWidget);
-    expect(find.text('SEO'), findsOneWidget);
-    expect(find.text('Referral'), findsOneWidget);
     expect(find.text('Interested'), findsOneWidget);
+    // Country/service/source also appear in the "Top ..." breakdown panels
+    // above the table, so these are expected to show up more than once.
+    expect(find.text('Pakistan'), findsAtLeastNWidgets(1));
+    expect(find.text('SEO'), findsAtLeastNWidgets(1));
+    expect(find.text('Referral'), findsAtLeastNWidgets(1));
   });
 
   testWidgets('shows an em dash for missing optional fields', (tester) async {
@@ -136,12 +139,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Total Leads'), findsOneWidget);
-    expect(find.text('New This Week'), findsOneWidget);
-    expect(find.text('New This Month'), findsOneWidget);
-    // Total Leads: 2. New This Week/Month: 1 (only l1 is recent).
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('1'), findsNWidgets(2));
+    // Scoped to MetricCard specifically — breakdown panels below also show
+    // plain count numbers, so a bare find.text('1') would be ambiguous.
+    final cardValues = {
+      for (final card in tester.widgetList<MetricCard>(find.byType(MetricCard)))
+        card.label: card.value,
+    };
+
+    expect(cardValues['Total Leads'], '2');
+    expect(cardValues['New This Week'], '1');
+    expect(cardValues['New This Month'], '1');
   });
 
   testWidgets(

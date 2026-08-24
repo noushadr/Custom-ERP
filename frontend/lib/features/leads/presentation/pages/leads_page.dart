@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/permission_gate.dart';
 import '../../../authentication/application/auth_providers.dart';
@@ -8,6 +9,21 @@ import '../../../authentication/application/auth_state.dart';
 import '../../application/leads_providers.dart';
 import '../../domain/entities/lead.dart';
 import 'lead_editor_page.dart';
+
+const _kMonthAbbreviations = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 /// (label, flex) for each spreadsheet-style column — shared between the
 /// header and every data row so widths always line up.
@@ -41,51 +57,70 @@ class LeadsPage extends ConsumerWidget {
 
     final leadsAsync = ref.watch(leadsListProvider);
 
+    // The insights section (stats/chart/breakdowns) added enough content
+    // that it can no longer share a fixed-height `Expanded` region with the
+    // table on shorter windows — the whole page scrolls instead, with the
+    // table given its own generous fixed-height, internally-virtualized
+    // scroll region (still fine at 2,000+ rows, since ListView.builder
+    // doesn't care whether its own height came from Expanded or a SizedBox).
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Leads',
-                  style: Theme.of(context).textTheme.titleLarge,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Leads',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                 ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LeadEditorPage()),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LeadEditorPage()),
+                  ),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('New Lead'),
                 ),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('New Lead'),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const _LeadsStatsRow(),
+            const SizedBox(height: 16),
+            const _MonthlyLeadsChart(),
+            const SizedBox(height: 16),
+            const _LeadsBreakdownRow(),
+            const SizedBox(height: 16),
+            leadsAsync.when(
+              loading: () => const SizedBox(
+                height: 300,
+                child: Center(child: CircularProgressIndicator()),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const _LeadsStatsRow(),
-          const SizedBox(height: 16),
-          Expanded(
-            child: leadsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, _) => Center(
-                child: Text(
-                  'Could not load leads. Please try again.',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
+              error: (_, _) => SizedBox(
+                height: 120,
+                child: Center(
+                  child: Text(
+                    'Could not load leads. Please try again.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ),
               ),
               data: (leads) {
                 if (leads.isEmpty) {
-                  return const Center(child: Text('No leads yet.'));
+                  return const SizedBox(
+                    height: 120,
+                    child: Center(child: Text('No leads yet.')),
+                  );
                 }
-                return _LeadsTable(leads: leads);
+                return SizedBox(height: 560, child: _LeadsTable(leads: leads));
               },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -146,6 +181,320 @@ class _LeadsStatsRow extends ConsumerWidget {
           value: '$newThisMonth',
           color: AppColors.accentTeal,
           icon: Icons.calendar_month_outlined,
+        ),
+      ],
+    );
+  }
+}
+
+/// A single-series bar chart of lead volume per calendar month — a plain
+/// hand-rolled bar chart (this app has no charting package dependency and
+/// the codebase's own convention is to avoid adding one for a single simple
+/// chart), one hue throughout since it's one series over time, not a
+/// category comparison.
+class _MonthlyLeadsChart extends ConsumerWidget {
+  const _MonthlyLeadsChart();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final leadsAsync = ref.watch(leadsListProvider);
+    return leadsAsync.maybeWhen(
+      data: (leads) {
+        final counts = <String, int>{};
+        for (final lead in leads) {
+          final date = DateTime.tryParse(lead.leadDate);
+          if (date == null) continue;
+          final key =
+              '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}';
+          counts[key] = (counts[key] ?? 0) + 1;
+        }
+        if (counts.isEmpty) return const SizedBox.shrink();
+
+        final months = counts.keys.toList()..sort();
+        final maxCount = counts.values.reduce((a, b) => a > b ? a : b);
+
+        return FormSection(
+          title: 'Leads by Month',
+          child: SizedBox(
+            height: 160,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (final month in months)
+                    _MonthBar(
+                      label: _formatMonthLabel(month),
+                      count: counts[month]!,
+                      fraction: counts[month]! / maxCount,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+String _formatMonthLabel(String monthKey) {
+  final parts = monthKey.split('-');
+  final shortYear = parts[0].substring(2);
+  final monthIndex = int.parse(parts[1]) - 1;
+  return '${_kMonthAbbreviations[monthIndex]}\n$shortYear';
+}
+
+class _MonthBar extends StatelessWidget {
+  const _MonthBar({
+    required this.label,
+    required this.count,
+    required this.fraction,
+  });
+
+  final String label;
+  final int count;
+  final double fraction;
+
+  static const _maxBarHeight = 100.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Tooltip(
+        message: '$label: $count lead${count == 1 ? '' : 's'}',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: _maxBarHeight,
+              width: 26,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  height: (_maxBarHeight * fraction).clamp(4.0, _maxBarHeight),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            SizedBox(
+              width: 38,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The three "top N" categorical breakdowns — countries, services, and lead
+/// sources — each its own panel with one representative hue (magnitude
+/// within a panel, not identity across panels, so a single hue per panel is
+/// correct rather than a categorical palette).
+class _LeadsBreakdownRow extends ConsumerWidget {
+  const _LeadsBreakdownRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final leadsAsync = ref.watch(leadsListProvider);
+    return leadsAsync.maybeWhen(
+      data: (leads) {
+        Map<String, int> topCounts(String? Function(Lead) selector) {
+          final counts = <String, int>{};
+          for (final lead in leads) {
+            final value = selector(lead)?.trim();
+            if (value == null || value.isEmpty) continue;
+            counts[value] = (counts[value] ?? 0) + 1;
+          }
+          final sorted = counts.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+          return Map.fromEntries(sorted.take(5));
+        }
+
+        final panels = [
+          _TopBreakdownPanel(
+            title: 'Top Countries',
+            icon: Icons.public_outlined,
+            color: AppColors.primary,
+            counts: topCounts((l) => l.country),
+          ),
+          _TopBreakdownPanel(
+            title: 'Top Services',
+            icon: Icons.design_services_outlined,
+            color: AppColors.secondary,
+            counts: topCounts((l) => l.serviceInterested),
+          ),
+          _TopBreakdownPanel(
+            title: 'Top Lead Sources',
+            icon: Icons.campaign_outlined,
+            color: AppColors.accentTeal,
+            counts: topCounts((l) => l.leadSource),
+          ),
+        ];
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 720) {
+              return Column(
+                children: [
+                  for (final panel in panels) ...[
+                    panel,
+                    const SizedBox(height: 12),
+                  ],
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < panels.length; i++) ...[
+                  Expanded(child: panels[i]),
+                  if (i < panels.length - 1) const SizedBox(width: 12),
+                ],
+              ],
+            );
+          },
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _TopBreakdownPanel extends StatelessWidget {
+  const _TopBreakdownPanel({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.counts,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color color;
+  final Map<String, int> counts;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxCount = counts.values.isEmpty ? 1 : counts.values.first;
+    return FormSection(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (counts.isEmpty)
+            Text(
+              'No data yet.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            )
+          else
+            for (final entry in counts.entries) ...[
+              _BreakdownBarRow(
+                label: entry.key,
+                count: entry.value,
+                fraction: entry.value / maxCount,
+                color: color,
+              ),
+              const SizedBox(height: 8),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BreakdownBarRow extends StatelessWidget {
+  const _BreakdownBarRow({
+    required this.label,
+    required this.count,
+    required this.fraction,
+    required this.color,
+  });
+
+  final String label;
+  final int count;
+  final double fraction;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 96,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Stack(
+            children: [
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: fraction.clamp(0.04, 1.0),
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 28,
+          child: Text(
+            '$count',
+            textAlign: TextAlign.right,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
         ),
       ],
     );
