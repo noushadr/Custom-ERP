@@ -66,6 +66,36 @@ describe('LeadsService', () => {
     expect(result.fullName).toBe('Jane Updated');
   });
 
+  it('prepends a "+" to a phone number that lacks one on create', async () => {
+    const result = await service.createLead({
+      leadDate: '2026-01-01',
+      fullName: 'Jane Prospect',
+      phone: '92 300 1234567',
+    });
+
+    expect(result.phone).toBe('+92 300 1234567');
+  });
+
+  it('does not double up "+" on create when already present', async () => {
+    const result = await service.createLead({
+      leadDate: '2026-01-01',
+      fullName: 'Jane Prospect',
+      phone: '+92 300 1234567',
+    });
+
+    expect(result.phone).toBe('+92 300 1234567');
+  });
+
+  it('prepends a "+" to a phone number that lacks one on update', async () => {
+    leadRepository.findById.mockResolvedValue(buildLead());
+
+    const result = await service.updateLead('lead-1', {
+      phone: '92 300 1234567',
+    });
+
+    expect(result.phone).toBe('+92 300 1234567');
+  });
+
   it('throws when updating a lead that does not exist', async () => {
     leadRepository.findById.mockResolvedValue(null);
 
