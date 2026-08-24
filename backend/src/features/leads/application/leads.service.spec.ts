@@ -96,6 +96,38 @@ describe('LeadsService', () => {
     expect(result.phone).toBe('+92 300 1234567');
   });
 
+  it('does not store a blank optional field on create', async () => {
+    const result = await service.createLead({
+      leadDate: '2026-01-01',
+      fullName: 'Jane Prospect',
+      companyName: '   ',
+    });
+
+    expect(result.companyName).toBeNull();
+  });
+
+  it('clears a field to null when the editor sends "" rather than omitting it', async () => {
+    leadRepository.findById.mockResolvedValue(
+      buildLead({ remarks: 'Old remark' }),
+    );
+
+    const result = await service.updateLead('lead-1', { remarks: '' });
+
+    expect(result.remarks).toBeNull();
+  });
+
+  it('leaves an untouched field alone on update', async () => {
+    leadRepository.findById.mockResolvedValue(
+      buildLead({ companyName: 'Acme Inc' }),
+    );
+
+    const result = await service.updateLead('lead-1', {
+      fullName: 'Jane Updated',
+    });
+
+    expect(result.companyName).toBe('Acme Inc');
+  });
+
   it('throws when updating a lead that does not exist', async () => {
     leadRepository.findById.mockResolvedValue(null);
 

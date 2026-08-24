@@ -18,6 +18,13 @@ function normalizePhone(phone: string | undefined): string | undefined {
   return trimmed.startsWith('+') ? trimmed : `+${trimmed}`;
 }
 
+/** A field the editor UI sends as "" (not omitted) when the user blanks it
+ * out — treated as "clear this field" rather than a literal empty string,
+ * so it's stored as NULL like an untouched field would be, not "". */
+function blankToUndefined(value: string | undefined): string | undefined {
+  return value !== undefined && value.trim() === '' ? undefined : value;
+}
+
 @Injectable()
 export class LeadsService {
   constructor(
@@ -34,13 +41,13 @@ export class LeadsService {
     const lead = new Lead();
     lead.leadDate = dto.leadDate;
     lead.fullName = dto.fullName;
-    lead.companyName = dto.companyName;
-    lead.leadSource = dto.leadSource;
-    lead.phone = normalizePhone(dto.phone);
-    lead.email = dto.email;
-    lead.country = dto.country;
-    lead.remarks = dto.remarks;
-    lead.serviceInterested = dto.serviceInterested;
+    lead.companyName = blankToUndefined(dto.companyName);
+    lead.leadSource = blankToUndefined(dto.leadSource);
+    lead.phone = normalizePhone(blankToUndefined(dto.phone));
+    lead.email = blankToUndefined(dto.email);
+    lead.country = blankToUndefined(dto.country);
+    lead.remarks = blankToUndefined(dto.remarks);
+    lead.serviceInterested = blankToUndefined(dto.serviceInterested);
 
     const saved = await this.leadRepository.save(lead);
     return toLeadResponse(saved);
@@ -50,6 +57,12 @@ export class LeadsService {
     const lead = await this.leadRepository.findById(id);
     if (!lead) throw new NotFoundException('Lead not found');
     const changes = definedFieldsOnly(dto);
+    for (const key of Object.keys(changes) as (keyof UpdateLeadDto)[]) {
+      const value = changes[key];
+      if (typeof value === 'string') {
+        changes[key] = blankToUndefined(value);
+      }
+    }
     if (changes.phone !== undefined) changes.phone = normalizePhone(changes.phone);
     Object.assign(lead, changes);
     const saved = await this.leadRepository.save(lead);

@@ -51,7 +51,8 @@ void main() {
       'Date',
       'Full Name',
       'Company',
-      'Phone/Email',
+      'Phone',
+      'Email',
       'Country',
       'Service Interested',
       'Lead Source',
@@ -75,6 +76,7 @@ void main() {
               leadSource: 'Referral',
               country: 'Pakistan',
               phone: '+1 555 0100',
+              email: 'jane@acme.test',
               serviceInterested: 'SEO',
               remarks: 'Interested',
             ),
@@ -87,7 +89,9 @@ void main() {
     expect(find.text('2026-03-05'), findsOneWidget);
     expect(find.text('Jane Prospect'), findsOneWidget);
     expect(find.text('Acme Inc'), findsOneWidget);
+    // Phone and email are separate columns, not one shared cell.
     expect(find.text('+1 555 0100'), findsOneWidget);
+    expect(find.text('jane@acme.test'), findsOneWidget);
     expect(find.text('Interested'), findsOneWidget);
     // Country/service/source also appear in the "Top ..." breakdown panels
     // above the table, so these are expected to show up more than once.
@@ -116,8 +120,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Bare Lead'), findsOneWidget);
-    // Company, Phone/Email, Country, Service Interested, Lead Source, Remarks.
-    expect(find.text('—'), findsNWidgets(6));
+    // Company, Phone, Email, Country, Service Interested, Lead Source, Remarks.
+    expect(find.text('—'), findsNWidgets(7));
   });
 
   testWidgets('shows summary stat tiles', (tester) async {
