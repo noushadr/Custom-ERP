@@ -93,12 +93,37 @@ void main() {
     expect(find.text('+1 555 0100'), findsOneWidget);
     expect(find.text('jane@acme.test'), findsOneWidget);
     expect(find.text('Interested'), findsOneWidget);
-    // Country/service/source also appear in the "Top ..." breakdown panels
-    // above the table, so these are expected to show up more than once.
-    expect(find.text('Pakistan'), findsAtLeastNWidgets(1));
+    // Service/source also appear in the "Top ..." breakdown panels above
+    // the table, so these are expected to show up more than once. Country
+    // renders as its short code (PK), not the full name.
+    expect(find.text('PK'), findsAtLeastNWidgets(1));
+    expect(find.text('Pakistan'), findsNothing);
     expect(find.text('SEO'), findsAtLeastNWidgets(1));
     expect(find.text('Referral'), findsAtLeastNWidgets(1));
   });
+
+  testWidgets(
+    'maps known country values to their short code, case-insensitively, '
+    'and leaves an unrecognized value as-is',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeLeadsRepository(
+            leads: [
+              buildTestLead(id: 'l1', fullName: 'A', country: 'Pakistan'),
+              buildTestLead(id: 'l2', fullName: 'B', country: 'saudia'),
+              buildTestLead(id: 'l3', fullName: 'C', country: 'Narnia'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('PK'), findsAtLeastNWidgets(1));
+      expect(find.text('KSA'), findsAtLeastNWidgets(1));
+      expect(find.text('Narnia'), findsAtLeastNWidgets(1));
+    },
+  );
 
   testWidgets('shows an em dash for missing optional fields', (tester) async {
     await tester.pumpWidget(

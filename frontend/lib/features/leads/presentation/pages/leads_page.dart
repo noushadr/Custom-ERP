@@ -26,18 +26,94 @@ const _kMonthAbbreviations = [
 ];
 
 /// (label, flex) for each spreadsheet-style column — shared between the
-/// header and every data row so widths always line up.
+/// header and every data row so widths always line up. Phone/Email get
+/// extra room since they were cramped and unreadable at flex 2/3; Country
+/// gives that room back since it now renders as a short code (PK, UAE, ...)
+/// rather than a full name.
 const _kLeadColumns = [
   ('Date', 2),
   ('Full Name', 3),
-  ('Company', 3),
-  ('Phone', 2),
-  ('Email', 3),
+  ('Company', 2),
+  ('Phone', 3),
+  ('Email', 4),
   ('Country', 2),
   ('Service Interested', 3),
   ('Lead Source', 2),
   ('Remarks', 4),
 ];
+
+/// Maps the free-text `Lead.country` values actually present in the
+/// imported sales-log data (including typos and cities entered in place of
+/// a country, e.g. "Dubai", "Rawalpindi") to a short display code. Lookup
+/// is case-insensitive; anything not covered here falls back to the
+/// original text rather than guessing at a code.
+const _kCountryShortCodes = {
+  'pakistan': 'PK',
+  'pakisan': 'PK',
+  'karachi': 'PK',
+  'rawalpindi': 'PK',
+  'uae': 'UAE',
+  'dubai': 'UAE',
+  'united arab emirates': 'UAE',
+  'uk': 'UK',
+  'united kingdom': 'UK',
+  'usa': 'USA',
+  'us': 'USA',
+  'united states': 'USA',
+  'saudi arabia': 'KSA',
+  'saudia': 'KSA',
+  'sa': 'KSA',
+  'riyadh': 'KSA',
+  'australia': 'AU',
+  'india': 'IN',
+  'germany': 'DE',
+  'italy': 'IT',
+  'oman': 'OM',
+  'china': 'CN',
+  'canada': 'CA',
+  'ca': 'CA',
+  'singapore': 'SG',
+  'uganda': 'UG',
+  'kuwait': 'KW',
+  'morocco': 'MA',
+  'netherlands': 'NL',
+  'netherland': 'NL',
+  'qatar': 'QA',
+  'south africa': 'ZA',
+  'laos': 'LA',
+  'malaysia': 'MY',
+  'bangladesh': 'BD',
+  'bahrain': 'BH',
+  'turkiye/turkey': 'TR',
+  'turkey': 'TR',
+  'turkiye': 'TR',
+  'switzerland': 'CH',
+  'spain': 'ES',
+  'france': 'FR',
+  'slovenia': 'SI',
+  'afghanistan': 'AF',
+  'georgia': 'GE',
+  'portugal': 'PT',
+  'belgium': 'BE',
+  'vietnam': 'VN',
+  'botswana': 'BW',
+  'philippines': 'PH',
+  'nigeria': 'NG',
+  'japan': 'JP',
+  'ethopia': 'ET',
+  'ethiopia': 'ET',
+  'latvia': 'LV',
+};
+
+/// Short display code for a country value, falling back to the original
+/// text unchanged when it isn't in [_kCountryShortCodes] — never invents a
+/// code for a value it doesn't recognize.
+String? _formatCountryShort(String? country) {
+  if (country == null) return null;
+  final trimmed = country.trim();
+  if (trimmed.isEmpty) return null;
+  return _kCountryShortCodes[trimmed.toLowerCase()] ?? trimmed;
+}
 
 /// The Leads module's root page — a simple CRM-style list of prospective
 /// clients gated by `leads.manage` (shared by Super Admin and HR/Manager,
@@ -333,7 +409,7 @@ class _LeadsBreakdownRow extends ConsumerWidget {
             title: 'Top Countries',
             icon: Icons.public_outlined,
             color: AppColors.primary,
-            counts: topCounts((l) => l.country),
+            counts: topCounts((l) => _formatCountryShort(l.country)),
           ),
           _TopBreakdownPanel(
             title: 'Top Services',
@@ -488,9 +564,11 @@ class _BreakdownBarRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         SizedBox(
-          width: 28,
+          width: 44,
           child: Text(
             '$count',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.right,
             style: Theme.of(
               context,
@@ -563,7 +641,12 @@ class _LeadsTableHeader extends StatelessWidget {
               flex: flex,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(label, style: style),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
               ),
             ),
         ],
@@ -587,7 +670,7 @@ class _LeadsTableRow extends StatelessWidget {
       lead.companyName ?? '—',
       lead.phone ?? '—',
       lead.email ?? '—',
-      lead.country ?? '—',
+      _formatCountryShort(lead.country) ?? '—',
       lead.serviceInterested ?? '—',
       lead.leadSource ?? '—',
       lead.remarks ?? '—',
