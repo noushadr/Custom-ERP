@@ -11,9 +11,8 @@ export class TypeOrmLeadRepository implements LeadRepository {
     private readonly repository: Repository<Lead>,
   ) {}
 
-  findAll(includeArchived = false): Promise<Lead[]> {
+  findAll(): Promise<Lead[]> {
     return this.repository.find({
-      where: includeArchived ? {} : { isArchived: false },
       order: { leadDate: 'DESC', createdAt: 'DESC' },
     });
   }

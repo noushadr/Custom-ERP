@@ -40,33 +40,82 @@ void main() {
     expect(find.text('New Lead'), findsOneWidget);
   });
 
-  testWidgets(
-    'lists leads with company/country, contact/source, and remarks lines',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          repository: FakeLeadsRepository(
-            leads: [
-              buildTestLead(
-                fullName: 'Jane Prospect',
-                companyName: 'Acme Inc',
-                leadSource: 'Referral',
-                country: 'Pakistan',
-                phone: '+1 555 0100',
-                remarks: 'Interested in SEO',
-              ),
-            ],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('shows the spreadsheet-style column headers', (tester) async {
+    await tester.pumpWidget(
+      _app(repository: FakeLeadsRepository(leads: [buildTestLead()])),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Jane Prospect'), findsOneWidget);
-      expect(find.text('Acme Inc · Pakistan'), findsOneWidget);
-      expect(find.text('+1 555 0100 · Referral'), findsOneWidget);
-      expect(find.text('Interested in SEO'), findsOneWidget);
-    },
-  );
+    for (final label in [
+      'Date',
+      'Full Name',
+      'Company',
+      'Phone/Email',
+      'Country',
+      'Service Interested',
+      'Lead Source',
+      'Remarks',
+    ]) {
+      expect(find.text(label), findsOneWidget);
+    }
+  });
+
+  testWidgets('lists a lead with every field in its own aligned column', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakeLeadsRepository(
+          leads: [
+            buildTestLead(
+              leadDate: '2026-03-05',
+              fullName: 'Jane Prospect',
+              companyName: 'Acme Inc',
+              leadSource: 'Referral',
+              country: 'Pakistan',
+              phone: '+1 555 0100',
+              serviceInterested: 'SEO',
+              remarks: 'Interested',
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('2026-03-05'), findsOneWidget);
+    expect(find.text('Jane Prospect'), findsOneWidget);
+    expect(find.text('Acme Inc'), findsOneWidget);
+    expect(find.text('+1 555 0100'), findsOneWidget);
+    expect(find.text('Pakistan'), findsOneWidget);
+    expect(find.text('SEO'), findsOneWidget);
+    expect(find.text('Referral'), findsOneWidget);
+    expect(find.text('Interested'), findsOneWidget);
+  });
+
+  testWidgets('shows an em dash for missing optional fields', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakeLeadsRepository(
+          leads: [
+            buildTestLead(
+              fullName: 'Bare Lead',
+              companyName: null,
+              leadSource: null,
+              country: null,
+              serviceInterested: null,
+              remarks: null,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bare Lead'), findsOneWidget);
+    // Company, Phone/Email, Country, Service Interested, Lead Source, Remarks.
+    expect(find.text('—'), findsNWidgets(6));
+  });
 
   testWidgets('shows summary stat tiles', (tester) async {
     final now = DateTime.now();
@@ -81,7 +130,6 @@ void main() {
           leads: [
             buildTestLead(id: 'l1', leadDate: isoDate(now)),
             buildTestLead(id: 'l2', leadDate: '2020-01-01'),
-            buildTestLead(id: 'l3', leadDate: '2020-01-01', isArchived: true),
           ],
         ),
       ),
@@ -91,42 +139,9 @@ void main() {
     expect(find.text('Total Leads'), findsOneWidget);
     expect(find.text('New This Week'), findsOneWidget);
     expect(find.text('New This Month'), findsOneWidget);
-    expect(find.text('Archived'), findsOneWidget);
-    // Total Leads: 2 (excludes the archived one). New This Week/Month/
-    // Archived are each 1 (only l1 is recent; l3 is the only archived lead).
+    // Total Leads: 2. New This Week/Month: 1 (only l1 is recent).
     expect(find.text('2'), findsOneWidget);
-    expect(find.text('1'), findsNWidgets(3));
-  });
-
-  testWidgets('excludes archived leads by default, shows them when toggled', (
-    tester,
-  ) async {
-    final repository = FakeLeadsRepository(
-      leads: [
-        buildTestLead(
-          id: 'l1',
-          fullName: 'Active Lead',
-          isArchived: false,
-        ),
-        buildTestLead(
-          id: 'l2',
-          fullName: 'Archived Lead',
-          isArchived: true,
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(_app(repository: repository));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Active Lead'), findsOneWidget);
-    expect(find.text('Archived Lead'), findsNothing);
-
-    await tester.tap(find.byType(Switch));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Active Lead'), findsOneWidget);
-    expect(find.text('Archived Lead'), findsOneWidget);
+    expect(find.text('1'), findsNWidgets(2));
   });
 
   testWidgets(

@@ -35,7 +35,4 @@ export class Lead extends BaseEntity {
    * spans multiple services and shouldn't be blocked on catalog entries. */
   @Column({ nullable: true })
   serviceInterested?: string;
-
-  @Column({ default: false })
-  isArchived: boolean;
 }

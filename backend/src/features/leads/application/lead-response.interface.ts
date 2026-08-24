@@ -9,7 +9,6 @@ export interface LeadResponseDto {
   country: string | null;
   remarks: string | null;
   serviceInterested: string | null;
-  isArchived: boolean;
   createdAt: string;
   updatedAt: string;
 }

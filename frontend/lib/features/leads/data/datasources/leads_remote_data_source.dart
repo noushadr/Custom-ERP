@@ -6,11 +6,8 @@ class LeadsRemoteDataSource {
 
   final Dio _dio;
 
-  Future<List<LeadModel>> getLeads({bool includeArchived = false}) async {
-    final response = await _dio.get<List<dynamic>>(
-      '/leads',
-      queryParameters: {'includeArchived': includeArchived.toString()},
-    );
+  Future<List<LeadModel>> getLeads() async {
+    final response = await _dio.get<List<dynamic>>('/leads');
     return response.data!
         .cast<Map<String, dynamic>>()
         .map(LeadModel.fromJson)
@@ -56,7 +53,6 @@ class LeadsRemoteDataSource {
     String? country,
     String? remarks,
     String? serviceInterested,
-    bool? isArchived,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/leads/$id',
@@ -70,7 +66,6 @@ class LeadsRemoteDataSource {
         'country': ?country,
         'remarks': ?remarks,
         'serviceInterested': ?serviceInterested,
-        'isArchived': ?isArchived,
       },
     );
     return LeadModel.fromJson(response.data!);

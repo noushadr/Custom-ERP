@@ -1,5 +1,4 @@
 import {
-  IsBoolean,
   IsDateString,
   IsEmail,
   IsOptional,
@@ -44,8 +43,4 @@ export class UpdateLeadDto {
   @IsOptional()
   @IsString()
   serviceInterested?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  isArchived?: boolean;
 }

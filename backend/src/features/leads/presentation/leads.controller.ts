@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import { CreateLeadDto } from '../application/dto/create-lead.dto';
 import { UpdateLeadDto } from '../application/dto/update-lead.dto';
@@ -10,8 +10,8 @@ export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
 
   @Get()
-  getLeads(@Query('includeArchived') includeArchived?: string) {
-    return this.leadsService.getLeads(includeArchived === 'true');
+  getLeads() {
+    return this.leadsService.getLeads();
   }
 
   @Post()

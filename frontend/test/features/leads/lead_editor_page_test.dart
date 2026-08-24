@@ -76,21 +76,15 @@ void main() {
     expect(nameField.controller?.text, 'Existing Prospect');
   });
 
-  testWidgets('archives an existing lead on save', (tester) async {
+  testWidgets('saves changes to an existing lead', (tester) async {
     final repository = FakeLeadsRepository();
-    final existing = buildTestLead(id: 'lead-9', fullName: 'To Archive');
+    final existing = buildTestLead(id: 'lead-9', fullName: 'Existing Prospect');
     await tester.pumpWidget(_app(repository: repository, existingLead: existing));
     await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Archive'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Unarchive'), findsOneWidget);
 
     await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
 
     expect(repository.lastUpdatedId, 'lead-9');
-    expect(repository.lastUpdatedIsArchived, true);
   });
 }

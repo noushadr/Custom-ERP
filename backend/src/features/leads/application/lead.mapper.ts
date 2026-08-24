@@ -13,7 +13,6 @@ export function toLeadResponse(lead: Lead): LeadResponseDto {
     country: lead.country ?? null,
     remarks: lead.remarks ?? null,
     serviceInterested: lead.serviceInterested ?? null,
-    isArchived: lead.isArchived,
     createdAt: lead.createdAt.toISOString(),
     updatedAt: lead.updatedAt.toISOString(),
   };

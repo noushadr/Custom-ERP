@@ -1,7 +1,7 @@
 import '../entities/lead.dart';
 
 abstract interface class LeadsRepository {
-  Future<List<Lead>> getLeads({bool includeArchived = false});
+  Future<List<Lead>> getLeads();
   Future<Lead> createLead({
     required String leadDate,
     required String fullName,
@@ -24,6 +24,5 @@ abstract interface class LeadsRepository {
     String? country,
     String? remarks,
     String? serviceInterested,
-    bool? isArchived,
   });
 }

@@ -10,7 +10,6 @@ class Lead {
     required this.country,
     required this.remarks,
     required this.serviceInterested,
-    required this.isArchived,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -31,7 +30,6 @@ class Lead {
 
   /// Free-text service label — not linked to the Service catalog.
   final String? serviceInterested;
-  final bool isArchived;
 
   final DateTime createdAt;
   final DateTime updatedAt;

@@ -31,7 +31,6 @@ class _LeadEditorPageState extends ConsumerState<LeadEditorPage> {
   late final TextEditingController _serviceInterestedController;
 
   DateTime? _leadDate;
-  bool _isArchived = false;
   bool _submitting = false;
   String? _errorMessage;
 
@@ -56,7 +55,6 @@ class _LeadEditorPageState extends ConsumerState<LeadEditorPage> {
       text: existing?.serviceInterested ?? '',
     );
     _leadDate = existing != null ? DateTime.parse(existing.leadDate) : DateTime.now();
-    _isArchived = existing?.isArchived ?? false;
   }
 
   @override
@@ -109,7 +107,6 @@ class _LeadEditorPageState extends ConsumerState<LeadEditorPage> {
               country: _countryController.text.trim(),
               remarks: _remarksController.text.trim(),
               serviceInterested: _serviceInterestedController.text.trim(),
-              isArchived: _isArchived,
             )
           : await repository.createLead(
               leadDate: _isoDate(_leadDate!),
@@ -125,8 +122,7 @@ class _LeadEditorPageState extends ConsumerState<LeadEditorPage> {
               ),
             );
 
-      ref.invalidate(leadsListProvider(false));
-      ref.invalidate(leadsListProvider(true));
+      ref.invalidate(leadsListProvider);
       if (!mounted) return;
       Navigator.of(context).pop(saved);
     } on LeadException catch (error) {
@@ -141,19 +137,7 @@ class _LeadEditorPageState extends ConsumerState<LeadEditorPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Lead' : 'New Lead'),
-        actions: [
-          if (_isEditing)
-            TextButton(
-              onPressed: _submitting
-                  ? null
-                  : () => setState(() => _isArchived = !_isArchived),
-              child: Text(_isArchived ? 'Unarchive' : 'Archive'),
-            ),
-          const SizedBox(width: 8),
-        ],
-      ),
+      appBar: AppBar(title: Text(_isEditing ? 'Edit Lead' : 'New Lead')),
       body: Form(
         key: _formKey,
         child: Column(

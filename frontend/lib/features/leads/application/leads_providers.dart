@@ -16,12 +16,7 @@ final leadsRepositoryProvider = Provider<LeadsRepository>(
 // Re-watches authControllerProvider purely to create a dependency edge, so
 // switching identity (impersonate/returnToAdmin/logout) triggers a refetch —
 // see the longer explanation in employee_providers.dart.
-final leadsListProvider = FutureProvider.autoDispose.family<List<Lead>, bool>((
-  ref,
-  includeArchived,
-) {
+final leadsListProvider = FutureProvider.autoDispose<List<Lead>>((ref) {
   ref.watch(authControllerProvider);
-  return ref
-      .watch(leadsRepositoryProvider)
-      .getLeads(includeArchived: includeArchived);
+  return ref.watch(leadsRepositoryProvider).getLeads();
 });

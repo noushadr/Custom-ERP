@@ -12,7 +12,6 @@ Lead buildTestLead({
   String? country,
   String? remarks,
   String? serviceInterested,
-  bool isArchived = false,
   DateTime? createdAt,
   DateTime? updatedAt,
 }) {
@@ -27,7 +26,6 @@ Lead buildTestLead({
     country: country,
     remarks: remarks,
     serviceInterested: serviceInterested,
-    isArchived: isArchived,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
     updatedAt: updatedAt ?? DateTime(2026, 1, 1),
   );
@@ -41,20 +39,17 @@ class FakeLeadsRepository implements LeadsRepository {
   /// The `fullName` passed to the most recent [createLead] call.
   String? lastCreatedFullName;
 
-  /// The arguments passed to the most recent [updateLead] call.
+  /// The id passed to the most recent [updateLead] call.
   String? lastUpdatedId;
-  bool? lastUpdatedIsArchived;
 
   /// Incremented on every [getLeads] call — used to confirm a mutation
   /// actually invalidated and re-fetched the leads list provider.
   int getLeadsCallCount = 0;
 
   @override
-  Future<List<Lead>> getLeads({bool includeArchived = false}) async {
+  Future<List<Lead>> getLeads() async {
     getLeadsCallCount++;
-    return includeArchived
-        ? leads
-        : leads.where((l) => !l.isArchived).toList();
+    return leads;
   }
 
   @override
@@ -95,10 +90,8 @@ class FakeLeadsRepository implements LeadsRepository {
     String? country,
     String? remarks,
     String? serviceInterested,
-    bool? isArchived,
   }) async {
     lastUpdatedId = id;
-    lastUpdatedIsArchived = isArchived;
-    return buildTestLead(id: id, isArchived: isArchived ?? false);
+    return buildTestLead(id: id);
   }
 }

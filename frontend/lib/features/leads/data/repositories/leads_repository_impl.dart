@@ -10,8 +10,7 @@ class LeadsRepositoryImpl implements LeadsRepository {
   final LeadsRemoteDataSource _remoteDataSource;
 
   @override
-  Future<List<Lead>> getLeads({bool includeArchived = false}) =>
-      _guard(() => _remoteDataSource.getLeads(includeArchived: includeArchived));
+  Future<List<Lead>> getLeads() => _guard(() => _remoteDataSource.getLeads());
 
   @override
   Future<Lead> createLead({
@@ -50,7 +49,6 @@ class LeadsRepositoryImpl implements LeadsRepository {
     String? country,
     String? remarks,
     String? serviceInterested,
-    bool? isArchived,
   }) => _guard(
     () => _remoteDataSource.updateLead(
       id,
@@ -63,7 +61,6 @@ class LeadsRepositoryImpl implements LeadsRepository {
       country: country,
       remarks: remarks,
       serviceInterested: serviceInterested,
-      isArchived: isArchived,
     ),
   );
 

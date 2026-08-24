@@ -17,8 +17,8 @@ export class LeadsService {
     private readonly leadRepository: LeadRepository,
   ) {}
 
-  async getLeads(includeArchived: boolean): Promise<LeadResponseDto[]> {
-    const leads = await this.leadRepository.findAll(includeArchived);
+  async getLeads(): Promise<LeadResponseDto[]> {
+    const leads = await this.leadRepository.findAll();
     return leads.map(toLeadResponse);
   }
 
@@ -33,7 +33,6 @@ export class LeadsService {
     lead.country = dto.country;
     lead.remarks = dto.remarks;
     lead.serviceInterested = dto.serviceInterested;
-    lead.isArchived = false;
 
     const saved = await this.leadRepository.save(lead);
     return toLeadResponse(saved);

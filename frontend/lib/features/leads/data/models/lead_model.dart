@@ -12,7 +12,6 @@ class LeadModel extends Lead {
     required super.country,
     required super.remarks,
     required super.serviceInterested,
-    required super.isArchived,
     required super.createdAt,
     required super.updatedAt,
   });
@@ -28,7 +27,6 @@ class LeadModel extends Lead {
     country: json['country'] as String?,
     remarks: json['remarks'] as String?,
     serviceInterested: json['serviceInterested'] as String?,
-    isArchived: json['isArchived'] as bool,
     createdAt: DateTime.parse(json['createdAt'] as String),
     updatedAt: DateTime.parse(json['updatedAt'] as String),
   );

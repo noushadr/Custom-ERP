@@ -9,100 +9,83 @@ import '../../application/leads_providers.dart';
 import '../../domain/entities/lead.dart';
 import 'lead_editor_page.dart';
 
+/// (label, flex) for each spreadsheet-style column — shared between the
+/// header and every data row so widths always line up.
+const _kLeadColumns = [
+  ('Date', 2),
+  ('Full Name', 3),
+  ('Company', 3),
+  ('Phone/Email', 3),
+  ('Country', 2),
+  ('Service Interested', 3),
+  ('Lead Source', 2),
+  ('Remarks', 4),
+];
+
 /// The Leads module's root page — a simple CRM-style list of prospective
 /// clients gated by `leads.manage` (shared by Super Admin and HR/Manager,
-/// same as Clients & Projects and Payroll).
-class LeadsPage extends ConsumerStatefulWidget {
+/// same as Clients & Projects and Payroll). Rendered as a spreadsheet-style
+/// grid (fixed columns, header row, zebra striping) rather than a card list,
+/// since the underlying data is a flat, column-shaped import from a sales
+/// log — a table reads closer to the source than a list of cards would.
+class LeadsPage extends ConsumerWidget {
   const LeadsPage({super.key});
 
   @override
-  ConsumerState<LeadsPage> createState() => _LeadsPageState();
-}
-
-class _LeadsPageState extends ConsumerState<LeadsPage> {
-  bool _includeArchived = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
     if (authState is! AuthAuthenticated ||
         !authState.user.hasPermission('leads.manage')) {
       return const AccessDeniedView();
     }
 
-    final leadsAsync = ref.watch(leadsListProvider(_includeArchived));
+    final leadsAsync = ref.watch(leadsListProvider);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1040),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Leads',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  Text(
-                    'Show archived',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  Switch(
-                    value: _includeArchived,
-                    onChanged: (value) =>
-                        setState(() => _includeArchived = value),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const LeadEditorPage(),
-                      ),
-                    ),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('New Lead'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const _LeadsStatsRow(),
-              const SizedBox(height: 16),
               Expanded(
-                child: leadsAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (_, _) => Center(
-                    child: Text(
-                      'Could not load leads. Please try again.',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ),
-                  data: (leads) {
-                    if (leads.isEmpty) {
-                      return const Center(child: Text('No leads yet.'));
-                    }
-                    return ListView.separated(
-                      itemCount: leads.length,
-                      separatorBuilder: (_, _) => const Divider(
-                        height: 1,
-                        color: AppColors.borderSubtle,
-                      ),
-                      itemBuilder: (context, index) =>
-                          _LeadRow(lead: leads[index]),
-                    );
-                  },
+                child: Text(
+                  'Leads',
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LeadEditorPage()),
+                ),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('New Lead'),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          const _LeadsStatsRow(),
+          const SizedBox(height: 16),
+          Expanded(
+            child: leadsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, _) => Center(
+                child: Text(
+                  'Could not load leads. Please try again.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+              data: (leads) {
+                if (leads.isEmpty) {
+                  return const Center(child: Text('No leads yet.'));
+                }
+                return _LeadsTable(leads: leads);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -113,7 +96,7 @@ class _LeadsStatsRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final leadsAsync = ref.watch(leadsListProvider(true));
+    final leadsAsync = ref.watch(leadsListProvider);
 
     if (leadsAsync.isLoading) {
       return const Padding(
@@ -129,8 +112,6 @@ class _LeadsStatsRow extends ConsumerWidget {
     }
 
     final leads = leadsAsync.value ?? const [];
-    final active = leads.where((l) => !l.isArchived).toList();
-    final archivedCount = leads.length - active.length;
 
     final now = DateTime.now();
     final weekAgo = now.subtract(const Duration(days: 7));
@@ -141,8 +122,8 @@ class _LeadsStatsRow extends ConsumerWidget {
       return date != null && !date.isBefore(threshold);
     }
 
-    final newThisWeek = active.where((l) => onOrAfter(l, weekAgo)).length;
-    final newThisMonth = active.where((l) => onOrAfter(l, monthStart)).length;
+    final newThisWeek = leads.where((l) => onOrAfter(l, weekAgo)).length;
+    final newThisMonth = leads.where((l) => onOrAfter(l, monthStart)).length;
 
     return Wrap(
       spacing: 10,
@@ -150,7 +131,7 @@ class _LeadsStatsRow extends ConsumerWidget {
       children: [
         MetricCard(
           label: 'Total Leads',
-          value: '${active.length}',
+          value: '${leads.length}',
           color: AppColors.primary,
           icon: Icons.person_search_outlined,
         ),
@@ -166,134 +147,141 @@ class _LeadsStatsRow extends ConsumerWidget {
           color: AppColors.accentTeal,
           icon: Icons.calendar_month_outlined,
         ),
-        MetricCard(
-          label: 'Archived',
-          value: '$archivedCount',
-          color: AppColors.textSecondary,
-          icon: Icons.archive_outlined,
-        ),
       ],
     );
   }
 }
 
-class _LeadRow extends StatelessWidget {
-  const _LeadRow({required this.lead});
+/// A spreadsheet-style grid: a fixed header row of column labels, then a
+/// virtualized [ListView.builder] of aligned, fixed-column rows with
+/// vertical cell dividers and alternating row shading — the "Excel" look
+/// requested for this list, which a card-per-lead layout couldn't give at
+/// 2,000+ rows without either scrolling forever or losing at-a-glance
+/// scannability across columns.
+class _LeadsTable extends StatelessWidget {
+  const _LeadsTable({required this.leads});
 
-  final Lead lead;
+  final List<Lead> leads;
 
   @override
   Widget build(BuildContext context) {
-    final companyLine = [
-      lead.companyName,
-      lead.country,
-    ].whereType<String>().where((s) => s.isNotEmpty).toList();
-    final contact = lead.phone ?? lead.email;
-    final contactLine = [
-      contact,
-      lead.leadSource,
-    ].whereType<String>().where((s) => s.isNotEmpty).toList();
-    final secondaryStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            const _LeadsTableHeader(),
+            Expanded(
+              child: ListView.builder(
+                itemCount: leads.length,
+                itemBuilder: (context, index) => _LeadsTableRow(
+                  lead: leads[index],
+                  isEven: index.isEven,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LeadsTableHeader extends StatelessWidget {
+  const _LeadsTableHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
+      color: AppColors.textSecondary,
+    );
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.fieldFill,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          for (final (label, flex) in _kLeadColumns)
+            Expanded(
+              flex: flex,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(label, style: style),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LeadsTableRow extends StatelessWidget {
+  const _LeadsTableRow({required this.lead, required this.isEven});
+
+  final Lead lead;
+  final bool isEven;
+
+  @override
+  Widget build(BuildContext context) {
+    final cellStyle = Theme.of(context).textTheme.bodySmall;
+    final cells = [
+      lead.leadDate,
+      lead.fullName,
+      lead.companyName ?? '—',
+      lead.phone ?? lead.email ?? '—',
+      lead.country ?? '—',
+      lead.serviceInterested ?? '—',
+      lead.leadSource ?? '—',
+      lead.remarks ?? '—',
+    ];
 
     return InkWell(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => LeadEditorPage(existingLead: lead),
-        ),
+        MaterialPageRoute(builder: (_) => LeadEditorPage(existingLead: lead)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isEven ? AppColors.surface : AppColors.canvasBackground,
+          border: const Border(
+            bottom: BorderSide(color: AppColors.borderSubtle),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          lead.fullName,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (lead.isArchived) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
+            for (var i = 0; i < _kLeadColumns.length; i++)
+              Expanded(
+                flex: _kLeadColumns[i].$2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: i < _kLeadColumns.length - 1
+                      ? const BoxDecoration(
+                          border: Border(
+                            right: BorderSide(color: AppColors.borderSubtle),
                           ),
-                          decoration: BoxDecoration(
-                            color: AppColors.textSecondary.withValues(
-                              alpha: 0.12,
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Archived',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: AppColors.textSecondary),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (companyLine.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(companyLine.join(' · '), style: secondaryStyle),
-                  ],
-                  if (contactLine.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(contactLine.join(' · '), style: secondaryStyle),
-                  ],
-                  if (lead.remarks != null && lead.remarks!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      lead.remarks!,
+                        )
+                      : null,
+                  child: Tooltip(
+                    message: cells[i],
+                    waitDuration: const Duration(milliseconds: 500),
+                    child: Text(
+                      cells[i],
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: secondaryStyle?.copyWith(
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (lead.serviceInterested != null &&
-                    lead.serviceInterested!.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primarySoft,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      lead.serviceInterested!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primary,
-                      ),
+                      style: i == 1
+                          ? cellStyle?.copyWith(fontWeight: FontWeight.w600)
+                          : cellStyle,
                     ),
                   ),
-                const SizedBox(height: 6),
-                Text(lead.leadDate, style: secondaryStyle),
-              ],
-            ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+                ),
+              ),
           ],
         ),
       ),
