@@ -40,27 +40,62 @@ void main() {
     expect(find.text('New Lead'), findsOneWidget);
   });
 
-  testWidgets('lists leads with company/source/country subtitle', (
-    tester,
-  ) async {
+  testWidgets(
+    'lists leads with company/country, contact/source, and remarks lines',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeLeadsRepository(
+            leads: [
+              buildTestLead(
+                fullName: 'Jane Prospect',
+                companyName: 'Acme Inc',
+                leadSource: 'Referral',
+                country: 'Pakistan',
+                phone: '+1 555 0100',
+                remarks: 'Interested in SEO',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Jane Prospect'), findsOneWidget);
+      expect(find.text('Acme Inc · Pakistan'), findsOneWidget);
+      expect(find.text('+1 555 0100 · Referral'), findsOneWidget);
+      expect(find.text('Interested in SEO'), findsOneWidget);
+    },
+  );
+
+  testWidgets('shows summary stat tiles', (tester) async {
+    final now = DateTime.now();
+    String isoDate(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-'
+        '${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
+
     await tester.pumpWidget(
       _app(
         repository: FakeLeadsRepository(
           leads: [
-            buildTestLead(
-              fullName: 'Jane Prospect',
-              companyName: 'Acme Inc',
-              leadSource: 'Referral',
-              country: 'Pakistan',
-            ),
+            buildTestLead(id: 'l1', leadDate: isoDate(now)),
+            buildTestLead(id: 'l2', leadDate: '2020-01-01'),
+            buildTestLead(id: 'l3', leadDate: '2020-01-01', isArchived: true),
           ],
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Jane Prospect'), findsOneWidget);
-    expect(find.text('Acme Inc · Referral · Pakistan'), findsOneWidget);
+    expect(find.text('Total Leads'), findsOneWidget);
+    expect(find.text('New This Week'), findsOneWidget);
+    expect(find.text('New This Month'), findsOneWidget);
+    expect(find.text('Archived'), findsOneWidget);
+    // Total Leads: 2 (excludes the archived one). New This Week/Month/
+    // Archived are each 1 (only l1 is recent; l3 is the only archived lead).
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('1'), findsNWidgets(3));
   });
 
   testWidgets('excludes archived leads by default, shows them when toggled', (
