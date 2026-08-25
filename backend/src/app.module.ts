@@ -11,6 +11,7 @@ import { ChecklistsModule } from './features/checklists/checklists.module';
 import { ClientsModule } from './features/clients/clients.module';
 import { DepartmentsModule } from './features/departments/departments.module';
 import { EmployeeModule } from './features/employee/employee.module';
+import { FinancialReportsModule } from './features/financial-reports/financial-reports.module';
 import { HolidaysModule } from './features/holidays/holidays.module';
 import { KnowledgeBaseModule } from './features/knowledge-base/knowledge-base.module';
 import { LeadsModule } from './features/leads/leads.module';
@@ -46,6 +47,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     NotificationsModule,
     PayrollModule,
     LeadsModule,
+    FinancialReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -358,7 +358,7 @@ class _NavRow extends StatelessWidget {
                   data: iconTheme ?? const IconThemeData(),
                   child: icon(destination, selected: selected),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     destination.label,

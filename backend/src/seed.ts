@@ -32,14 +32,19 @@ const DEFAULT_PERMISSIONS = [
   'clients.manage',
   'payroll.manage',
   'leads.manage',
+  'finances.manage',
 ];
 
 // 'clients.manage', 'payroll.manage', and 'leads.manage' (Clients & Projects /
 // Client Health / Payroll / Leads — the Admin Business Management modules;
-// Agency Reporting and Finances were removed 2026-08-23) are deliberately
-// absent from Team Lead/Employee below, but ARE granted to HR/Manager as a
-// deliberate exception, alongside Super Admin's implicit "every known
-// permission" grant.
+// the original Agency Reporting and Finances modules were removed
+// 2026-08-23) are deliberately absent from Team Lead/Employee below, but ARE
+// granted to HR/Manager as a deliberate exception, alongside Super Admin's
+// implicit "every known permission" grant. 'finances.manage' (the new
+// Financial Reports module, added back 2026-08-25 at the user's explicit
+// request) is the one exception to that exception — it is Super-Admin-only,
+// deliberately absent from HR/Manager too, since it exposes real company
+// revenue/profit figures.
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
   { name: 'Super Admin', permissions: [] }, // always granted every known permission, see below
   {

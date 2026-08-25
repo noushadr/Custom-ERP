@@ -19,6 +19,7 @@ import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
+import 'features/financial_reports/presentation/pages/financial_reports_page.dart';
 import 'features/knowledge_base/presentation/pages/knowledge_base_page.dart';
 import 'features/leads/presentation/pages/leads_page.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
@@ -151,6 +152,11 @@ const _allDestinations = [
     icon: Icons.person_search_outlined,
     selectedIcon: Icons.person_search_outlined,
   ),
+  AppNavDestination(
+    label: 'Financial Reports',
+    icon: Icons.account_balance_outlined,
+    selectedIcon: Icons.account_balance_outlined,
+  ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
@@ -163,22 +169,20 @@ const _adminOnlyLabels = {
   'Clients & Projects',
   'Payroll',
   'Leads',
+  'Financial Reports',
 };
 
 // Hidden from Super Admin/HR/Manager — they use Dashboard instead.
 // Visible to everyone else.
 const _nonAdminOnlyLabels = {'User Dashboard'};
 
-// Stricter than _adminOnlyLabels: modules in this set would be Super Admin
-// only — Employees, Team Leads, and HR/Manager would not even see the nav
-// entry. Currently empty: Agency Reporting and Finances (the only two
-// modules that were ever Super-Admin-exclusive) were removed 2026-08-23;
-// every remaining Admin Business Management module (Clients & Projects,
-// Payroll, Leads) is shared with HR/Manager instead — see
-// _hrAndAdminOnlyLabels below. Left in place (rather than deleted) so a
-// future Super-Admin-exclusive module has somewhere to go without touching
-// the grouping mechanism in ResponsiveScaffold.adminSectionCount.
-const _superAdminOnlyLabels = <String>{};
+// Stricter than _adminOnlyLabels: modules in this set are Super Admin only —
+// Employees, Team Leads, and HR/Manager do not even see the nav entry. Was
+// empty from 2026-08-23 (when the original Agency Reporting and Finances
+// modules were removed) until 2026-08-25, when the new Financial Reports
+// module became its first member — real company revenue/profit data,
+// materially more sensitive than the shared-with-HR/Manager modules below.
+const _superAdminOnlyLabels = {'Financial Reports'};
 
 // The other half of Admin Business Management: shared between Super Admin
 // and HR/Manager, but still off-limits to Team Lead/Employee (who are
@@ -307,6 +311,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const PayrollPage();
       case 'Leads':
         return const LeadsPage();
+      case 'Financial Reports':
+        return const FinancialReportsPage();
       default:
         return _ComingSoon(destination: destination);
     }

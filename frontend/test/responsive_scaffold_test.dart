@@ -113,15 +113,16 @@ void main() {
     );
 
     testWidgets(
-      'shows the HR & admin and general section headings, ordered HR & '
-      'admin above general, at desktop width — no admin-only group exists '
-      'since Agency Reporting/Finances were removed',
+      'shows the admin-only, HR & admin, and general section headings, '
+      'ordered admin-only above HR & admin above general, at desktop width '
+      '— Financial Reports is the admin-only group\'s first member since '
+      '2026-08-25',
       (tester) async {
         await _setSurfaceWidth(tester, 1280);
         await tester.pumpWidget(_authenticatedApp(user: superAdmin));
         await tester.pumpAndSettle();
 
-        expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
+        expect(find.text('ADMIN ONLY FEATURES'), findsOneWidget);
         expect(find.text('HR & ADMIN FEATURES'), findsOneWidget);
         expect(find.text('GENERAL FEATURES'), findsOneWidget);
 
@@ -132,8 +133,10 @@ void main() {
             )
             .dy;
 
+        final adminOnlyItemY = topOf('Financial Reports');
         final hrAdminItemY = topOf('Clients & Projects');
         final generalItemY = topOf('Dashboard');
+        expect(adminOnlyItemY, lessThan(hrAdminItemY));
         expect(hrAdminItemY, lessThan(generalItemY));
       },
     );
@@ -184,7 +187,7 @@ void main() {
         await tester.tap(find.byIcon(Icons.menu));
         await tester.pumpAndSettle();
 
-        expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
+        expect(find.text('ADMIN ONLY FEATURES'), findsOneWidget);
         expect(find.text('HR & ADMIN FEATURES'), findsOneWidget);
         expect(find.text('GENERAL FEATURES'), findsOneWidget);
       },
