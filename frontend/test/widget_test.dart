@@ -8,6 +8,7 @@ import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
+import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leads/application/leads_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
@@ -24,6 +25,7 @@ import 'package:zera_erp/main.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
+import 'helpers/fake_freelancers.dart';
 import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leads.dart';
 import 'helpers/fake_leave.dart';
@@ -74,6 +76,9 @@ Widget _authenticatedApp({
         FakeNotificationsRepository(),
       ),
       payrollRepositoryProvider.overrideWithValue(FakePayrollRepository()),
+      freelancersRepositoryProvider.overrideWithValue(
+        FakeFreelancersRepository(),
+      ),
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
     ],
     child: const ZeraApp(),
@@ -442,6 +447,7 @@ void main() {
       expect(find.text('Clients At Risk'), findsOneWidget);
       expect(find.text('Latest Payroll Run'), findsOneWidget);
       expect(find.text('Draft'), findsOneWidget);
+      expect(find.text('Total Freelancers'), findsOneWidget);
     },
   );
 
@@ -464,6 +470,7 @@ void main() {
       expect(find.text('Admin Business Management'), findsNothing);
       expect(find.text('Active Projects'), findsNothing);
       expect(find.text('Latest Payroll Run'), findsNothing);
+      expect(find.text('Total Freelancers'), findsNothing);
     },
   );
 

@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../../freelancers/application/freelancers_providers.dart';
 import '../../application/payroll_providers.dart';
 import '../../domain/entities/payroll_line_item.dart';
 import '../../domain/entities/payroll_run_detail.dart';
@@ -137,6 +138,20 @@ class _RunDetailBody extends ConsumerWidget {
           const SizedBox(height: 16),
           FormSection(
             title: 'Line items',
+            trailing: run.status == PayrollRunStatus.draft
+                ? OutlinedButton.icon(
+                    onPressed: () async {
+                      await showDialog<void>(
+                        context: context,
+                        builder: (_) => _AddFreelancerDialog(run: run),
+                      );
+                      ref.invalidate(payrollRunDetailProvider(run.id));
+                      ref.invalidate(payrollRunsListProvider);
+                    },
+                    icon: const Icon(Icons.person_add_alt_outlined, size: 16),
+                    label: const Text('Add Freelancer'),
+                  )
+                : null,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
@@ -178,7 +193,36 @@ class _RunDetailBody extends ConsumerWidget {
                             }
                           : null,
                       cells: [
-                        DataCell(Text(item.employeeName)),
+                        DataCell(
+                          item.isFreelancer
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(item.employeeName),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        'Freelancer',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(color: AppColors.primary),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(item.employeeName),
+                        ),
                         DataCell(Text(formatAmount(item.baseSalary))),
                         DataCell(Text(item.quantity == null ? '—' : '${item.quantity}')),
                         DataCell(
@@ -232,6 +276,7 @@ class _EditLineItemDialog extends ConsumerStatefulWidget {
 }
 
 class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
+  late final TextEditingController _baseSalaryController;
   late final TextEditingController _quantityController;
   late final TextEditingController _perUnitRateController;
   late final TextEditingController _allowancesController;
@@ -252,6 +297,9 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
   @override
   void initState() {
     super.initState();
+    _baseSalaryController = TextEditingController(
+      text: widget.item.baseSalary.toStringAsFixed(2),
+    );
     _quantityController = TextEditingController(
       text: widget.item.quantity == null ? '' : '${widget.item.quantity}',
     );
@@ -296,6 +344,7 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
 
   @override
   void dispose() {
+    _baseSalaryController.dispose();
     _quantityController.dispose();
     _perUnitRateController.dispose();
     _allowancesController.dispose();
@@ -324,6 +373,9 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
           .updateLineItem(
             widget.runId,
             widget.item.id,
+            baseSalary: widget.item.isFreelancer
+                ? double.tryParse(_baseSalaryController.text)
+                : null,
             quantity: int.tryParse(_quantityController.text),
             perUnitRate: double.tryParse(_perUnitRateController.text),
             allowances: double.tryParse(_allowancesController.text) ?? 0,
@@ -368,12 +420,21 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
                 ),
                 const SizedBox(height: 12),
               ],
-              Text(
-                'Salary snapshot: PKR ${formatAmount(widget.item.baseSalary)}',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-              ),
+              if (widget.item.isFreelancer) ...[
+                const _SectionLabel('Amount'),
+                const SizedBox(height: 8),
+                _AmountField(
+                  label: 'This month\'s pay',
+                  controller: _baseSalaryController,
+                  enabled: !_saving,
+                ),
+              ] else
+                Text(
+                  'Salary snapshot: PKR ${formatAmount(widget.item.baseSalary)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               const SizedBox(height: 16),
               const _SectionLabel('Piece-rate pay (optional)'),
               const SizedBox(height: 8),
@@ -488,6 +549,150 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddFreelancerDialog extends ConsumerStatefulWidget {
+  const _AddFreelancerDialog({required this.run});
+
+  final PayrollRunDetail run;
+
+  @override
+  ConsumerState<_AddFreelancerDialog> createState() =>
+      _AddFreelancerDialogState();
+}
+
+class _AddFreelancerDialogState extends ConsumerState<_AddFreelancerDialog> {
+  String? _selectedFreelancerId;
+  final _amountController = TextEditingController();
+  final _notesController = TextEditingController();
+  bool _saving = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final freelancerId = _selectedFreelancerId;
+    if (freelancerId == null) return;
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+    try {
+      await ref
+          .read(payrollRepositoryProvider)
+          .addFreelancerToRun(
+            widget.run.id,
+            freelancerId: freelancerId,
+            baseSalary: double.tryParse(_amountController.text) ?? 0,
+            notes: _notesController.text.trim().isEmpty
+                ? null
+                : _notesController.text.trim(),
+          );
+      if (mounted) Navigator.of(context).pop();
+    } on PayrollException catch (error) {
+      setState(() => _errorMessage = error.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final freelancersAsync = ref.watch(freelancersListProvider);
+    final alreadyInRun = widget.run.lineItems
+        .map((item) => item.freelancerId)
+        .whereType<String>()
+        .toSet();
+
+    return AlertDialog(
+      title: const Text('Add Freelancer'),
+      content: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_errorMessage != null) ...[
+              Text(
+                _errorMessage!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: 12),
+            ],
+            freelancersAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, _) => const Text('Could not load freelancers.'),
+              data: (freelancers) {
+                final available = freelancers
+                    .where((f) => f.isActive && !alreadyInRun.contains(f.id))
+                    .toList();
+                if (available.isEmpty) {
+                  return Text(
+                    'No active freelancers left to add — everyone active is '
+                    'already in this run.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  );
+                }
+                return DropdownButtonFormField<String>(
+                  initialValue: _selectedFreelancerId,
+                  decoration: const InputDecoration(labelText: 'Freelancer'),
+                  items: [
+                    for (final freelancer in available)
+                      DropdownMenuItem(
+                        value: freelancer.id,
+                        child: Text(freelancer.fullName),
+                      ),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (value) =>
+                            setState(() => _selectedFreelancerId = value),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _AmountField(
+              label: "This month's pay",
+              controller: _amountController,
+              enabled: !_saving,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notesController,
+              enabled: !_saving,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: 'Notes (optional)'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: (_saving || _selectedFreelancerId == null)
+              ? null
+              : _submit,
+          child: _saving
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Add'),
         ),
       ],
     );

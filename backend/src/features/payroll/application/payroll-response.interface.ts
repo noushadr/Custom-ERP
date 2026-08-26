@@ -1,6 +1,11 @@
 export interface PayrollLineItemResponseDto {
   id: string;
-  employeeId: string;
+  employeeId: string | null;
+  freelancerId: string | null;
+  /** `true` when this line item is a freelancer's rather than an
+   * employee's — the frontend uses this to decide whether `baseSalary` is
+   * directly editable (freelancers) or a read-only snapshot (employees). */
+  isFreelancer: boolean;
   employeeName: string;
   employeePhotoUrl: string | null;
   /** The salary snapshot for salaried employees, or `quantity *

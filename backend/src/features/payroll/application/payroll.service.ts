@@ -16,7 +16,12 @@ import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
+import {
+  FREELANCER_REPOSITORY,
+  type FreelancerRepository,
+} from '../../freelancers/domain/repositories/freelancer-repository.interface';
 import { NotificationsService } from '../../notifications/application/notifications.service';
+import { AddFreelancerLineItemDto } from './dto/add-freelancer-line-item.dto';
 import { GeneratePayrollRunDto } from './dto/generate-payroll-run.dto';
 import { UpdatePayrollLineItemDto } from './dto/update-payroll-line-item.dto';
 import { PayrollLineItem } from '../domain/entities/payroll-line-item.entity';
@@ -59,6 +64,8 @@ export class PayrollService {
     private readonly employeeRepository: EmployeeRepository,
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
+    @Inject(FREELANCER_REPOSITORY)
+    private readonly freelancerRepository: FreelancerRepository,
     private readonly employeesService: EmployeesService,
     private readonly notificationsService: NotificationsService,
   ) {}
@@ -129,6 +136,7 @@ export class PayrollService {
         const item = new PayrollLineItem();
         item.runId = savedRun.id;
         item.employeeId = employee.id;
+        item.freelancerId = null;
         item.baseSalary = baseSalary.toFixed(2);
         item.quantity = null;
         item.perUnitRate = null;
@@ -172,6 +180,15 @@ export class PayrollService {
       throw new NotFoundException('Payroll line item not found');
     }
 
+    if (dto.baseSalary !== undefined) {
+      if (item.freelancerId == null) {
+        throw new BadRequestException(
+          "Only a freelancer's base pay can be edited directly — an " +
+            "employee's is snapshotted from their salary record.",
+        );
+      }
+      item.baseSalary = dto.baseSalary.toFixed(2);
+    }
     if (dto.quantity !== undefined) item.quantity = dto.quantity;
     if (dto.perUnitRate !== undefined) {
       item.perUnitRate = dto.perUnitRate.toFixed(2);
@@ -197,6 +214,59 @@ export class PayrollService {
     if (dto.lateDays !== undefined) item.lateDays = dto.lateDays;
     if (dto.notes !== undefined) item.notes = dto.notes;
 
+    await this.lineItemRepository.save(item);
+
+    const lineItems = await this.lineItemRepository.findByRunId(runId);
+    return toPayrollRunDetail(run, lineItems);
+  }
+
+  /** Adds one freelancer to a draft run, with this month's pay entered
+   * directly (freelancers have no SalaryRecord to snapshot from — see
+   * `PayrollLineItem.baseSalary`'s doc comment). Unlike active employees,
+   * freelancers are never auto-included when a run is generated, since
+   * whether/how much a given freelancer worked varies month to month. */
+  async addFreelancerToRun(
+    runId: string,
+    dto: AddFreelancerLineItemDto,
+  ): Promise<PayrollRunDetailDto> {
+    const run = await this.getRunOrThrow(runId);
+    if (run.status !== PayrollRunStatus.DRAFT) {
+      throw new BadRequestException(
+        'Only a draft payroll run can be edited.',
+      );
+    }
+
+    const freelancer = await this.freelancerRepository.findById(
+      dto.freelancerId,
+    );
+    if (!freelancer) throw new NotFoundException('Freelancer not found');
+
+    const existingItems = await this.lineItemRepository.findByRunId(runId);
+    if (existingItems.some((item) => item.freelancerId === dto.freelancerId)) {
+      throw new ConflictException(
+        `${freelancer.fullName} is already in this payroll run.`,
+      );
+    }
+
+    const item = new PayrollLineItem();
+    item.runId = runId;
+    item.employeeId = null;
+    item.freelancerId = freelancer.id;
+    item.baseSalary = dto.baseSalary.toFixed(2);
+    item.quantity = null;
+    item.perUnitRate = null;
+    item.allowances = '0.00';
+    item.overtime = '0.00';
+    item.reimbursement = '0.00';
+    item.commissions = '0.00';
+    item.deductions = '0.00';
+    item.advances = '0.00';
+    item.tax = '0.00';
+    item.fines = '0.00';
+    item.totalAbsent = 0;
+    item.lateHours = 0;
+    item.lateDays = 0;
+    item.notes = dto.notes ?? null;
     await this.lineItemRepository.save(item);
 
     const lineItems = await this.lineItemRepository.findByRunId(runId);
@@ -246,6 +316,8 @@ export class PayrollService {
     const lineItems = await this.lineItemRepository.findByRunId(saved.id);
 
     for (const item of lineItems) {
+      // Freelancers have no User/login account to notify.
+      if (!item.employee) continue;
       await this.notificationsService.create({
         recipientUserId: item.employee.userId,
         message: `Your payroll for ${MONTH_NAMES[saved.month - 1]} ${saved.year} has been paid.`,

@@ -4,11 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
+import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
 import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_run_status.dart';
 import 'package:zera_erp/features/payroll/presentation/pages/payroll_page.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_freelancers.dart';
 import '../../helpers/fake_payroll.dart';
 
 const _superAdmin = AuthUser(
@@ -18,7 +20,11 @@ const _superAdmin = AuthUser(
   permissions: ['payroll.manage'],
 );
 
-Widget _app({FakePayrollRepository? repository, AuthUser? viewer}) {
+Widget _app({
+  FakePayrollRepository? repository,
+  FakeFreelancersRepository? freelancersRepository,
+  AuthUser? viewer,
+}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
@@ -26,6 +32,9 @@ Widget _app({FakePayrollRepository? repository, AuthUser? viewer}) {
       ),
       payrollRepositoryProvider.overrideWithValue(
         repository ?? FakePayrollRepository(),
+      ),
+      freelancersRepositoryProvider.overrideWithValue(
+        freelancersRepository ?? FakeFreelancersRepository(),
       ),
     ],
     child: const MaterialApp(home: Scaffold(body: PayrollPage())),
@@ -132,6 +141,97 @@ void main() {
       );
       expect(find.text('August 2026'), findsNothing);
       expect(repository.getRunsCallCount, 0);
+    },
+  );
+
+  testWidgets(
+    'the Freelancers tab lists freelancers with their role and active status',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          freelancersRepository: FakeFreelancersRepository(
+            freelancers: [
+              buildTestFreelancer(
+                fullName: 'Kulsum Zehra',
+                role: 'Content Writer',
+              ),
+              buildTestFreelancer(
+                id: 'freelancer-2',
+                fullName: 'Hamza Saqib',
+                role: 'Data Entry',
+                isActive: false,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Freelancers'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kulsum Zehra'), findsOneWidget);
+      expect(find.text('Content Writer'), findsOneWidget);
+      expect(find.text('Active'), findsOneWidget);
+      expect(find.text('Hamza Saqib'), findsOneWidget);
+      expect(find.text('Data Entry'), findsOneWidget);
+      expect(find.text('Inactive'), findsOneWidget);
+    },
+  );
+
+  testWidgets('adding a freelancer submits the entered name and role', (
+    tester,
+  ) async {
+    final freelancersRepository = FakeFreelancersRepository(freelancers: []);
+    await tester.pumpWidget(
+      _app(freelancersRepository: freelancersRepository),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Freelancers'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Add Freelancer'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Full name'),
+      'Kulsum Zehra',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Role (optional)'),
+      'Content Writer',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+    await tester.pumpAndSettle();
+
+    expect(freelancersRepository.lastCreatedFullName, 'Kulsum Zehra');
+    expect(freelancersRepository.lastCreatedRole, 'Content Writer');
+  });
+
+  testWidgets(
+    'tapping a freelancer and toggling Active submits the update',
+    (tester) async {
+      final freelancersRepository = FakeFreelancersRepository(
+        freelancers: [buildTestFreelancer(fullName: 'Kulsum Zehra')],
+      );
+      await tester.pumpWidget(
+        _app(freelancersRepository: freelancersRepository),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Freelancers'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Kulsum Zehra'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(SwitchListTile));
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(freelancersRepository.lastUpdatedId, 'freelancer-1');
+      expect(freelancersRepository.lastUpdatedIsActive, false);
     },
   );
 }

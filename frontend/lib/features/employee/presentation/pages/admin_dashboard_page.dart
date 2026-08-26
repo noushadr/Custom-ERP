@@ -6,6 +6,7 @@ import '../../../../shared/widgets/metric_card.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../clients/application/clients_providers.dart';
+import '../../../freelancers/application/freelancers_providers.dart';
 import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
 import '../../../payroll/application/payroll_providers.dart';
@@ -240,7 +241,10 @@ class _DashboardStats extends ConsumerWidget {
                   const _ActiveProjectsCard(),
                   const _ClientsAtRiskCard(),
                 ],
-                if (showPayrollRuns) const _LatestPayrollRunCard(),
+                if (showPayrollRuns) ...[
+                  const _LatestPayrollRunCard(),
+                  const _TotalFreelancersCard(),
+                ],
               ],
             ),
             const SizedBox(height: 18),
@@ -437,6 +441,30 @@ class _LatestPayrollRunCard extends ConsumerWidget {
       default:
         return status;
     }
+  }
+}
+
+/// Active freelancer count — same "same as employees" stat parity the
+/// user asked for, placed alongside Payroll's other Admin Business
+/// Management tiles since freelancers are managed from that module.
+class _TotalFreelancersCard extends ConsumerWidget {
+  const _TotalFreelancersCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final freelancersAsync = ref.watch(freelancersListProvider);
+
+    return MetricCard(
+      label: 'Total Freelancers',
+      value: freelancersAsync.when(
+        data: (freelancers) =>
+            '${freelancers.where((f) => f.isActive).length}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.accentTeal,
+      icon: Icons.badge_outlined,
+    );
   }
 }
 

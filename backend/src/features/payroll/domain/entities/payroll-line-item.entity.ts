@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { Employee } from '../../../employee/domain/entities/employee.entity';
+import { Freelancer } from '../../../freelancers/domain/entities/freelancer.entity';
 import { PayrollRun } from './payroll-run.entity';
 
 /** One row per employee per PayrollRun. `baseSalary` is a snapshot taken
@@ -29,13 +30,29 @@ export class PayrollLineItem extends BaseEntity {
   @JoinColumn({ name: 'runId' })
   run: PayrollRun;
 
-  @Column()
-  employeeId: string;
+  /** Exactly one of `employeeId`/`freelancerId` is set per line item —
+   * enforced in `PayrollService`, not a DB constraint (see the migration
+   * that introduced `freelancerId`). */
+  @Column({ type: 'uuid', nullable: true })
+  employeeId?: string | null;
 
-  @ManyToOne(() => Employee, { eager: true })
+  @ManyToOne(() => Employee, { eager: true, nullable: true })
   @JoinColumn({ name: 'employeeId' })
-  employee: Employee;
+  employee?: Employee | null;
 
+  @Column({ type: 'uuid', nullable: true })
+  freelancerId?: string | null;
+
+  @ManyToOne(() => Freelancer, { eager: true, nullable: true })
+  @JoinColumn({ name: 'freelancerId' })
+  freelancer?: Freelancer | null;
+
+  /** For an employee, the SalaryRecord snapshot taken at generation time
+   * (see the class doc above). For a freelancer, there is no salary
+   * history to snapshot from — this is instead a plain directly-entered
+   * amount, set when they're added to the run and freely editable
+   * afterwards while the run is Draft (see `PayrollService.updateLineItem`
+   * — it only allows editing `baseSalary` when `freelancerId` is set). */
   @Column({ type: 'numeric', precision: 12, scale: 2 })
   baseSalary: string;
 

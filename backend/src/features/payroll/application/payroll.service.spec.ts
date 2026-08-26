@@ -4,6 +4,8 @@ import { Employee } from '../../employee/domain/entities/employee.entity';
 import { EmployeesService } from '../../employee/application/employees.service';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
+import { Freelancer } from '../../freelancers/domain/entities/freelancer.entity';
+import type { FreelancerRepository } from '../../freelancers/domain/repositories/freelancer-repository.interface';
 import { PayrollLineItem } from '../domain/entities/payroll-line-item.entity';
 import { PayrollRun } from '../domain/entities/payroll-run.entity';
 import { PayrollRunStatus } from '../domain/enums/payroll-run-status.enum';
@@ -41,12 +43,25 @@ function buildRun(overrides: Partial<PayrollRun> = {}): PayrollRun {
   } as PayrollRun;
 }
 
+function buildFreelancer(overrides: Partial<Freelancer> = {}): Freelancer {
+  return {
+    id: 'freelancer-1',
+    fullName: 'Kulsum Zehra',
+    role: 'Content Writer',
+    notes: null,
+    isActive: true,
+    ...overrides,
+  } as Freelancer;
+}
+
 function buildLineItem(overrides: Partial<PayrollLineItem> = {}): PayrollLineItem {
   return {
     id: 'item-1',
     runId: 'run-1',
     employeeId: 'employee-1',
     employee: buildEmployee(),
+    freelancerId: null,
+    freelancer: null,
     baseSalary: '50000.00',
     quantity: null,
     perUnitRate: null,
@@ -74,6 +89,7 @@ describe('PayrollService', () => {
   let lineItemRepository: jest.Mocked<PayrollLineItemRepository>;
   let employeeRepository: jest.Mocked<EmployeeRepository>;
   let userRepository: jest.Mocked<UserRepository>;
+  let freelancerRepository: jest.Mocked<FreelancerRepository>;
   let employeesService: jest.Mocked<EmployeesService>;
   let notificationsService: jest.Mocked<NotificationsService>;
 
@@ -125,6 +141,11 @@ describe('PayrollService', () => {
       findAll: jest.fn(),
       save: jest.fn(),
     };
+    freelancerRepository = {
+      findAll: jest.fn().mockResolvedValue([]),
+      findById: jest.fn(),
+      save: jest.fn((freelancer) => Promise.resolve(freelancer)),
+    };
     employeesService = {
       getSalaryAsOf: jest.fn().mockResolvedValue(0),
     } as unknown as jest.Mocked<EmployeesService>;
@@ -137,6 +158,7 @@ describe('PayrollService', () => {
       lineItemRepository,
       employeeRepository,
       userRepository,
+      freelancerRepository,
       employeesService,
       notificationsService,
     );
@@ -298,6 +320,39 @@ describe('PayrollService', () => {
       expect(result.lineItems[0].netPay).toBe(5000);
     });
 
+    it("allows editing a freelancer's baseSalary directly", async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      lineItemRepository.findById.mockResolvedValue(
+        buildLineItem({ employeeId: null, employee: null, freelancerId: 'freelancer-1', freelancer: buildFreelancer() }),
+      );
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({
+          employeeId: null,
+          employee: null,
+          freelancerId: 'freelancer-1',
+          freelancer: buildFreelancer(),
+          baseSalary: '27300.00',
+        }),
+      ]);
+
+      const result = await service.updateLineItem('run-1', 'item-1', {
+        baseSalary: 27300,
+      });
+
+      expect(result.lineItems[0].isFreelancer).toBe(true);
+      expect(result.lineItems[0].baseSalary).toBe(27300);
+      expect(result.lineItems[0].netPay).toBe(27300);
+    });
+
+    it("rejects editing an employee's baseSalary directly", async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      lineItemRepository.findById.mockResolvedValue(buildLineItem());
+
+      await expect(
+        service.updateLineItem('run-1', 'item-1', { baseSalary: 99999 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('rejects editing a line item once the run is no longer draft', async () => {
       runRepository.findById.mockResolvedValue(
         buildRun({ status: PayrollRunStatus.FINALIZED }),
@@ -317,6 +372,82 @@ describe('PayrollService', () => {
       await expect(
         service.updateLineItem('run-1', 'item-1', { fines: 100 }),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('addFreelancerToRun', () => {
+    it("adds a freelancer line item with the entered amount as baseSalary, employeeId null", async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      freelancerRepository.findById.mockResolvedValue(buildFreelancer());
+      // First call is the pre-add duplicate check (no existing items yet);
+      // second is the post-save refetch used to build the response.
+      lineItemRepository.findByRunId
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          buildLineItem({
+            employeeId: null,
+            employee: null,
+            freelancerId: 'freelancer-1',
+            freelancer: buildFreelancer(),
+            baseSalary: '27300.00',
+          }),
+        ]);
+
+      const result = await service.addFreelancerToRun('run-1', {
+        freelancerId: 'freelancer-1',
+        baseSalary: 27300,
+      });
+
+      expect(lineItemRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          runId: 'run-1',
+          employeeId: null,
+          freelancerId: 'freelancer-1',
+          baseSalary: '27300.00',
+        }),
+      );
+      expect(result.lineItems[0].isFreelancer).toBe(true);
+      expect(result.lineItems[0].employeeName).toBe('Kulsum Zehra');
+    });
+
+    it('throws NotFoundException for an unknown freelancerId', async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      freelancerRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.addFreelancerToRun('run-1', {
+          freelancerId: 'nonexistent',
+          baseSalary: 1000,
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws ConflictException when the freelancer is already in this run', async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      freelancerRepository.findById.mockResolvedValue(buildFreelancer());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({ employeeId: null, employee: null, freelancerId: 'freelancer-1' }),
+      ]);
+
+      await expect(
+        service.addFreelancerToRun('run-1', {
+          freelancerId: 'freelancer-1',
+          baseSalary: 1000,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rejects adding a freelancer once the run is no longer draft', async () => {
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.FINALIZED }),
+      );
+
+      await expect(
+        service.addFreelancerToRun('run-1', {
+          freelancerId: 'freelancer-1',
+          baseSalary: 1000,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
@@ -385,6 +516,19 @@ describe('PayrollService', () => {
       expect(notificationsService.create).toHaveBeenCalledWith(
         expect.objectContaining({ recipientUserId: 'user-b' }),
       );
+    });
+
+    it('skips notifying a freelancer line item (no User account to notify)', async () => {
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.FINALIZED }),
+      );
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({ employeeId: null, employee: null, freelancerId: 'freelancer-1', freelancer: buildFreelancer() }),
+      ]);
+
+      await service.payRun('run-1', 'admin-1');
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
     });
   });
 

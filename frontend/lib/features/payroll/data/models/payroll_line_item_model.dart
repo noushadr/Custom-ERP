@@ -4,6 +4,8 @@ class PayrollLineItemModel extends PayrollLineItem {
   const PayrollLineItemModel({
     required super.id,
     required super.employeeId,
+    required super.freelancerId,
+    required super.isFreelancer,
     required super.employeeName,
     required super.employeePhotoUrl,
     required super.baseSalary,
@@ -30,7 +32,9 @@ class PayrollLineItemModel extends PayrollLineItem {
   factory PayrollLineItemModel.fromJson(Map<String, dynamic> json) =>
       PayrollLineItemModel(
         id: json['id'] as String,
-        employeeId: json['employeeId'] as String,
+        employeeId: json['employeeId'] as String?,
+        freelancerId: json['freelancerId'] as String?,
+        isFreelancer: json['isFreelancer'] as bool,
         employeeName: json['employeeName'] as String,
         employeePhotoUrl: json['employeePhotoUrl'] as String?,
         baseSalary: (json['baseSalary'] as num).toDouble(),

@@ -11,6 +11,7 @@ abstract interface class PayrollRepository {
   Future<PayrollRunDetail> updateLineItem(
     String runId,
     String lineItemId, {
+    double? baseSalary,
     int? quantity,
     double? perUnitRate,
     double? allowances,
@@ -24,6 +25,15 @@ abstract interface class PayrollRepository {
     int? totalAbsent,
     int? lateHours,
     int? lateDays,
+    String? notes,
+  });
+
+  /// Adds one freelancer to a draft run, with this month's pay entered
+  /// directly (freelancers have no salary history to snapshot from).
+  Future<PayrollRunDetail> addFreelancerToRun(
+    String runId, {
+    required String freelancerId,
+    required double baseSalary,
     String? notes,
   });
 

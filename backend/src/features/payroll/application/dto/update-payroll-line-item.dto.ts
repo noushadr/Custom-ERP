@@ -1,6 +1,14 @@
 import { IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class UpdatePayrollLineItemDto {
+  /** Only settable when the target line item is a freelancer's (see
+   * `PayrollService.updateLineItem`) — an employee's `baseSalary` is an
+   * immutable snapshot from their SalaryRecord and can't be edited here. */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  baseSalary?: number;
+
   @IsOptional()
   @IsInt()
   @Min(0)

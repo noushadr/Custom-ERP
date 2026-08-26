@@ -34,6 +34,7 @@ class PayrollRemoteDataSource {
   Future<PayrollRunDetailModel> updateLineItem(
     String runId,
     String lineItemId, {
+    double? baseSalary,
     int? quantity,
     double? perUnitRate,
     double? allowances,
@@ -52,6 +53,7 @@ class PayrollRemoteDataSource {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/payroll/runs/$runId/line-items/$lineItemId',
       data: {
+        'baseSalary': ?baseSalary,
         'quantity': ?quantity,
         'perUnitRate': ?perUnitRate,
         'allowances': ?allowances,
@@ -65,6 +67,23 @@ class PayrollRemoteDataSource {
         'totalAbsent': ?totalAbsent,
         'lateHours': ?lateHours,
         'lateDays': ?lateDays,
+        'notes': ?notes,
+      },
+    );
+    return PayrollRunDetailModel.fromJson(response.data!);
+  }
+
+  Future<PayrollRunDetailModel> addFreelancerToRun(
+    String runId, {
+    required String freelancerId,
+    required double baseSalary,
+    String? notes,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/payroll/runs/$runId/freelancer-line-items',
+      data: {
+        'freelancerId': freelancerId,
+        'baseSalary': baseSalary,
         'notes': ?notes,
       },
     );

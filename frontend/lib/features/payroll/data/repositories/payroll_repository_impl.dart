@@ -28,6 +28,7 @@ class PayrollRepositoryImpl implements PayrollRepository {
   Future<PayrollRunDetail> updateLineItem(
     String runId,
     String lineItemId, {
+    double? baseSalary,
     int? quantity,
     double? perUnitRate,
     double? allowances,
@@ -46,6 +47,7 @@ class PayrollRepositoryImpl implements PayrollRepository {
     () => _remoteDataSource.updateLineItem(
       runId,
       lineItemId,
+      baseSalary: baseSalary,
       quantity: quantity,
       perUnitRate: perUnitRate,
       allowances: allowances,
@@ -59,6 +61,21 @@ class PayrollRepositoryImpl implements PayrollRepository {
       totalAbsent: totalAbsent,
       lateHours: lateHours,
       lateDays: lateDays,
+      notes: notes,
+    ),
+  );
+
+  @override
+  Future<PayrollRunDetail> addFreelancerToRun(
+    String runId, {
+    required String freelancerId,
+    required double baseSalary,
+    String? notes,
+  }) => _guard(
+    () => _remoteDataSource.addFreelancerToRun(
+      runId,
+      freelancerId: freelancerId,
+      baseSalary: baseSalary,
       notes: notes,
     ),
   );

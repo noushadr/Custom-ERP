@@ -4,11 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
+import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
 import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_run_status.dart';
 import 'package:zera_erp/features/payroll/presentation/pages/payroll_run_detail_page.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_freelancers.dart';
 import '../../helpers/fake_payroll.dart';
 
 const _superAdmin = AuthUser(
@@ -18,13 +20,20 @@ const _superAdmin = AuthUser(
   permissions: ['payroll.manage'],
 );
 
-Widget _app({required FakePayrollRepository repository, String runId = 'run-1'}) {
+Widget _app({
+  required FakePayrollRepository repository,
+  String runId = 'run-1',
+  FakeFreelancersRepository? freelancersRepository,
+}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
         (ref) => PresetAuthController(AuthAuthenticated(_superAdmin)),
       ),
       payrollRepositoryProvider.overrideWithValue(repository),
+      freelancersRepositoryProvider.overrideWithValue(
+        freelancersRepository ?? FakeFreelancersRepository(),
+      ),
     ],
     child: MaterialApp(home: PayrollRunDetailPage(runId: runId)),
   );
@@ -298,6 +307,93 @@ void main() {
         ),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    "a freelancer's line item shows a Freelancer badge and an editable "
+    'amount instead of a read-only salary snapshot',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(
+          status: PayrollRunStatus.draft,
+          lineItems: [
+            buildTestPayrollLineItem(
+              employeeName: 'Kulsum Zehra',
+              freelancerId: 'freelancer-1',
+              isFreelancer: true,
+              employeeId: null,
+              baseSalary: 27300,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Freelancer'), findsOneWidget);
+
+      await tester.tap(find.text('Kulsum Zehra'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Salary snapshot: PKR 27,300.00'), findsNothing);
+      expect(
+        find.widgetWithText(TextField, "This month's pay (PKR)"),
+        findsOneWidget,
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextField, "This month's pay (PKR)"),
+        '30000',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedBaseSalary, 30000);
+    },
+  );
+
+  testWidgets(
+    'tapping Add Freelancer submits the selected freelancer and amount',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(status: PayrollRunStatus.draft),
+      );
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          freelancersRepository: FakeFreelancersRepository(
+            freelancers: [
+              buildTestFreelancer(
+                id: 'freelancer-2',
+                fullName: 'Hamza Saqib',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Add Freelancer'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Freelancer'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hamza Saqib').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, "This month's pay (PKR)"),
+        '27300',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastAddedFreelancerRunId, 'run-1');
+      expect(repository.lastAddedFreelancerId, 'freelancer-2');
+      expect(repository.lastAddedFreelancerBaseSalary, 27300);
     },
   );
 }

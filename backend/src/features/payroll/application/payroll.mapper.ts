@@ -16,6 +16,14 @@ const HOURS_PER_DAY = 8;
 export function toPayrollLineItemResponse(
   item: PayrollLineItem,
 ): PayrollLineItemResponseDto {
+  const isFreelancer = item.freelancerId != null;
+  const employeeName = isFreelancer
+    ? item.freelancer!.fullName
+    : `${item.employee!.firstName} ${item.employee!.lastName}`;
+  const employeePhotoUrl = isFreelancer
+    ? null
+    : (item.employee!.profilePhotoUrl ?? null);
+
   const salarySnapshot = Number(item.baseSalary);
   const quantity = item.quantity ?? null;
   const perUnitRate = item.perUnitRate != null ? Number(item.perUnitRate) : null;
@@ -58,9 +66,11 @@ export function toPayrollLineItemResponse(
 
   return {
     id: item.id,
-    employeeId: item.employeeId,
-    employeeName: `${item.employee.firstName} ${item.employee.lastName}`,
-    employeePhotoUrl: item.employee.profilePhotoUrl ?? null,
+    employeeId: item.employeeId ?? null,
+    freelancerId: item.freelancerId ?? null,
+    isFreelancer,
+    employeeName,
+    employeePhotoUrl,
     baseSalary,
     quantity,
     perUnitRate,

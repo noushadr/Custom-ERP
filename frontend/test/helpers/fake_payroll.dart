@@ -6,7 +6,9 @@ import 'package:zera_erp/features/payroll/domain/repositories/payroll_repository
 
 PayrollLineItem buildTestPayrollLineItem({
   String id = 'item-1',
-  String employeeId = 'employee-1',
+  String? employeeId = 'employee-1',
+  String? freelancerId,
+  bool isFreelancer = false,
   String employeeName = 'Jane Doe',
   String? employeePhotoUrl,
   double baseSalary = 50000,
@@ -38,6 +40,8 @@ PayrollLineItem buildTestPayrollLineItem({
   return PayrollLineItem(
     id: id,
     employeeId: employeeId,
+    freelancerId: freelancerId,
+    isFreelancer: isFreelancer,
     employeeName: employeeName,
     employeePhotoUrl: employeePhotoUrl,
     baseSalary: effectiveBaseSalary,
@@ -146,6 +150,7 @@ class FakePayrollRepository implements PayrollRepository {
   int? lastGeneratedYear;
 
   String? lastUpdatedLineItemId;
+  double? lastUpdatedBaseSalary;
   double? lastUpdatedFines;
   int? lastUpdatedTotalAbsent;
   int? lastUpdatedLateHours;
@@ -156,6 +161,11 @@ class FakePayrollRepository implements PayrollRepository {
 
   String? lastFinalizedRunId;
   String? lastPaidRunId;
+
+  String? lastAddedFreelancerRunId;
+  String? lastAddedFreelancerId;
+  double? lastAddedFreelancerBaseSalary;
+  String? lastAddedFreelancerNotes;
 
   /// Incremented on every [getRuns] call — used to confirm an unauthorized
   /// viewer's page never even fetches the list.
@@ -185,6 +195,7 @@ class FakePayrollRepository implements PayrollRepository {
   Future<PayrollRunDetail> updateLineItem(
     String runId,
     String lineItemId, {
+    double? baseSalary,
     int? quantity,
     double? perUnitRate,
     double? allowances,
@@ -201,6 +212,7 @@ class FakePayrollRepository implements PayrollRepository {
     String? notes,
   }) async {
     lastUpdatedLineItemId = lineItemId;
+    lastUpdatedBaseSalary = baseSalary;
     lastUpdatedFines = fines;
     lastUpdatedTotalAbsent = totalAbsent;
     lastUpdatedLateHours = lateHours;
@@ -208,6 +220,20 @@ class FakePayrollRepository implements PayrollRepository {
     lastUpdatedDeductions = deductions;
     lastUpdatedQuantity = quantity;
     lastUpdatedPerUnitRate = perUnitRate;
+    return runDetail ?? buildTestPayrollRunDetail(id: runId);
+  }
+
+  @override
+  Future<PayrollRunDetail> addFreelancerToRun(
+    String runId, {
+    required String freelancerId,
+    required double baseSalary,
+    String? notes,
+  }) async {
+    lastAddedFreelancerRunId = runId;
+    lastAddedFreelancerId = freelancerId;
+    lastAddedFreelancerBaseSalary = baseSalary;
+    lastAddedFreelancerNotes = notes;
     return runDetail ?? buildTestPayrollRunDetail(id: runId);
   }
 

@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
+import { AddFreelancerLineItemDto } from '../application/dto/add-freelancer-line-item.dto';
 import { GeneratePayrollRunDto } from '../application/dto/generate-payroll-run.dto';
 import { UpdatePayrollLineItemDto } from '../application/dto/update-payroll-line-item.dto';
 import { PayrollService } from '../application/payroll.service';
@@ -38,6 +39,14 @@ export class PayrollController {
     @Body() dto: UpdatePayrollLineItemDto,
   ) {
     return this.payrollService.updateLineItem(runId, lineItemId, dto);
+  }
+
+  @Post('runs/:runId/freelancer-line-items')
+  addFreelancerToRun(
+    @Param('runId') runId: string,
+    @Body() dto: AddFreelancerLineItemDto,
+  ) {
+    return this.payrollService.addFreelancerToRun(runId, dto);
   }
 
   @Post('runs/:id/finalize')
