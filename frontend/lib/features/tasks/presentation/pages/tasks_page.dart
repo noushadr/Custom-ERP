@@ -74,6 +74,7 @@ class TasksPage extends ConsumerWidget {
                       child: TabBar(
                         tabs: tabs,
                         isScrollable: true,
+                        tabAlignment: TabAlignment.start,
                         labelColor: AppColors.primary,
                         unselectedLabelColor: AppColors.textSecondary,
                         indicatorColor: AppColors.primary,

@@ -40,6 +40,7 @@ class PayrollPage extends ConsumerWidget {
               children: [
                 const TabBar(
                   isScrollable: true,
+                  tabAlignment: TabAlignment.start,
                   labelColor: AppColors.primary,
                   unselectedLabelColor: AppColors.textSecondary,
                   indicatorColor: AppColors.primary,

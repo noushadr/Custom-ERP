@@ -61,6 +61,7 @@ class ClientsProjectsPage extends ConsumerWidget {
                       const Expanded(
                         child: TabBar(
                           isScrollable: true,
+                          tabAlignment: TabAlignment.start,
                           labelColor: AppColors.primary,
                           unselectedLabelColor: AppColors.textSecondary,
                           indicatorColor: AppColors.primary,
