@@ -24,4 +24,8 @@ export class TypeOrmLeadRepository implements LeadRepository {
   save(lead: Lead): Promise<Lead> {
     return this.repository.save(lead);
   }
+
+  saveMany(leads: Lead[]): Promise<Lead[]> {
+    return this.repository.save(leads);
+  }
 }

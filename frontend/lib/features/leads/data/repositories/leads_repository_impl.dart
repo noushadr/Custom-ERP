@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../domain/entities/lead.dart';
+import '../../domain/entities/lead_import_row.dart';
 import '../../domain/exceptions/lead_exception.dart';
 import '../../domain/repositories/leads_repository.dart';
 import '../datasources/leads_remote_data_source.dart';
@@ -11,6 +12,10 @@ class LeadsRepositoryImpl implements LeadsRepository {
 
   @override
   Future<List<Lead>> getLeads() => _guard(() => _remoteDataSource.getLeads());
+
+  @override
+  Future<int> importLeads(List<LeadImportRow> rows) =>
+      _guard(() => _remoteDataSource.importLeads(rows));
 
   @override
   Future<Lead> createLead({

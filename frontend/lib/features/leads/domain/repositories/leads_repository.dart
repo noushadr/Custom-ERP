@@ -1,7 +1,11 @@
 import '../entities/lead.dart';
+import '../entities/lead_import_row.dart';
 
 abstract interface class LeadsRepository {
   Future<List<Lead>> getLeads();
+
+  /// Bulk-creates every row in one request; returns how many were created.
+  Future<int> importLeads(List<LeadImportRow> rows);
   Future<Lead> createLead({
     required String leadDate,
     required String fullName,

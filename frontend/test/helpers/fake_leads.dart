@@ -1,4 +1,5 @@
 import 'package:zera_erp/features/leads/domain/entities/lead.dart';
+import 'package:zera_erp/features/leads/domain/entities/lead_import_row.dart';
 import 'package:zera_erp/features/leads/domain/repositories/leads_repository.dart';
 
 Lead buildTestLead({
@@ -46,10 +47,22 @@ class FakeLeadsRepository implements LeadsRepository {
   /// actually invalidated and re-fetched the leads list provider.
   int getLeadsCallCount = 0;
 
+  /// The rows passed to the most recent [importLeads] call.
+  List<LeadImportRow>? lastImportedRows;
+
+  /// Overrides the count [importLeads] returns; defaults to `rows.length`.
+  int? importLeadsResultOverride;
+
   @override
   Future<List<Lead>> getLeads() async {
     getLeadsCallCount++;
     return leads;
+  }
+
+  @override
+  Future<int> importLeads(List<LeadImportRow> rows) async {
+    lastImportedRows = rows;
+    return importLeadsResultOverride ?? rows.length;
   }
 
   @override

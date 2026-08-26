@@ -11,6 +11,7 @@ import '../../../authentication/application/auth_state.dart';
 import '../../application/leads_providers.dart';
 import '../../domain/entities/lead.dart';
 import 'lead_editor_page.dart';
+import 'lead_import_page.dart';
 
 const _kMonthAbbreviations = [
   'Jan',
@@ -77,12 +78,24 @@ class LeadsPage extends ConsumerWidget {
           children: [
             Align(
               alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LeadEditorPage()),
-                ),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('New Lead'),
+              child: Wrap(
+                spacing: 10,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LeadImportPage()),
+                    ),
+                    icon: const Icon(Icons.upload_outlined, size: 18),
+                    label: const Text('Import Leads'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LeadEditorPage()),
+                    ),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('New Lead'),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -160,14 +173,13 @@ class _LeadsStatsRow extends ConsumerWidget {
     final newThisMonth = leads.where((l) => onOrAfter(l, monthStart)).length;
 
     // Same selectors (and the same flag-formatted country grouping) as the
-    // "Top Countries/Services/Lead Sources" panels below, so these totals
-    // never disagree with what those panels are drawing from — just
-    // uncapped, since the panels themselves only show their top 5.
+    // "Top Countries/Lead Sources" panels below, so these totals never
+    // disagree with what those panels are drawing from — just uncapped,
+    // since the panels themselves only show their top 5.
     final totalCountries = _countDistinct(
       leads,
       (l) => formatCountryFlag(l.country),
     );
-    final totalServices = _countDistinct(leads, (l) => l.serviceInterested);
     final totalLeadSources = _countDistinct(leads, (l) => l.leadSource);
 
     return Wrap(
@@ -197,12 +209,6 @@ class _LeadsStatsRow extends ConsumerWidget {
           value: '$totalCountries',
           color: AppColors.primary,
           icon: Icons.public_outlined,
-        ),
-        MetricCard(
-          label: 'Total Services',
-          value: '$totalServices',
-          color: AppColors.secondary,
-          icon: Icons.design_services_outlined,
         ),
         MetricCard(
           label: 'Total Lead Sources',

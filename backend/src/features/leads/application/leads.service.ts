@@ -6,6 +6,7 @@ import {
   type LeadRepository,
 } from '../domain/repositories/lead-repository.interface';
 import { CreateLeadDto } from './dto/create-lead.dto';
+import { ImportLeadsDto } from './dto/import-leads.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { LeadResponseDto } from './lead-response.interface';
 import { toLeadResponse } from './lead.mapper';
@@ -38,6 +39,22 @@ export class LeadsService {
   }
 
   async createLead(dto: CreateLeadDto): Promise<LeadResponseDto> {
+    const saved = await this.leadRepository.save(this.buildLead(dto));
+    return toLeadResponse(saved);
+  }
+
+  /** Bulk-creates every row in one save — the frontend has already parsed
+   * and let the user preview the pasted data, so by the time it reaches
+   * here every row is a normal, already-validated `CreateLeadDto` (the
+   * global `ValidationPipe` rejects the whole request otherwise, same as
+   * a single `POST /leads` would for one bad row). */
+  async importLeads(dto: ImportLeadsDto): Promise<{ created: number }> {
+    const leads = dto.leads.map((row) => this.buildLead(row));
+    const saved = await this.leadRepository.saveMany(leads);
+    return { created: saved.length };
+  }
+
+  private buildLead(dto: CreateLeadDto): Lead {
     const lead = new Lead();
     lead.leadDate = dto.leadDate;
     lead.fullName = dto.fullName;
@@ -48,9 +65,7 @@ export class LeadsService {
     lead.country = blankToUndefined(dto.country);
     lead.remarks = blankToUndefined(dto.remarks);
     lead.serviceInterested = blankToUndefined(dto.serviceInterested);
-
-    const saved = await this.leadRepository.save(lead);
-    return toLeadResponse(saved);
+    return lead;
   }
 
   async updateLead(id: string, dto: UpdateLeadDto): Promise<LeadResponseDto> {

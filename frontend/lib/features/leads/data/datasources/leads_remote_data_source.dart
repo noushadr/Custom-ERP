@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../domain/entities/lead_import_row.dart';
 import '../models/lead_model.dart';
 
 class LeadsRemoteDataSource {
@@ -12,6 +13,29 @@ class LeadsRemoteDataSource {
         .cast<Map<String, dynamic>>()
         .map(LeadModel.fromJson)
         .toList();
+  }
+
+  Future<int> importLeads(List<LeadImportRow> rows) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/leads/import',
+      data: {
+        'leads': [
+          for (final row in rows)
+            {
+              'leadDate': row.leadDate,
+              'fullName': row.fullName,
+              'companyName': ?row.companyName,
+              'leadSource': ?row.leadSource,
+              'phone': ?row.phone,
+              'email': ?row.email,
+              'country': ?row.country,
+              'remarks': ?row.remarks,
+              'serviceInterested': ?row.serviceInterested,
+            },
+        ],
+      },
+    );
+    return response.data!['created'] as int;
   }
 
   Future<LeadModel> createLead({

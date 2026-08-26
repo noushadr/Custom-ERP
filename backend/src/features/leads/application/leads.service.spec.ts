@@ -29,6 +29,9 @@ describe('LeadsService', () => {
       findAll: jest.fn().mockResolvedValue([]),
       findById: jest.fn(),
       save: jest.fn((item) => Promise.resolve(stampTimestamps(item) as Lead)),
+      saveMany: jest.fn((items) =>
+        Promise.resolve(items.map((item) => stampTimestamps(item) as Lead)),
+      ),
     };
 
     service = new LeadsService(leadRepository);
@@ -126,6 +129,30 @@ describe('LeadsService', () => {
     });
 
     expect(result.companyName).toBe('Acme Inc');
+  });
+
+  it('bulk-creates every row in one save, applying the same normalization as a single create', async () => {
+    const result = await service.importLeads({
+      leads: [
+        {
+          leadDate: '2026-01-01',
+          fullName: 'Jane Prospect',
+          phone: '92 300 1234567',
+        },
+        {
+          leadDate: '2026-01-02',
+          fullName: 'John Prospect',
+          companyName: '   ',
+        },
+      ],
+    });
+
+    expect(result.created).toBe(2);
+    expect(leadRepository.saveMany).toHaveBeenCalledTimes(1);
+    const savedLeads = leadRepository.saveMany.mock.calls[0][0];
+    expect(savedLeads).toHaveLength(2);
+    expect(savedLeads[0].phone).toBe('+92 300 1234567');
+    expect(savedLeads[1].companyName).toBeUndefined();
   });
 
   it('throws when updating a lead that does not exist', async () => {

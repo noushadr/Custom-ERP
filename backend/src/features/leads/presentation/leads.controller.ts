@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import { CreateLeadDto } from '../application/dto/create-lead.dto';
+import { ImportLeadsDto } from '../application/dto/import-leads.dto';
 import { UpdateLeadDto } from '../application/dto/update-lead.dto';
 import { LeadsService } from '../application/leads.service';
 
@@ -17,6 +18,11 @@ export class LeadsController {
   @Post()
   createLead(@Body() dto: CreateLeadDto) {
     return this.leadsService.createLead(dto);
+  }
+
+  @Post('import')
+  importLeads(@Body() dto: ImportLeadsDto) {
+    return this.leadsService.importLeads(dto);
   }
 
   @Patch(':id')

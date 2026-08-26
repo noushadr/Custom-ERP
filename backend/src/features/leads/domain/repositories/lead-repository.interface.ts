@@ -6,4 +6,5 @@ export interface LeadRepository {
   findAll(): Promise<Lead[]>;
   findById(id: string): Promise<Lead | null>;
   save(lead: Lead): Promise<Lead>;
+  saveMany(leads: Lead[]): Promise<Lead[]>;
 }

@@ -40,6 +40,19 @@ void main() {
 
     expect(find.text('No leads yet.'), findsOneWidget);
     expect(find.text('New Lead'), findsOneWidget);
+    expect(find.text('Import Leads'), findsOneWidget);
+  });
+
+  testWidgets('opens the import page from the "Import Leads" button', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Import Leads'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paste tab-separated rows here…'), findsOneWidget);
   });
 
   testWidgets(
@@ -202,7 +215,7 @@ void main() {
     expect(cardValues['New This Week'], '1');
     expect(cardValues['New This Month'], '1');
     expect(cardValues['Total Countries'], '2'); // Pakistan, UAE
-    expect(cardValues['Total Services'], '1'); // SEO (shared by both)
+    expect(cardValues['Total Services'], isNull); // removed from the stats row
     expect(cardValues['Total Lead Sources'], '2'); // Referral, Facebook
   });
 
