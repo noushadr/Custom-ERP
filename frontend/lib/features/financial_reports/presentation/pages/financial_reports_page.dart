@@ -856,18 +856,21 @@ class _YearlyComparisonChart extends StatelessWidget {
 /// straight-line chart, not bars, since the point is the overall growth
 /// trend rather than comparing discrete categories. Scaled between the
 /// data's own min/max (not from zero) so the trend line has visible slope
-/// instead of being flattened near the top of a zero-based axis. Per the
-/// `dataviz` skill's guidance for line charts, a hover tooltip stands in for
-/// direct labels — with 40+ months of history, a label on every point would
-/// be unreadable.
+/// instead of being flattened near the top of a zero-based axis. Every
+/// point's spacing is computed from the available width (via
+/// `LayoutBuilder`) rather than a fixed pixel spacing, so the whole
+/// history — every dot — always fits on screen with no horizontal
+/// scrolling, however many months there are; a hover `Tooltip` on each dot
+/// still carries the exact month + revenue figure, since 40+ direct labels
+/// packed this tightly would be unreadable.
 class _RevenueGrowthChart extends StatelessWidget {
   const _RevenueGrowthChart({required this.records});
 
   final List<FinancialRecord> records;
 
   static const _chartHeight = 160.0;
-  static const _pointSpacing = 40.0;
   static const _verticalPadding = 14.0;
+  static const _horizontalPadding = 10.0;
 
   @override
   Widget build(BuildContext context) {
@@ -888,12 +891,6 @@ class _RevenueGrowthChart extends StatelessWidget {
       return _verticalPadding + plotHeight - (fraction * plotHeight);
     }
 
-    final points = [
-      for (var i = 0; i < records.length; i++)
-        Offset(i * _pointSpacing, yFor(records[i].revenueRs)),
-    ];
-    final width = (records.length - 1) * _pointSpacing + 16;
-
     return FormSection(
       title: 'Revenue Growth — All-Time',
       child: Column(
@@ -903,15 +900,23 @@ class _RevenueGrowthChart extends StatelessWidget {
           const SizedBox(height: 12),
           SizedBox(
             height: _chartHeight + 26,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: width,
-                height: _chartHeight + 26,
-                child: Stack(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final plotWidth =
+                    constraints.maxWidth - _horizontalPadding * 2;
+                final pointSpacing = plotWidth / (records.length - 1);
+                final points = [
+                  for (var i = 0; i < records.length; i++)
+                    Offset(
+                      _horizontalPadding + i * pointSpacing,
+                      yFor(records[i].revenueRs),
+                    ),
+                ];
+
+                return Stack(
                   children: [
                     SizedBox(
-                      width: width,
+                      width: constraints.maxWidth,
                       height: _chartHeight,
                       child: CustomPaint(
                         painter: _LineChartPainter(
@@ -939,16 +944,20 @@ class _RevenueGrowthChart extends StatelessWidget {
                           ),
                         ),
                       ),
-                    // A year label at each January (or the very first point,
-                    // if the history doesn't start in January) — labeling
-                    // every month across 40+ months would be unreadable.
-                    // The very first label is left-aligned to its point
-                    // rather than centered, so it never gets clipped by the
-                    // scroll area's left edge.
+                    // A year label at each January (or the very first/last
+                    // point, if the history doesn't start/end in January) —
+                    // labeling every month across 40+ months would be
+                    // unreadable. The first and last labels are anchored to
+                    // stay inside the chart's own bounds rather than
+                    // centered, so neither ever clips past its edge.
                     for (var i = 0; i < records.length; i++)
-                      if (i == 0 || records[i].month == 1)
+                      if (i == 0 || i == records.length - 1 || records[i].month == 1)
                         Positioned(
-                          left: i == 0 ? points[i].dx : points[i].dx - 14,
+                          left: i == 0
+                              ? points[i].dx
+                              : (i == records.length - 1
+                                    ? points[i].dx - 28
+                                    : points[i].dx - 14),
                           top: _chartHeight + 6,
                           child: Text(
                             '${records[i].year}',
@@ -960,8 +969,8 @@ class _RevenueGrowthChart extends StatelessWidget {
                           ),
                         ),
                   ],
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],
