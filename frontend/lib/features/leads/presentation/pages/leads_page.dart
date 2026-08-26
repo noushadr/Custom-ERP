@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/utils/country_short_code.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/permission_gate.dart';
+import '../../../../shared/widgets/top_breakdown_panel.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/leads_providers.dart';
@@ -41,79 +43,6 @@ const _kLeadColumns = [
   ('Lead Source', 2),
   ('Remarks', 4),
 ];
-
-/// Maps the free-text `Lead.country` values actually present in the
-/// imported sales-log data (including typos and cities entered in place of
-/// a country, e.g. "Dubai", "Rawalpindi") to a short display code. Lookup
-/// is case-insensitive; anything not covered here falls back to the
-/// original text rather than guessing at a code.
-const _kCountryShortCodes = {
-  'pakistan': 'PK',
-  'pakisan': 'PK',
-  'karachi': 'PK',
-  'rawalpindi': 'PK',
-  'uae': 'UAE',
-  'dubai': 'UAE',
-  'united arab emirates': 'UAE',
-  'uk': 'UK',
-  'united kingdom': 'UK',
-  'usa': 'USA',
-  'us': 'USA',
-  'united states': 'USA',
-  'saudi arabia': 'KSA',
-  'saudia': 'KSA',
-  'sa': 'KSA',
-  'riyadh': 'KSA',
-  'australia': 'AU',
-  'india': 'IN',
-  'germany': 'DE',
-  'italy': 'IT',
-  'oman': 'OM',
-  'china': 'CN',
-  'canada': 'CA',
-  'ca': 'CA',
-  'singapore': 'SG',
-  'uganda': 'UG',
-  'kuwait': 'KW',
-  'morocco': 'MA',
-  'netherlands': 'NL',
-  'netherland': 'NL',
-  'qatar': 'QA',
-  'south africa': 'ZA',
-  'laos': 'LA',
-  'malaysia': 'MY',
-  'bangladesh': 'BD',
-  'bahrain': 'BH',
-  'turkiye/turkey': 'TR',
-  'turkey': 'TR',
-  'turkiye': 'TR',
-  'switzerland': 'CH',
-  'spain': 'ES',
-  'france': 'FR',
-  'slovenia': 'SI',
-  'afghanistan': 'AF',
-  'georgia': 'GE',
-  'portugal': 'PT',
-  'belgium': 'BE',
-  'vietnam': 'VN',
-  'botswana': 'BW',
-  'philippines': 'PH',
-  'nigeria': 'NG',
-  'japan': 'JP',
-  'ethopia': 'ET',
-  'ethiopia': 'ET',
-  'latvia': 'LV',
-};
-
-/// Short display code for a country value, falling back to the original
-/// text unchanged when it isn't in [_kCountryShortCodes] — never invents a
-/// code for a value it doesn't recognize.
-String? _formatCountryShort(String? country) {
-  if (country == null) return null;
-  final trimmed = country.trim();
-  if (trimmed.isEmpty) return null;
-  return _kCountryShortCodes[trimmed.toLowerCase()] ?? trimmed;
-}
 
 /// The Leads module's root page — a simple CRM-style list of prospective
 /// clients gated by `leads.manage` (shared by Super Admin and HR/Manager,
@@ -392,190 +321,30 @@ class _LeadsBreakdownRow extends ConsumerWidget {
     final leadsAsync = ref.watch(leadsListProvider);
     return leadsAsync.maybeWhen(
       data: (leads) {
-        Map<String, int> topCounts(String? Function(Lead) selector) {
-          final counts = <String, int>{};
-          for (final lead in leads) {
-            final value = selector(lead)?.trim();
-            if (value == null || value.isEmpty) continue;
-            counts[value] = (counts[value] ?? 0) + 1;
-          }
-          final sorted = counts.entries.toList()
-            ..sort((a, b) => b.value.compareTo(a.value));
-          return Map.fromEntries(sorted.take(5));
-        }
-
         final panels = [
-          _TopBreakdownPanel(
+          TopBreakdownPanel(
             title: 'Top Countries',
             icon: Icons.public_outlined,
             color: AppColors.primary,
-            counts: topCounts((l) => _formatCountryShort(l.country)),
+            counts: computeTopCounts(leads, (l) => formatCountryFlag(l.country)),
           ),
-          _TopBreakdownPanel(
+          TopBreakdownPanel(
             title: 'Top Services',
             icon: Icons.design_services_outlined,
             color: AppColors.secondary,
-            counts: topCounts((l) => l.serviceInterested),
+            counts: computeTopCounts(leads, (l) => l.serviceInterested),
           ),
-          _TopBreakdownPanel(
+          TopBreakdownPanel(
             title: 'Top Lead Sources',
             icon: Icons.campaign_outlined,
             color: AppColors.accentTeal,
-            counts: topCounts((l) => l.leadSource),
+            counts: computeTopCounts(leads, (l) => l.leadSource),
           ),
         ];
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 720) {
-              return Column(
-                children: [
-                  for (final panel in panels) ...[
-                    panel,
-                    const SizedBox(height: 12),
-                  ],
-                ],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < panels.length; i++) ...[
-                  Expanded(child: panels[i]),
-                  if (i < panels.length - 1) const SizedBox(width: 12),
-                ],
-              ],
-            );
-          },
-        );
+        return TopBreakdownRow(panels: panels);
       },
       orElse: () => const SizedBox.shrink(),
-    );
-  }
-}
-
-class _TopBreakdownPanel extends StatelessWidget {
-  const _TopBreakdownPanel({
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.counts,
-  });
-
-  final String title;
-  final IconData icon;
-  final Color color;
-  final Map<String, int> counts;
-
-  @override
-  Widget build(BuildContext context) {
-    final maxCount = counts.values.isEmpty ? 1 : counts.values.first;
-    return FormSection(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (counts.isEmpty)
-            Text(
-              'No data yet.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-            )
-          else
-            for (final entry in counts.entries) ...[
-              _BreakdownBarRow(
-                label: entry.key,
-                count: entry.value,
-                fraction: entry.value / maxCount,
-                color: color,
-              ),
-              const SizedBox(height: 8),
-            ],
-        ],
-      ),
-    );
-  }
-}
-
-class _BreakdownBarRow extends StatelessWidget {
-  const _BreakdownBarRow({
-    required this.label,
-    required this.count,
-    required this.fraction,
-    required this.color,
-  });
-
-  final String label;
-  final int count;
-  final double fraction;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 96,
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Stack(
-            children: [
-              Container(
-                height: 8,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              FractionallySizedBox(
-                widthFactor: fraction.clamp(0.04, 1.0),
-                child: Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 44,
-          child: Text(
-            '$count',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -670,7 +439,7 @@ class _LeadsTableRow extends StatelessWidget {
       lead.companyName ?? '—',
       lead.phone ?? '—',
       lead.email ?? '—',
-      _formatCountryShort(lead.country) ?? '—',
+      formatCountryFlag(lead.country) ?? '—',
       lead.serviceInterested ?? '—',
       lead.leadSource ?? '—',
       lead.remarks ?? '—',

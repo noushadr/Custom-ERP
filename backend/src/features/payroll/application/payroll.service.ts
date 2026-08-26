@@ -130,12 +130,13 @@ export class PayrollService {
         item.runId = savedRun.id;
         item.employeeId = employee.id;
         item.baseSalary = baseSalary.toFixed(2);
-        item.bonuses = '0.00';
         item.allowances = '0.00';
         item.overtime = '0.00';
         item.deductions = '0.00';
         item.advances = '0.00';
         item.tax = '0.00';
+        item.fines = '0.00';
+        item.lateCount = 0;
         return item;
       }),
     );
@@ -165,7 +166,6 @@ export class PayrollService {
       throw new NotFoundException('Payroll line item not found');
     }
 
-    if (dto.bonuses !== undefined) item.bonuses = dto.bonuses.toFixed(2);
     if (dto.allowances !== undefined) {
       item.allowances = dto.allowances.toFixed(2);
     }
@@ -175,6 +175,8 @@ export class PayrollService {
     }
     if (dto.advances !== undefined) item.advances = dto.advances.toFixed(2);
     if (dto.tax !== undefined) item.tax = dto.tax.toFixed(2);
+    if (dto.fines !== undefined) item.fines = dto.fines.toFixed(2);
+    if (dto.lateCount !== undefined) item.lateCount = dto.lateCount;
     if (dto.notes !== undefined) item.notes = dto.notes;
 
     await this.lineItemRepository.save(item);

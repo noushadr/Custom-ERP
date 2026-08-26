@@ -14,12 +14,21 @@ class MetricCard extends StatelessWidget {
     this.secondaryValue,
     this.valueFontSize,
     this.labelFirst = false,
+    this.valueSpans,
   });
 
   final String label;
   final String value;
   final Color color;
   final IconData? icon;
+
+  /// Renders [value] as rich text instead of a plain string — e.g. a
+  /// bracketed USD conversion styled smaller/lighter than the headline PKR
+  /// figure. The first span inherits this card's own value style (color,
+  /// weight, size); later spans can override any of those. When set,
+  /// [value] is still required but only used for widget identity/tests,
+  /// not rendered.
+  final List<InlineSpan>? valueSpans;
 
   /// An optional smaller line shown right below [value] — e.g. an
   /// approximate USD figure below a PKR headline amount.
@@ -51,14 +60,14 @@ class MetricCard extends StatelessWidget {
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
     );
-    final valueText = Text(
-      value,
-      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-        color: color,
-        fontWeight: FontWeight.w700,
-        fontSize: valueFontSize,
-      ),
+    final baseValueStyle = Theme.of(context).textTheme.headlineSmall?.copyWith(
+      color: color,
+      fontWeight: FontWeight.w700,
+      fontSize: valueFontSize,
     );
+    final valueText = valueSpans != null
+        ? Text.rich(TextSpan(style: baseValueStyle, children: valueSpans))
+        : Text(value, style: baseValueStyle);
 
     return Container(
       constraints: const BoxConstraints(minWidth: 150),

@@ -11,12 +11,13 @@ abstract interface class PayrollRepository {
   Future<PayrollRunDetail> updateLineItem(
     String runId,
     String lineItemId, {
-    double? bonuses,
     double? allowances,
     double? overtime,
     double? deductions,
     double? advances,
     double? tax,
+    double? fines,
+    int? lateCount,
     String? notes,
   });
 

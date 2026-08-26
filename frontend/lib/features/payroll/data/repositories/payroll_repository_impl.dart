@@ -28,23 +28,25 @@ class PayrollRepositoryImpl implements PayrollRepository {
   Future<PayrollRunDetail> updateLineItem(
     String runId,
     String lineItemId, {
-    double? bonuses,
     double? allowances,
     double? overtime,
     double? deductions,
     double? advances,
     double? tax,
+    double? fines,
+    int? lateCount,
     String? notes,
   }) => _guard(
     () => _remoteDataSource.updateLineItem(
       runId,
       lineItemId,
-      bonuses: bonuses,
       allowances: allowances,
       overtime: overtime,
       deductions: deductions,
       advances: advances,
       tax: tax,
+      fines: fines,
+      lateCount: lateCount,
       notes: notes,
     ),
   );

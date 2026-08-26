@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/utils/country_short_code.dart';
 import '../../../../shared/widgets/permission_gate.dart';
+import '../../../../shared/widgets/top_breakdown_panel.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/clients_providers.dart';
@@ -41,36 +43,46 @@ class ClientsProjectsPage extends ConsumerWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1040),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _SummaryRow(),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: TabBar(
-                        isScrollable: true,
-                        labelColor: AppColors.primary,
-                        unselectedLabelColor: AppColors.textSecondary,
-                        indicatorColor: AppColors.primary,
-                        tabs: [
-                          Tab(text: 'Projects'),
-                          Tab(text: 'Clients'),
-                          Tab(text: 'Health'),
-                        ],
+            // The breakdown panels added enough content above the tabs that
+            // it can no longer share a fixed-height `Expanded` region with
+            // the tab content on shorter windows — the whole page scrolls
+            // instead, with the tabs given their own generous fixed-height
+            // region (each tab already scrolls its own list internally).
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _SummaryRow(),
+                  const SizedBox(height: 20),
+                  const _ClientsBreakdownRow(),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: TabBar(
+                          isScrollable: true,
+                          labelColor: AppColors.primary,
+                          unselectedLabelColor: AppColors.textSecondary,
+                          indicatorColor: AppColors.primary,
+                          tabs: [
+                            Tab(text: 'Projects'),
+                            Tab(text: 'Clients'),
+                            Tab(text: 'Health'),
+                          ],
+                        ),
                       ),
-                    ),
-                    _NewButtons(),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Expanded(
-                  child: TabBarView(
-                    children: [_ProjectsTab(), _ClientsTab(), _HealthTab()],
+                      _NewButtons(),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  const SizedBox(
+                    height: 640,
+                    child: TabBarView(
+                      children: [_ProjectsTab(), _ClientsTab(), _HealthTab()],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -149,6 +161,54 @@ class _SummaryRow extends ConsumerWidget {
         ),
       ],
     );
+  }
+}
+
+/// Three "top N" categorical breakdowns for the whole module — countries
+/// and lead source come from `Client`, services from every `Project`'s
+/// assigned services — each its own panel with one representative hue,
+/// mirroring the Leads page's identical breakdown row (shared widgets, see
+/// `top_breakdown_panel.dart`).
+class _ClientsBreakdownRow extends ConsumerWidget {
+  const _ClientsBreakdownRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clientsAsync = ref.watch(clientsListProvider(false));
+    final projectsAsync = ref.watch(
+      projectsListProvider((status: null, clientId: null)),
+    );
+
+    if (!clientsAsync.hasValue || !projectsAsync.hasValue) {
+      return const SizedBox.shrink();
+    }
+
+    final clients = clientsAsync.value!;
+    final projects = projectsAsync.value!;
+    final serviceNames = projects.expand((p) => p.services.map((s) => s.name));
+
+    final panels = [
+      TopBreakdownPanel(
+        title: 'Top Countries',
+        icon: Icons.public_outlined,
+        color: AppColors.primary,
+        counts: computeTopCounts(clients, (c) => formatCountryFlag(c.country)),
+      ),
+      TopBreakdownPanel(
+        title: 'Top Services',
+        icon: Icons.design_services_outlined,
+        color: AppColors.secondary,
+        counts: computeTopCounts(serviceNames.toList(), (name) => name),
+      ),
+      TopBreakdownPanel(
+        title: 'Top Lead Sources',
+        icon: Icons.campaign_outlined,
+        color: AppColors.accentTeal,
+        counts: computeTopCounts(clients, (c) => c.leadSource),
+      ),
+    ];
+
+    return TopBreakdownRow(panels: panels);
   }
 }
 

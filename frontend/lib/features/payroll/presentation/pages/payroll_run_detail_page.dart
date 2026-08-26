@@ -143,10 +143,12 @@ class _RunDetailBody extends ConsumerWidget {
                 columns: const [
                   DataColumn(label: Text('Employee')),
                   DataColumn(label: Text('Base'), numeric: true),
-                  DataColumn(label: Text('Bonuses'), numeric: true),
                   DataColumn(label: Text('Allowances'), numeric: true),
                   DataColumn(label: Text('Overtime'), numeric: true),
                   DataColumn(label: Text('Deductions'), numeric: true),
+                  DataColumn(label: Text('Fines'), numeric: true),
+                  DataColumn(label: Text('Lates'), numeric: true),
+                  DataColumn(label: Text('Late Deduction'), numeric: true),
                   DataColumn(label: Text('Advances'), numeric: true),
                   DataColumn(label: Text('Tax'), numeric: true),
                   DataColumn(label: Text('Net Pay'), numeric: true),
@@ -170,10 +172,12 @@ class _RunDetailBody extends ConsumerWidget {
                       cells: [
                         DataCell(Text(item.employeeName)),
                         DataCell(Text(formatAmount(item.baseSalary))),
-                        DataCell(Text(formatAmount(item.bonuses))),
                         DataCell(Text(formatAmount(item.allowances))),
                         DataCell(Text(formatAmount(item.overtime))),
                         DataCell(Text(formatAmount(item.deductions))),
+                        DataCell(Text(formatAmount(item.fines))),
+                        DataCell(Text('${item.lateCount}')),
+                        DataCell(Text(formatAmount(item.lateDeductionRs))),
                         DataCell(Text(formatAmount(item.advances))),
                         DataCell(Text(formatAmount(item.tax))),
                         DataCell(
@@ -206,12 +210,13 @@ class _EditLineItemDialog extends ConsumerStatefulWidget {
 }
 
 class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
-  late final TextEditingController _bonusesController;
   late final TextEditingController _allowancesController;
   late final TextEditingController _overtimeController;
   late final TextEditingController _deductionsController;
   late final TextEditingController _advancesController;
   late final TextEditingController _taxController;
+  late final TextEditingController _finesController;
+  late final TextEditingController _lateCountController;
   late final TextEditingController _notesController;
   bool _saving = false;
   String? _errorMessage;
@@ -219,9 +224,6 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
   @override
   void initState() {
     super.initState();
-    _bonusesController = TextEditingController(
-      text: widget.item.bonuses.toStringAsFixed(2),
-    );
     _allowancesController = TextEditingController(
       text: widget.item.allowances.toStringAsFixed(2),
     );
@@ -237,17 +239,24 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
     _taxController = TextEditingController(
       text: widget.item.tax.toStringAsFixed(2),
     );
+    _finesController = TextEditingController(
+      text: widget.item.fines.toStringAsFixed(2),
+    );
+    _lateCountController = TextEditingController(
+      text: '${widget.item.lateCount}',
+    );
     _notesController = TextEditingController(text: widget.item.notes ?? '');
   }
 
   @override
   void dispose() {
-    _bonusesController.dispose();
     _allowancesController.dispose();
     _overtimeController.dispose();
     _deductionsController.dispose();
     _advancesController.dispose();
     _taxController.dispose();
+    _finesController.dispose();
+    _lateCountController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -263,12 +272,13 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
           .updateLineItem(
             widget.runId,
             widget.item.id,
-            bonuses: double.tryParse(_bonusesController.text) ?? 0,
             allowances: double.tryParse(_allowancesController.text) ?? 0,
             overtime: double.tryParse(_overtimeController.text) ?? 0,
             deductions: double.tryParse(_deductionsController.text) ?? 0,
             advances: double.tryParse(_advancesController.text) ?? 0,
             tax: double.tryParse(_taxController.text) ?? 0,
+            fines: double.tryParse(_finesController.text) ?? 0,
+            lateCount: int.tryParse(_lateCountController.text) ?? 0,
             notes: _notesController.text.trim().isEmpty
                 ? null
                 : _notesController.text.trim(),
@@ -306,13 +316,23 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
                 ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
-              _AmountField(label: 'Bonuses', controller: _bonusesController, enabled: !_saving),
-              const SizedBox(height: 12),
               _AmountField(label: 'Allowances', controller: _allowancesController, enabled: !_saving),
               const SizedBox(height: 12),
               _AmountField(label: 'Overtime', controller: _overtimeController, enabled: !_saving),
               const SizedBox(height: 12),
               _AmountField(label: 'Deductions', controller: _deductionsController, enabled: !_saving),
+              const SizedBox(height: 12),
+              _AmountField(label: 'Fines', controller: _finesController, enabled: !_saving),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _lateCountController,
+                enabled: !_saving,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Late arrivals this month',
+                  helperText: 'Every 3 lates deducts one unpaid day\'s pay',
+                ),
+              ),
               const SizedBox(height: 12),
               _AmountField(label: 'Advances', controller: _advancesController, enabled: !_saving),
               const SizedBox(height: 12),

@@ -1,11 +1,6 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class UpdatePayrollLineItemDto {
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  bonuses?: number;
-
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -30,6 +25,16 @@ export class UpdatePayrollLineItemDto {
   @IsNumber()
   @Min(0)
   tax?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  fines?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  lateCount?: number;
 
   @IsOptional()
   @IsString()

@@ -6,16 +6,27 @@ import {
   PayrollRunSummaryDto,
 } from './payroll-response.interface';
 
+/** Calendar days in [month] (1-12) of [year] — plain arithmetic, no
+ * Date-to-string timezone conversion involved. */
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
 export function toPayrollLineItemResponse(
   item: PayrollLineItem,
+  run: PayrollRun,
 ): PayrollLineItemResponseDto {
   const baseSalary = Number(item.baseSalary);
-  const bonuses = Number(item.bonuses);
   const allowances = Number(item.allowances);
   const overtime = Number(item.overtime);
   const deductions = Number(item.deductions);
   const advances = Number(item.advances);
   const tax = Number(item.tax);
+  const fines = Number(item.fines);
+
+  const unpaidOffs = Math.floor(item.lateCount / 3);
+  const dailyRate = baseSalary / daysInMonth(run.year, run.month);
+  const lateDeductionRs = Math.round(unpaidOffs * dailyRate * 100) / 100;
 
   return {
     id: item.id,
@@ -23,14 +34,23 @@ export function toPayrollLineItemResponse(
     employeeName: `${item.employee.firstName} ${item.employee.lastName}`,
     employeePhotoUrl: item.employee.profilePhotoUrl ?? null,
     baseSalary,
-    bonuses,
     allowances,
     overtime,
     deductions,
     advances,
     tax,
+    fines,
+    lateCount: item.lateCount,
+    lateDeductionRs,
     netPay:
-      baseSalary + bonuses + allowances + overtime - deductions - advances - tax,
+      baseSalary +
+      allowances +
+      overtime -
+      deductions -
+      advances -
+      tax -
+      fines -
+      lateDeductionRs,
     notes: item.notes ?? null,
   };
 }
@@ -40,7 +60,7 @@ export function toPayrollRunSummary(
   lineItems: PayrollLineItem[],
 ): PayrollRunSummaryDto {
   const totalNetPay = lineItems
-    .map(toPayrollLineItemResponse)
+    .map((item) => toPayrollLineItemResponse(item, run))
     .reduce((sum, item) => sum + item.netPay, 0);
 
   return {
@@ -65,6 +85,6 @@ export function toPayrollRunDetail(
 ): PayrollRunDetailDto {
   return {
     ...toPayrollRunSummary(run, lineItems),
-    lineItems: lineItems.map(toPayrollLineItemResponse),
+    lineItems: lineItems.map((item) => toPayrollLineItemResponse(item, run)),
   };
 }

@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/clients/domain/entities/client_health_status.dart';
+import 'package:zera_erp/features/clients/domain/entities/project_refs.dart';
 import 'package:zera_erp/features/clients/domain/entities/project_status.dart';
 import 'package:zera_erp/features/clients/domain/entities/project_type.dart';
 import 'package:zera_erp/features/clients/presentation/pages/clients_projects_page.dart';
@@ -87,6 +88,75 @@ void main() {
     expect(find.text('2'), findsOneWidget);
     expect(find.text('1'), findsNWidgets(3));
   });
+
+  testWidgets(
+    'shows Top Countries, Top Services, and Top Lead Sources breakdown '
+    'panels — countries render as short codes, services are pulled from '
+    'each project\'s assigned services',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            clients: [
+              buildTestClient(
+                id: 'c1',
+                companyName: 'Acme Co',
+                country: 'Pakistan',
+                leadSource: 'Whatsapp',
+              ),
+              buildTestClient(
+                id: 'c2',
+                companyName: 'Beta LLC',
+                country: 'saudia',
+                leadSource: 'Referral',
+              ),
+              buildTestClient(
+                id: 'c3',
+                companyName: 'Gamma Inc',
+                country: 'Pakistan',
+                leadSource: 'Whatsapp',
+              ),
+            ],
+            projects: [
+              buildTestProject(
+                id: 'p1',
+                clientId: 'c1',
+                clientName: 'Acme Co',
+                services: const [ProjectServiceRef(id: 's1', name: 'SEO')],
+              ),
+              buildTestProject(
+                id: 'p2',
+                clientId: 'c2',
+                clientName: 'Beta LLC',
+                services: const [ProjectServiceRef(id: 's2', name: 'SMM')],
+              ),
+              buildTestProject(
+                id: 'p3',
+                clientId: 'c3',
+                clientName: 'Gamma Inc',
+                services: const [ProjectServiceRef(id: 's1', name: 'SEO')],
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Top Countries'), findsOneWidget);
+      expect(find.text('Top Services'), findsOneWidget);
+      expect(find.text('Top Lead Sources'), findsOneWidget);
+
+      // 2 clients are in Pakistan (flag + short code), 1 in Saudi Arabia.
+      expect(find.text('🇵🇰 PK'), findsOneWidget);
+      expect(find.text('🇸🇦 KSA'), findsOneWidget);
+      // 2 projects use SEO, 1 uses SMM.
+      expect(find.text('SEO'), findsOneWidget);
+      expect(find.text('SMM'), findsOneWidget);
+      // 2 clients came via Whatsapp, 1 via Referral.
+      expect(find.text('Whatsapp'), findsOneWidget);
+      expect(find.text('Referral'), findsOneWidget);
+    },
+  );
 
   testWidgets('shows the Projects tab by default with New Project/New Client buttons', (
     tester,

@@ -95,8 +95,8 @@ void main() {
     expect(find.text('Interested'), findsOneWidget);
     // Service/source also appear in the "Top ..." breakdown panels above
     // the table, so these are expected to show up more than once. Country
-    // renders as its short code (PK), not the full name.
-    expect(find.text('PK'), findsAtLeastNWidgets(1));
+    // renders as a flag + short code (🇵🇰 PK), not the full name.
+    expect(find.text('🇵🇰 PK'), findsAtLeastNWidgets(1));
     expect(find.text('Pakistan'), findsNothing);
     expect(find.text('SEO'), findsAtLeastNWidgets(1));
     expect(find.text('Referral'), findsAtLeastNWidgets(1));
@@ -119,8 +119,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('PK'), findsAtLeastNWidgets(1));
-      expect(find.text('KSA'), findsAtLeastNWidgets(1));
+      expect(find.text('🇵🇰 PK'), findsAtLeastNWidgets(1));
+      expect(find.text('🇸🇦 KSA'), findsAtLeastNWidgets(1));
       expect(find.text('Narnia'), findsAtLeastNWidgets(1));
     },
   );

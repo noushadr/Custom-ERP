@@ -51,18 +51,45 @@ String _formatMoney(double value, _Currency currency) {
 String _formatMoneyWithUsd(double valueRs, double valueUsd) =>
     '${_formatMoney(valueRs, _Currency.pkr)} (${_formatMoney(valueUsd, _Currency.usd)})';
 
+/// Rich-text version of [_formatMoneyWithUsd]: the PKR figure inherits
+/// whatever style its host `Text.rich`/`TextSpan` sets, while the bracketed
+/// USD conversion is deliberately de-emphasized — lighter weight, smaller,
+/// neutral grey — so it reads as a secondary conversion, not a second
+/// headline number competing with the PKR one.
+List<InlineSpan> _moneyValueSpans(double valueRs, double valueUsd) => [
+  TextSpan(text: _formatMoney(valueRs, _Currency.pkr)),
+  TextSpan(
+    text: ' (${_formatMoney(valueUsd, _Currency.usd)})',
+    style: const TextStyle(
+      fontWeight: FontWeight.w500,
+      color: AppColors.textSecondary,
+      fontSize: 12,
+    ),
+  ),
+];
+
+/// A short "975K" / "20.9M" form used only for direct chart labels — a bar
+/// column is far too narrow for a full precise "Rs974,834", and this way
+/// every value is visible on the chart itself, not just on hover. The exact
+/// figure is still available via the bar's tooltip.
+String _formatCompact(double value) {
+  final isNegative = value < 0;
+  final abs = value.abs();
+  final String magnitude;
+  if (abs >= 1000000) {
+    magnitude = '${(abs / 1000000).toStringAsFixed(1)}M';
+  } else if (abs >= 1000) {
+    magnitude = '${(abs / 1000).round()}K';
+  } else {
+    magnitude = abs.round().toString();
+  }
+  return '${isNegative ? '-' : ''}$magnitude';
+}
+
 String _formatPercent(double value) => '${value.toStringAsFixed(1)}%';
 
 String _formatMonthYear(int month, int year) =>
     '${_kMonthAbbreviations[month - 1]} $year';
-
-/// Month label used on the monthly charts — includes a short year (e.g.
-/// "Jan\n26") so a bar is never ambiguous about which year it belongs to,
-/// even though the chart itself is already scoped to one selected year.
-String _formatChartMonthLabel(int month, int year) {
-  final shortYear = year.toString().substring(2);
-  return '${_kMonthAbbreviations[month - 1]}\n$shortYear';
-}
 
 /// The Financial Reports module's root page — monthly/yearly revenue,
 /// expense, and profit reporting for the whole company. Super-Admin-only
@@ -84,6 +111,11 @@ class FinancialReportsPage extends ConsumerStatefulWidget {
 }
 
 class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
+  /// `null` means "All-Time" — the default, so the page opens on the
+  /// grand-total view rather than assuming the most recent year is what's
+  /// wanted. Monthly detail (the two monthly charts and the detail table)
+  /// stays hidden until a specific year is picked, since 40+ months of
+  /// bars/rows in one view isn't "monthly detail" anymore.
   int? _selectedYear;
 
   @override
@@ -118,10 +150,14 @@ class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
             });
           final years = {for (final r in sorted) r.year}.toList()
             ..sort((a, b) => b.compareTo(a));
-          final selectedYear = years.contains(_selectedYear)
-              ? _selectedYear!
-              : years.first;
-          final yearRecords = sorted.where((r) => r.year == selectedYear).toList();
+          final selectedYear = (_selectedYear != null && years.contains(_selectedYear))
+              ? _selectedYear
+              : null;
+          final isAllTime = selectedYear == null;
+          final scopedRecords = isAllTime
+              ? sorted
+              : sorted.where((r) => r.year == selectedYear).toList();
+          final scopeLabel = isAllTime ? 'All-Time' : '$selectedYear';
 
           return SingleChildScrollView(
             child: Column(
@@ -129,17 +165,29 @@ class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
               children: [
                 // No page-body title here — the top bar already shows
                 // "Financial Reports" for the active nav destination.
-                _AllTimeStatsRow(records: sorted),
-                const SizedBox(height: 24),
                 Row(
                   children: [
                     Text(
-                      'Year:',
+                      'Period:',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(width: 10),
-                    SegmentedButton<int>(
+                    // Tighter padding/density and no selected-checkmark icon
+                    // — with up to 6 segments (All-Time + 5 years) the
+                    // default Material sizing spanned the full page width.
+                    SegmentedButton<int?>(
+                      style: SegmentedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 0,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        textStyle: Theme.of(context).textTheme.labelSmall,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      showSelectedIcon: false,
                       segments: [
+                        const ButtonSegment(value: null, label: Text('All-Time')),
                         for (final year in years)
                           ButtonSegment(value: year, label: Text('$year')),
                       ],
@@ -150,114 +198,40 @@ class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _SummaryStatsRow(records: yearRecords, year: selectedYear),
+                _SummaryStatsRow(records: scopedRecords, scopeLabel: scopeLabel),
                 const SizedBox(height: 16),
-                _RevenueExpenseChart(
-                  records: yearRecords,
-                  title: 'Revenue vs Expense — $selectedYear',
-                ),
-                const SizedBox(height: 16),
-                _ProfitTrendChart(
-                  records: yearRecords,
-                  title: 'Monthly Profit / Loss — $selectedYear',
-                ),
+                if (isAllTime)
+                  FormSection(
+                    child: Text(
+                      'Select a year above to see its monthly Revenue vs '
+                      'Expense, Profit/Loss, and detail table.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  )
+                else ...[
+                  _RevenueExpenseChart(
+                    records: scopedRecords,
+                    title: 'Revenue vs Expense — $scopeLabel',
+                  ),
+                  const SizedBox(height: 16),
+                  _ProfitTrendChart(
+                    records: scopedRecords,
+                    title: 'Monthly Profit / Loss — $scopeLabel',
+                  ),
+                ],
                 const SizedBox(height: 16),
                 _YearlyComparisonChart(records: sorted),
-                const SizedBox(height: 16),
-                _MonthlyRecordsTable(records: yearRecords),
+                if (!isAllTime) ...[
+                  const SizedBox(height: 16),
+                  _MonthlyRecordsTable(records: scopedRecords),
+                ],
               ],
             ),
           );
         },
       ),
-    );
-  }
-}
-
-/// The page's lead section — grand totals across every record on file,
-/// independent of the year selector below it, with the exact date range
-/// the figures cover spelled out so a total is never mistaken for a
-/// single-year number.
-class _AllTimeStatsRow extends StatelessWidget {
-  const _AllTimeStatsRow({required this.records});
-
-  /// Every record, sorted chronologically ascending.
-  final List<FinancialRecord> records;
-
-  @override
-  Widget build(BuildContext context) {
-    if (records.isEmpty) return const SizedBox.shrink();
-
-    final totalRevenueRs = records.fold(0.0, (sum, r) => sum + r.revenueRs);
-    final totalRevenueUsd = records.fold(0.0, (sum, r) => sum + r.revenueUsd);
-    final totalExpenseRs = records.fold(0.0, (sum, r) => sum + r.expenseRs);
-    final totalExpenseUsd = records.fold(0.0, (sum, r) => sum + r.expenseUsd);
-    final totalProfitRs = totalRevenueRs - totalExpenseRs;
-    final totalProfitUsd = totalRevenueUsd - totalExpenseUsd;
-    final profitMargin = totalRevenueRs == 0
-        ? 0.0
-        : (totalProfitRs / totalRevenueRs) * 100;
-
-    final first = records.first;
-    final last = records.last;
-    final rangeLabel = first.year == last.year && first.month == last.month
-        ? _formatMonthYear(first.month, first.year)
-        : '${_formatMonthYear(first.month, first.year)} – '
-              '${_formatMonthYear(last.month, last.year)}';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'All-Time Totals',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          'Since $rangeLabel · ${records.length} months of data',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _MoneyMetricCard(
-              label: 'All-Time Revenue',
-              valueRs: totalRevenueRs,
-              valueUsd: totalRevenueUsd,
-              color: AppColors.primary,
-              icon: Icons.trending_up_outlined,
-            ),
-            _MoneyMetricCard(
-              label: 'All-Time Expense',
-              valueRs: totalExpenseRs,
-              valueUsd: totalExpenseUsd,
-              color: AppColors.secondary,
-              icon: Icons.trending_down_outlined,
-            ),
-            _MoneyMetricCard(
-              label: 'All-Time Profit',
-              valueRs: totalProfitRs,
-              valueUsd: totalProfitUsd,
-              color: totalProfitRs >= 0 ? AppColors.success : AppColors.error,
-              icon: Icons.account_balance_wallet_outlined,
-            ),
-            MetricCard(
-              label: 'All-Time Profit Margin',
-              value: _formatPercent(profitMargin),
-              color: profitMargin >= 0 ? AppColors.success : AppColors.error,
-              icon: Icons.percent_outlined,
-              valueFontSize: 20,
-              labelFirst: true,
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -287,6 +261,7 @@ class _MoneyMetricCard extends StatelessWidget {
     return MetricCard(
       label: label,
       value: _formatMoneyWithUsd(valueRs, valueUsd),
+      valueSpans: _moneyValueSpans(valueRs, valueUsd),
       secondaryValue: secondaryValue,
       color: color,
       icon: icon,
@@ -300,14 +275,24 @@ class _MoneyMetricCard extends StatelessWidget {
 }
 
 class _SummaryStatsRow extends StatelessWidget {
-  const _SummaryStatsRow({required this.records, required this.year});
+  const _SummaryStatsRow({required this.records, required this.scopeLabel});
 
   final List<FinancialRecord> records;
-  final int year;
+
+  /// "All-Time" or a specific year (e.g. "2026") — whichever is currently
+  /// selected above.
+  final String scopeLabel;
 
   @override
   Widget build(BuildContext context) {
     if (records.isEmpty) return const SizedBox.shrink();
+
+    final first = records.first;
+    final last = records.last;
+    final rangeLabel = first.year == last.year && first.month == last.month
+        ? _formatMonthYear(first.month, first.year)
+        : '${_formatMonthYear(first.month, first.year)} – '
+              '${_formatMonthYear(last.month, last.year)}';
 
     final totalRevenueRs = records.fold(0.0, (sum, r) => sum + r.revenueRs);
     final totalRevenueUsd = records.fold(0.0, (sum, r) => sum + r.revenueUsd);
@@ -335,45 +320,65 @@ class _SummaryStatsRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          'Totals ($scopeLabel)',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Since $rangeLabel · $monthCount month${monthCount == 1 ? '' : 's'} of data',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 10),
         Wrap(
           spacing: 10,
           runSpacing: 10,
           children: [
+            // No "($scopeLabel)" suffix on these labels — the "Totals
+            // ($scopeLabel)" heading right above already states the scope,
+            // matching how the Monthly Averages tiles below don't repeat
+            // it either.
             _MoneyMetricCard(
-              label: 'Total Revenue ($year)',
+              label: 'Total Revenue',
               valueRs: totalRevenueRs,
               valueUsd: totalRevenueUsd,
               color: AppColors.primary,
               icon: Icons.trending_up_outlined,
             ),
             _MoneyMetricCard(
-              label: 'Total Expense ($year)',
+              label: 'Total Expense',
               valueRs: totalExpenseRs,
               valueUsd: totalExpenseUsd,
               color: AppColors.secondary,
               icon: Icons.trending_down_outlined,
             ),
             _MoneyMetricCard(
-              label: 'Total Profit ($year)',
+              label: 'Total Profit',
               valueRs: totalProfitRs,
               valueUsd: totalProfitUsd,
               color: totalProfitRs >= 0 ? AppColors.success : AppColors.error,
               icon: Icons.account_balance_wallet_outlined,
             ),
             MetricCard(
-              label: 'Profit Margin ($year)',
+              label: 'Profit Margin',
               value: _formatPercent(profitMargin),
               secondaryValue: '$profitableMonths of $monthCount months profitable',
               color: profitMargin >= 0 ? AppColors.success : AppColors.error,
               icon: Icons.percent_outlined,
-              valueFontSize: 20,
+              // Matches the money tiles' size for visual consistency across
+              // the row.
+              valueFontSize: 16,
               labelFirst: true,
             ),
           ],
         ),
         const SizedBox(height: 16),
         Text(
-          'Monthly Averages & Highlights ($year)',
+          'Monthly Averages & Highlights ($scopeLabel)',
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 10),
@@ -403,7 +408,7 @@ class _SummaryStatsRow extends StatelessWidget {
               icon: Icons.savings_outlined,
             ),
             _MoneyMetricCard(
-              label: 'Best Month',
+              label: 'Best Month (by Profit)',
               valueRs: bestMonth.profitRs,
               valueUsd: bestMonth.profitUsd,
               secondaryValue: _formatMonthYear(bestMonth.month, bestMonth.year),
@@ -411,7 +416,7 @@ class _SummaryStatsRow extends StatelessWidget {
               icon: Icons.emoji_events_outlined,
             ),
             _MoneyMetricCard(
-              label: 'Worst Month',
+              label: 'Worst Month (by Profit)',
               valueRs: worstMonth.profitRs,
               valueUsd: worstMonth.profitUsd,
               secondaryValue: _formatMonthYear(worstMonth.month, worstMonth.year),
@@ -484,6 +489,19 @@ class _GroupedBars extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // A direct value label per series, stacked above the bars and
+          // color-matched to each — so every figure is visible without
+          // hovering; the tooltip still carries the exact PKR+USD amount.
+          for (final spec in bars)
+            Text(
+              _formatCompact(spec.value),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: spec.color,
+              ),
+            ),
+          const SizedBox(height: 4),
           SizedBox(
             height: maxBarHeight,
             child: Row(
@@ -558,7 +576,9 @@ class _RevenueExpenseChart extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: _maxBarHeight + 40,
+            // + 40 for the month label below the bars, + 28 for the two
+            // stacked value labels (Revenue/Expense) above them.
+            height: _maxBarHeight + 68,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -566,7 +586,9 @@ class _RevenueExpenseChart extends StatelessWidget {
                 children: [
                   for (final record in records)
                     _GroupedBars(
-                      label: _formatChartMonthLabel(record.month, record.year),
+                      // No year suffix — this chart is always scoped to one
+                      // selected year, already named in its title above.
+                      label: _kMonthAbbreviations[record.month - 1],
                       maxValue: maxValue == 0 ? 1 : maxValue,
                       maxBarHeight: _maxBarHeight,
                       bars: [
@@ -626,7 +648,9 @@ class _ProfitTrendChart extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: _maxBarHeight + 40,
+            // + 40 for the month label below the bars, + 16 for the value
+            // label above them.
+            height: _maxBarHeight + 56,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -634,7 +658,9 @@ class _ProfitTrendChart extends StatelessWidget {
                 children: [
                   for (final record in records)
                     _ProfitBar(
-                      label: _formatChartMonthLabel(record.month, record.year),
+                      // No year suffix — this chart is always scoped to one
+                      // selected year, already named in its title above.
+                      label: _kMonthAbbreviations[record.month - 1],
                       tooltipLabel: _formatMonthYear(record.month, record.year),
                       value: record.profitRs,
                       maxAbs: maxAbs == 0 ? 1 : maxAbs,
@@ -683,6 +709,17 @@ class _ProfitBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Direct value label — visible without hovering; the tooltip
+            // above still carries the exact PKR+USD amount.
+            Text(
+              _formatCompact(value),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
             SizedBox(
               height: maxBarHeight,
               width: 26,
@@ -768,7 +805,9 @@ class _YearlyComparisonChart extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: _maxBarHeight + 40,
+            // + 40 for the year label below the bars, + 42 for the three
+            // stacked value labels (Revenue/Expense/Profit) above them.
+            height: _maxBarHeight + 82,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -837,18 +876,37 @@ class _MonthlyRecordsTable extends StatelessWidget {
                     Text('${_kMonthAbbreviations[record.month - 1]} ${record.year}'),
                   ),
                   DataCell(
-                    Text(_formatMoneyWithUsd(record.revenueRs, record.revenueUsd)),
+                    Text.rich(
+                      TextSpan(
+                        children: _moneyValueSpans(
+                          record.revenueRs,
+                          record.revenueUsd,
+                        ),
+                      ),
+                    ),
                   ),
                   DataCell(
-                    Text(_formatMoneyWithUsd(record.expenseRs, record.expenseUsd)),
+                    Text.rich(
+                      TextSpan(
+                        children: _moneyValueSpans(
+                          record.expenseRs,
+                          record.expenseUsd,
+                        ),
+                      ),
+                    ),
                   ),
                   DataCell(
-                    Text(
-                      _formatMoneyWithUsd(record.profitRs, record.profitUsd),
-                      style: TextStyle(
-                        color: record.profitRs >= 0
-                            ? AppColors.success
-                            : AppColors.error,
+                    Text.rich(
+                      TextSpan(
+                        style: TextStyle(
+                          color: record.profitRs >= 0
+                              ? AppColors.success
+                              : AppColors.error,
+                        ),
+                        children: _moneyValueSpans(
+                          record.profitRs,
+                          record.profitUsd,
+                        ),
                       ),
                     ),
                   ),

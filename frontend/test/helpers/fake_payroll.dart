@@ -10,28 +10,40 @@ PayrollLineItem buildTestPayrollLineItem({
   String employeeName = 'Jane Doe',
   String? employeePhotoUrl,
   double baseSalary = 50000,
-  double bonuses = 0,
   double allowances = 0,
   double overtime = 0,
   double deductions = 0,
   double advances = 0,
   double tax = 0,
+  double fines = 0,
+  int lateCount = 0,
+  double? lateDeductionRs,
   String? notes,
 }) {
+  final resolvedLateDeductionRs = lateDeductionRs ?? 0;
   return PayrollLineItem(
     id: id,
     employeeId: employeeId,
     employeeName: employeeName,
     employeePhotoUrl: employeePhotoUrl,
     baseSalary: baseSalary,
-    bonuses: bonuses,
     allowances: allowances,
     overtime: overtime,
     deductions: deductions,
     advances: advances,
     tax: tax,
+    fines: fines,
+    lateCount: lateCount,
+    lateDeductionRs: resolvedLateDeductionRs,
     netPay:
-        baseSalary + bonuses + allowances + overtime - deductions - advances - tax,
+        baseSalary +
+        allowances +
+        overtime -
+        deductions -
+        advances -
+        tax -
+        fines -
+        resolvedLateDeductionRs,
     notes: notes,
   );
 }
@@ -108,7 +120,8 @@ class FakePayrollRepository implements PayrollRepository {
   int? lastGeneratedYear;
 
   String? lastUpdatedLineItemId;
-  double? lastUpdatedBonuses;
+  double? lastUpdatedFines;
+  int? lastUpdatedLateCount;
   double? lastUpdatedDeductions;
 
   String? lastFinalizedRunId;
@@ -142,16 +155,18 @@ class FakePayrollRepository implements PayrollRepository {
   Future<PayrollRunDetail> updateLineItem(
     String runId,
     String lineItemId, {
-    double? bonuses,
     double? allowances,
     double? overtime,
     double? deductions,
     double? advances,
     double? tax,
+    double? fines,
+    int? lateCount,
     String? notes,
   }) async {
     lastUpdatedLineItemId = lineItemId;
-    lastUpdatedBonuses = bonuses;
+    lastUpdatedFines = fines;
+    lastUpdatedLateCount = lateCount;
     lastUpdatedDeductions = deductions;
     return runDetail ?? buildTestPayrollRunDetail(id: runId);
   }

@@ -42,7 +42,7 @@ void main() {
           buildTestPayrollLineItem(
             employeeName: 'Jane Doe',
             baseSalary: 50000,
-            bonuses: 5000,
+            allowances: 5000,
           ),
         ],
       ),
@@ -119,12 +119,17 @@ void main() {
 
     expect(find.text('Jane Doe'), findsWidgets); // dialog title + table cell
 
-    await tester.enterText(find.widgetWithText(TextField, 'Bonuses (PKR)'), '5000');
+    await tester.enterText(find.widgetWithText(TextField, 'Fines (PKR)'), '500');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Late arrivals this month'),
+      '3',
+    );
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
 
     expect(repository.lastUpdatedLineItemId, 'item-9');
-    expect(repository.lastUpdatedBonuses, 5000);
+    expect(repository.lastUpdatedFines, 500);
+    expect(repository.lastUpdatedLateCount, 3);
   });
 
   testWidgets('does not open the edit dialog for a finalized run\'s line items', (
@@ -142,6 +147,32 @@ void main() {
     await tester.tap(find.text('Jane Doe'));
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(TextField, 'Bonuses (PKR)'), findsNothing);
+    expect(find.widgetWithText(TextField, 'Fines (PKR)'), findsNothing);
   });
+
+  testWidgets(
+    'shows the late-arrival count and computed late deduction in the table',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(
+          status: PayrollRunStatus.draft,
+          lineItems: [
+            buildTestPayrollLineItem(
+              employeeName: 'Jane Doe',
+              baseSalary: 31000,
+              lateCount: 3,
+              lateDeductionRs: 1000,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Lates'), findsOneWidget);
+      expect(find.text('Late Deduction'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
+      expect(find.text('1,000.00'), findsOneWidget);
+    },
+  );
 }

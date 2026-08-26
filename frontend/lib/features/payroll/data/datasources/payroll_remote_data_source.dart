@@ -34,23 +34,25 @@ class PayrollRemoteDataSource {
   Future<PayrollRunDetailModel> updateLineItem(
     String runId,
     String lineItemId, {
-    double? bonuses,
     double? allowances,
     double? overtime,
     double? deductions,
     double? advances,
     double? tax,
+    double? fines,
+    int? lateCount,
     String? notes,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/payroll/runs/$runId/line-items/$lineItemId',
       data: {
-        'bonuses': ?bonuses,
         'allowances': ?allowances,
         'overtime': ?overtime,
         'deductions': ?deductions,
         'advances': ?advances,
         'tax': ?tax,
+        'fines': ?fines,
+        'lateCount': ?lateCount,
         'notes': ?notes,
       },
     );

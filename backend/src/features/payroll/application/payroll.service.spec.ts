@@ -48,12 +48,13 @@ function buildLineItem(overrides: Partial<PayrollLineItem> = {}): PayrollLineIte
     employeeId: 'employee-1',
     employee: buildEmployee(),
     baseSalary: '50000.00',
-    bonuses: '0.00',
     allowances: '0.00',
     overtime: '0.00',
     deductions: '0.00',
     advances: '0.00',
     tax: '0.00',
+    fines: '0.00',
+    lateCount: 0,
     notes: null,
     createdAt: new Date('2026-08-01T00:00:00.000Z'),
     updatedAt: new Date('2026-08-01T00:00:00.000Z'),
@@ -178,17 +179,53 @@ describe('PayrollService', () => {
       lineItemRepository.findByRunId.mockResolvedValue([
         buildLineItem({
           baseSalary: '50000.00',
-          bonuses: '5000.00',
           deductions: '1000.00',
+          fines: '500.00',
         }),
       ]);
 
       const result = await service.updateLineItem('run-1', 'item-1', {
-        bonuses: 5000,
         deductions: 1000,
+        fines: 500,
       });
 
-      expect(result.lineItems[0].netPay).toBe(54000); // 50000 + 5000 - 1000
+      expect(result.lineItems[0].netPay).toBe(48500); // 50000 - 1000 - 500
+    });
+
+    it('deducts one day of salary for every 3 late arrivals', async () => {
+      // August 2026 has 31 days, so a 31,000 base salary is a clean 1,000/day.
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT, month: 8, year: 2026 }),
+      );
+      lineItemRepository.findById.mockResolvedValue(buildLineItem());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({ baseSalary: '31000.00', lateCount: 3 }),
+      ]);
+
+      const result = await service.updateLineItem('run-1', 'item-1', {
+        lateCount: 3,
+      });
+
+      expect(result.lineItems[0].lateCount).toBe(3);
+      expect(result.lineItems[0].lateDeductionRs).toBe(1000); // floor(3/3) * 1000
+      expect(result.lineItems[0].netPay).toBe(30000); // 31000 - 1000
+    });
+
+    it('does not deduct for fewer than 3 late arrivals', async () => {
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT, month: 8, year: 2026 }),
+      );
+      lineItemRepository.findById.mockResolvedValue(buildLineItem());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({ baseSalary: '31000.00', lateCount: 2 }),
+      ]);
+
+      const result = await service.updateLineItem('run-1', 'item-1', {
+        lateCount: 2,
+      });
+
+      expect(result.lineItems[0].lateDeductionRs).toBe(0); // floor(2/3) = 0
+      expect(result.lineItems[0].netPay).toBe(31000);
     });
 
     it('rejects editing a line item once the run is no longer draft', async () => {
@@ -197,7 +234,7 @@ describe('PayrollService', () => {
       );
 
       await expect(
-        service.updateLineItem('run-1', 'item-1', { bonuses: 100 }),
+        service.updateLineItem('run-1', 'item-1', { fines: 100 }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -208,7 +245,7 @@ describe('PayrollService', () => {
       );
 
       await expect(
-        service.updateLineItem('run-1', 'item-1', { bonuses: 100 }),
+        service.updateLineItem('run-1', 'item-1', { fines: 100 }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
@@ -285,7 +322,7 @@ describe('PayrollService', () => {
     it('returns a summary with totalNetPay across all line items', async () => {
       runRepository.findAll.mockResolvedValue([buildRun()]);
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ baseSalary: '50000.00', bonuses: '2000.00' }),
+        buildLineItem({ baseSalary: '50000.00', allowances: '2000.00' }),
         buildLineItem({ id: 'item-2', baseSalary: '60000.00' }),
       ]);
 

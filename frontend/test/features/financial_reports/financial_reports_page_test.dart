@@ -32,6 +32,11 @@ Widget _app({FakeFinancialReportsRepository? repository, AuthUser? viewer}) {
   );
 }
 
+Finder _periodSegment(String label) => find.descendant(
+  of: find.byType(SegmentedButton<int?>),
+  matching: find.text(label),
+);
+
 void main() {
   testWidgets('shows an empty state when there are no records', (
     tester,
@@ -65,66 +70,13 @@ void main() {
 
     expect(find.text('PKR'), findsNothing);
     expect(find.text('USD'), findsNothing);
-    // Exactly one SegmentedButton remains — the year selector.
-    expect(find.byType(SegmentedButton<int>), findsOneWidget);
-  });
-
-  testWidgets('shows summary stat tiles for the most recent year', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _app(
-        repository: FakeFinancialReportsRepository(
-          records: [
-            buildTestFinancialRecord(
-              id: 'r1',
-              year: 2025,
-              month: 1,
-              revenueRs: 1000000,
-              revenueUsd: 3571,
-              expenseRs: 600000,
-              expenseUsd: 2143,
-            ),
-            buildTestFinancialRecord(
-              id: 'r2',
-              year: 2026,
-              month: 1,
-              revenueRs: 2000000,
-              revenueUsd: 7142,
-              expenseRs: 1200000,
-              expenseUsd: 4286,
-            ),
-          ],
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // Defaults to the most recent year (2026), not 2025. Every PKR figure
-    // is the full precise number, with its USD equivalent in brackets.
-    final cardValues = {
-      for (final card in tester.widgetList<MetricCard>(find.byType(MetricCard)))
-        card.label: card.value,
-    };
-    expect(cardValues['Total Revenue (2026)'], 'Rs2,000,000 (\$7,142)');
-    expect(cardValues['Total Expense (2026)'], 'Rs1,200,000 (\$4,286)');
-    expect(cardValues['Total Profit (2026)'], 'Rs800,000 (\$2,856)');
-    expect(cardValues['Profit Margin (2026)'], '40.0%');
-    // The only record in 2026 is both the best and the worst month, and
-    // with one month, the monthly average equals the yearly total.
-    expect(cardValues['Best Month'], 'Rs800,000 (\$2,856)');
-    expect(cardValues['Worst Month'], 'Rs800,000 (\$2,856)');
-    expect(cardValues['Avg Monthly Revenue'], 'Rs2,000,000 (\$7,142)');
-    final cardSecondaryValues = {
-      for (final card in tester.widgetList<MetricCard>(find.byType(MetricCard)))
-        card.label: card.secondaryValue,
-    };
-    expect(cardSecondaryValues['Best Month'], 'Jan 2026');
+    // Exactly one SegmentedButton remains — the Period selector.
+    expect(find.byType(SegmentedButton<int?>), findsOneWidget);
   });
 
   testWidgets(
-    'shows all-time totals across every year, with the covered date range, '
-    'unaffected by the year selector',
+    'defaults to All-Time — totals span every year, with the covered date '
+    'range, and monthly detail stays hidden until a year is picked',
     (tester) async {
       await tester.pumpWidget(
         _app(
@@ -154,79 +106,97 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('All-Time Totals'), findsOneWidget);
+      expect(_periodSegment('All-Time'), findsOneWidget);
+      expect(find.text('Totals (All-Time)'), findsOneWidget);
       expect(find.text('Since Jul 2022 – Jan 2026 · 2 months of data'), findsOneWidget);
 
       final cardValues = {
         for (final card in tester.widgetList<MetricCard>(find.byType(MetricCard)))
           card.label: card.value,
       };
-      expect(cardValues['All-Time Revenue'], 'Rs3,000,000 (\$10,713)');
-      expect(cardValues['All-Time Expense'], 'Rs1,800,000 (\$6,429)');
-      expect(cardValues['All-Time Profit'], 'Rs1,200,000 (\$4,284)');
+      // The tile labels themselves stay plain ("Total Revenue", not "Total
+      // Revenue (All-Time)") — the "Totals (All-Time)" heading above them
+      // already states the scope.
+      expect(cardValues['Total Revenue'], 'Rs3,000,000 (\$10,713)');
+      expect(cardValues['Total Expense'], 'Rs1,800,000 (\$6,429)');
+      expect(cardValues['Total Profit'], 'Rs1,200,000 (\$4,284)');
 
-      // Switching the year selector must not change the all-time figures —
-      // they're deliberately independent of it.
-      await tester.tap(
-        find.descendant(
-          of: find.byType(SegmentedButton<int>),
-          matching: find.text('2022'),
+      // Monthly detail (charts + table) is inherently single-year — hidden
+      // by default, with a hint explaining why.
+      expect(find.byType(DataTable), findsNothing);
+      expect(
+        find.textContaining('Select a year above to see its monthly'),
+        findsOneWidget,
+      );
+      // The multi-year comparison chart is not "monthly detail" — it stays.
+      expect(find.text('Revenue vs Expense vs Profit by Year'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'picking a year narrows the totals and reveals monthly detail; '
+    'switching back to All-Time hides it again',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeFinancialReportsRepository(
+            records: [
+              buildTestFinancialRecord(
+                id: 'r1',
+                year: 2025,
+                month: 1,
+                revenueRs: 500000,
+                revenueUsd: 1786,
+                expenseRs: 400000,
+                expenseUsd: 1429,
+              ),
+              buildTestFinancialRecord(
+                id: 'r2',
+                year: 2026,
+                month: 1,
+                revenueRs: 2000000,
+                revenueUsd: 7142,
+                expenseRs: 1200000,
+                expenseUsd: 4286,
+              ),
+            ],
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
-      final cardValuesAfter = {
+      await tester.tap(_periodSegment('2025'));
+      await tester.pumpAndSettle();
+
+      final cardValues = {
         for (final card in tester.widgetList<MetricCard>(find.byType(MetricCard)))
           card.label: card.value,
       };
-      expect(cardValuesAfter['All-Time Revenue'], 'Rs3,000,000 (\$10,713)');
+      expect(cardValues['Total Revenue'], 'Rs500,000 (\$1,786)');
+      // The heading switches to the selected year, not "All-Time".
+      expect(find.text('Totals (2025)'), findsOneWidget);
+      expect(find.text('Totals (All-Time)'), findsNothing);
+      expect(find.byType(DataTable), findsOneWidget);
+      expect(
+        find.textContaining('Select a year above to see its monthly'),
+        findsNothing,
+      );
+
+      await tester.tap(_periodSegment('All-Time'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DataTable), findsNothing);
+      expect(
+        find.textContaining('Select a year above to see its monthly'),
+        findsOneWidget,
+      );
     },
   );
 
-  testWidgets('switching the year segment recomputes the stat tiles', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _app(
-        repository: FakeFinancialReportsRepository(
-          records: [
-            buildTestFinancialRecord(
-              id: 'r1',
-              year: 2025,
-              month: 1,
-              revenueRs: 500000,
-              expenseRs: 400000,
-            ),
-            buildTestFinancialRecord(
-              id: 'r2',
-              year: 2026,
-              month: 1,
-              revenueRs: 2000000,
-              expenseRs: 1200000,
-            ),
-          ],
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.descendant(
-        of: find.byType(SegmentedButton<int>),
-        matching: find.text('2025'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final cardValues = {
-      for (final card in tester.widgetList<MetricCard>(find.byType(MetricCard)))
-        card.label: card.value,
-    };
-    expect(cardValues['Total Revenue (2025)'], 'Rs500,000 (\$3,571)');
-  });
-
   testWidgets(
-    'the monthly charts label each bar with both month and short year',
+    'the monthly charts label each bar with a plain month — the chart '
+    'title already names the year, since these charts are always scoped '
+    'to one selected year',
     (tester) async {
       await tester.pumpWidget(
         _app(
@@ -238,12 +208,13 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.tap(_periodSegment('2026'));
+      await tester.pumpAndSettle();
 
-      // A bare "Mar" would be ambiguous across years — the chart bars (not
-      // just the detail table, which already showed "Mar 2026") must carry
-      // the year too.
-      expect(find.text('Mar\n26'), findsWidgets);
-      expect(find.text('Mar'), findsNothing);
+      expect(find.text('Mar'), findsWidgets);
+      expect(find.text('Mar\n26'), findsNothing);
+      expect(find.text('Revenue vs Expense — 2026'), findsOneWidget);
+      expect(find.text('Monthly Profit / Loss — 2026'), findsOneWidget);
     },
   );
 
@@ -263,7 +234,9 @@ void main() {
     },
   );
 
-  testWidgets('the monthly detail table shows each record', (tester) async {
+  testWidgets('the monthly detail table shows each record once a year is picked', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _app(
         repository: FakeFinancialReportsRepository(
@@ -281,6 +254,8 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(_periodSegment('2026'));
     await tester.pumpAndSettle();
 
     // "Mar 2026" also appears on the Best/Worst Month tiles above the

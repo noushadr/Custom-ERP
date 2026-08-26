@@ -4,14 +4,19 @@ export interface PayrollLineItemResponseDto {
   employeeName: string;
   employeePhotoUrl: string | null;
   baseSalary: number;
-  bonuses: number;
   allowances: number;
   overtime: number;
   deductions: number;
   advances: number;
   tax: number;
-  /** Computed: baseSalary + bonuses + allowances + overtime - deductions
-   * - advances - tax. Never stored. */
+  fines: number;
+  /** Entered count of late arrivals this month. */
+  lateCount: number;
+  /** Computed: `floor(lateCount / 3)` unpaid days × (baseSalary /
+   * days-in-run's-month). Never stored. */
+  lateDeductionRs: number;
+  /** Computed: baseSalary + allowances + overtime - deductions - advances
+   * - tax - fines - lateDeductionRs. Never stored. */
   netPay: number;
   notes: string | null;
 }

@@ -8,12 +8,14 @@ import { PayrollRun } from './payroll-run.entity';
  * it never changes afterwards even if the employee's salary is later
  * amended, since this is meant to be exactly what that month's payroll
  * actually paid. `netPay` is deliberately not a column — computed in the
- * mapper from the other six figures on every read, same convention as
- * Project's netPrice/profit. Bonuses/allowances/overtime/deductions/
- * advances/tax are one-off amounts entered directly against this run —
- * there is no recurring-item or loan-ledger concept in V1. `netPay` here
- * is computed the same way, but Project's own pricing fields have since
- * been removed. */
+ * mapper from the other figures on every read, same convention as
+ * Project's netPrice/profit (since removed). Allowances/overtime/
+ * deductions/advances/tax/fines are one-off amounts entered directly
+ * against this run — there is no recurring-item or loan-ledger concept in
+ * V1. `lateCount` is a plain entered count (no attendance-tracking module
+ * exists yet) — every 3 lates deducts one unpaid day's salary, computed
+ * in the mapper from `baseSalary` and the run's days-in-month (see
+ * `lateDeductionRs` in payroll.mapper.ts), never stored. */
 @Entity('payroll_line_items')
 export class PayrollLineItem extends BaseEntity {
   @Column()
@@ -34,9 +36,6 @@ export class PayrollLineItem extends BaseEntity {
   baseSalary: string;
 
   @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
-  bonuses: string;
-
-  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
   allowances: string;
 
   @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
@@ -50,6 +49,17 @@ export class PayrollLineItem extends BaseEntity {
 
   @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
   tax: string;
+
+  /** One-off fine amount for this run — distinct from the generic
+   * `deductions` field so fines are tracked separately. */
+  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
+  fines: string;
+
+  /** Count of late arrivals recorded for this employee this month. Every
+   * 3 lates deducts one unpaid day's salary — see `lateDeductionRs` in
+   * payroll.mapper.ts. */
+  @Column({ type: 'int', default: 0 })
+  lateCount: number;
 
   @Column({ type: 'text', nullable: true })
   notes?: string | null;

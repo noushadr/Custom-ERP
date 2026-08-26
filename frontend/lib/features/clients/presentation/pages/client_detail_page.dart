@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/utils/country_short_code.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../employee/presentation/widgets/employee_status_badges.dart';
@@ -191,7 +192,8 @@ class _ClientDetailBody extends ConsumerWidget {
                 if (client.primaryContactPhone != null)
                   Text('Phone: ${client.primaryContactPhone}'),
                 if (client.website != null) Text('Website: ${client.website}'),
-                if (client.country != null) Text('Country: ${client.country}'),
+                if (client.country != null)
+                  Text('Country: ${formatCountryFlag(client.country)}'),
                 if (client.address != null) Text('Address: ${client.address}'),
                 if (client.leadSource != null)
                   Text('Lead source: ${client.leadSource}'),
