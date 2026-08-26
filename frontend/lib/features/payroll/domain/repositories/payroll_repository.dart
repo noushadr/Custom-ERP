@@ -11,13 +11,19 @@ abstract interface class PayrollRepository {
   Future<PayrollRunDetail> updateLineItem(
     String runId,
     String lineItemId, {
+    int? quantity,
+    double? perUnitRate,
     double? allowances,
     double? overtime,
+    double? reimbursement,
+    double? commissions,
     double? deductions,
     double? advances,
     double? tax,
     double? fines,
-    int? lateCount,
+    int? totalAbsent,
+    int? lateHours,
+    int? lateDays,
     String? notes,
   });
 

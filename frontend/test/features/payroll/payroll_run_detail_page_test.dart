@@ -121,7 +121,7 @@ void main() {
 
     await tester.enterText(find.widgetWithText(TextField, 'Fines (PKR)'), '500');
     await tester.enterText(
-      find.widgetWithText(TextField, 'Late arrivals this month'),
+      find.widgetWithText(TextField, 'Late-arrival days'),
       '3',
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
@@ -129,8 +129,72 @@ void main() {
 
     expect(repository.lastUpdatedLineItemId, 'item-9');
     expect(repository.lastUpdatedFines, 500);
-    expect(repository.lastUpdatedLateCount, 3);
+    expect(repository.lastUpdatedLateDays, 3);
   });
+
+  testWidgets(
+    'editing attendance fields (absent days, late hours) and additions '
+    '(reimbursement, commissions) submits them',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(
+          status: PayrollRunStatus.draft,
+          lineItems: [buildTestPayrollLineItem(id: 'item-9', employeeName: 'Jane Doe')],
+        ),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Jane Doe'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextField, 'Absent days'), '2');
+      await tester.enterText(find.widgetWithText(TextField, 'Late hours'), '5');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Reimbursement (PKR)'),
+        '7000',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Commissions/Incentives (PKR)'),
+        '1500',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedTotalAbsent, 2);
+      expect(repository.lastUpdatedLateHours, 5);
+    },
+  );
+
+  testWidgets(
+    'editing piece-rate quantity and per-unit rate submits both',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(
+          status: PayrollRunStatus.draft,
+          lineItems: [
+            buildTestPayrollLineItem(id: 'item-9', employeeName: 'Kulsum Zehra'),
+          ],
+        ),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Kulsum Zehra'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextField, 'Quantity'), '5');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Per unit (PKR)'),
+        '1000',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedQuantity, 5);
+      expect(repository.lastUpdatedPerUnitRate, 1000);
+    },
+  );
 
   testWidgets('does not open the edit dialog for a finalized run\'s line items', (
     tester,
@@ -151,7 +215,7 @@ void main() {
   });
 
   testWidgets(
-    'shows the late-arrival count and computed late deduction in the table',
+    'shows the late-arrival day count and computed deduction in the table',
     (tester) async {
       final repository = FakePayrollRepository(
         runDetail: buildTestPayrollRunDetail(
@@ -160,8 +224,8 @@ void main() {
             buildTestPayrollLineItem(
               employeeName: 'Jane Doe',
               baseSalary: 31000,
-              lateCount: 3,
-              lateDeductionRs: 1000,
+              lateDays: 3,
+              lateDaysDeductionRs: 1000,
             ),
           ],
         ),
@@ -169,10 +233,71 @@ void main() {
       await tester.pumpWidget(_app(repository: repository));
       await tester.pumpAndSettle();
 
-      expect(find.text('Lates'), findsOneWidget);
-      expect(find.text('Late Deduction'), findsOneWidget);
+      expect(find.text('Late Days'), findsOneWidget);
+      expect(find.text('Late Days Ded.'), findsOneWidget);
       expect(find.text('3'), findsOneWidget);
       expect(find.text('1,000.00'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows the piece-rate quantity/rate and absence/late-hour deductions in the table',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(
+          status: PayrollRunStatus.draft,
+          lineItems: [
+            buildTestPayrollLineItem(
+              employeeName: 'Kulsum Zehra',
+              quantity: 5,
+              perUnitRate: 1000,
+              // A nonzero allowance keeps net pay (5,500.00) distinct from
+              // the computed piece-rate base pay (5,000.00) being asserted
+              // on below, so the two don't collide as the same table cell.
+              allowances: 500,
+            ),
+            buildTestPayrollLineItem(
+              id: 'item-2',
+              employeeName: 'Naveed Ghani',
+              baseSalary: 33000,
+              totalAbsent: 20,
+              absentDeductionRs: 22000,
+              lateHours: 4,
+              lateHoursDeductionRs: 400,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      // Kulsum's base pay is the computed quantity * rate (5,000.00), not a
+      // separately-tracked "Salary" value.
+      expect(
+        find.descendant(
+          of: find.byType(DataTable),
+          matching: find.text('5,000.00'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(DataTable), matching: find.text('5')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(DataTable),
+          matching: find.text('1,000.00'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(DataTable),
+          matching: find.text('22,000.00'),
+        ),
+        findsOneWidget,
+      );
     },
   );
 }

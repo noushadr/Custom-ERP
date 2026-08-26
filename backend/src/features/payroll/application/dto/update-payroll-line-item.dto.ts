@@ -2,6 +2,16 @@ import { IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class UpdatePayrollLineItemDto {
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  quantity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  perUnitRate?: number;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   allowances?: number;
@@ -10,6 +20,16 @@ export class UpdatePayrollLineItemDto {
   @IsNumber()
   @Min(0)
   overtime?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  reimbursement?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  commissions?: number;
 
   @IsOptional()
   @IsNumber()
@@ -34,7 +54,17 @@ export class UpdatePayrollLineItemDto {
   @IsOptional()
   @IsInt()
   @Min(0)
-  lateCount?: number;
+  totalAbsent?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  lateHours?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  lateDays?: number;
 
   @IsOptional()
   @IsString()

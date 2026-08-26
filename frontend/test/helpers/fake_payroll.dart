@@ -10,40 +10,66 @@ PayrollLineItem buildTestPayrollLineItem({
   String employeeName = 'Jane Doe',
   String? employeePhotoUrl,
   double baseSalary = 50000,
+  int? quantity,
+  double? perUnitRate,
   double allowances = 0,
   double overtime = 0,
+  double reimbursement = 0,
+  double commissions = 0,
   double deductions = 0,
   double advances = 0,
   double tax = 0,
   double fines = 0,
-  int lateCount = 0,
-  double? lateDeductionRs,
+  int totalAbsent = 0,
+  double? absentDeductionRs,
+  int lateHours = 0,
+  double? lateHoursDeductionRs,
+  int lateDays = 0,
+  double? lateDaysDeductionRs,
   String? notes,
 }) {
-  final resolvedLateDeductionRs = lateDeductionRs ?? 0;
+  final effectiveBaseSalary =
+      (quantity != null && quantity > 0 && perUnitRate != null)
+      ? quantity * perUnitRate
+      : baseSalary;
+  final resolvedAbsentDeductionRs = absentDeductionRs ?? 0;
+  final resolvedLateHoursDeductionRs = lateHoursDeductionRs ?? 0;
+  final resolvedLateDaysDeductionRs = lateDaysDeductionRs ?? 0;
   return PayrollLineItem(
     id: id,
     employeeId: employeeId,
     employeeName: employeeName,
     employeePhotoUrl: employeePhotoUrl,
-    baseSalary: baseSalary,
+    baseSalary: effectiveBaseSalary,
+    quantity: quantity,
+    perUnitRate: perUnitRate,
     allowances: allowances,
     overtime: overtime,
+    reimbursement: reimbursement,
+    commissions: commissions,
     deductions: deductions,
     advances: advances,
     tax: tax,
     fines: fines,
-    lateCount: lateCount,
-    lateDeductionRs: resolvedLateDeductionRs,
+    totalAbsent: totalAbsent,
+    absentDeductionRs: resolvedAbsentDeductionRs,
+    lateHours: lateHours,
+    lateHoursDeductionRs: resolvedLateHoursDeductionRs,
+    lateDays: lateDays,
+    lateDaysDeductionRs: resolvedLateDaysDeductionRs,
     netPay:
-        baseSalary +
+        effectiveBaseSalary +
         allowances +
-        overtime -
+        overtime +
+        reimbursement +
+        commissions -
         deductions -
         advances -
         tax -
         fines -
-        resolvedLateDeductionRs,
+        resolvedAbsentDeductionRs -
+        resolvedLateHoursDeductionRs -
+        resolvedLateDaysDeductionRs,
     notes: notes,
   );
 }
@@ -121,8 +147,12 @@ class FakePayrollRepository implements PayrollRepository {
 
   String? lastUpdatedLineItemId;
   double? lastUpdatedFines;
-  int? lastUpdatedLateCount;
+  int? lastUpdatedTotalAbsent;
+  int? lastUpdatedLateHours;
+  int? lastUpdatedLateDays;
   double? lastUpdatedDeductions;
+  int? lastUpdatedQuantity;
+  double? lastUpdatedPerUnitRate;
 
   String? lastFinalizedRunId;
   String? lastPaidRunId;
@@ -155,19 +185,29 @@ class FakePayrollRepository implements PayrollRepository {
   Future<PayrollRunDetail> updateLineItem(
     String runId,
     String lineItemId, {
+    int? quantity,
+    double? perUnitRate,
     double? allowances,
     double? overtime,
+    double? reimbursement,
+    double? commissions,
     double? deductions,
     double? advances,
     double? tax,
     double? fines,
-    int? lateCount,
+    int? totalAbsent,
+    int? lateHours,
+    int? lateDays,
     String? notes,
   }) async {
     lastUpdatedLineItemId = lineItemId;
     lastUpdatedFines = fines;
-    lastUpdatedLateCount = lateCount;
+    lastUpdatedTotalAbsent = totalAbsent;
+    lastUpdatedLateHours = lateHours;
+    lastUpdatedLateDays = lateDays;
     lastUpdatedDeductions = deductions;
+    lastUpdatedQuantity = quantity;
+    lastUpdatedPerUnitRate = perUnitRate;
     return runDetail ?? buildTestPayrollRunDetail(id: runId);
   }
 

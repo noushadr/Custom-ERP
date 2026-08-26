@@ -219,6 +219,50 @@ void main() {
   );
 
   testWidgets(
+    'the revenue growth chart spans every record regardless of the '
+    'selected period, and stays hidden with fewer than 2 records',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeFinancialReportsRepository(
+            records: [
+              buildTestFinancialRecord(id: 'r1', year: 2022, month: 7),
+              buildTestFinancialRecord(id: 'r2', year: 2026, month: 1),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Visible by default in All-Time...
+      expect(find.text('Revenue Growth — All-Time'), findsOneWidget);
+
+      await tester.tap(_periodSegment('2026'));
+      await tester.pumpAndSettle();
+
+      // ...and stays visible, still covering both records, after narrowing
+      // to a single year via the Period selector.
+      expect(find.text('Revenue Growth — All-Time'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'the revenue growth chart stays hidden with fewer than 2 records',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeFinancialReportsRepository(
+            records: [buildTestFinancialRecord()],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Revenue Growth — All-Time'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'the yearly comparison chart offers Revenue, Expense, and Profit',
     (tester) async {
       await tester.pumpWidget(

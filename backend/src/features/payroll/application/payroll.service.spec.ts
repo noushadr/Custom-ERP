@@ -48,13 +48,19 @@ function buildLineItem(overrides: Partial<PayrollLineItem> = {}): PayrollLineIte
     employeeId: 'employee-1',
     employee: buildEmployee(),
     baseSalary: '50000.00',
+    quantity: null,
+    perUnitRate: null,
     allowances: '0.00',
     overtime: '0.00',
+    reimbursement: '0.00',
+    commissions: '0.00',
     deductions: '0.00',
     advances: '0.00',
     tax: '0.00',
     fines: '0.00',
-    lateCount: 0,
+    totalAbsent: 0,
+    lateHours: 0,
+    lateDays: 0,
     notes: null,
     createdAt: new Date('2026-08-01T00:00:00.000Z'),
     updatedAt: new Date('2026-08-01T00:00:00.000Z'),
@@ -192,40 +198,104 @@ describe('PayrollService', () => {
       expect(result.lineItems[0].netPay).toBe(48500); // 50000 - 1000 - 500
     });
 
-    it('deducts one day of salary for every 3 late arrivals', async () => {
-      // August 2026 has 31 days, so a 31,000 base salary is a clean 1,000/day.
-      runRepository.findById.mockResolvedValue(
-        buildRun({ status: PayrollRunStatus.DRAFT, month: 8, year: 2026 }),
-      );
+    it('deducts one day of salary for every 3 late-arrival days (flat 30-day month)', async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
       lineItemRepository.findById.mockResolvedValue(buildLineItem());
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ baseSalary: '31000.00', lateCount: 3 }),
+        buildLineItem({ baseSalary: '30000.00', lateDays: 3 }), // 1,000/day
       ]);
 
       const result = await service.updateLineItem('run-1', 'item-1', {
-        lateCount: 3,
+        lateDays: 3,
       });
 
-      expect(result.lineItems[0].lateCount).toBe(3);
-      expect(result.lineItems[0].lateDeductionRs).toBe(1000); // floor(3/3) * 1000
-      expect(result.lineItems[0].netPay).toBe(30000); // 31000 - 1000
+      expect(result.lineItems[0].lateDays).toBe(3);
+      expect(result.lineItems[0].lateDaysDeductionRs).toBe(1000); // floor(3/3) * 1000
+      expect(result.lineItems[0].netPay).toBe(29000); // 30000 - 1000
     });
 
-    it('does not deduct for fewer than 3 late arrivals', async () => {
-      runRepository.findById.mockResolvedValue(
-        buildRun({ status: PayrollRunStatus.DRAFT, month: 8, year: 2026 }),
-      );
+    it('does not deduct for fewer than 3 late-arrival days', async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
       lineItemRepository.findById.mockResolvedValue(buildLineItem());
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ baseSalary: '31000.00', lateCount: 2 }),
+        buildLineItem({ baseSalary: '30000.00', lateDays: 2 }),
       ]);
 
       const result = await service.updateLineItem('run-1', 'item-1', {
-        lateCount: 2,
+        lateDays: 2,
       });
 
-      expect(result.lineItems[0].lateDeductionRs).toBe(0); // floor(2/3) = 0
-      expect(result.lineItems[0].netPay).toBe(31000);
+      expect(result.lineItems[0].lateDaysDeductionRs).toBe(0); // floor(2/3) = 0
+      expect(result.lineItems[0].netPay).toBe(30000);
+    });
+
+    it('deducts late hours at the flat hourly rate (baseSalary / 30 / 8)', async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      lineItemRepository.findById.mockResolvedValue(buildLineItem());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({ baseSalary: '24000.00', lateHours: 5 }), // 100/hour
+      ]);
+
+      const result = await service.updateLineItem('run-1', 'item-1', {
+        lateHours: 5,
+      });
+
+      expect(result.lineItems[0].lateHoursDeductionRs).toBe(500); // 5 * 100
+      expect(result.lineItems[0].netPay).toBe(23500);
+    });
+
+    it('deducts full absence days at the flat daily rate', async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      lineItemRepository.findById.mockResolvedValue(buildLineItem());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({ baseSalary: '30000.00', totalAbsent: 2 }), // 1,000/day
+      ]);
+
+      const result = await service.updateLineItem('run-1', 'item-1', {
+        totalAbsent: 2,
+      });
+
+      expect(result.lineItems[0].absentDeductionRs).toBe(2000);
+      expect(result.lineItems[0].netPay).toBe(28000);
+    });
+
+    it('adds reimbursement and commissions to net pay', async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      lineItemRepository.findById.mockResolvedValue(buildLineItem());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({
+          baseSalary: '30000.00',
+          reimbursement: '7000.00',
+          commissions: '1500.00',
+        }),
+      ]);
+
+      const result = await service.updateLineItem('run-1', 'item-1', {
+        reimbursement: 7000,
+        commissions: 1500,
+      });
+
+      expect(result.lineItems[0].netPay).toBe(38500); // 30000 + 7000 + 1500
+    });
+
+    it("computes a piece-rate employee's base pay as quantity * perUnitRate, replacing the salary snapshot", async () => {
+      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      lineItemRepository.findById.mockResolvedValue(buildLineItem());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({
+          baseSalary: '0.00',
+          quantity: 5,
+          perUnitRate: '1000.00',
+        }),
+      ]);
+
+      const result = await service.updateLineItem('run-1', 'item-1', {
+        quantity: 5,
+        perUnitRate: 1000,
+      });
+
+      expect(result.lineItems[0].baseSalary).toBe(5000);
+      expect(result.lineItems[0].netPay).toBe(5000);
     });
 
     it('rejects editing a line item once the run is no longer draft', async () => {

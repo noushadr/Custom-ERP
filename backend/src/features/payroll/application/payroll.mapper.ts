@@ -6,27 +6,55 @@ import {
   PayrollRunSummaryDto,
 } from './payroll-response.interface';
 
-/** Calendar days in [month] (1-12) of [year] — plain arithmetic, no
- * Date-to-string timezone conversion involved. */
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate();
-}
+/** Every rate-based deduction in this app's real payroll process divides
+ * by a flat 30-day month, regardless of the actual calendar days in the
+ * run's month — mirrored here exactly rather than using real days-in-
+ * month. */
+const DAYS_PER_MONTH = 30;
+const HOURS_PER_DAY = 8;
 
 export function toPayrollLineItemResponse(
   item: PayrollLineItem,
-  run: PayrollRun,
 ): PayrollLineItemResponseDto {
-  const baseSalary = Number(item.baseSalary);
+  const salarySnapshot = Number(item.baseSalary);
+  const quantity = item.quantity ?? null;
+  const perUnitRate = item.perUnitRate != null ? Number(item.perUnitRate) : null;
+  const baseSalary =
+    quantity != null && quantity > 0 && perUnitRate != null
+      ? quantity * perUnitRate
+      : salarySnapshot;
+
   const allowances = Number(item.allowances);
   const overtime = Number(item.overtime);
+  const reimbursement = Number(item.reimbursement);
+  const commissions = Number(item.commissions);
   const deductions = Number(item.deductions);
   const advances = Number(item.advances);
   const tax = Number(item.tax);
   const fines = Number(item.fines);
 
-  const unpaidOffs = Math.floor(item.lateCount / 3);
-  const dailyRate = baseSalary / daysInMonth(run.year, run.month);
-  const lateDeductionRs = Math.round(unpaidOffs * dailyRate * 100) / 100;
+  const dailyRate = baseSalary / DAYS_PER_MONTH;
+  const hourlyRate = dailyRate / HOURS_PER_DAY;
+
+  const absentDeductionRs = Math.round(item.totalAbsent * dailyRate * 100) / 100;
+  const lateHoursDeductionRs =
+    Math.round(item.lateHours * hourlyRate * 100) / 100;
+  const unpaidOffs = Math.floor(item.lateDays / 3);
+  const lateDaysDeductionRs = Math.round(unpaidOffs * dailyRate * 100) / 100;
+
+  const netPay =
+    baseSalary +
+    allowances +
+    overtime +
+    reimbursement +
+    commissions -
+    deductions -
+    advances -
+    tax -
+    fines -
+    absentDeductionRs -
+    lateHoursDeductionRs -
+    lateDaysDeductionRs;
 
   return {
     id: item.id,
@@ -34,23 +62,23 @@ export function toPayrollLineItemResponse(
     employeeName: `${item.employee.firstName} ${item.employee.lastName}`,
     employeePhotoUrl: item.employee.profilePhotoUrl ?? null,
     baseSalary,
+    quantity,
+    perUnitRate,
     allowances,
     overtime,
+    reimbursement,
+    commissions,
     deductions,
     advances,
     tax,
     fines,
-    lateCount: item.lateCount,
-    lateDeductionRs,
-    netPay:
-      baseSalary +
-      allowances +
-      overtime -
-      deductions -
-      advances -
-      tax -
-      fines -
-      lateDeductionRs,
+    totalAbsent: item.totalAbsent,
+    absentDeductionRs,
+    lateHours: item.lateHours,
+    lateHoursDeductionRs,
+    lateDays: item.lateDays,
+    lateDaysDeductionRs,
+    netPay,
     notes: item.notes ?? null,
   };
 }
@@ -60,7 +88,7 @@ export function toPayrollRunSummary(
   lineItems: PayrollLineItem[],
 ): PayrollRunSummaryDto {
   const totalNetPay = lineItems
-    .map((item) => toPayrollLineItemResponse(item, run))
+    .map(toPayrollLineItemResponse)
     .reduce((sum, item) => sum + item.netPay, 0);
 
   return {
@@ -85,6 +113,6 @@ export function toPayrollRunDetail(
 ): PayrollRunDetailDto {
   return {
     ...toPayrollRunSummary(run, lineItems),
-    lineItems: lineItems.map((item) => toPayrollLineItemResponse(item, run)),
+    lineItems: lineItems.map(toPayrollLineItemResponse),
   };
 }

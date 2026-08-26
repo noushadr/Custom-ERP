@@ -143,12 +143,20 @@ class _RunDetailBody extends ConsumerWidget {
                 columns: const [
                   DataColumn(label: Text('Employee')),
                   DataColumn(label: Text('Base'), numeric: true),
+                  DataColumn(label: Text('Qty'), numeric: true),
+                  DataColumn(label: Text('Rate'), numeric: true),
                   DataColumn(label: Text('Allowances'), numeric: true),
                   DataColumn(label: Text('Overtime'), numeric: true),
+                  DataColumn(label: Text('Reimbursement'), numeric: true),
+                  DataColumn(label: Text('Commissions'), numeric: true),
                   DataColumn(label: Text('Deductions'), numeric: true),
                   DataColumn(label: Text('Fines'), numeric: true),
-                  DataColumn(label: Text('Lates'), numeric: true),
-                  DataColumn(label: Text('Late Deduction'), numeric: true),
+                  DataColumn(label: Text('Absent'), numeric: true),
+                  DataColumn(label: Text('Absent Ded.'), numeric: true),
+                  DataColumn(label: Text('Late Hrs'), numeric: true),
+                  DataColumn(label: Text('Late Hrs Ded.'), numeric: true),
+                  DataColumn(label: Text('Late Days'), numeric: true),
+                  DataColumn(label: Text('Late Days Ded.'), numeric: true),
                   DataColumn(label: Text('Advances'), numeric: true),
                   DataColumn(label: Text('Tax'), numeric: true),
                   DataColumn(label: Text('Net Pay'), numeric: true),
@@ -172,12 +180,26 @@ class _RunDetailBody extends ConsumerWidget {
                       cells: [
                         DataCell(Text(item.employeeName)),
                         DataCell(Text(formatAmount(item.baseSalary))),
+                        DataCell(Text(item.quantity == null ? '—' : '${item.quantity}')),
+                        DataCell(
+                          Text(
+                            item.perUnitRate == null
+                                ? '—'
+                                : formatAmount(item.perUnitRate!),
+                          ),
+                        ),
                         DataCell(Text(formatAmount(item.allowances))),
                         DataCell(Text(formatAmount(item.overtime))),
+                        DataCell(Text(formatAmount(item.reimbursement))),
+                        DataCell(Text(formatAmount(item.commissions))),
                         DataCell(Text(formatAmount(item.deductions))),
                         DataCell(Text(formatAmount(item.fines))),
-                        DataCell(Text('${item.lateCount}')),
-                        DataCell(Text(formatAmount(item.lateDeductionRs))),
+                        DataCell(Text('${item.totalAbsent}')),
+                        DataCell(Text(formatAmount(item.absentDeductionRs))),
+                        DataCell(Text('${item.lateHours}')),
+                        DataCell(Text(formatAmount(item.lateHoursDeductionRs))),
+                        DataCell(Text('${item.lateDays}')),
+                        DataCell(Text(formatAmount(item.lateDaysDeductionRs))),
                         DataCell(Text(formatAmount(item.advances))),
                         DataCell(Text(formatAmount(item.tax))),
                         DataCell(
@@ -210,13 +232,19 @@ class _EditLineItemDialog extends ConsumerStatefulWidget {
 }
 
 class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
+  late final TextEditingController _quantityController;
+  late final TextEditingController _perUnitRateController;
   late final TextEditingController _allowancesController;
   late final TextEditingController _overtimeController;
+  late final TextEditingController _reimbursementController;
+  late final TextEditingController _commissionsController;
   late final TextEditingController _deductionsController;
+  late final TextEditingController _finesController;
+  late final TextEditingController _totalAbsentController;
+  late final TextEditingController _lateHoursController;
+  late final TextEditingController _lateDaysController;
   late final TextEditingController _advancesController;
   late final TextEditingController _taxController;
-  late final TextEditingController _finesController;
-  late final TextEditingController _lateCountController;
   late final TextEditingController _notesController;
   bool _saving = false;
   String? _errorMessage;
@@ -224,14 +252,38 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
   @override
   void initState() {
     super.initState();
+    _quantityController = TextEditingController(
+      text: widget.item.quantity == null ? '' : '${widget.item.quantity}',
+    );
+    _perUnitRateController = TextEditingController(
+      text: widget.item.perUnitRate?.toStringAsFixed(2) ?? '',
+    );
     _allowancesController = TextEditingController(
       text: widget.item.allowances.toStringAsFixed(2),
     );
     _overtimeController = TextEditingController(
       text: widget.item.overtime.toStringAsFixed(2),
     );
+    _reimbursementController = TextEditingController(
+      text: widget.item.reimbursement.toStringAsFixed(2),
+    );
+    _commissionsController = TextEditingController(
+      text: widget.item.commissions.toStringAsFixed(2),
+    );
     _deductionsController = TextEditingController(
       text: widget.item.deductions.toStringAsFixed(2),
+    );
+    _finesController = TextEditingController(
+      text: widget.item.fines.toStringAsFixed(2),
+    );
+    _totalAbsentController = TextEditingController(
+      text: '${widget.item.totalAbsent}',
+    );
+    _lateHoursController = TextEditingController(
+      text: '${widget.item.lateHours}',
+    );
+    _lateDaysController = TextEditingController(
+      text: '${widget.item.lateDays}',
     );
     _advancesController = TextEditingController(
       text: widget.item.advances.toStringAsFixed(2),
@@ -239,24 +291,24 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
     _taxController = TextEditingController(
       text: widget.item.tax.toStringAsFixed(2),
     );
-    _finesController = TextEditingController(
-      text: widget.item.fines.toStringAsFixed(2),
-    );
-    _lateCountController = TextEditingController(
-      text: '${widget.item.lateCount}',
-    );
     _notesController = TextEditingController(text: widget.item.notes ?? '');
   }
 
   @override
   void dispose() {
+    _quantityController.dispose();
+    _perUnitRateController.dispose();
     _allowancesController.dispose();
     _overtimeController.dispose();
+    _reimbursementController.dispose();
+    _commissionsController.dispose();
     _deductionsController.dispose();
+    _finesController.dispose();
+    _totalAbsentController.dispose();
+    _lateHoursController.dispose();
+    _lateDaysController.dispose();
     _advancesController.dispose();
     _taxController.dispose();
-    _finesController.dispose();
-    _lateCountController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -272,13 +324,20 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
           .updateLineItem(
             widget.runId,
             widget.item.id,
+            quantity: int.tryParse(_quantityController.text),
+            perUnitRate: double.tryParse(_perUnitRateController.text),
             allowances: double.tryParse(_allowancesController.text) ?? 0,
             overtime: double.tryParse(_overtimeController.text) ?? 0,
+            reimbursement:
+                double.tryParse(_reimbursementController.text) ?? 0,
+            commissions: double.tryParse(_commissionsController.text) ?? 0,
             deductions: double.tryParse(_deductionsController.text) ?? 0,
+            fines: double.tryParse(_finesController.text) ?? 0,
+            totalAbsent: int.tryParse(_totalAbsentController.text) ?? 0,
+            lateHours: int.tryParse(_lateHoursController.text) ?? 0,
+            lateDays: int.tryParse(_lateDaysController.text) ?? 0,
             advances: double.tryParse(_advancesController.text) ?? 0,
             tax: double.tryParse(_taxController.text) ?? 0,
-            fines: double.tryParse(_finesController.text) ?? 0,
-            lateCount: int.tryParse(_lateCountController.text) ?? 0,
             notes: _notesController.text.trim().isEmpty
                 ? null
                 : _notesController.text.trim(),
@@ -296,7 +355,7 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
     return AlertDialog(
       title: Text(widget.item.employeeName),
       content: SizedBox(
-        width: 380,
+        width: 420,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -310,34 +369,101 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
                 const SizedBox(height: 12),
               ],
               Text(
-                'Base salary: PKR ${formatAmount(widget.item.baseSalary)}',
+                'Salary snapshot: PKR ${formatAmount(widget.item.baseSalary)}',
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              const _SectionLabel('Piece-rate pay (optional)'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _quantityController,
+                      enabled: !_saving,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Quantity'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _AmountField(
+                      label: 'Per unit',
+                      controller: _perUnitRateController,
+                      enabled: !_saving,
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'When both are set, Quantity × Per unit replaces the salary '
+                  'snapshot as this run\'s base pay.',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const _SectionLabel('Additions'),
+              const SizedBox(height: 8),
               _AmountField(label: 'Allowances', controller: _allowancesController, enabled: !_saving),
               const SizedBox(height: 12),
               _AmountField(label: 'Overtime', controller: _overtimeController, enabled: !_saving),
               const SizedBox(height: 12),
+              _AmountField(label: 'Reimbursement', controller: _reimbursementController, enabled: !_saving),
+              const SizedBox(height: 12),
+              _AmountField(label: 'Commissions/Incentives', controller: _commissionsController, enabled: !_saving),
+              const SizedBox(height: 16),
+              const _SectionLabel('Attendance deductions'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _totalAbsentController,
+                      enabled: !_saving,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Absent days',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _lateHoursController,
+                      enabled: !_saving,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Late hours'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _lateDaysController,
+                enabled: !_saving,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Late-arrival days',
+                  helperText: 'Every 3 late days deducts one unpaid day\'s pay',
+                ),
+              ),
+              const SizedBox(height: 16),
+              const _SectionLabel('Other deductions'),
+              const SizedBox(height: 8),
               _AmountField(label: 'Deductions', controller: _deductionsController, enabled: !_saving),
               const SizedBox(height: 12),
               _AmountField(label: 'Fines', controller: _finesController, enabled: !_saving),
               const SizedBox(height: 12),
-              TextField(
-                controller: _lateCountController,
-                enabled: !_saving,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Late arrivals this month',
-                  helperText: 'Every 3 lates deducts one unpaid day\'s pay',
-                ),
-              ),
-              const SizedBox(height: 12),
               _AmountField(label: 'Advances', controller: _advancesController, enabled: !_saving),
               const SizedBox(height: 12),
               _AmountField(label: 'Tax', controller: _taxController, enabled: !_saving),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               TextField(
                 controller: _notesController,
                 enabled: !_saving,
@@ -364,6 +490,24 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
               : const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        color: AppColors.textSecondary,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.4,
+      ),
     );
   }
 }

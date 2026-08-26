@@ -3,20 +3,38 @@ export interface PayrollLineItemResponseDto {
   employeeId: string;
   employeeName: string;
   employeePhotoUrl: string | null;
+  /** The salary snapshot for salaried employees, or `quantity *
+   * perUnitRate` for piece-rate employees (see `quantity`/`perUnitRate`
+   * below) — whichever this run's effective base pay actually is. */
   baseSalary: number;
+  /** Piece-rate units this run; `null` for salaried employees. */
+  quantity: number | null;
+  perUnitRate: number | null;
   allowances: number;
   overtime: number;
+  reimbursement: number;
+  commissions: number;
   deductions: number;
   advances: number;
   tax: number;
   fines: number;
-  /** Entered count of late arrivals this month. */
-  lateCount: number;
-  /** Computed: `floor(lateCount / 3)` unpaid days × (baseSalary /
-   * days-in-run's-month). Never stored. */
-  lateDeductionRs: number;
-  /** Computed: baseSalary + allowances + overtime - deductions - advances
-   * - tax - fines - lateDeductionRs. Never stored. */
+  /** Entered count of full absence days this month. */
+  totalAbsent: number;
+  /** Computed: totalAbsent * (baseSalary / 30). Never stored. */
+  absentDeductionRs: number;
+  /** Entered count of cumulative late hours this month. */
+  lateHours: number;
+  /** Computed: lateHours * (baseSalary / 30 / 8). Never stored. */
+  lateHoursDeductionRs: number;
+  /** Entered count of late-arrival days this month. */
+  lateDays: number;
+  /** Computed: `floor(lateDays / 3)` unpaid days * (baseSalary / 30).
+   * Never stored. */
+  lateDaysDeductionRs: number;
+  /** Computed: baseSalary + allowances + overtime + reimbursement +
+   * commissions - deductions - advances - tax - fines -
+   * absentDeductionRs - lateHoursDeductionRs - lateDaysDeductionRs.
+   * Never stored. */
   netPay: number;
   notes: string | null;
 }

@@ -200,6 +200,11 @@ class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
                 const SizedBox(height: 16),
                 _SummaryStatsRow(records: scopedRecords, scopeLabel: scopeLabel),
                 const SizedBox(height: 16),
+                // Always the full history, independent of the Period
+                // selector above — "from day 1" means every record, not
+                // just the selected year.
+                _RevenueGrowthChart(records: sorted),
+                const SizedBox(height: 16),
                 if (isAllTime)
                   FormSection(
                     child: Text(
@@ -845,6 +850,151 @@ class _YearlyComparisonChart extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Revenue over the entire history, oldest to newest — a single-series
+/// straight-line chart, not bars, since the point is the overall growth
+/// trend rather than comparing discrete categories. Scaled between the
+/// data's own min/max (not from zero) so the trend line has visible slope
+/// instead of being flattened near the top of a zero-based axis. Per the
+/// `dataviz` skill's guidance for line charts, a hover tooltip stands in for
+/// direct labels — with 40+ months of history, a label on every point would
+/// be unreadable.
+class _RevenueGrowthChart extends StatelessWidget {
+  const _RevenueGrowthChart({required this.records});
+
+  final List<FinancialRecord> records;
+
+  static const _chartHeight = 160.0;
+  static const _pointSpacing = 40.0;
+  static const _verticalPadding = 14.0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (records.length < 2) return const SizedBox.shrink();
+
+    final maxRevenue = records
+        .map((r) => r.revenueRs)
+        .reduce((a, b) => a > b ? a : b);
+    final minRevenue = records
+        .map((r) => r.revenueRs)
+        .reduce((a, b) => a < b ? a : b);
+    final range = maxRevenue - minRevenue;
+    final plotHeight = _chartHeight - _verticalPadding * 2;
+
+    double yFor(double value) {
+      if (range == 0) return _verticalPadding + plotHeight / 2;
+      final fraction = (value - minRevenue) / range;
+      return _verticalPadding + plotHeight - (fraction * plotHeight);
+    }
+
+    final points = [
+      for (var i = 0; i < records.length; i++)
+        Offset(i * _pointSpacing, yFor(records[i].revenueRs)),
+    ];
+    final width = (records.length - 1) * _pointSpacing + 16;
+
+    return FormSection(
+      title: 'Revenue Growth — All-Time',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _ChartLegend(entries: [('Revenue', AppColors.primary)]),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: _chartHeight + 26,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: width,
+                height: _chartHeight + 26,
+                child: Stack(
+                  children: [
+                    SizedBox(
+                      width: width,
+                      height: _chartHeight,
+                      child: CustomPaint(
+                        painter: _LineChartPainter(
+                          points: points,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    for (var i = 0; i < records.length; i++)
+                      Positioned(
+                        left: points[i].dx - 4,
+                        top: points[i].dy - 4,
+                        child: Tooltip(
+                          message:
+                              '${_formatMonthYear(records[i].month, records[i].year)}: '
+                              '${_formatMoneyWithUsd(records[i].revenueRs, records[i].revenueUsd)}',
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                    // A year label at each January (or the very first point,
+                    // if the history doesn't start in January) — labeling
+                    // every month across 40+ months would be unreadable.
+                    // The very first label is left-aligned to its point
+                    // rather than centered, so it never gets clipped by the
+                    // scroll area's left edge.
+                    for (var i = 0; i < records.length; i++)
+                      if (i == 0 || records[i].month == 1)
+                        Positioned(
+                          left: i == 0 ? points[i].dx : points[i].dx - 14,
+                          top: _chartHeight + 6,
+                          child: Text(
+                            '${records[i].year}',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.labelSmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LineChartPainter extends CustomPainter {
+  const _LineChartPainter({required this.points, required this.color});
+
+  final List<Offset> points;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      path.lineTo(point.dx, point.dy);
+    }
+    canvas.drawPath(path, linePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _LineChartPainter oldDelegate) => true;
 }
 
 class _MonthlyRecordsTable extends StatelessWidget {
