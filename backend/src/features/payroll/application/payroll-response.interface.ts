@@ -15,31 +15,11 @@ export interface PayrollLineItemResponseDto {
   /** Piece-rate units this run; `null` for salaried employees. */
   quantity: number | null;
   perUnitRate: number | null;
-  allowances: number;
-  overtime: number;
-  reimbursement: number;
-  commissions: number;
-  deductions: number;
-  advances: number;
-  tax: number;
-  fines: number;
-  /** Entered count of full absence days this month. */
-  totalAbsent: number;
-  /** Computed: totalAbsent * (baseSalary / 30). Never stored. */
-  absentDeductionRs: number;
-  /** Entered count of cumulative late hours this month. */
-  lateHours: number;
-  /** Computed: lateHours * (baseSalary / 30 / 8). Never stored. */
-  lateHoursDeductionRs: number;
-  /** Entered count of late-arrival days this month. */
-  lateDays: number;
-  /** Computed: `floor(lateDays / 3)` unpaid days * (baseSalary / 30).
-   * Never stored. */
-  lateDaysDeductionRs: number;
-  /** Computed: baseSalary + allowances + overtime + reimbursement +
-   * commissions - deductions - advances - tax - fines -
-   * absentDeductionRs - lateHoursDeductionRs - lateDaysDeductionRs.
-   * Never stored. */
+  /** What was actually paid — a plain stored figure, not computed from any
+   * deduction/addition breakdown (this app has no attendance module and
+   * deliberately doesn't track fines/deductions/allowances per line item).
+   * Defaults to `baseSalary` when the line item is created, then freely
+   * editable for every line item while the run is Draft. */
   netPay: number;
   notes: string | null;
 }

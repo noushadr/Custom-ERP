@@ -6,13 +6,6 @@ import {
   PayrollRunSummaryDto,
 } from './payroll-response.interface';
 
-/** Every rate-based deduction in this app's real payroll process divides
- * by a flat 30-day month, regardless of the actual calendar days in the
- * run's month — mirrored here exactly rather than using real days-in-
- * month. */
-const DAYS_PER_MONTH = 30;
-const HOURS_PER_DAY = 8;
-
 export function toPayrollLineItemResponse(
   item: PayrollLineItem,
 ): PayrollLineItemResponseDto {
@@ -32,38 +25,6 @@ export function toPayrollLineItemResponse(
       ? quantity * perUnitRate
       : salarySnapshot;
 
-  const allowances = Number(item.allowances);
-  const overtime = Number(item.overtime);
-  const reimbursement = Number(item.reimbursement);
-  const commissions = Number(item.commissions);
-  const deductions = Number(item.deductions);
-  const advances = Number(item.advances);
-  const tax = Number(item.tax);
-  const fines = Number(item.fines);
-
-  const dailyRate = baseSalary / DAYS_PER_MONTH;
-  const hourlyRate = dailyRate / HOURS_PER_DAY;
-
-  const absentDeductionRs = Math.round(item.totalAbsent * dailyRate * 100) / 100;
-  const lateHoursDeductionRs =
-    Math.round(item.lateHours * hourlyRate * 100) / 100;
-  const unpaidOffs = Math.floor(item.lateDays / 3);
-  const lateDaysDeductionRs = Math.round(unpaidOffs * dailyRate * 100) / 100;
-
-  const netPay =
-    baseSalary +
-    allowances +
-    overtime +
-    reimbursement +
-    commissions -
-    deductions -
-    advances -
-    tax -
-    fines -
-    absentDeductionRs -
-    lateHoursDeductionRs -
-    lateDaysDeductionRs;
-
   return {
     id: item.id,
     employeeId: item.employeeId ?? null,
@@ -74,21 +35,7 @@ export function toPayrollLineItemResponse(
     baseSalary,
     quantity,
     perUnitRate,
-    allowances,
-    overtime,
-    reimbursement,
-    commissions,
-    deductions,
-    advances,
-    tax,
-    fines,
-    totalAbsent: item.totalAbsent,
-    absentDeductionRs,
-    lateHours: item.lateHours,
-    lateHoursDeductionRs,
-    lateDays: item.lateDays,
-    lateDaysDeductionRs,
-    netPay,
+    netPay: Number(item.netPay),
     notes: item.notes ?? null,
   };
 }

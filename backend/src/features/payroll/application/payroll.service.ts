@@ -140,17 +140,7 @@ export class PayrollService {
         item.baseSalary = baseSalary.toFixed(2);
         item.quantity = null;
         item.perUnitRate = null;
-        item.allowances = '0.00';
-        item.overtime = '0.00';
-        item.reimbursement = '0.00';
-        item.commissions = '0.00';
-        item.deductions = '0.00';
-        item.advances = '0.00';
-        item.tax = '0.00';
-        item.fines = '0.00';
-        item.totalAbsent = 0;
-        item.lateHours = 0;
-        item.lateDays = 0;
+        item.netPay = baseSalary.toFixed(2);
         return item;
       }),
     );
@@ -193,25 +183,7 @@ export class PayrollService {
     if (dto.perUnitRate !== undefined) {
       item.perUnitRate = dto.perUnitRate.toFixed(2);
     }
-    if (dto.allowances !== undefined) {
-      item.allowances = dto.allowances.toFixed(2);
-    }
-    if (dto.overtime !== undefined) item.overtime = dto.overtime.toFixed(2);
-    if (dto.reimbursement !== undefined) {
-      item.reimbursement = dto.reimbursement.toFixed(2);
-    }
-    if (dto.commissions !== undefined) {
-      item.commissions = dto.commissions.toFixed(2);
-    }
-    if (dto.deductions !== undefined) {
-      item.deductions = dto.deductions.toFixed(2);
-    }
-    if (dto.advances !== undefined) item.advances = dto.advances.toFixed(2);
-    if (dto.tax !== undefined) item.tax = dto.tax.toFixed(2);
-    if (dto.fines !== undefined) item.fines = dto.fines.toFixed(2);
-    if (dto.totalAbsent !== undefined) item.totalAbsent = dto.totalAbsent;
-    if (dto.lateHours !== undefined) item.lateHours = dto.lateHours;
-    if (dto.lateDays !== undefined) item.lateDays = dto.lateDays;
+    if (dto.netPay !== undefined) item.netPay = dto.netPay.toFixed(2);
     if (dto.notes !== undefined) item.notes = dto.notes;
 
     await this.lineItemRepository.save(item);
@@ -255,17 +227,7 @@ export class PayrollService {
     item.baseSalary = dto.baseSalary.toFixed(2);
     item.quantity = null;
     item.perUnitRate = null;
-    item.allowances = '0.00';
-    item.overtime = '0.00';
-    item.reimbursement = '0.00';
-    item.commissions = '0.00';
-    item.deductions = '0.00';
-    item.advances = '0.00';
-    item.tax = '0.00';
-    item.fines = '0.00';
-    item.totalAbsent = 0;
-    item.lateHours = 0;
-    item.lateDays = 0;
+    item.netPay = dto.baseSalary.toFixed(2);
     item.notes = dto.notes ?? null;
     await this.lineItemRepository.save(item);
 

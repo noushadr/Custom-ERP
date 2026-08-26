@@ -4,23 +4,17 @@ import { Employee } from '../../../employee/domain/entities/employee.entity';
 import { Freelancer } from '../../../freelancers/domain/entities/freelancer.entity';
 import { PayrollRun } from './payroll-run.entity';
 
-/** One row per employee per PayrollRun. `baseSalary` is a snapshot taken
- * at generation time (the employee's SalaryRecord in effect that month) —
- * it never changes afterwards even if the employee's salary is later
- * amended, since this is meant to be exactly what that month's payroll
- * actually paid. `netPay` (and the "effective" base pay used to compute
- * it) is deliberately not a column — computed in the mapper on every
- * read, same convention as Project's netPrice/profit (since removed).
- * Allowances/overtime/deductions/advances/tax/fines/reimbursement/
- * commissions/totalAbsent/lateHours/lateDays are one-off amounts entered
- * directly against this run — there is no recurring-item or loan-ledger
- * concept in V1, and no attendance-tracking module exists yet (Attendance
- * is still a future module), so absence/lateness are plain entered counts
- * rather than derived from real attendance data. Every rate-based
- * deduction (absence, late hours, late days) uses a flat 30-day month —
- * this app's real payroll process divides by 30 regardless of the actual
- * calendar days in the run's month, so the mapper mirrors that exactly
- * rather than using the real days-in-month. */
+/** One row per employee (or freelancer) per PayrollRun. `baseSalary` is a
+ * snapshot taken at generation time (the employee's SalaryRecord in effect
+ * that month) — it never changes afterwards even if the employee's salary
+ * is later amended, since this is meant to be exactly what that month's
+ * payroll actually paid. Deliberately minimal: no deductions/fines/
+ * attendance tracking of any kind (removed 2026-08-26 per explicit
+ * instruction — "get rid of all the deductions, fines, absents etc." —
+ * this app has no attendance module, and the granular breakdown wasn't
+ * wanted). `netPay` is a plain, directly-entered figure — defaults to
+ * `baseSalary` when the line item is created, then freely editable for
+ * every line item (not just freelancers') while the run is Draft. */
 @Entity('payroll_line_items')
 export class PayrollLineItem extends BaseEntity {
   @Column()
@@ -67,49 +61,11 @@ export class PayrollLineItem extends BaseEntity {
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   perUnitRate?: string | null;
 
-  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
-  allowances: string;
-
-  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
-  overtime: string;
-
-  /** One-off addition — reimbursed expenses for this run. */
-  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
-  reimbursement: string;
-
-  /** One-off addition — commissions/incentives for this run. */
-  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
-  commissions: string;
-
-  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
-  deductions: string;
-
-  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
-  advances: string;
-
-  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
-  tax: string;
-
-  /** One-off fine amount for this run — distinct from the generic
-   * `deductions` field so fines are tracked separately. */
-  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
-  fines: string;
-
-  /** Full absence days this month — deducted at the flat daily rate
-   * (baseSalary / 30), no threshold. */
-  @Column({ type: 'int', default: 0 })
-  totalAbsent: number;
-
-  /** Cumulative hours late this month — deducted at the flat hourly rate
-   * (baseSalary / 30 / 8), no threshold. Distinct from `lateDays` below;
-   * an employee can accrue both in the same run. */
-  @Column({ type: 'int', default: 0 })
-  lateHours: number;
-
-  /** Count of late-arrival days this month. Every 3 lates deducts one
-   * unpaid day's salary — see `lateDaysDeductionRs` in payroll.mapper.ts. */
-  @Column({ type: 'int', default: 0 })
-  lateDays: number;
+  /** What was actually paid — plain and directly entered, not computed
+   * from any deduction/addition breakdown. Defaults to `baseSalary` at
+   * creation. */
+  @Column({ type: 'numeric', precision: 12, scale: 2 })
+  netPay: string;
 
   @Column({ type: 'text', nullable: true })
   notes?: string | null;

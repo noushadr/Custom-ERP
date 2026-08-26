@@ -14,17 +14,7 @@ abstract interface class PayrollRepository {
     double? baseSalary,
     int? quantity,
     double? perUnitRate,
-    double? allowances,
-    double? overtime,
-    double? reimbursement,
-    double? commissions,
-    double? deductions,
-    double? advances,
-    double? tax,
-    double? fines,
-    int? totalAbsent,
-    int? lateHours,
-    int? lateDays,
+    double? netPay,
     String? notes,
   });
 
