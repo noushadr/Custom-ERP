@@ -88,9 +88,9 @@ class LeadsPage extends ConsumerWidget {
             const SizedBox(height: 16),
             const _LeadsStatsRow(),
             const SizedBox(height: 16),
-            const _MonthlyLeadsChart(),
-            const SizedBox(height: 16),
             const _LeadsBreakdownRow(),
+            const SizedBox(height: 16),
+            const _MonthlyLeadsChart(),
             const SizedBox(height: 16),
             leadsAsync.when(
               loading: () => const SizedBox(
@@ -159,6 +159,17 @@ class _LeadsStatsRow extends ConsumerWidget {
     final newThisWeek = leads.where((l) => onOrAfter(l, weekAgo)).length;
     final newThisMonth = leads.where((l) => onOrAfter(l, monthStart)).length;
 
+    // Same selectors (and the same flag-formatted country grouping) as the
+    // "Top Countries/Services/Lead Sources" panels below, so these totals
+    // never disagree with what those panels are drawing from — just
+    // uncapped, since the panels themselves only show their top 5.
+    final totalCountries = _countDistinct(
+      leads,
+      (l) => formatCountryFlag(l.country),
+    );
+    final totalServices = _countDistinct(leads, (l) => l.serviceInterested);
+    final totalLeadSources = _countDistinct(leads, (l) => l.leadSource);
+
     return Wrap(
       spacing: 10,
       runSpacing: 10,
@@ -181,9 +192,39 @@ class _LeadsStatsRow extends ConsumerWidget {
           color: AppColors.accentTeal,
           icon: Icons.calendar_month_outlined,
         ),
+        MetricCard(
+          label: 'Total Countries',
+          value: '$totalCountries',
+          color: AppColors.primary,
+          icon: Icons.public_outlined,
+        ),
+        MetricCard(
+          label: 'Total Services',
+          value: '$totalServices',
+          color: AppColors.secondary,
+          icon: Icons.design_services_outlined,
+        ),
+        MetricCard(
+          label: 'Total Lead Sources',
+          value: '$totalLeadSources',
+          color: AppColors.accentTeal,
+          icon: Icons.campaign_outlined,
+        ),
       ],
     );
   }
+}
+
+/// Count of distinct non-empty values `selector` returns across `items` —
+/// same trim/skip-empty normalization as [computeTopCounts], just without
+/// its top-N truncation.
+int _countDistinct<T>(List<T> items, String? Function(T) selector) {
+  final values = <String>{};
+  for (final item in items) {
+    final value = selector(item)?.trim();
+    if (value != null && value.isNotEmpty) values.add(value);
+  }
+  return values.length;
 }
 
 /// A single-series bar chart of lead volume per calendar month — a plain
@@ -209,13 +250,15 @@ class _MonthlyLeadsChart extends ConsumerWidget {
         }
         if (counts.isEmpty) return const SizedBox.shrink();
 
-        final months = counts.keys.toList()..sort();
+        // Newest month first (leftmost), oldest trailing off to the right —
+        // so the most recent activity is visible without scrolling.
+        final months = counts.keys.toList()..sort((a, b) => b.compareTo(a));
         final maxCount = counts.values.reduce((a, b) => a > b ? a : b);
 
         return FormSection(
           title: 'Leads by Month',
           child: SizedBox(
-            height: 160,
+            height: 178,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -267,6 +310,17 @@ class _MonthBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // A direct count label above each bar — visible without
+            // hovering; the tooltip above still carries the full sentence.
+            Text(
+              '$count',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 4),
             SizedBox(
               height: _maxBarHeight,
               width: 26,
@@ -348,13 +402,41 @@ class _LeadsBreakdownRow extends ConsumerWidget {
 /// requested for this list, which a card-per-lead layout couldn't give at
 /// 2,000+ rows without either scrolling forever or losing at-a-glance
 /// scannability across columns.
-class _LeadsTable extends StatelessWidget {
+/// Paginated at 50 rows/page — `leads` already arrives newest-first (the
+/// backend's default `GET /leads` order), so page 1 is always the most
+/// recent 50 leads, not an arbitrary slice.
+class _LeadsTable extends StatefulWidget {
   const _LeadsTable({required this.leads});
 
   final List<Lead> leads;
 
+  static const _pageSize = 50;
+
+  @override
+  State<_LeadsTable> createState() => _LeadsTableState();
+}
+
+class _LeadsTableState extends State<_LeadsTable> {
+  int _page = 0;
+
+  @override
+  void didUpdateWidget(_LeadsTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A changed lead list (e.g. a new lead was just created) invalidates
+    // whatever page index was in view — back to the newest page.
+    if (oldWidget.leads.length != widget.leads.length) {
+      _page = 0;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final pageCount = (widget.leads.length / _LeadsTable._pageSize).ceil();
+    final page = _page.clamp(0, pageCount - 1);
+    final start = page * _LeadsTable._pageSize;
+    final end = (start + _LeadsTable._pageSize).clamp(0, widget.leads.length);
+    final pageLeads = widget.leads.sublist(start, end);
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -368,15 +450,89 @@ class _LeadsTable extends StatelessWidget {
             const _LeadsTableHeader(),
             Expanded(
               child: ListView.builder(
-                itemCount: leads.length,
+                itemCount: pageLeads.length,
                 itemBuilder: (context, index) => _LeadsTableRow(
-                  lead: leads[index],
+                  lead: pageLeads[index],
                   isEven: index.isEven,
                 ),
               ),
             ),
+            _LeadsTablePagination(
+              start: start + 1,
+              end: end,
+              total: widget.leads.length,
+              page: page,
+              pageCount: pageCount,
+              onPrevious: page > 0 ? () => setState(() => _page = page - 1) : null,
+              onNext: page < pageCount - 1
+                  ? () => setState(() => _page = page + 1)
+                  : null,
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LeadsTablePagination extends StatelessWidget {
+  const _LeadsTablePagination({
+    required this.start,
+    required this.end,
+    required this.total,
+    required this.page,
+    required this.pageCount,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int start;
+  final int end;
+  final int total;
+  final int page;
+  final int pageCount;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.fieldFill,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Showing $start–$end of $total',
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: onPrevious,
+                icon: const Icon(Icons.chevron_left, size: 20),
+                tooltip: 'Previous page',
+                visualDensity: VisualDensity.compact,
+              ),
+              Text(
+                'Page ${page + 1} of $pageCount',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              IconButton(
+                onPressed: onNext,
+                icon: const Icon(Icons.chevron_right, size: 20),
+                tooltip: 'Next page',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/leads/application/leads_providers.dart';
 import 'package:zera_erp/features/leads/presentation/pages/leads_page.dart';
+import 'package:zera_erp/shared/widgets/form_section.dart';
 import 'package:zera_erp/shared/widgets/metric_card.dart';
 
 import '../../helpers/fake_auth.dart';
@@ -170,8 +171,20 @@ void main() {
       _app(
         repository: FakeLeadsRepository(
           leads: [
-            buildTestLead(id: 'l1', leadDate: isoDate(now)),
-            buildTestLead(id: 'l2', leadDate: '2020-01-01'),
+            buildTestLead(
+              id: 'l1',
+              leadDate: isoDate(now),
+              country: 'Pakistan',
+              serviceInterested: 'SEO',
+              leadSource: 'Referral',
+            ),
+            buildTestLead(
+              id: 'l2',
+              leadDate: '2020-01-01',
+              country: 'UAE',
+              serviceInterested: 'SEO',
+              leadSource: 'Facebook',
+            ),
           ],
         ),
       ),
@@ -188,6 +201,9 @@ void main() {
     expect(cardValues['Total Leads'], '2');
     expect(cardValues['New This Week'], '1');
     expect(cardValues['New This Month'], '1');
+    expect(cardValues['Total Countries'], '2'); // Pakistan, UAE
+    expect(cardValues['Total Services'], '1'); // SEO (shared by both)
+    expect(cardValues['Total Lead Sources'], '2'); // Referral, Facebook
   });
 
   testWidgets(
@@ -217,6 +233,79 @@ void main() {
       );
       expect(find.text('Should Not Be Visible'), findsNothing);
       expect(repository.getLeadsCallCount, 0);
+    },
+  );
+
+  testWidgets(
+    'the monthly chart labels each bar with its lead count and orders '
+    'newest month first',
+    (tester) async {
+      final repository = FakeLeadsRepository(
+        leads: [
+          buildTestLead(id: 'l1', leadDate: '2026-01-05'),
+          buildTestLead(id: 'l2', leadDate: '2026-01-20'),
+          buildTestLead(id: 'l3', leadDate: '2026-03-10'),
+        ],
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      // Jan 2026 has 2 leads, Mar 2026 has 1 — both counts shown directly.
+      // Scoped to the chart's own FormSection — the stat tiles above it
+      // (e.g. "Total Lead Sources") can coincidentally show the same bare
+      // digit.
+      final chart = find.widgetWithText(FormSection, 'Leads by Month');
+      expect(
+        find.descendant(of: chart, matching: find.text('2')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: chart, matching: find.text('1')),
+        findsOneWidget,
+      );
+
+      final marBarX = tester.getCenter(find.text('Mar\n26')).dx;
+      final janBarX = tester.getCenter(find.text('Jan\n26')).dx;
+      expect(marBarX, lessThan(janBarX)); // newest (Mar) is further left
+    },
+  );
+
+  testWidgets(
+    'the table paginates at 50 rows, and Next/Previous move between pages',
+    (tester) async {
+      final leads = [
+        for (var i = 0; i < 60; i++)
+          buildTestLead(id: 'lead-$i', fullName: 'Lead Number $i'),
+      ];
+      await tester.pumpWidget(_app(repository: FakeLeadsRepository(leads: leads)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Showing 1–50 of 60'), findsOneWidget);
+      expect(find.text('Page 1 of 2'), findsOneWidget);
+      expect(find.text('Lead Number 0'), findsOneWidget);
+      expect(find.text('Lead Number 50'), findsNothing);
+
+      final nextIcon = find.byIcon(Icons.chevron_right);
+      final previousIcon = find.byIcon(Icons.chevron_left);
+
+      await tester.ensureVisible(nextIcon);
+      await tester.tap(nextIcon);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Showing 51–60 of 60'), findsOneWidget);
+      expect(find.text('Page 2 of 2'), findsOneWidget);
+      expect(find.text('Lead Number 0'), findsNothing);
+      expect(find.text('Lead Number 50'), findsOneWidget);
+      final nextButton = tester.widget<IconButton>(
+        find.ancestor(of: nextIcon, matching: find.byType(IconButton)),
+      );
+      expect(nextButton.onPressed, isNull);
+
+      await tester.ensureVisible(previousIcon);
+      await tester.tap(previousIcon);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Showing 1–50 of 60'), findsOneWidget);
     },
   );
 }
