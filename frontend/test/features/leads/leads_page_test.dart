@@ -41,6 +41,16 @@ void main() {
     expect(find.text('New Lead'), findsOneWidget);
   });
 
+  testWidgets(
+    'does not repeat a "Leads" heading — the top bar already shows it',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Leads'), findsNothing);
+    },
+  );
+
   testWidgets('shows the spreadsheet-style column headers', (tester) async {
     await tester.pumpWidget(
       _app(repository: FakeLeadsRepository(leads: [buildTestLead()])),

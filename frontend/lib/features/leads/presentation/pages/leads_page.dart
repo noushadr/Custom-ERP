@@ -75,22 +75,15 @@ class LeadsPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Leads',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LeadEditorPage()),
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const LeadEditorPage()),
-                  ),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('New Lead'),
-                ),
-              ],
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('New Lead'),
+              ),
             ),
             const SizedBox(height: 16),
             const _LeadsStatsRow(),
