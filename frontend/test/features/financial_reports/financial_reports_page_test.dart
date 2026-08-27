@@ -45,6 +45,53 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No financial records yet.'), findsOneWidget);
+    // Even with nothing yet, there's a way to add the first record.
+    expect(find.text('Add Record'), findsOneWidget);
+  });
+
+  testWidgets('opens the editor from the "Add Record" button', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(repository: FakeFinancialReportsRepository(records: [buildTestFinancialRecord()])),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add Record'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('New Financial Record'), findsOneWidget);
+  });
+
+  testWidgets('opens the editor pre-filled when a monthly detail row is tapped', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakeFinancialReportsRepository(
+          records: [
+            buildTestFinancialRecord(id: 'r1', year: 2026, month: 3, revenueRs: 741000),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(_periodSegment('2026'));
+    await tester.pumpAndSettle();
+
+    final rowCell = find.descendant(
+      of: find.byType(DataTable),
+      matching: find.text('Mar 2026'),
+    );
+    await tester.ensureVisible(rowCell);
+    await tester.tap(rowCell);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Financial Record'), findsOneWidget);
+    final revenueField = tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, 'Revenue (Rs)'),
+    );
+    expect(revenueField.controller?.text, '741000');
   });
 
   testWidgets(

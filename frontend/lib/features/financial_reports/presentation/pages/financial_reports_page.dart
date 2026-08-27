@@ -8,6 +8,7 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/financial_reports_providers.dart';
 import '../../domain/entities/financial_record.dart';
+import 'financial_record_editor_page.dart';
 
 const _kMonthAbbreviations = [
   'Jan',
@@ -97,9 +98,10 @@ String _formatMonthYear(int month, int year) =>
 /// `main.dart`): this is real company financial data, a materially more
 /// sensitive surface than the other Admin Business Management modules
 /// (Clients & Projects, Payroll, Leads) which are all shared with HR/Manager.
-/// A pure reporting surface — the underlying monthly figures are entered via
-/// a one-off import script, not an in-app editor, since v1 only asked for
-/// "see my monthly and yearly reports in stats and graphs". Every money
+/// New months are added/edited in-app via [FinancialRecordEditorPage] (the
+/// "Add Record" button, or tapping a row in the Monthly Detail table); the
+/// initial 42 months of history were a one-off import script, but ongoing
+/// entry doesn't need one. Every money
 /// figure is shown as PKR with its USD equivalent in brackets, always — no
 /// currency toggle, since the two currencies are shown together everywhere.
 class FinancialReportsPage extends ConsumerStatefulWidget {
@@ -140,7 +142,24 @@ class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
         ),
         data: (records) {
           if (records.isEmpty) {
-            return const Center(child: Text('No financial records yet.'));
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('No financial records yet.'),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const FinancialRecordEditorPage(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add Record'),
+                  ),
+                ],
+              ),
+            );
           }
 
           final sorted = [...records]
@@ -194,6 +213,16 @@ class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
                       selected: {selectedYear},
                       onSelectionChanged: (selection) =>
                           setState(() => _selectedYear = selection.first),
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const FinancialRecordEditorPage(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add Record'),
                     ),
                   ],
                 ),
@@ -1020,6 +1049,8 @@ class _MonthlyRecordsTable extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
+          // Rows are tap-to-edit, not multi-select — no checkbox column.
+          showCheckboxColumn: false,
           columns: const [
             DataColumn(label: Text('Month')),
             DataColumn(label: Text('Revenue')),
@@ -1030,6 +1061,12 @@ class _MonthlyRecordsTable extends StatelessWidget {
           rows: [
             for (final record in records)
               DataRow(
+                onSelectChanged: (_) => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        FinancialRecordEditorPage(existingRecord: record),
+                  ),
+                ),
                 cells: [
                   DataCell(
                     Text('${_kMonthAbbreviations[record.month - 1]} ${record.year}'),

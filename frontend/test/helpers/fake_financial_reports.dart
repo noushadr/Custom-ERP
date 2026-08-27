@@ -41,9 +41,52 @@ class FakeFinancialReportsRepository implements FinancialReportsRepository {
   /// permission gate short-circuits before ever fetching.
   int getRecordsCallCount = 0;
 
+  /// The `(year, month)` passed to the most recent [createRecord] call.
+  (int, int)? lastCreatedYearMonth;
+
+  /// The id passed to the most recent [updateRecord] call.
+  String? lastUpdatedId;
+
   @override
   Future<List<FinancialRecord>> getRecords() async {
     getRecordsCallCount++;
     return records;
+  }
+
+  @override
+  Future<FinancialRecord> createRecord({
+    required int year,
+    required int month,
+    required String revenueRs,
+    required String revenueUsd,
+    required String expenseRs,
+    required String expenseUsd,
+    required String fxRate,
+  }) async {
+    lastCreatedYearMonth = (year, month);
+    return buildTestFinancialRecord(
+      year: year,
+      month: month,
+      revenueRs: double.parse(revenueRs),
+      revenueUsd: double.parse(revenueUsd),
+      expenseRs: double.parse(expenseRs),
+      expenseUsd: double.parse(expenseUsd),
+      fxRate: double.parse(fxRate),
+    );
+  }
+
+  @override
+  Future<FinancialRecord> updateRecord(
+    String id, {
+    int? year,
+    int? month,
+    String? revenueRs,
+    String? revenueUsd,
+    String? expenseRs,
+    String? expenseUsd,
+    String? fxRate,
+  }) async {
+    lastUpdatedId = id;
+    return buildTestFinancialRecord(id: id);
   }
 }
