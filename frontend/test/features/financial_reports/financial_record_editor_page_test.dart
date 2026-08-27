@@ -163,6 +163,138 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'warns and disables Create once the selected month/year already has a '
+    'record, without ever needing to submit and hit the 409',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeFinancialReportsRepository(
+            records: [buildTestFinancialRecord(year: 2030, month: 3)],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Picking March is still fine — the year field hasn't been set to
+      // 2030 yet, so nothing conflicts.
+      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('March').last);
+      await tester.pumpAndSettle();
+
+      final createButton = tester.widget<FilledButton>(
+        find.byType(FilledButton),
+      );
+      expect(createButton.onPressed, isNotNull);
+      expect(find.textContaining('already exists'), findsNothing);
+
+      // Now typing the conflicting year should surface the warning and
+      // disable the button — no need to fill in every money field and get
+      // rejected by the server to find out.
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Year'),
+        '2030',
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'A record for March 2030 already exists — edit it from the '
+          'Monthly Detail table instead of creating another one.',
+        ),
+        findsOneWidget,
+      );
+      final disabledButton = tester.widget<FilledButton>(
+        find.byType(FilledButton),
+      );
+      expect(disabledButton.onPressed, isNull);
+    },
+  );
+
+  testWidgets(
+    'a taken month is shown as disabled with an "(already added)" label in '
+    'the dropdown',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeFinancialReportsRepository(
+            records: [buildTestFinancialRecord(year: 2030, month: 3)],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Year'),
+        '2030',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.pumpAndSettle();
+
+      expect(find.text('March (already added)'), findsOneWidget);
+      expect(find.text('April'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "editing a record doesn't flag its own month/year as a conflict, even "
+    'though another record for the same month exists',
+    (tester) async {
+      final ownRecord = buildTestFinancialRecord(
+        id: 'record-own',
+        year: 2026,
+        month: 3,
+      );
+      final repository = FakeFinancialReportsRepository(
+        records: [
+          ownRecord,
+          buildTestFinancialRecord(id: 'record-other', year: 2026, month: 3),
+        ],
+      );
+      await tester.pumpWidget(
+        _app(repository: repository, existingRecord: ownRecord),
+      );
+      await tester.pumpAndSettle();
+
+      // A genuine duplicate — a *different* record for the same
+      // month/year — should still warn.
+      expect(
+        find.text(
+          'A record for March 2026 already exists — edit it from the '
+          'Monthly Detail table instead of creating another one.',
+        ),
+        findsOneWidget,
+      );
+      final button = tester.widget<FilledButton>(find.byType(FilledButton));
+      expect(button.onPressed, isNull);
+    },
+  );
+
+  testWidgets(
+    "editing a record with no other conflicting record doesn't warn",
+    (tester) async {
+      final ownRecord = buildTestFinancialRecord(
+        id: 'record-own',
+        year: 2026,
+        month: 3,
+      );
+      final repository = FakeFinancialReportsRepository(
+        records: [ownRecord],
+      );
+      await tester.pumpWidget(
+        _app(repository: repository, existingRecord: ownRecord),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('already exists'), findsNothing);
+      final button = tester.widget<FilledButton>(find.byType(FilledButton));
+      expect(button.onPressed, isNotNull);
+    },
+  );
 }
 
 class _ConflictRepository extends FakeFinancialReportsRepository {

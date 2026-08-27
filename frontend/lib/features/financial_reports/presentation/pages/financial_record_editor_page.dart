@@ -74,7 +74,13 @@ class _FinancialRecordEditorPageState
     _fxRateController = TextEditingController(
       text: existing == null ? '' : _trimmed(existing.fxRate),
     );
+    // Recomputes which months are already taken for the typed year as the
+    // user edits it — a plain TextEditingController doesn't trigger a
+    // rebuild on its own.
+    _yearController.addListener(_onYearChanged);
   }
+
+  void _onYearChanged() => setState(() {});
 
   /// Drops a trailing ".0" so a whole-number figure doesn't show a
   /// pointless decimal when the editor opens for an existing record.
@@ -85,6 +91,7 @@ class _FinancialRecordEditorPageState
 
   @override
   void dispose() {
+    _yearController.removeListener(_onYearChanged);
     _yearController.dispose();
     _revenueRsController.dispose();
     _revenueUsdController.dispose();
@@ -142,6 +149,21 @@ class _FinancialRecordEditorPageState
 
   @override
   Widget build(BuildContext context) {
+    final records = ref.watch(financialRecordsListProvider).value ?? const [];
+    final year = int.tryParse(_yearController.text.trim());
+    // Every other month/year already on file for the typed year — "every
+    // other" so editing a record doesn't flag its own current month as
+    // taken. Backed by the same uniqueness the server enforces
+    // (`POST /financial-records` 409s on a duplicate) — this is a
+    // proactive warning on top of that, not a replacement for it.
+    final takenMonths = year == null
+        ? const <int>{}
+        : {
+            for (final r in records)
+              if (r.year == year && r.id != widget.existingRecord?.id) r.month,
+          };
+    final isDuplicate = takenMonths.contains(_month);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Edit Financial Record' : 'New Financial Record'),
@@ -177,8 +199,18 @@ class _FinancialRecordEditorPageState
                             items: [
                               for (var m = 1; m <= 12; m++)
                                 DropdownMenuItem(
+                                  enabled: !takenMonths.contains(m),
                                   value: m,
-                                  child: Text(_kMonthNames[m - 1]),
+                                  child: Text(
+                                    takenMonths.contains(m)
+                                        ? '${_kMonthNames[m - 1]} (already added)'
+                                        : _kMonthNames[m - 1],
+                                    style: takenMonths.contains(m)
+                                        ? Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: Theme.of(context).disabledColor,
+                                          )
+                                        : null,
+                                  ),
                                 ),
                             ],
                             onChanged: (value) =>
@@ -204,6 +236,17 @@ class _FinancialRecordEditorPageState
                         ),
                       ],
                     ),
+                    if (isDuplicate) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'A record for ${_kMonthNames[_month - 1]} $year already '
+                        'exists — edit it from the Monthly Detail table '
+                        'instead of creating another one.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -293,7 +336,7 @@ class _FinancialRecordEditorPageState
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   FilledButton(
-                    onPressed: _submitting ? null : _submit,
+                    onPressed: (_submitting || isDuplicate) ? null : _submit,
                     child: _submitting
                         ? const SizedBox(
                             width: 16,
