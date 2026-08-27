@@ -288,6 +288,33 @@ class _NewButtons extends StatelessWidget {
   }
 }
 
+/// (label, flex) for each spreadsheet-style column — shared between the
+/// header and every data row so widths always line up. Mirrors the Leads
+/// table's convention (`leads_page.dart`'s `_kLeadColumns`): a fixed
+/// column set, flex-based `Expanded` cells (no horizontal scroll, which
+/// would desync the header from the body), zebra striping, per-cell
+/// tooltips for anything that might truncate.
+const _kProjectColumns = [
+  ('Client', 2),
+  ('Project', 2),
+  ('Type', 1),
+  ('Status', 1),
+  ('Start Date', 1),
+  ('Package', 1),
+  ('Employees', 2),
+  ('Services', 2),
+];
+
+const _kClientColumns = [
+  ('Company', 2),
+  ('Contact', 2),
+  ('Email', 2),
+  ('Phone', 2),
+  ('Country', 1),
+  ('Industry', 1),
+  ('Lead Source', 1),
+];
+
 class _ProjectsTab extends ConsumerWidget {
   const _ProjectsTab();
 
@@ -311,61 +338,58 @@ class _ProjectsTab extends ConsumerWidget {
         }
         final sorted = [...projects]
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        return ListView.separated(
+        return _DataTableShell(
+          header: const _TableHeader(columns: _kProjectColumns),
           itemCount: sorted.length,
-          separatorBuilder: (_, _) =>
-              const Divider(height: 1, color: AppColors.borderSubtle),
-          itemBuilder: (context, index) => _ProjectRow(project: sorted[index]),
+          itemBuilder: (context, index) =>
+              _ProjectTableRow(project: sorted[index], isEven: index.isEven),
         );
       },
     );
   }
 }
 
-class _ProjectRow extends StatelessWidget {
-  const _ProjectRow({required this.project});
+class _ProjectTableRow extends StatelessWidget {
+  const _ProjectTableRow({required this.project, required this.isEven});
 
   final Project project;
+  final bool isEven;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final statusColor = switch (project.status) {
+      ProjectStatus.active => AppColors.success,
+      ProjectStatus.onHold => AppColors.warning,
+      ProjectStatus.completed => AppColors.textSecondary,
+      ProjectStatus.cancelled => AppColors.error,
+      _ => AppColors.textSecondary,
+    };
+    final employeesText = project.assignedEmployees.isEmpty
+        ? '—'
+        : project.assignedEmployees.map((e) => e.fullName).join(', ');
+    final servicesText = project.services.isEmpty
+        ? '—'
+        : project.services.map((s) => s.name).join(', ');
+    final cells = [
+      project.clientName,
+      project.name,
+      formatProjectTypeLabel(project.type),
+      formatProjectStatusLabel(project.status),
+      project.startDate,
+      project.packageName ?? '—',
+      employeesText,
+      servicesText,
+    ];
+
+    return _TableRow(
+      isEven: isEven,
+      columns: _kProjectColumns,
+      cells: cells,
+      cellColor: (i) => i == 3 ? statusColor : null,
+      cellWeight: (i) => i == 0 ? FontWeight.w600 : null,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ProjectDetailPage(projectId: project.id),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    project.clientName,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    project.name,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            ProjectTypeBadge(type: project.type, dense: true),
-            const SizedBox(width: 8),
-            ProjectStatusBadge(status: project.status, dense: true),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-          ],
         ),
       ),
     );
@@ -391,13 +415,227 @@ class _ClientsTab extends ConsumerWidget {
         if (clients.isEmpty) {
           return const Center(child: Text('No clients yet.'));
         }
-        return ListView.separated(
+        return _DataTableShell(
+          header: const _TableHeader(
+            columns: _kClientColumns,
+            trailingLabel: 'Health',
+          ),
           itemCount: clients.length,
-          separatorBuilder: (_, _) =>
-              const Divider(height: 1, color: AppColors.borderSubtle),
-          itemBuilder: (context, index) => _ClientRow(client: clients[index]),
+          itemBuilder: (context, index) =>
+              _ClientTableRow(client: clients[index], isEven: index.isEven),
         );
       },
+    );
+  }
+}
+
+class _ClientTableRow extends StatelessWidget {
+  const _ClientTableRow({required this.client, required this.isEven});
+
+  final Client client;
+  final bool isEven;
+
+  @override
+  Widget build(BuildContext context) {
+    final cells = [
+      client.companyName,
+      client.primaryContactName ?? '—',
+      client.primaryContactEmail ?? '—',
+      client.primaryContactPhone ?? '—',
+      formatCountryFlag(client.country) ?? '—',
+      client.industry ?? '—',
+      client.leadSource ?? '—',
+    ];
+
+    return _TableRow(
+      isEven: isEven,
+      columns: _kClientColumns,
+      cells: cells,
+      cellWeight: (i) => i == 0 ? FontWeight.w600 : null,
+      trailing: ClientHealthBadge(status: client.healthStatus, dense: true),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ClientDetailPage(clientId: client.id),
+        ),
+      ),
+    );
+  }
+}
+
+/// The shared spreadsheet-table chrome (rounded card border, fixed header,
+/// virtualized body) both the Projects and Clients tabs are built on.
+class _DataTableShell extends StatelessWidget {
+  const _DataTableShell({
+    required this.header,
+    required this.itemCount,
+    required this.itemBuilder,
+  });
+
+  final Widget header;
+  final int itemCount;
+  final Widget Function(BuildContext, int) itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            header,
+            Expanded(
+              child: ListView.builder(
+                itemCount: itemCount,
+                itemBuilder: itemBuilder,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TableHeader extends StatelessWidget {
+  const _TableHeader({required this.columns, this.trailingLabel});
+
+  final List<(String, int)> columns;
+
+  /// An extra fixed-width label at the end (e.g. "Health") for a column
+  /// that renders a badge rather than plain text in each row.
+  final String? trailingLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(
+      context,
+    ).textTheme.labelMedium?.copyWith(color: AppColors.textSecondary);
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.fieldFill,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          for (final (label, flex) in columns)
+            Expanded(
+              flex: flex,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
+              ),
+            ),
+          if (trailingLabel != null)
+            SizedBox(
+              width: 160,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  trailingLabel!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TableRow extends StatelessWidget {
+  const _TableRow({
+    required this.columns,
+    required this.cells,
+    required this.isEven,
+    required this.onTap,
+    this.cellColor,
+    this.cellWeight,
+    this.trailing,
+  });
+
+  final List<(String, int)> columns;
+  final List<String> cells;
+  final bool isEven;
+  final VoidCallback onTap;
+
+  /// Optional per-cell text color override, e.g. a status column colored by
+  /// its value.
+  final Color? Function(int index)? cellColor;
+
+  /// Optional per-cell font-weight override, e.g. the first (identity)
+  /// column rendered bolder than the rest.
+  final FontWeight? Function(int index)? cellWeight;
+
+  /// An extra fixed-width trailing cell rendering a widget rather than
+  /// plain text (e.g. a status badge) — paired with `_TableHeader`'s
+  /// `trailingLabel`.
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseStyle = Theme.of(context).textTheme.bodySmall;
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isEven ? AppColors.surface : AppColors.canvasBackground,
+          border: const Border(
+            bottom: BorderSide(color: AppColors.borderSubtle),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            for (var i = 0; i < columns.length; i++)
+              Expanded(
+                flex: columns[i].$2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(color: AppColors.borderSubtle),
+                    ),
+                  ),
+                  child: Tooltip(
+                    message: cells[i],
+                    waitDuration: const Duration(milliseconds: 500),
+                    child: Text(
+                      cells[i],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: baseStyle?.copyWith(
+                        color: cellColor?.call(i),
+                        fontWeight: cellWeight?.call(i),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (trailing != null)
+              SizedBox(
+                width: 160,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: trailing,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

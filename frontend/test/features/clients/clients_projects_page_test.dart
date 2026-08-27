@@ -11,10 +11,21 @@ import 'package:zera_erp/features/clients/domain/entities/project_status.dart';
 import 'package:zera_erp/features/clients/domain/entities/project_type.dart';
 import 'package:zera_erp/features/clients/presentation/pages/clients_projects_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/shared/widgets/form_section.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_clients.dart';
 import '../../helpers/fake_employee.dart';
+
+/// Scopes a text lookup to inside the named `TopBreakdownPanel` (a titled
+/// `FormSection`) — needed now that the Projects/Clients tables also show
+/// countries/services/lead sources as plain columns, so a bare
+/// `find.text(...)` can match both the panel's bar-row label and a table
+/// cell.
+Finder _inPanel(String panelTitle, String text) => find.descendant(
+  of: find.widgetWithText(FormSection, panelTitle),
+  matching: find.text(text),
+);
 
 const _superAdmin = AuthUser(
   id: 'admin-1',
@@ -146,15 +157,121 @@ void main() {
       expect(find.text('Top Services'), findsOneWidget);
       expect(find.text('Top Lead Sources'), findsOneWidget);
 
+      // Scoped to each panel specifically — the Projects/Clients tables
+      // below now also show countries/services/lead sources as plain
+      // columns, so these values legitimately appear more than once on
+      // screen.
       // 2 clients are in Pakistan (flag + short code), 1 in Saudi Arabia.
-      expect(find.text('🇵🇰 PK'), findsOneWidget);
-      expect(find.text('🇸🇦 KSA'), findsOneWidget);
+      expect(_inPanel('Top Countries', '🇵🇰 PK'), findsOneWidget);
+      expect(_inPanel('Top Countries', '🇸🇦 KSA'), findsOneWidget);
       // 2 projects use SEO, 1 uses SMM.
-      expect(find.text('SEO'), findsOneWidget);
-      expect(find.text('SMM'), findsOneWidget);
+      expect(_inPanel('Top Services', 'SEO'), findsOneWidget);
+      expect(_inPanel('Top Services', 'SMM'), findsOneWidget);
       // 2 clients came via Whatsapp, 1 via Referral.
-      expect(find.text('Whatsapp'), findsOneWidget);
-      expect(find.text('Referral'), findsOneWidget);
+      expect(_inPanel('Top Lead Sources', 'Whatsapp'), findsOneWidget);
+      expect(_inPanel('Top Lead Sources', 'Referral'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'the Projects tab renders as a detailed table — type, status, start '
+    'date, package, employees, and services all visible per row',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            projects: [
+              buildTestProject(
+                clientName: 'Acme Co',
+                name: 'SEO Retainer',
+                type: ProjectType.retainer,
+                status: ProjectStatus.active,
+                startDate: '2026-02-15',
+                packageName: 'GROWTH +',
+                assignedEmployees: const [
+                  ProjectEmployeeRef(
+                    id: 'e1',
+                    fullName: 'Jane Employee',
+                    photoUrl: null,
+                  ),
+                ],
+                services: const [ProjectServiceRef(id: 's1', name: 'SEO')],
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Acme Co'), findsOneWidget);
+      expect(find.text('SEO Retainer'), findsOneWidget);
+      expect(find.text('Retainer'), findsOneWidget);
+      expect(find.text('Active'), findsOneWidget);
+      expect(find.text('2026-02-15'), findsOneWidget);
+      expect(find.text('GROWTH +'), findsOneWidget);
+      expect(find.text('Jane Employee'), findsOneWidget);
+      // At least once — the "Top Services" breakdown panel above the
+      // table also derives from this same project's services, so "SEO"
+      // legitimately appears twice on screen.
+      expect(find.text('SEO'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'a project with no package/employees/services shows an em dash for '
+    'each',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            projects: [buildTestProject(name: 'Bare Project')],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bare Project'), findsOneWidget);
+      expect(find.text('—'), findsNWidgets(3));
+    },
+  );
+
+  testWidgets(
+    'the Clients tab renders as a detailed table — contact, email, phone, '
+    'country, industry, and lead source all visible per row',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            clients: [
+              buildTestClient(
+                companyName: 'Acme Co',
+                industry: 'E-commerce',
+                country: 'Pakistan',
+                primaryContactName: 'Jane Client',
+                primaryContactEmail: 'jane@acme.test',
+                primaryContactPhone: '+92 300 1234567',
+                leadSource: 'Referral',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Clients'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Acme Co'), findsOneWidget);
+      expect(find.text('Jane Client'), findsOneWidget);
+      expect(find.text('jane@acme.test'), findsOneWidget);
+      expect(find.text('+92 300 1234567'), findsOneWidget);
+      // At least once — the "Top Countries" breakdown panel above the
+      // table also derives from this same client's country, so the flag
+      // code legitimately appears twice on screen.
+      expect(find.text('🇵🇰 PK'), findsWidgets);
+      expect(find.text('E-commerce'), findsOneWidget);
+      // Also mirrored in the "Top Lead Sources" breakdown panel above.
+      expect(find.text('Referral'), findsWidgets);
     },
   );
 
