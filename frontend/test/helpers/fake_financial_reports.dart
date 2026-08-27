@@ -44,8 +44,27 @@ class FakeFinancialReportsRepository implements FinancialReportsRepository {
   /// The `(year, month)` passed to the most recent [createRecord] call.
   (int, int)? lastCreatedYearMonth;
 
+  /// The `(revenueUsd, expenseUsd)` passed to the most recent [createRecord]
+  /// call — lets tests confirm the editor computed these from Rs ÷ FX rate
+  /// rather than the (now nonexistent) USD input fields.
+  (String, String)? lastCreatedUsd;
+
   /// The id passed to the most recent [updateRecord] call.
   String? lastUpdatedId;
+
+  /// The full set of named args passed to the most recent [updateRecord]
+  /// call — lets tests confirm editing never sends `year`/`month` (they're
+  /// no longer editable) alongside the computed USD figures.
+  ({
+    int? year,
+    int? month,
+    String? revenueRs,
+    String? revenueUsd,
+    String? expenseRs,
+    String? expenseUsd,
+    String? fxRate,
+  })?
+  lastUpdateArgs;
 
   @override
   Future<List<FinancialRecord>> getRecords() async {
@@ -64,6 +83,7 @@ class FakeFinancialReportsRepository implements FinancialReportsRepository {
     required String fxRate,
   }) async {
     lastCreatedYearMonth = (year, month);
+    lastCreatedUsd = (revenueUsd, expenseUsd);
     return buildTestFinancialRecord(
       year: year,
       month: month,
@@ -87,6 +107,15 @@ class FakeFinancialReportsRepository implements FinancialReportsRepository {
     String? fxRate,
   }) async {
     lastUpdatedId = id;
+    lastUpdateArgs = (
+      year: year,
+      month: month,
+      revenueRs: revenueRs,
+      revenueUsd: revenueUsd,
+      expenseRs: expenseRs,
+      expenseUsd: expenseUsd,
+      fxRate: fxRate,
+    );
     return buildTestFinancialRecord(id: id);
   }
 }

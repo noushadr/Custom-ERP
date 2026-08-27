@@ -38,26 +38,23 @@ Widget _app({
   );
 }
 
+/// Fills the FX rate + both Rs fields — the only inputs left once USD
+/// became a computed, read-only figure. FX rate 280 against these Rs
+/// values matches the USD figures the old, now-removed USD inputs used to
+/// carry (1000000/280≈3571, 600000/280≈2143), so callers that used to
+/// assert on those numbers still can.
 Future<void> _fillRequiredFields(WidgetTester tester) async {
+  await tester.enterText(
+    find.widgetWithText(TextFormField, 'FX Rate (PKR per USD)'),
+    '280',
+  );
   await tester.enterText(
     find.widgetWithText(TextFormField, 'Revenue (Rs)'),
     '1000000',
   );
   await tester.enterText(
-    find.widgetWithText(TextFormField, 'Revenue (USD)'),
-    '3571',
-  );
-  await tester.enterText(
     find.widgetWithText(TextFormField, 'Expense (Rs)'),
     '600000',
-  );
-  await tester.enterText(
-    find.widgetWithText(TextFormField, 'Expense (USD)'),
-    '2143',
-  );
-  await tester.enterText(
-    find.widgetWithText(TextFormField, 'FX Rate (PKR per USD)'),
-    '280',
   );
 }
 
@@ -89,64 +86,119 @@ void main() {
     expect(find.text('Must be a number'), findsOneWidget);
   });
 
-  testWidgets('submits a new record with the selected month/year', (
-    tester,
-  ) async {
-    final repository = FakeFinancialReportsRepository();
-    await tester.pumpWidget(_app(repository: repository));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Year'),
-      '2026',
-    );
-    await tester.tap(find.byType(DropdownButtonFormField<int>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('March').last);
+  testWidgets('rejects a zero or negative FX rate', (tester) async {
+    await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
     await _fillRequiredFields(tester);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'FX Rate (PKR per USD)'),
+      '0',
+    );
     await tester.tap(find.text('Create Record'));
     await tester.pumpAndSettle();
 
-    expect(repository.lastCreatedYearMonth, (2026, 3));
+    expect(find.text('Must be greater than 0'), findsOneWidget);
   });
 
-  testWidgets('pre-fills fields when editing an existing record', (
-    tester,
-  ) async {
-    final existing = buildTestFinancialRecord(
-      year: 2025,
-      month: 6,
-      revenueRs: 850000,
-    );
-    await tester.pumpWidget(_app(existingRecord: existing));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'there is no editable USD field — Revenue/Expense USD are computed, '
+    'read-only, and update live as Rs and FX rate are typed',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
 
-    expect(find.text('Edit Financial Record'), findsOneWidget);
-    final yearField = tester.widget<TextFormField>(
-      find.widgetWithText(TextFormField, 'Year'),
-    );
-    expect(yearField.controller?.text, '2025');
-    final revenueField = tester.widget<TextFormField>(
-      find.widgetWithText(TextFormField, 'Revenue (Rs)'),
-    );
-    expect(revenueField.controller?.text, '850000');
-  });
+      expect(
+        find.widgetWithText(TextFormField, 'Revenue (USD)'),
+        findsNothing,
+      );
+      expect(
+        find.widgetWithText(TextFormField, 'Expense (USD)'),
+        findsNothing,
+      );
+      // Nothing computed yet.
+      expect(find.text('—'), findsWidgets);
 
-  testWidgets('saves changes to an existing record', (tester) async {
-    final repository = FakeFinancialReportsRepository();
-    final existing = buildTestFinancialRecord(id: 'record-9');
-    await tester.pumpWidget(
-      _app(repository: repository, existingRecord: existing),
-    );
-    await tester.pumpAndSettle();
+      await _fillRequiredFields(tester);
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Save changes'));
-    await tester.pumpAndSettle();
+      // 1000000/280 ≈ 3571, 600000/280 ≈ 2143 — computed, not typed.
+      expect(find.text('3571'), findsOneWidget);
+      expect(find.text('2143'), findsOneWidget);
+    },
+  );
 
-    expect(repository.lastUpdatedId, 'record-9');
-  });
+  testWidgets(
+    'submits a new record with the selected month/year and the computed '
+    'USD figures',
+    (tester) async {
+      final repository = FakeFinancialReportsRepository();
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Year'),
+        '2026',
+      );
+      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('March').last);
+      await tester.pumpAndSettle();
+
+      await _fillRequiredFields(tester);
+      await tester.tap(find.text('Create Record'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastCreatedYearMonth, (2026, 3));
+      expect(repository.lastCreatedUsd, ('3571', '2143'));
+    },
+  );
+
+  testWidgets(
+    'edit mode shows the record\'s month/year as plain text — no dropdown, '
+    'no Year field — and pre-fills the money fields',
+    (tester) async {
+      final existing = buildTestFinancialRecord(
+        year: 2025,
+        month: 6,
+        revenueRs: 850000,
+      );
+      await tester.pumpWidget(_app(existingRecord: existing));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Financial Record'), findsOneWidget);
+      expect(find.text('June 2025'), findsOneWidget);
+      expect(find.byType(DropdownButtonFormField<int>), findsNothing);
+      expect(find.widgetWithText(TextFormField, 'Year'), findsNothing);
+
+      final revenueField = tester.widget<TextFormField>(
+        find.widgetWithText(TextFormField, 'Revenue (Rs)'),
+      );
+      expect(revenueField.controller?.text, '850000');
+    },
+  );
+
+  testWidgets(
+    'saves changes to an existing record without ever sending year/month',
+    (tester) async {
+      final repository = FakeFinancialReportsRepository();
+      final existing = buildTestFinancialRecord(id: 'record-9');
+      await tester.pumpWidget(
+        _app(repository: repository, existingRecord: existing),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Save changes'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedId, 'record-9');
+      expect(repository.lastUpdateArgs?.year, isNull);
+      expect(repository.lastUpdateArgs?.month, isNull);
+      // The pre-filled Rs/FX-rate figures (1000000, 280) still compute and
+      // send the same USD the record already carried (1000000/280≈3571).
+      expect(repository.lastUpdateArgs?.revenueUsd, '3571');
+    },
+  );
 
   testWidgets('shows the backend error message on a duplicate month conflict', (
     tester,
@@ -241,49 +293,23 @@ void main() {
   );
 
   testWidgets(
-    "editing a record doesn't flag its own month/year as a conflict, even "
-    'though another record for the same month exists',
+    'editing never shows the duplicate-month warning — month/year are fixed '
+    'once a record exists, so there is nothing left to conflict',
     (tester) async {
       final ownRecord = buildTestFinancialRecord(
         id: 'record-own',
         year: 2026,
         month: 3,
       );
+      // Another record shares the exact same month/year — under the old,
+      // create-mode duplicate check this would have warned, but editing
+      // can no longer change month/year, so it's structurally impossible
+      // to create a conflict here.
       final repository = FakeFinancialReportsRepository(
         records: [
           ownRecord,
           buildTestFinancialRecord(id: 'record-other', year: 2026, month: 3),
         ],
-      );
-      await tester.pumpWidget(
-        _app(repository: repository, existingRecord: ownRecord),
-      );
-      await tester.pumpAndSettle();
-
-      // A genuine duplicate — a *different* record for the same
-      // month/year — should still warn.
-      expect(
-        find.text(
-          'A record for March 2026 already exists — edit it from the '
-          'Monthly Detail table instead of creating another one.',
-        ),
-        findsOneWidget,
-      );
-      final button = tester.widget<FilledButton>(find.byType(FilledButton));
-      expect(button.onPressed, isNull);
-    },
-  );
-
-  testWidgets(
-    "editing a record with no other conflicting record doesn't warn",
-    (tester) async {
-      final ownRecord = buildTestFinancialRecord(
-        id: 'record-own',
-        year: 2026,
-        month: 3,
-      );
-      final repository = FakeFinancialReportsRepository(
-        records: [ownRecord],
       );
       await tester.pumpWidget(
         _app(repository: repository, existingRecord: ownRecord),
