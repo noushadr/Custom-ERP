@@ -23,33 +23,59 @@ Map<String, int> computeTopCounts<T>(
   return Map.fromEntries(sorted.take(limit));
 }
 
-/// Lays out a row of [TopBreakdownPanel]s side by side on wide screens,
-/// stacked on narrow ones.
+/// Lays out [TopBreakdownPanel]s in as many equal-width columns as
+/// comfortably fit the available width, wrapping to additional rows for
+/// the rest — rather than a fixed single-row-or-stacked split, so this
+/// scales correctly whether it's given 3 panels (Leads) or 4+ (Clients &
+/// Projects) without a hardcoded panel count.
 class TopBreakdownRow extends StatelessWidget {
   const TopBreakdownRow({super.key, required this.panels});
 
   final List<Widget> panels;
 
+  /// The narrowest a panel can get before `_BreakdownBarRow`'s fixed-width
+  /// label/count columns start overflowing its bar — used to decide how
+  /// many panels fit per row.
+  static const _minPanelWidth = 220.0;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 720) {
+        final columns = (constraints.maxWidth / _minPanelWidth)
+            .floor()
+            .clamp(1, panels.length);
+        if (columns == 1) {
           return Column(
             children: [
               for (final panel in panels) ...[panel, const SizedBox(height: 12)],
             ],
           );
         }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < panels.length; i++) ...[
-              Expanded(child: panels[i]),
-              if (i < panels.length - 1) const SizedBox(width: 12),
-            ],
-          ],
-        );
+
+        final rows = <Widget>[];
+        for (var i = 0; i < panels.length; i += columns) {
+          final rowPanels = panels.skip(i).take(columns).toList();
+          rows.add(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var j = 0; j < rowPanels.length; j++) ...[
+                  Expanded(child: rowPanels[j]),
+                  const SizedBox(width: 12),
+                ],
+                // Pads a short trailing row so its panels stay the same
+                // width as the fully-populated rows above it.
+                for (var j = rowPanels.length; j < columns; j++) ...[
+                  const Expanded(child: SizedBox.shrink()),
+                  const SizedBox(width: 12),
+                ],
+              ]..removeLast(),
+            ),
+          );
+          if (i + columns < panels.length) rows.add(const SizedBox(height: 12));
+        }
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
       },
     );
   }

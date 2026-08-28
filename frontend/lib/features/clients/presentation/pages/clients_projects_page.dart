@@ -165,9 +165,11 @@ class _SummaryRow extends ConsumerWidget {
   }
 }
 
-/// Three "top N" categorical breakdowns for the whole module — countries
-/// and lead source come from `Client`, services from every `Project`'s
-/// assigned services — each its own panel with one representative hue,
+/// Four "top N" categorical breakdowns for the whole module — countries,
+/// lead source, and industry come from `Client`, services from every
+/// `Project`'s assigned services — each its own panel with one
+/// representative hue (reused across panels freely, since each is an
+/// independent magnitude breakdown, not one shared categorical legend),
 /// mirroring the Leads page's identical breakdown row (shared widgets, see
 /// `top_breakdown_panel.dart`).
 class _ClientsBreakdownRow extends ConsumerWidget {
@@ -206,6 +208,12 @@ class _ClientsBreakdownRow extends ConsumerWidget {
         icon: Icons.campaign_outlined,
         color: AppColors.accentTeal,
         counts: computeTopCounts(clients, (c) => c.leadSource),
+      ),
+      TopBreakdownPanel(
+        title: 'Top Industries',
+        icon: Icons.category_outlined,
+        color: AppColors.primary,
+        counts: computeTopCounts(clients, (c) => c.industry),
       ),
     ];
 
