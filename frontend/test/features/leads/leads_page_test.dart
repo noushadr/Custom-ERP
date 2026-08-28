@@ -250,6 +250,36 @@ void main() {
   );
 
   testWidgets(
+    'shows an access-denied message for HR/Manager too — Leads became '
+    'Super-Admin-exclusive 2026-08-28, no longer shared with HR/Manager',
+    (tester) async {
+      final repository = FakeLeadsRepository(
+        leads: [buildTestLead(fullName: 'Should Not Be Visible')],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          viewer: const AuthUser(
+            id: 'hr-1',
+            email: 'hr@zeracreative.com',
+            role: 'HR/Manager',
+            permissions: ['clients.manage', 'payroll.manage'],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text("You don't have permission to view this page."),
+        findsOneWidget,
+      );
+      expect(find.text('Should Not Be Visible'), findsNothing);
+      expect(repository.getLeadsCallCount, 0);
+    },
+  );
+
+  testWidgets(
     'the monthly chart labels each bar with its lead count and orders '
     'newest month first',
     (tester) async {

@@ -182,7 +182,11 @@ const _nonAdminOnlyLabels = {'User Dashboard'};
 // modules were removed) until 2026-08-25, when the new Financial Reports
 // module became its first member — real company revenue/profit data,
 // materially more sensitive than the shared-with-HR/Manager modules below.
-const _superAdminOnlyLabels = {'Financial Reports'};
+// 'Leads' joined 2026-08-28 per explicit instruction, moving out of
+// _hrAndAdminOnlyLabels below (it had been shared with HR/Manager since its
+// 2026-08-23 launch) — the backend's `leads.manage` grant to HR/Manager was
+// removed from seed.ts in the same change.
+const _superAdminOnlyLabels = {'Financial Reports', 'Leads'};
 
 // The other half of Admin Business Management: shared between Super Admin
 // and HR/Manager, but still off-limits to Team Lead/Employee (who are
@@ -193,7 +197,6 @@ const _superAdminOnlyLabels = {'Financial Reports'};
 const _hrAndAdminOnlyLabels = {
   'Clients & Projects',
   'Payroll',
-  'Leads',
 };
 
 bool _isAdminOrHr(WidgetRef ref) {

@@ -46,8 +46,9 @@ const _kLeadColumns = [
 ];
 
 /// The Leads module's root page — a simple CRM-style list of prospective
-/// clients gated by `leads.manage` (shared by Super Admin and HR/Manager,
-/// same as Clients & Projects and Payroll). Rendered as a spreadsheet-style
+/// clients gated by `leads.manage`, Super-Admin-exclusive since 2026-08-28
+/// (previously shared with HR/Manager, like Clients & Projects and Payroll
+/// still are). Rendered as a spreadsheet-style
 /// grid (fixed columns, header row, zebra striping) rather than a card list,
 /// since the underlying data is a flat, column-shaped import from a sales
 /// log — a table reads closer to the source than a list of cards would.
