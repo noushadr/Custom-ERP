@@ -35,9 +35,9 @@ Set<NamedRef> _departmentsFor(
   return byId.values.toSet();
 }
 
-/// Create or edit a project: client, type/status, dates, SEO
-/// package/tracking details, and employee/service assignment (departments
-/// follow automatically from whichever employees are assigned).
+/// Create or edit a project: client, type/status, start/renewal dates,
+/// package, and employee/service assignment (departments follow
+/// automatically from whichever employees are assigned).
 class ProjectEditorPage extends ConsumerStatefulWidget {
   const ProjectEditorPage({super.key, this.existingProject});
 
@@ -53,17 +53,11 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   late final TextEditingController _nameController;
   late final TextEditingController _notesController;
   late final TextEditingController _packageNameController;
-  late final TextEditingController _backlinksTargetController;
-  late final TextEditingController _seoSheetNameController;
-  late final TextEditingController _projectFolderNameController;
-  late final TextEditingController _workingEmailAccountController;
-  late final TextEditingController _ahrefsAccountController;
 
   String? _clientId;
   late String _type;
   late String _status;
   DateTime? _startDate;
-  DateTime? _endDate;
   DateTime? _renewalDate;
   late Set<String> _selectedEmployeeIds;
   late Set<String> _selectedServiceIds;
@@ -82,28 +76,10 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
     _packageNameController = TextEditingController(
       text: existing?.packageName ?? '',
     );
-    _backlinksTargetController = TextEditingController(
-      text: existing?.backlinksTarget ?? '',
-    );
-    _seoSheetNameController = TextEditingController(
-      text: existing?.seoSheetName ?? '',
-    );
-    _projectFolderNameController = TextEditingController(
-      text: existing?.projectFolderName ?? '',
-    );
-    _workingEmailAccountController = TextEditingController(
-      text: existing?.workingEmailAccount ?? '',
-    );
-    _ahrefsAccountController = TextEditingController(
-      text: existing?.ahrefsAccount ?? '',
-    );
     _clientId = existing?.clientId;
     _type = existing?.type ?? ProjectType.oneTime;
     _status = existing?.status ?? ProjectStatus.active;
     _startDate = existing != null ? DateTime.parse(existing.startDate) : null;
-    _endDate = existing?.endDate != null
-        ? DateTime.parse(existing!.endDate!)
-        : null;
     _renewalDate = existing?.renewalDate != null
         ? DateTime.parse(existing!.renewalDate!)
         : null;
@@ -120,11 +96,6 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
     _nameController.dispose();
     _notesController.dispose();
     _packageNameController.dispose();
-    _backlinksTargetController.dispose();
-    _seoSheetNameController.dispose();
-    _projectFolderNameController.dispose();
-    _workingEmailAccountController.dispose();
-    _ahrefsAccountController.dispose();
     super.dispose();
   }
 
@@ -174,15 +145,9 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               type: _type,
               status: _status,
               startDate: _isoDate(_startDate!),
-              endDate: _endDate != null ? _isoDate(_endDate!) : null,
               renewalDate: _renewalDate != null ? _isoDate(_renewalDate!) : null,
               notes: _notesController.text.trim(),
               packageName: _packageNameController.text.trim(),
-              backlinksTarget: _backlinksTargetController.text.trim(),
-              seoSheetName: _seoSheetNameController.text.trim(),
-              projectFolderName: _projectFolderNameController.text.trim(),
-              workingEmailAccount: _workingEmailAccountController.text.trim(),
-              ahrefsAccount: _ahrefsAccountController.text.trim(),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
               targetDepartmentIds: departmentIds,
               serviceIds: _selectedServiceIds.toList(),
@@ -193,21 +158,11 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               type: _type,
               status: _status,
               startDate: _isoDate(_startDate!),
-              endDate: _endDate != null ? _isoDate(_endDate!) : null,
               renewalDate: _renewalDate != null ? _isoDate(_renewalDate!) : null,
               notes: _notesController.text.trim().isEmpty
                   ? null
                   : _notesController.text.trim(),
               packageName: _emptyToNull(_packageNameController.text),
-              backlinksTarget: _emptyToNull(_backlinksTargetController.text),
-              seoSheetName: _emptyToNull(_seoSheetNameController.text),
-              projectFolderName: _emptyToNull(
-                _projectFolderNameController.text,
-              ),
-              workingEmailAccount: _emptyToNull(
-                _workingEmailAccountController.text,
-              ),
-              ahrefsAccount: _emptyToNull(_ahrefsAccountController.text),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
               targetDepartmentIds: departmentIds,
               serviceIds: _selectedServiceIds.toList(),
@@ -340,31 +295,14 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _DateField(
-                            key: const Key('project-start-date'),
-                            label: 'Start date',
-                            value: _startDate,
-                            onTap: () => _pickDate(
-                              current: _startDate,
-                              onPicked: (d) => setState(() => _startDate = d),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _DateField(
-                            label: 'End date',
-                            value: _endDate,
-                            onTap: () => _pickDate(
-                              current: _endDate,
-                              onPicked: (d) => setState(() => _endDate = d),
-                            ),
-                          ),
-                        ),
-                      ],
+                    _DateField(
+                      key: const Key('project-start-date'),
+                      label: 'Start date',
+                      value: _startDate,
+                      onTap: () => _pickDate(
+                        current: _startDate,
+                        onPicked: (d) => setState(() => _startDate = d),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     _DateField(
@@ -382,74 +320,9 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                       maxLines: 3,
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _packageNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Package',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _backlinksTargetController,
-                            decoration: const InputDecoration(
-                              labelText: 'Backlinks target',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _seoSheetNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'SEO sheet name',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _projectFolderNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Project folder name',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _workingEmailAccountController,
-                            decoration: const InputDecoration(
-                              labelText: 'Working email account',
-                              helperText:
-                                  'Reference only — no passwords stored here.',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _ahrefsAccountController,
-                            decoration: const InputDecoration(
-                              labelText: 'Ahrefs account',
-                              helperText:
-                                  'Reference only — no passwords stored here.',
-                            ),
-                          ),
-                        ),
-                      ],
+                    TextFormField(
+                      controller: _packageNameController,
+                      decoration: const InputDecoration(labelText: 'Package'),
                     ),
                     const SizedBox(height: 20),
                     Text(

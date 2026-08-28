@@ -74,6 +74,100 @@ void main() {
     expect(find.text('Jane Doe'), findsOneWidget);
   });
 
+  testWidgets(
+    'shows only a plain "Package" section — never "SEO Details" or its '
+    'other fields — regardless of the project\'s actual service',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            projects: [
+              buildTestProject(
+                name: 'SMM Retainer',
+                services: const [ProjectServiceRef(id: 's1', name: 'SMM')],
+                packageName: 'GROWTH +',
+                // Legacy data some older projects still carry — none of
+                // this should render any more.
+                backlinksTarget: '50',
+                seoSheetName: 'Old Sheet',
+                projectFolderName: 'Old Folder',
+                workingEmailAccount: 'old@client.test',
+                ahrefsAccount: 'old-ahrefs',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('SEO Details'), findsNothing);
+      expect(find.text('Package'), findsOneWidget);
+      expect(find.text('GROWTH +'), findsOneWidget);
+      expect(find.text('Backlinks target'), findsNothing);
+      expect(find.text('50'), findsNothing);
+      expect(find.text('SEO sheet'), findsNothing);
+      expect(find.text('Old Sheet'), findsNothing);
+      expect(find.text('Project folder'), findsNothing);
+      expect(find.text('Old Folder'), findsNothing);
+      expect(find.text('Working email account'), findsNothing);
+      expect(find.text('old@client.test'), findsNothing);
+      expect(find.text('Ahrefs account'), findsNothing);
+      expect(find.text('old-ahrefs'), findsNothing);
+      expect(
+        find.textContaining('kept in the team password manager'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets('shows no Package section when the project has none set', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakeClientsRepository(
+          projects: [buildTestProject(packageName: null)],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Package'), findsNothing);
+  });
+
+  testWidgets(
+    'the project name renders bold and large, with the client name as a '
+    'smaller subtitle underneath — never an end/"due" date',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            projects: [
+              buildTestProject(
+                name: 'SMM Retainer',
+                clientName: 'Acme Co',
+                endDate: '2026-12-31',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final nameText = tester.widget<Text>(find.text('SMM Retainer'));
+      expect(nameText.style?.fontWeight, FontWeight.bold);
+      expect(
+        nameText.style?.fontSize,
+        Theme.of(
+          tester.element(find.text('SMM Retainer')),
+        ).textTheme.headlineMedium?.fontSize,
+      );
+
+      expect(find.text('Acme Co'), findsOneWidget);
+      expect(find.textContaining('End'), findsNothing);
+    },
+  );
+
   testWidgets('shows linked tasks and an empty state when there are none', (
     tester,
   ) async {
