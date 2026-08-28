@@ -1,6 +1,6 @@
-# Zera Creative ERP
+# Custom ERP Flutter
 
-Internal ERP platform for Zera Creative. See [CLAUDE.md](./CLAUDE.md) for the full project specification and architecture reference.
+Internal custom-made Flutter ERP platform. See [CLAUDE.md](./CLAUDE.md) for the full project specification and architecture reference.
 
 ## Structure
 
