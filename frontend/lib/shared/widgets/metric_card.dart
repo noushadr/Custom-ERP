@@ -11,6 +11,10 @@ class MetricCard extends StatelessWidget {
     required this.value,
     required this.color,
     this.icon,
+    this.secondaryValue,
+    this.valueFontSize,
+    this.labelFirst = false,
+    this.valueSpans,
   });
 
   final String label;
@@ -18,8 +22,53 @@ class MetricCard extends StatelessWidget {
   final Color color;
   final IconData? icon;
 
+  /// Renders [value] as rich text instead of a plain string — e.g. a
+  /// bracketed USD conversion styled smaller/lighter than the headline PKR
+  /// figure. The first span inherits this card's own value style (color,
+  /// weight, size); later spans can override any of those. When set,
+  /// [value] is still required but only used for widget identity/tests,
+  /// not rendered.
+  final List<InlineSpan>? valueSpans;
+
+  /// An optional smaller line shown right below [value] — e.g. an
+  /// approximate USD figure below a PKR headline amount.
+  final String? secondaryValue;
+
+  /// Overrides the default `headlineSmall` size — for a caller whose
+  /// [value] strings run unusually long (e.g. a full currency figure with
+  /// a bracketed conversion) and would otherwise crowd the tile.
+  final double? valueFontSize;
+
+  /// Puts [label] first as a prominent heading above [value], instead of
+  /// the default small caption below it — for a caller whose tiles read
+  /// better named-then-valued (e.g. "Total Revenue" above the figure)
+  /// rather than value-then-caption.
+  final bool labelFirst;
+
   @override
   Widget build(BuildContext context) {
+    final labelText = Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: labelFirst
+          ? Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
+            )
+          : Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+    );
+    final baseValueStyle = Theme.of(context).textTheme.headlineSmall?.copyWith(
+      color: color,
+      fontWeight: FontWeight.w700,
+      fontSize: valueFontSize,
+    );
+    final valueText = valueSpans != null
+        ? Text.rich(TextSpan(style: baseValueStyle, children: valueSpans))
+        : Text(value, style: baseValueStyle);
+
     return Container(
       constraints: const BoxConstraints(minWidth: 150),
       padding: const EdgeInsets.all(14),
@@ -42,22 +91,18 @@ class MetricCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
+          if (labelFirst) ...[labelText, const SizedBox(height: 4)],
+          valueText,
+          if (secondaryValue != null) ...[
+            const SizedBox(height: 1),
+            Text(
+              secondaryValue!,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-          ),
+          ],
+          if (!labelFirst) ...[const SizedBox(height: 2), labelText],
         ],
       ),
     );

@@ -8,6 +8,7 @@ import {
 import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util';
 import { Permission } from '../domain/entities/permission.entity';
 import { Role } from '../domain/entities/role.entity';
+import { UserStatus } from '../domain/enums/user-status.enum';
 import {
   PERMISSION_REPOSITORY,
   type PermissionRepository,
@@ -114,6 +115,24 @@ export class RolesService {
     }
 
     await this.roleRepository.remove(role);
+  }
+
+  /** Active users whose role carries `permissionKey` — since Super Admin's
+   * role is seeded with every known permission explicitly (see seed.ts),
+   * this naturally includes Super Admin without any special-casing. Used
+   * to resolve who should be notified about something (e.g. everyone
+   * holding `leave.manage`). */
+  async findUsersWithPermission(
+    permissionKey: string,
+  ): Promise<{ id: string }[]> {
+    const users = await this.userRepository.findAll();
+    return users
+      .filter(
+        (user) =>
+          user.status === UserStatus.ACTIVE &&
+          user.role.permissions.some((p) => p.key === permissionKey),
+      )
+      .map((user) => ({ id: user.id }));
   }
 
   private async resolvePermissions(keys: string[]): Promise<Permission[]> {

@@ -13,6 +13,8 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { SetChecklistItemCompletedDto } from '../../checklists/application/dto/set-checklist-item-completed.dto';
+import { ChecklistType } from '../../checklists/domain/enums/checklist-type.enum';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
@@ -108,12 +110,20 @@ export class EmployeesController {
 
   @Get('me/direct-reports')
   getMyDirectReports(@CurrentUser() user: JwtPayload) {
-    return this.employeesService.getMyDirectReports(user.sub);
+    return this.employeesService.getMyDirectReports(user);
   }
 
   @Get('me/salary-history')
   getMySalaryHistory(@CurrentUser() user: JwtPayload) {
     return this.employeesService.getMySalaryHistory(user.sub);
+  }
+
+  @Get('me/checklist')
+  getMyChecklist(
+    @Query('type') type: ChecklistType,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.employeesService.getMyChecklist(user.sub, type);
   }
 
   @Get('me/education-history')
@@ -242,6 +252,29 @@ export class EmployeesController {
   @Permissions('employees.manage')
   getSalaryHistory(@Param('id') id: string) {
     return this.employeesService.getSalaryHistory(id);
+  }
+
+  @Get(':id/checklist')
+  @Permissions('employees.manage')
+  getEmployeeChecklist(
+    @Param('id') id: string,
+    @Query('type') type: ChecklistType,
+  ) {
+    return this.employeesService.getEmployeeChecklist(id, type);
+  }
+
+  @Patch(':id/checklist/:itemId')
+  @Permissions('employees.manage')
+  setChecklistItemCompleted(
+    @Param('itemId') itemId: string,
+    @Body() dto: SetChecklistItemCompletedDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.employeesService.setChecklistItemCompleted(
+      itemId,
+      dto,
+      user.sub,
+    );
   }
 
   @Post(':id/salary-history')

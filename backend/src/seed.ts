@@ -8,8 +8,13 @@ import { Permission } from './features/authentication/domain/entities/permission
 import { Role } from './features/authentication/domain/entities/role.entity';
 import { User } from './features/authentication/domain/entities/user.entity';
 import { UserStatus } from './features/authentication/domain/enums/user-status.enum';
+import { ChecklistTemplateItem } from './features/checklists/domain/entities/checklist-template-item.entity';
+import { ChecklistType } from './features/checklists/domain/enums/checklist-type.enum';
 import { Department } from './features/departments/domain/entities/department.entity';
+import { WorkMode } from './features/employee/domain/enums/work-mode.enum';
 import { LeaveType } from './features/leave/domain/entities/leave-type.entity';
+import { PerformanceReviewCriterion } from './features/performance-reviews/domain/entities/performance-review-criterion.entity';
+import { CriterionResponseType } from './features/performance-reviews/domain/enums/criterion-response-type.enum';
 
 const DEFAULT_PERMISSIONS = [
   'users.manage',
@@ -21,8 +26,25 @@ const DEFAULT_PERMISSIONS = [
   'notices.manage',
   'leave.manage',
   'roles.manage',
+  'performance.manage',
+  'knowledge_base.manage',
+  'tasks.manage',
+  'clients.manage',
+  'payroll.manage',
+  'leads.manage',
+  'finances.manage',
 ];
 
+// 'clients.manage', 'payroll.manage', and 'leads.manage' (Clients & Projects /
+// Client Health / Payroll / Leads — the Admin Business Management modules;
+// the original Agency Reporting and Finances modules were removed
+// 2026-08-23) are deliberately absent from Team Lead/Employee below, but ARE
+// granted to HR/Manager as a deliberate exception, alongside Super Admin's
+// implicit "every known permission" grant. 'finances.manage' (the new
+// Financial Reports module, added back 2026-08-25 at the user's explicit
+// request) is the one exception to that exception — it is Super-Admin-only,
+// deliberately absent from HR/Manager too, since it exposes real company
+// revenue/profit figures.
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
   { name: 'Super Admin', permissions: [] }, // always granted every known permission, see below
   {
@@ -34,9 +56,15 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'departments.manage',
       'notices.manage',
       'leave.manage',
+      'performance.manage',
+      'knowledge_base.manage',
+      'tasks.manage',
+      'clients.manage',
+      'payroll.manage',
+      'leads.manage',
     ],
   },
-  { name: 'Team Lead', permissions: ['employees.read'] },
+  { name: 'Team Lead', permissions: ['employees.read', 'knowledge_base.manage'] },
   { name: 'Employee', permissions: [] },
 ];
 
@@ -49,6 +77,58 @@ const SAMPLE_LEAVE_TYPES: {
   { name: 'Annual Leave', annualAllowanceDays: '20.0', carryForwardLimitDays: '5.0', colorHex: '#00D5EE' },
   { name: 'Casual Leave', annualAllowanceDays: '10.0', colorHex: '#F59E0B' },
   { name: 'Sick Leave', annualAllowanceDays: '10.0', colorHex: '#DC2626' },
+];
+
+const SAMPLE_CHECKLIST_TEMPLATE_ITEMS: {
+  type: ChecklistType;
+  title: string;
+  appliesToWorkMode?: WorkMode;
+}[] = [
+  { type: ChecklistType.ONBOARDING, title: 'Acceptance of offer letter via email' },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Provide email, phone, bank, and CNIC details',
+  },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Create employment contract and send for approval',
+  },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Bring CNIC copy at the time of joining',
+  },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Sign contract and receive appointment letter',
+  },
+  { type: ChecklistType.ONBOARDING, title: 'Add to company communication groups' },
+  { type: ChecklistType.ONBOARDING, title: 'Team and company introduction' },
+  {
+    type: ChecklistType.ONBOARDING,
+    title: 'Review office rules and regulations',
+    appliesToWorkMode: WorkMode.ON_SITE,
+  },
+  {
+    type: ChecklistType.OFFBOARDING,
+    title: 'Resignation/termination notice acknowledged',
+  },
+  { type: ChecklistType.OFFBOARDING, title: 'Exit interview conducted' },
+  { type: ChecklistType.OFFBOARDING, title: 'Return company assets' },
+  { type: ChecklistType.OFFBOARDING, title: 'Revoke system access and accounts' },
+  { type: ChecklistType.OFFBOARDING, title: 'Final settlement and clearance' },
+  { type: ChecklistType.OFFBOARDING, title: 'Issue relieving/NOC letter' },
+];
+
+const SAMPLE_PERFORMANCE_REVIEW_CRITERIA: {
+  name: string;
+  responseType: CriterionResponseType;
+}[] = [
+  { name: 'Overall Performance', responseType: CriterionResponseType.RATING },
+  { name: 'Attendance', responseType: CriterionResponseType.RATING },
+  { name: 'Teamwork', responseType: CriterionResponseType.RATING },
+  { name: 'Strengths', responseType: CriterionResponseType.TEXT },
+  { name: 'Areas for Improvement', responseType: CriterionResponseType.TEXT },
+  { name: 'Goals for Next Period', responseType: CriterionResponseType.TEXT },
 ];
 
 const SAMPLE_DEPARTMENTS: {
@@ -79,6 +159,12 @@ async function seed() {
   const leaveTypeRepo = app.get<Repository<LeaveType>>(
     getRepositoryToken(LeaveType),
   );
+  const checklistTemplateRepo = app.get<Repository<ChecklistTemplateItem>>(
+    getRepositoryToken(ChecklistTemplateItem),
+  );
+  const performanceReviewCriterionRepo = app.get<
+    Repository<PerformanceReviewCriterion>
+  >(getRepositoryToken(PerformanceReviewCriterion));
   const config = app.get(ConfigService);
 
   const permissionsByKey = new Map<string, Permission>();
@@ -160,6 +246,35 @@ async function seed() {
     if (!existing) {
       await leaveTypeRepo.save(leaveTypeRepo.create(typeDef));
       console.log(`Leave type ready: ${typeDef.name}`);
+    }
+  }
+
+  const checklistSortOrderByType = new Map<ChecklistType, number>();
+  for (const itemDef of SAMPLE_CHECKLIST_TEMPLATE_ITEMS) {
+    const sortOrder = checklistSortOrderByType.get(itemDef.type) ?? 0;
+    checklistSortOrderByType.set(itemDef.type, sortOrder + 1);
+
+    const existing = await checklistTemplateRepo.findOne({
+      where: { type: itemDef.type, title: itemDef.title },
+    });
+    if (!existing) {
+      await checklistTemplateRepo.save(
+        checklistTemplateRepo.create({ ...itemDef, sortOrder }),
+      );
+      console.log(`Checklist template item ready: ${itemDef.title}`);
+    }
+  }
+
+  for (let i = 0; i < SAMPLE_PERFORMANCE_REVIEW_CRITERIA.length; i++) {
+    const criterionDef = SAMPLE_PERFORMANCE_REVIEW_CRITERIA[i];
+    const existing = await performanceReviewCriterionRepo.findOne({
+      where: { name: criterionDef.name },
+    });
+    if (!existing) {
+      await performanceReviewCriterionRepo.save(
+        performanceReviewCriterionRepo.create({ ...criterionDef, sortOrder: i }),
+      );
+      console.log(`Performance review criterion ready: ${criterionDef.name}`);
     }
   }
 

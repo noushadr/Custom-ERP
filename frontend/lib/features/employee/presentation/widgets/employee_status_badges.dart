@@ -47,9 +47,14 @@ class InfoChip extends StatelessWidget {
 }
 
 class EmploymentStatusBadge extends StatelessWidget {
-  const EmploymentStatusBadge({super.key, required this.status});
+  const EmploymentStatusBadge({
+    super.key,
+    required this.status,
+    this.dense = false,
+  });
 
   final String status;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +67,19 @@ class EmploymentStatusBadge extends StatelessWidget {
       _ => (status, AppColors.textSecondary),
     };
 
-    return StatusBadge(label: label, color: color);
+    return StatusBadge(label: label, color: color, dense: dense);
   }
 }
 
 class WorkModeBadge extends StatelessWidget {
-  const WorkModeBadge({super.key, required this.workMode});
+  const WorkModeBadge({
+    super.key,
+    required this.workMode,
+    this.dense = false,
+  });
 
   final String workMode;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -80,23 +90,42 @@ class WorkModeBadge extends StatelessWidget {
       _ => (workMode, Icons.apartment_outlined),
     };
 
-    return StatusBadge(label: label, color: AppColors.textSecondary, icon: icon);
+    return StatusBadge(
+      label: label,
+      color: AppColors.textSecondary,
+      icon: icon,
+      dense: dense,
+    );
   }
 }
 
 /// A small colored pill — the base building block for the status badges
 /// above. Named to avoid clashing with Flutter's own [Badge] widget.
 class StatusBadge extends StatelessWidget {
-  const StatusBadge({super.key, required this.label, required this.color, this.icon});
+  const StatusBadge({
+    super.key,
+    required this.label,
+    required this.color,
+    this.icon,
+    this.dense = false,
+  });
 
   final String label;
   final Color color;
   final IconData? icon;
 
+  /// A slightly smaller rendering — smaller padding/icon/font — for
+  /// contexts like the employee directory card where many badges and chips
+  /// need to fit comfortably without dominating the row.
+  final bool dense;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 8 : 11,
+        vertical: dense ? 3 : 5,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
@@ -105,7 +134,7 @@ class StatusBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 13, color: color),
+            Icon(icon, size: dense ? 11 : 13, color: color),
             const SizedBox(width: 4),
           ],
           Text(
@@ -113,6 +142,7 @@ class StatusBadge extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w600,
+              fontSize: dense ? 10.5 : null,
             ),
           ),
         ],

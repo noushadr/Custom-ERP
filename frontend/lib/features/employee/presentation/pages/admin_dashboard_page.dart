@@ -5,8 +5,14 @@ import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
+import '../../../clients/application/clients_providers.dart';
+import '../../../freelancers/application/freelancers_providers.dart';
 import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
+import '../../../payroll/application/payroll_providers.dart';
+import '../../../payroll/domain/entities/payroll_run_status.dart';
+import '../../../payroll/domain/entities/payroll_run_summary.dart';
+import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/company_audit_log_section.dart';
@@ -25,9 +31,18 @@ class AdminDashboardPage extends ConsumerWidget {
     final canViewPayroll =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('employees.manage');
+    final canViewPerformance =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('performance.manage');
+    final canViewClients =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('clients.manage');
+    final canViewPayrollRuns =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('payroll.manage');
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1040),
@@ -43,6 +58,9 @@ class AdminDashboardPage extends ConsumerWidget {
               employees: employees,
               showCompanyAuditLog: canViewAllAudit,
               showPayroll: canViewPayroll,
+              showPendingReviews: canViewPerformance,
+              showClients: canViewClients,
+              showPayrollRuns: canViewPayrollRuns,
             ),
           ),
         ),
@@ -56,11 +74,17 @@ class _DashboardStats extends ConsumerWidget {
     required this.employees,
     required this.showCompanyAuditLog,
     required this.showPayroll,
+    required this.showPendingReviews,
+    required this.showClients,
+    required this.showPayrollRuns,
   });
 
   final List<Employee> employees;
   final bool showCompanyAuditLog;
   final bool showPayroll;
+  final bool showPendingReviews;
+  final bool showClients;
+  final bool showPayrollRuns;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -169,6 +193,7 @@ class _DashboardStats extends ConsumerWidget {
                 color: AppColors.error,
                 icon: Icons.cancel_outlined,
               ),
+              if (showPendingReviews) const _PendingReviewsCard(),
             ],
           ),
           const SizedBox(height: 18),
@@ -205,6 +230,25 @@ class _DashboardStats extends ConsumerWidget {
             const _PayrollStats(),
             const SizedBox(height: 18),
           ],
+          if (showClients || showPayrollRuns) ...[
+            const _SectionHeader('Admin Business Management'),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (showClients) ...[
+                  const _ActiveProjectsCard(),
+                  const _ClientsAtRiskCard(),
+                ],
+                if (showPayrollRuns) ...[
+                  const _LatestPayrollRunCard(),
+                  const _TotalFreelancersCard(),
+                ],
+              ],
+            ),
+            const SizedBox(height: 18),
+          ],
           const CompanyNoticesSection(),
           if (showCompanyAuditLog) ...[
             const SizedBox(height: 18),
@@ -212,6 +256,30 @@ class _DashboardStats extends ConsumerWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Company-wide count of reviews still awaiting a manager's/HR's
+/// completion — a separate async fetch from the (already-loaded) employee
+/// list, so it renders its own loading/error value rather than blocking the
+/// rest of the Overview stats.
+class _PendingReviewsCard extends ConsumerWidget {
+  const _PendingReviewsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reviewsAsync = ref.watch(allPendingPerformanceReviewsProvider);
+
+    return MetricCard(
+      label: 'Pending Performance Reviews',
+      value: reviewsAsync.when(
+        data: (reviews) => '${reviews.length}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.secondary,
+      icon: Icons.rate_review_outlined,
     );
   }
 }
@@ -259,24 +327,143 @@ class _PayrollStats extends ConsumerWidget {
             MetricCard(
               label: 'Monthly Payroll',
               value: 'PKR ${formatWholeAmount(payroll.totalMonthlyPayroll)}',
+              secondaryValue: formatUsdApprox(payroll.totalMonthlyPayroll),
               color: AppColors.primary,
               icon: Icons.account_balance_wallet_outlined,
             ),
             MetricCard(
               label: 'Daily Payroll',
               value: 'PKR ${formatWholeAmount(payroll.dailyPayroll)}',
+              secondaryValue: formatUsdApprox(payroll.dailyPayroll),
               color: AppColors.accentTeal,
               icon: Icons.today_outlined,
             ),
             MetricCard(
               label: 'Average Salary',
               value: 'PKR ${formatWholeAmount(averageSalary)}',
+              secondaryValue: formatUsdApprox(averageSalary),
               color: AppColors.secondary,
               icon: Icons.person_outline,
             ),
           ],
         );
       },
+    );
+  }
+}
+
+/// Active project count from the Clients & Projects module — the cheapest
+/// available headline number, already computed by the same summary endpoint
+/// the module's own dashboard tab uses.
+class _ActiveProjectsCard extends ConsumerWidget {
+  const _ActiveProjectsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(projectsSummaryProvider);
+
+    return MetricCard(
+      label: 'Active Projects',
+      value: summaryAsync.when(
+        data: (summary) => '${summary.activeCount}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.primary,
+      icon: Icons.work_outline,
+    );
+  }
+}
+
+/// At-risk client count from Client Health — folded into the Clients &
+/// Projects module rather than a separate one, so it shares that module's
+/// permission and summary provider.
+class _ClientsAtRiskCard extends ConsumerWidget {
+  const _ClientsAtRiskCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(clientHealthSummaryProvider);
+
+    return MetricCard(
+      label: 'Clients At Risk',
+      value: summaryAsync.when(
+        data: (summary) => '${summary.atRiskCount}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.error,
+      icon: Icons.warning_amber_outlined,
+    );
+  }
+}
+
+/// The most recently generated payroll run's status and total, sorted
+/// client-side since there's no dedicated "latest run" endpoint.
+class _LatestPayrollRunCard extends ConsumerWidget {
+  const _LatestPayrollRunCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final runsAsync = ref.watch(payrollRunsListProvider);
+    final latest = runsAsync.whenOrNull(
+      data: (runs) => runs.isEmpty ? null : _latestOf(runs),
+    );
+
+    return MetricCard(
+      label: 'Latest Payroll Run',
+      value: runsAsync.when(
+        data: (runs) =>
+            runs.isEmpty ? 'None yet' : _formatRunStatus(latest!.status),
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      secondaryValue: latest == null
+          ? null
+          : 'PKR ${formatWholeAmount(latest.totalNetPay)}',
+      color: AppColors.primary,
+      icon: Icons.receipt_outlined,
+    );
+  }
+
+  PayrollRunSummary _latestOf(List<PayrollRunSummary> runs) => runs.reduce(
+    (a, b) => (a.year * 12 + a.month) >= (b.year * 12 + b.month) ? a : b,
+  );
+
+  String _formatRunStatus(String status) {
+    switch (status) {
+      case PayrollRunStatus.draft:
+        return 'Draft';
+      case PayrollRunStatus.finalized:
+        return 'Finalized';
+      case PayrollRunStatus.paid:
+        return 'Paid';
+      default:
+        return status;
+    }
+  }
+}
+
+/// Active freelancer count — same "same as employees" stat parity the
+/// user asked for, placed alongside Payroll's other Admin Business
+/// Management tiles since freelancers are managed from that module.
+class _TotalFreelancersCard extends ConsumerWidget {
+  const _TotalFreelancersCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final freelancersAsync = ref.watch(freelancersListProvider);
+
+    return MetricCard(
+      label: 'Total Freelancers',
+      value: freelancersAsync.when(
+        data: (freelancers) =>
+            '${freelancers.where((f) => f.isActive).length}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.accentTeal,
+      icon: Icons.badge_outlined,
     );
   }
 }

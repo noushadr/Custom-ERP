@@ -7,6 +7,8 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../checklists/presentation/widgets/employee_checklist_section.dart';
+import '../../../performance_reviews/presentation/widgets/employee_performance_reviews_section.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/employee_assets_section.dart';
@@ -264,32 +266,53 @@ class _ProfileBody extends ConsumerWidget {
           EmployeeDocumentsSection(
             employeeId: isOwnProfile ? null : employee.id,
           ),
+          const SizedBox(height: 16),
+          EmployeeChecklistSection(
+            employeeId: employee.id,
+            isSelf: isOwnProfile,
+            canManage: canManage,
+          ),
         ],
+        // Not nested under showAuditLog (which gates on employees.manage) —
+        // this section gates itself on the separate performance.manage
+        // permission, so it stays visible to a custom role that holds
+        // performance.manage without employees.manage too.
+        const SizedBox(height: 16),
+        EmployeePerformanceReviewsSection(
+          employeeId: employee.id,
+          isSelf: isOwnProfile,
+        ),
         const SizedBox(height: 16),
         _Section(
           title: 'Contact',
           children: [
             _LabeledRow(label: 'Company email', child: Text(employee.email)),
-            _LabeledRow(
-              label: 'Personal email',
-              child: Text(employee.personalEmail ?? '—'),
-            ),
-            _LabeledRow(
-              label: 'Phone',
-              child: Text(employee.phoneNumber ?? '—'),
-            ),
-            _LabeledRow(
-              label: 'Date of birth',
-              child: Text(
-                employee.dateOfBirth == null
-                    ? '—'
-                    : formatDisplayDate(employee.dateOfBirth!),
+            // The backend already strips these for a viewer who is neither
+            // the employee themselves nor an employees.manage holder — this
+            // gate is a second line of defense so a regression there
+            // wouldn't also mean this page renders a real leaked value.
+            if (showAuditLog) ...[
+              _LabeledRow(
+                label: 'Personal email',
+                child: Text(employee.personalEmail ?? '—'),
               ),
-            ),
-            _LabeledRow(
-              label: 'Address',
-              child: Text(employee.address ?? '—'),
-            ),
+              _LabeledRow(
+                label: 'Phone',
+                child: Text(employee.phoneNumber ?? '—'),
+              ),
+              _LabeledRow(
+                label: 'Date of birth',
+                child: Text(
+                  employee.dateOfBirth == null
+                      ? '—'
+                      : formatDisplayDate(employee.dateOfBirth!),
+                ),
+              ),
+              _LabeledRow(
+                label: 'Address',
+                child: Text(employee.address ?? '—'),
+              ),
+            ],
           ],
         ),
         if (showAuditLog) ...[
@@ -335,24 +358,26 @@ class _ProfileBody extends ConsumerWidget {
             employeeId: isOwnProfile ? null : employee.id,
           ),
         ],
-        const SizedBox(height: 16),
-        _Section(
-          title: 'Emergency contact',
-          children: [
-            _LabeledRow(
-              label: 'Name',
-              child: Text(employee.emergencyContactName ?? '—'),
-            ),
-            _LabeledRow(
-              label: 'Phone',
-              child: Text(employee.emergencyContactPhone ?? '—'),
-            ),
-            _LabeledRow(
-              label: 'Relation',
-              child: Text(employee.emergencyContactRelation ?? '—'),
-            ),
-          ],
-        ),
+        if (showAuditLog) ...[
+          const SizedBox(height: 16),
+          _Section(
+            title: 'Emergency contact',
+            children: [
+              _LabeledRow(
+                label: 'Name',
+                child: Text(employee.emergencyContactName ?? '—'),
+              ),
+              _LabeledRow(
+                label: 'Phone',
+                child: Text(employee.emergencyContactPhone ?? '—'),
+              ),
+              _LabeledRow(
+                label: 'Relation',
+                child: Text(employee.emergencyContactRelation ?? '—'),
+              ),
+            ],
+          ),
+        ],
       ],
     );
 

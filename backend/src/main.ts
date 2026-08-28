@@ -26,8 +26,17 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
+  // Lets the app own yourdomain.com/<prefix>/* when reverse-proxied at a
+  // subdirectory (e.g. cPanel hosting the Flutter web build at the domain
+  // root and the API under /api) — unset/empty in local dev, so routes stay
+  // at the domain root as before.
+  const globalPrefix = config.get<string>('apiGlobalPrefix');
+  if (globalPrefix) {
+    app.setGlobalPrefix(globalPrefix);
+  }
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads',
+    prefix: globalPrefix ? `/${globalPrefix}/uploads` : '/uploads',
   });
 
   await app.listen(config.get<number>('port') ?? 3000);

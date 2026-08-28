@@ -21,4 +21,9 @@ export default () => ({
   // Comma-separated list of allowed frontend origins. Falls back to the
   // local Flutter-web dev server when unset — never wide open by default.
   corsOrigin: process.env.CORS_ORIGIN,
+  // Mounts every route (and /uploads) under this path segment, e.g. 'api'
+  // so the app owns yourdomain.com/api/* when reverse-proxied at a
+  // subdirectory (cPanel's Node.js Selector forwards the full, unstripped
+  // path). Empty/unset locally — routes stay at the domain root.
+  apiGlobalPrefix: process.env.API_GLOBAL_PREFIX ?? '',
 });

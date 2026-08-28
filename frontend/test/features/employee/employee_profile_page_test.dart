@@ -4,12 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
+import 'package:zera_erp/features/checklists/application/checklist_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/presentation/pages/employee_profile_page.dart';
+import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/shared/widgets/tag_input.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_checklist.dart';
 import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_performance_review.dart';
 
 Future<void> _useTallSurface(WidgetTester tester) async {
   tester.view.physicalSize = const Size(900, 2600);
@@ -23,6 +27,8 @@ Widget _app({
   required FakeEmployeeRepository repository,
   String? employeeId,
   FakeAuthRepository? authRepository,
+  FakeChecklistRepository? checklistRepository,
+  FakePerformanceReviewRepository? performanceReviewRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -33,6 +39,12 @@ Widget _app({
         ),
       ),
       employeeRepositoryProvider.overrideWithValue(repository),
+      checklistRepositoryProvider.overrideWithValue(
+        checklistRepository ?? FakeChecklistRepository(),
+      ),
+      performanceReviewRepositoryProvider.overrideWithValue(
+        performanceReviewRepository ?? FakePerformanceReviewRepository(),
+      ),
     ],
     child: MaterialApp(home: EmployeeProfilePage(employeeId: employeeId)),
   );
@@ -142,6 +154,49 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Edit'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'hides Bank Information, personal contact fields, and Emergency contact '
+    'from a viewer without employees.manage — a frontend-side second line '
+    'of defense on top of the backend already stripping these fields, so a '
+    'regression there would not also render a real leaked value here',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+        // The backend would normally null these out for this viewer, but
+        // set them here anyway to prove the frontend also hides the
+        // section rather than relying solely on the value being null.
+        personalEmail: 'other.personal@example.com',
+        phoneNumber: '+92 300 0000000',
+        bankName: 'Meezan Bank',
+        emergencyContactName: 'Someone',
+      );
+      final viewer = AuthUser(
+        id: 'user-3',
+        email: 'coworker@zeracreative.com',
+        role: 'Employee',
+        permissions: const ['employees.read'],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bank Information'), findsNothing);
+      expect(find.text('Meezan Bank'), findsNothing);
+      expect(find.text('Emergency contact'), findsNothing);
+      expect(find.text('Someone'), findsNothing);
+      expect(find.text('Personal email'), findsNothing);
+      expect(find.text('other.personal@example.com'), findsNothing);
     },
   );
 
@@ -756,6 +811,254 @@ void main() {
 
       expect(repository.lastDeleteAssetId, isNull);
       expect(find.text('Dell Laptop'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows the onboarding checklist with a progress count for HR/Admin',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.manage'],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+          checklistRepository: FakeChecklistRepository(
+            employeeChecklist: [
+              buildTestEmployeeChecklistItem(
+                id: 'item-1',
+                employeeId: 'employee-2',
+                title: 'Acceptance of offer letter via email',
+                isCompleted: true,
+              ),
+              buildTestEmployeeChecklistItem(
+                id: 'item-2',
+                employeeId: 'employee-2',
+                title: 'Bring CNIC copy at the time of joining',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Onboarding Checklist (1/2)'), findsOneWidget);
+      expect(find.text('Acceptance of offer letter via email'), findsOneWidget);
+      expect(find.text('Bring CNIC copy at the time of joining'), findsOneWidget);
+    },
+  );
+
+  testWidgets('HR/Admin can mark a checklist item as done', (tester) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'hr-1',
+      email: 'hr.manager@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: const ['employees.manage'],
+    );
+    final checklistRepository = FakeChecklistRepository(
+      employeeChecklist: [
+        buildTestEmployeeChecklistItem(
+          id: 'item-1',
+          employeeId: 'employee-2',
+          title: 'Acceptance of offer letter via email',
+        ),
+      ],
+    );
+
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        employeeId: 'employee-2',
+        repository: FakeEmployeeRepository(employees: [other]),
+        checklistRepository: checklistRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+
+    expect(
+      checklistRepository.lastSetChecklistItemCompletedInput,
+      (
+        employeeId: 'employee-2',
+        itemId: 'item-1',
+        isCompleted: true,
+        note: null,
+      ),
+    );
+  });
+
+  testWidgets(
+    "the employee's own checklist view has a disabled, read-only checkbox",
+    (tester) async {
+      final me = buildTestEmployee();
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(me: me),
+          checklistRepository: FakeChecklistRepository(
+            myChecklist: [
+              buildTestEmployeeChecklistItem(
+                title: 'Acceptance of offer letter via email',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Acceptance of offer letter via email'), findsOneWidget);
+      final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
+      expect(checkbox.onChanged, isNull);
+    },
+  );
+
+  testWidgets(
+    'hides the Offboarding block for a still-active employee',
+    (tester) async {
+      final me = buildTestEmployee();
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(me: me),
+          checklistRepository: FakeChecklistRepository(
+            myChecklist: [buildTestEmployeeChecklistItem()],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Offboarding'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'shows the performance review history for a performance.manage holder',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['performance.manage'],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+          performanceReviewRepository: FakePerformanceReviewRepository(
+            employeeReviews: [
+              buildTestPerformanceReview(
+                employeeId: 'employee-2',
+                reviewYear: 1,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Performance Reviews'), findsOneWidget);
+      expect(find.text('Year 1 Review'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'hides the performance review section from a manager without performance.manage',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'lead-1',
+        email: 'team.lead@zeracreative.com',
+        role: 'Team Lead',
+        permissions: const ['employees.manage'],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Performance Reviews'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    "shows the employee's own performance reviews on their own profile",
+    (tester) async {
+      final me = buildTestEmployee();
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(me: me),
+          performanceReviewRepository: FakePerformanceReviewRepository(
+            myReviews: [buildTestPerformanceReview(reviewYear: 2)],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Performance Reviews'), findsOneWidget);
+      expect(find.text('Year 2 Review'), findsOneWidget);
     },
   );
 }

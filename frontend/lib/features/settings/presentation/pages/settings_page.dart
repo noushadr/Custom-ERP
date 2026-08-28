@@ -4,9 +4,12 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../authentication/presentation/pages/role_permissions_page.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../checklists/presentation/pages/checklist_templates_page.dart';
+import '../../../clients/presentation/pages/services_settings_page.dart';
 import '../../../employee/presentation/pages/departments_page.dart';
 import '../../../holidays/presentation/pages/holidays_page.dart';
 import '../../../leave/presentation/pages/leave_settings_page.dart';
+import '../../../performance_reviews/presentation/pages/performance_review_criteria_page.dart';
 
 /// A single home for the admin-configuration screens that used to be
 /// scattered across other pages (Departments under Employees, Leave Types
@@ -24,6 +27,11 @@ class SettingsPage extends ConsumerWidget {
         authUser?.hasPermission('departments.manage') ?? false;
     final canManageLeave = authUser?.hasPermission('leave.manage') ?? false;
     final canManageRoles = authUser?.hasPermission('roles.manage') ?? false;
+    final canManageEmployees =
+        authUser?.hasPermission('employees.manage') ?? false;
+    final canManagePerformanceReviews =
+        authUser?.hasPermission('performance.manage') ?? false;
+    final canManageClients = authUser?.hasPermission('clients.manage') ?? false;
 
     final entries = [
       if (canManageDepartments)
@@ -32,6 +40,13 @@ class SettingsPage extends ConsumerWidget {
           title: 'Departments',
           subtitle: 'Create, edit, and archive departments',
           builder: (_) => const DepartmentsPage(),
+        ),
+      if (canManageEmployees)
+        _SettingsEntry(
+          icon: Icons.checklist_outlined,
+          title: 'Onboarding & Offboarding Checklist',
+          subtitle: 'Configure the checklist items every employee gets',
+          builder: (_) => const ChecklistTemplatesPage(),
         ),
       if (canManageLeave)
         _SettingsEntry(
@@ -47,6 +62,13 @@ class SettingsPage extends ConsumerWidget {
           subtitle: 'Dates Leave excludes from working-day counts',
           builder: (_) => const HolidaysPage(),
         ),
+      if (canManagePerformanceReviews)
+        _SettingsEntry(
+          icon: Icons.rate_review_outlined,
+          title: 'Performance Review Criteria',
+          subtitle: 'Configure the review areas every review is built from',
+          builder: (_) => const PerformanceReviewCriteriaPage(),
+        ),
       if (canManageRoles)
         _SettingsEntry(
           icon: Icons.admin_panel_settings_outlined,
@@ -54,10 +76,17 @@ class SettingsPage extends ConsumerWidget {
           subtitle: 'Define custom roles and what they can access',
           builder: (_) => const RolePermissionsPage(),
         ),
+      if (canManageClients)
+        _SettingsEntry(
+          icon: Icons.design_services_outlined,
+          title: 'Services',
+          subtitle: 'Catalog of services offered to clients on projects',
+          builder: (_) => const ServicesSettingsPage(),
+        ),
     ];
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),

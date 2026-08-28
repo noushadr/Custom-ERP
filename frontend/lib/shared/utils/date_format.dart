@@ -31,11 +31,47 @@ String formatMonthDay(String isoDate) {
   return '$month $day';
 }
 
+/// Formats how long someone has worked here since [isoDate] (their joining
+/// date) as e.g. "2 yrs 3 mos", "8 mos", or "Joined this month" — calendar-
+/// aware (not a flat 30-day month), relative to today.
+String formatTenure(String isoDate) {
+  final joined = DateTime.parse(isoDate);
+  final now = DateTime.now();
+
+  var years = now.year - joined.year;
+  var months = now.month - joined.month;
+  if (now.day < joined.day) months -= 1;
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  if (years < 0) return 'Joined today';
+  if (years == 0 && months == 0) return 'Joined this month';
+
+  final parts = <String>[
+    if (years > 0) '$years ${years == 1 ? 'yr' : 'yrs'}',
+    if (months > 0) '$months ${months == 1 ? 'mo' : 'mos'}',
+  ];
+  return parts.join(' ');
+}
+
 // Pakistan Standard Time is a fixed UTC+5 offset with no daylight saving, so
 // timestamps are shifted here directly rather than via DateTime.toLocal() —
 // which would instead reflect whichever timezone the viewing device is set
 // to, not the company's.
 const _karachiOffset = Duration(hours: 5);
+
+/// Formats a [DateTime] as a plain date (no time) as e.g. "Oct 03, 2026",
+/// always in Asia/Karachi regardless of the viewer's own device timezone —
+/// for showing just the day something happened.
+String formatDisplayDateOnly(DateTime dateTime) {
+  final karachi = (dateTime.isUtc ? dateTime : dateTime.toUtc()).add(
+    _karachiOffset,
+  );
+  final month = _monthNames[karachi.month - 1];
+  final day = karachi.day.toString().padLeft(2, '0');
+  return '$month $day, ${karachi.year}';
+}
 
 /// Formats a [DateTime] with time as e.g. "Oct 03, 2026, 3:41 PM", always in
 /// Asia/Karachi regardless of the viewer's own device timezone.
