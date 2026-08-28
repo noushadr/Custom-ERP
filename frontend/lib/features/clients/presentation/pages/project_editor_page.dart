@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../employee/application/employee_providers.dart';
-import '../../../employee/domain/entities/department.dart';
 import '../../../employee/domain/entities/employee.dart';
+import '../../../../shared/models/named_ref.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/client.dart';
 import '../../domain/entities/project.dart';
@@ -17,8 +17,27 @@ String _isoDate(DateTime date) =>
     '${date.month.toString().padLeft(2, '0')}-'
     '${date.day.toString().padLeft(2, '0')}';
 
+/// The distinct departments the given employees belong to — a project's
+/// departments ("Teams") are derived from whoever is assigned rather than
+/// picked separately, since an employee is already assigned to a
+/// department and picking both was redundant.
+Set<NamedRef> _departmentsFor(
+  List<Employee> employees,
+  Set<String> employeeIds,
+) {
+  final byId = <String, NamedRef>{};
+  for (final employee in employees) {
+    final department = employee.department;
+    if (employeeIds.contains(employee.id) && department != null) {
+      byId[department.id] = department;
+    }
+  }
+  return byId.values.toSet();
+}
+
 /// Create or edit a project: client, type/status, dates, SEO
-/// package/tracking details, and employee/department/service assignment.
+/// package/tracking details, and employee/service assignment (departments
+/// follow automatically from whichever employees are assigned).
 class ProjectEditorPage extends ConsumerStatefulWidget {
   const ProjectEditorPage({super.key, this.existingProject});
 
@@ -47,7 +66,6 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   DateTime? _endDate;
   DateTime? _renewalDate;
   late Set<String> _selectedEmployeeIds;
-  late Set<String> _selectedDepartmentIds;
   late Set<String> _selectedServiceIds;
 
   bool _submitting = false;
@@ -91,9 +109,6 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
         : null;
     _selectedEmployeeIds = {
       ...(existing?.assignedEmployees.map((e) => e.id) ?? const []),
-    };
-    _selectedDepartmentIds = {
-      ...(existing?.targetDepartments.map((d) => d.id) ?? const []),
     };
     _selectedServiceIds = {
       ...(existing?.services.map((s) => s.id) ?? const []),
@@ -143,6 +158,12 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
       _errorMessage = null;
     });
 
+    final employees = ref.read(employeeListProvider).value ?? const [];
+    final departmentIds = _departmentsFor(
+      employees,
+      _selectedEmployeeIds,
+    ).map((d) => d.id).toList();
+
     final repository = ref.read(clientsRepositoryProvider);
     try {
       final saved = _isEditing
@@ -163,7 +184,7 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               workingEmailAccount: _workingEmailAccountController.text.trim(),
               ahrefsAccount: _ahrefsAccountController.text.trim(),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
-              targetDepartmentIds: _selectedDepartmentIds.toList(),
+              targetDepartmentIds: departmentIds,
               serviceIds: _selectedServiceIds.toList(),
             )
           : await repository.createProject(
@@ -188,7 +209,7 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               ),
               ahrefsAccount: _emptyToNull(_ahrefsAccountController.text),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
-              targetDepartmentIds: _selectedDepartmentIds.toList(),
+              targetDepartmentIds: departmentIds,
               serviceIds: _selectedServiceIds.toList(),
             );
 
@@ -214,7 +235,6 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   Widget build(BuildContext context) {
     final clientsAsync = ref.watch(clientsListProvider(false));
     final employeesAsync = ref.watch(employeeListProvider);
-    final departmentsAsync = ref.watch(departmentsProvider);
     final servicesAsync = ref.watch(servicesListProvider(false));
 
     return Scaffold(
@@ -456,27 +476,32 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Teams (departments)',
+                      'Departments',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const SizedBox(height: 8),
-                    departmentsAsync.when(
-                      loading: () => const LinearProgressIndicator(),
-                      error: (_, _) =>
-                          const Text('Could not load departments.'),
-                      data: (departments) => _ChipMultiSelect<Department>(
-                        items: departments,
-                        idOf: (d) => d.id,
-                        labelOf: (d) => d.name,
-                        selectedIds: _selectedDepartmentIds,
-                        onToggled: (id, selected) => setState(() {
-                          if (selected) {
-                            _selectedDepartmentIds.add(id);
-                          } else {
-                            _selectedDepartmentIds.remove(id);
-                          }
-                        }),
-                      ),
+                    employeesAsync.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, _) => const SizedBox.shrink(),
+                      data: (employees) {
+                        final departments = _departmentsFor(
+                          employees,
+                          _selectedEmployeeIds,
+                        );
+                        final names = departments.map((d) => d.name).toList()
+                          ..sort();
+                        return Text(
+                          names.isEmpty
+                              ? 'Follows whichever employees are assigned above.'
+                              : names.join(', '),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: names.isEmpty
+                                    ? Theme.of(context).disabledColor
+                                    : null,
+                              ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     Text(
