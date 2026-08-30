@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 
-/// A compact stat tile: a large value over a label, on a background softly
-/// tinted with [color]. Used on the Dashboard and anywhere else a quick
-/// count/metric needs to be shown.
+/// A compact stat tile: a heading right under the icon, then a large value,
+/// on a background softly tinted with [color]. Used on the Dashboard and
+/// anywhere else a quick count/metric needs to be shown.
 class MetricCard extends StatelessWidget {
   const MetricCard({
     super.key,
@@ -13,7 +13,6 @@ class MetricCard extends StatelessWidget {
     this.icon,
     this.secondaryValue,
     this.valueFontSize,
-    this.labelFirst = false,
     this.valueSpans,
   });
 
@@ -39,26 +38,15 @@ class MetricCard extends StatelessWidget {
   /// a bracketed conversion) and would otherwise crowd the tile.
   final double? valueFontSize;
 
-  /// Puts [label] first as a prominent heading above [value], instead of
-  /// the default small caption below it — for a caller whose tiles read
-  /// better named-then-valued (e.g. "Total Revenue" above the figure)
-  /// rather than value-then-caption.
-  final bool labelFirst;
-
   @override
   Widget build(BuildContext context) {
     final labelText = Text(
       label,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: labelFirst
-          ? Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            )
-          : Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+      style: Theme.of(
+        context,
+      ).textTheme.titleSmall?.copyWith(color: AppColors.textPrimary),
     );
     final baseValueStyle = Theme.of(context).textTheme.headlineSmall?.copyWith(
       color: color,
@@ -91,7 +79,8 @@ class MetricCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
-          if (labelFirst) ...[labelText, const SizedBox(height: 4)],
+          labelText,
+          const SizedBox(height: 4),
           valueText,
           if (secondaryValue != null) ...[
             const SizedBox(height: 1),
@@ -102,7 +91,6 @@ class MetricCard extends StatelessWidget {
               ),
             ),
           ],
-          if (!labelFirst) ...[const SizedBox(height: 2), labelText],
         ],
       ),
     );

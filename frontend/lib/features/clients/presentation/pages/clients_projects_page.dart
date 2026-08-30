@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/country_short_code.dart';
+import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/permission_gate.dart';
 import '../../../../shared/widgets/top_breakdown_panel.dart';
 import '../../../authentication/application/auth_providers.dart';
@@ -136,25 +137,25 @@ class _SummaryRow extends ConsumerWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
-        _StatTile(
+        MetricCard(
           label: 'Total Clients',
           value: '${clients.length}',
           color: AppColors.primary,
           icon: Icons.business_outlined,
         ),
-        _StatTile(
+        MetricCard(
           label: 'Active Clients',
           value: '$activeClientsCount',
           color: AppColors.success,
           icon: Icons.verified_outlined,
         ),
-        _StatTile(
+        MetricCard(
           label: 'Monthly Retainers',
           value: '$retainerCount',
           color: AppColors.secondary,
           icon: Icons.event_repeat_outlined,
         ),
-        _StatTile(
+        MetricCard(
           label: 'One-Time Projects',
           value: '$oneTimeCount',
           color: AppColors.accentTeal,
@@ -218,54 +219,6 @@ class _ClientsBreakdownRow extends ConsumerWidget {
     ];
 
     return TopBreakdownRow(panels: panels);
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 150),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -726,19 +679,19 @@ class _HealthTab extends ConsumerWidget {
               spacing: 10,
               runSpacing: 10,
               children: [
-                _StatTile(
+                MetricCard(
                   label: 'Healthy',
                   value: '${summary.healthyCount}',
                   color: AppColors.success,
                   icon: Icons.favorite_border,
                 ),
-                _StatTile(
+                MetricCard(
                   label: 'Attention Required',
                   value: '${summary.attentionRequiredCount}',
                   color: AppColors.warning,
                   icon: Icons.warning_amber_outlined,
                 ),
-                _StatTile(
+                MetricCard(
                   label: 'At Risk',
                   value: '${summary.atRiskCount}',
                   color: AppColors.error,
