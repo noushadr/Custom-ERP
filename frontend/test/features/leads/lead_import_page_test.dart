@@ -96,6 +96,81 @@ void main() {
     });
   });
 
+  group('flagDuplicates', () {
+    test('flags a row whose phone matches an existing lead', () {
+      final parsed = parseImportText(
+        '2026-07-15\tJohn New\t\t+92 300 1234567',
+      );
+      final flagged = flagDuplicates(parsed, [
+        buildTestLead(fullName: 'Jane Existing', phone: '+923001234567'),
+      ]);
+
+      expect(flagged.single.isDuplicate, isTrue);
+      expect(
+        flagged.single.duplicateReason,
+        'Same phone as existing lead "Jane Existing"',
+      );
+    });
+
+    test(
+      'ignores phone formatting differences when comparing to an existing lead',
+      () {
+        final parsed = parseImportText('2026-07-15\tJohn New\t\t923001234567');
+        final flagged = flagDuplicates(parsed, [
+          buildTestLead(fullName: 'Jane Existing', phone: '+92-300-1234567'),
+        ]);
+
+        expect(flagged.single.isDuplicate, isTrue);
+      },
+    );
+
+    test('flags a row whose email matches an existing lead, case-insensitively', () {
+      final parsed = parseImportText(
+        '2026-07-15\tJohn New\t\t\tJANE@ACME.TEST',
+      );
+      final flagged = flagDuplicates(parsed, [
+        buildTestLead(fullName: 'Jane Existing', email: 'jane@acme.test'),
+      ]);
+
+      expect(flagged.single.isDuplicate, isTrue);
+      expect(
+        flagged.single.duplicateReason,
+        'Same email as existing lead "Jane Existing"',
+      );
+    });
+
+    test('flags the second of two rows in the same paste sharing a phone', () {
+      final parsed = parseImportText(
+        '2026-07-15\tJohn New\t\t+923001234567\n'
+        '2026-07-16\tJohn Duplicate\t\t+923001234567',
+      );
+      final flagged = flagDuplicates(parsed, const []);
+
+      expect(flagged[0].isDuplicate, isFalse);
+      expect(flagged[1].isDuplicate, isTrue);
+      expect(flagged[1].duplicateReason, 'Same phone as row 1 above');
+    });
+
+    test('never flags a row with neither phone nor email', () {
+      final parsed = parseImportText(
+        '2026-07-15\tJohn New\n2026-07-16\tJohn Also New',
+      );
+      final flagged = flagDuplicates(parsed, [
+        buildTestLead(fullName: 'Someone Else'),
+      ]);
+
+      expect(flagged.every((row) => !row.isDuplicate), isTrue);
+    });
+
+    test('passes error rows through unchanged', () {
+      final parsed = parseImportText('not a date\tJane Prospect');
+      final flagged = flagDuplicates(parsed, const []);
+
+      expect(flagged.single.isValid, isFalse);
+      expect(flagged.single.isDuplicate, isFalse);
+    });
+  });
+
   testWidgets('previews parsed rows as they are typed', (tester) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
@@ -136,6 +211,59 @@ void main() {
     expect(repository.lastImportedRows!.single.fullName, 'Jane Prospect');
     expect(find.text('Imported 1 lead.'), findsOneWidget);
   });
+
+  testWidgets(
+    'flags a possible duplicate against an existing lead, excludes it from '
+    'the import by default, and includes it once checked',
+    (tester) async {
+      final repository = FakeLeadsRepository(
+        leads: [
+          buildTestLead(fullName: 'Jane Existing', phone: '+923001234567'),
+        ],
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextField),
+        '2026-07-15\tJohn New\t\t+92 300 1234567',
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('1 row found — 0 ready to import, 1 possible duplicate (excluded by default).'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Same phone as existing lead "Jane Existing" — skipped'),
+        findsOneWidget,
+      );
+
+      final importButton = tester.widget<FilledButton>(
+        find.byType(FilledButton),
+      );
+      expect(importButton.onPressed, isNull);
+
+      final checkbox = find.byType(Checkbox);
+      await tester.ensureVisible(checkbox);
+      await tester.tap(checkbox);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Same phone as existing lead "Jane Existing" — will be imported'),
+        findsOneWidget,
+      );
+      expect(find.text('Import 1 Lead'), findsOneWidget);
+
+      final importNowButton = find.text('Import 1 Lead');
+      await tester.ensureVisible(importNowButton);
+      await tester.tap(importNowButton);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastImportedRows, hasLength(1));
+      expect(repository.lastImportedRows!.single.fullName, 'John New');
+    },
+  );
 
   testWidgets('the import button is disabled until at least one row is valid', (
     tester,

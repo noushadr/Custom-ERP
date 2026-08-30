@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/country_short_code.dart';
+import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/permission_gate.dart';
@@ -102,9 +103,9 @@ class LeadsPage extends ConsumerWidget {
             const SizedBox(height: 16),
             const _LeadsStatsRow(),
             const SizedBox(height: 16),
-            const _LeadsBreakdownRow(),
-            const SizedBox(height: 16),
             const _MonthlyLeadsChart(),
+            const SizedBox(height: 16),
+            const _LeadsBreakdownRow(),
             const SizedBox(height: 16),
             leadsAsync.when(
               loading: () => const SizedBox(
@@ -172,6 +173,7 @@ class _LeadsStatsRow extends ConsumerWidget {
 
     final newThisWeek = leads.where((l) => onOrAfter(l, weekAgo)).length;
     final newThisMonth = leads.where((l) => onOrAfter(l, monthStart)).length;
+    final lastLeadReceived = _lastLeadReceivedIso(leads);
 
     // Same selectors (and the same flag-formatted country grouping) as the
     // "Top Countries/Lead Sources" panels below, so these totals never
@@ -192,6 +194,14 @@ class _LeadsStatsRow extends ConsumerWidget {
           value: '${leads.length}',
           color: AppColors.primary,
           icon: Icons.person_search_outlined,
+        ),
+        MetricCard(
+          label: 'Last Lead Received',
+          value: lastLeadReceived != null
+              ? formatDisplayDate(lastLeadReceived)
+              : '—',
+          color: AppColors.success,
+          icon: Icons.event_available_outlined,
         ),
         MetricCard(
           label: 'New This Week',
@@ -220,6 +230,24 @@ class _LeadsStatsRow extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// The ISO 'YYYY-MM-DD' `leadDate` of the most recently received lead, or
+/// null if none parse — found directly rather than trusting `leads.first`,
+/// since that's only the newest by construction while `GET /leads` keeps
+/// returning its current sort order.
+String? _lastLeadReceivedIso(List<Lead> leads) {
+  String? latestIso;
+  DateTime? latestDate;
+  for (final lead in leads) {
+    final date = DateTime.tryParse(lead.leadDate);
+    if (date == null) continue;
+    if (latestDate == null || date.isAfter(latestDate)) {
+      latestDate = date;
+      latestIso = lead.leadDate;
+    }
+  }
+  return latestIso;
 }
 
 /// Count of distinct non-empty values `selector` returns across `items` —
@@ -290,9 +318,9 @@ class _MonthlyLeadsChart extends ConsumerWidget {
 
 String _formatMonthLabel(String monthKey) {
   final parts = monthKey.split('-');
-  final shortYear = parts[0].substring(2);
+  final year = parts[0];
   final monthIndex = int.parse(parts[1]) - 1;
-  return '${_kMonthAbbreviations[monthIndex]}\n$shortYear';
+  return '${_kMonthAbbreviations[monthIndex]}\n$year';
 }
 
 class _MonthBar extends StatelessWidget {
@@ -346,7 +374,7 @@ class _MonthBar extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             SizedBox(
-              width: 38,
+              width: 42,
               child: Text(
                 label,
                 textAlign: TextAlign.center,
