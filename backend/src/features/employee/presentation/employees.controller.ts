@@ -181,6 +181,17 @@ export class EmployeesController {
     return this.employeesService.getPayrollSummary();
   }
 
+  // Must come before @Get(':id') for the same reason as "audit-log" above.
+  // Same permission as the plain employee list (@Get() above), since this
+  // backs a delta shown right next to the Overview stats that list feeds.
+  @Get('stats/active-delta')
+  @Permissions('employees.read')
+  getActiveEmployeeDelta(@Query('days') days?: string) {
+    return this.employeesService.getActiveEmployeeDelta(
+      days ? parseInt(days, 10) : 7,
+    );
+  }
+
   @Get(':id')
   @Permissions('employees.read')
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {

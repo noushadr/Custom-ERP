@@ -72,6 +72,17 @@ final allPendingPerformanceReviewsProvider =
           .getAllPendingReviews();
     });
 
+/// How the company-wide pending-review count has changed over the last 7
+/// days — see `PerformanceReviewsService.getPendingReviewsDelta` for how
+/// "7 days ago" is reconstructed from `createdAt`/`completedAt` rather than
+/// a new snapshot.
+final pendingReviewsDeltaProvider = FutureProvider.autoDispose<int>((ref) {
+  ref.watch(authControllerProvider);
+  return ref
+      .watch(performanceReviewRepositoryProvider)
+      .getPendingReviewsDelta();
+});
+
 /// Every review that has completed the full workflow — company-wide.
 final finalizedPerformanceReviewsProvider =
     FutureProvider.autoDispose<List<PerformanceReview>>((ref) {

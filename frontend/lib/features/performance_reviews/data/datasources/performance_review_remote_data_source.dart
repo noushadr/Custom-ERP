@@ -124,6 +124,14 @@ class PerformanceReviewRemoteDataSource {
         .toList();
   }
 
+  Future<int> getPendingReviewsDelta({int days = 7}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/performance-reviews/pending-delta',
+      queryParameters: {'days': days},
+    );
+    return response.data!['delta'] as int;
+  }
+
   Future<List<PerformanceReviewModel>> getFinalizedReviews() async {
     final response = await _dio.get<List<dynamic>>(
       '/performance-reviews/finalized',

@@ -79,6 +79,10 @@ class PerformanceReviewRepositoryImpl implements PerformanceReviewRepository {
       _guard(() => _remoteDataSource.getAllPendingReviews());
 
   @override
+  Future<int> getPendingReviewsDelta({int days = 7}) =>
+      _guard(() => _remoteDataSource.getPendingReviewsDelta(days: days));
+
+  @override
   Future<List<PerformanceReview>> getFinalizedReviews() =>
       _guard(() => _remoteDataSource.getFinalizedReviews());
 

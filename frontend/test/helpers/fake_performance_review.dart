@@ -104,6 +104,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
     this.employeeReviews = const [],
     this.latestReviewSummaries = const [],
     this.allPendingReviews = const [],
+    this.pendingReviewsDelta = 0,
     this.finalizedReviews = const [],
     this.reviewById,
     this.dueCheckPreview = const [],
@@ -127,6 +128,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   final List<PerformanceReview> employeeReviews;
   final List<PerformanceReviewSummary> latestReviewSummaries;
   final List<PerformanceReview> allPendingReviews;
+  final int pendingReviewsDelta;
   final List<PerformanceReview> finalizedReviews;
   final PerformanceReview? reviewById;
   final List<Map<String, dynamic>> dueCheckPreview;
@@ -226,6 +228,10 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   @override
   Future<List<PerformanceReview>> getAllPendingReviews() async =>
       allPendingReviews;
+
+  @override
+  Future<int> getPendingReviewsDelta({int days = 7}) async =>
+      pendingReviewsDelta;
 
   @override
   Future<List<PerformanceReview>> getFinalizedReviews() async =>

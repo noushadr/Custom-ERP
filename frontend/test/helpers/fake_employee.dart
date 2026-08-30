@@ -141,11 +141,13 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.createAndAssignAssetError,
     this.updateAssetError,
     this.deleteAssetError,
+    this.activeEmployeeDelta = 0,
   }) : me = me ?? buildTestEmployee();
 
   final List<Employee> employees;
   final Employee me;
   final Object? getMeError;
+  final int activeEmployeeDelta;
   final List<UpcomingBirthday> upcomingBirthdays;
   final Object? getUpcomingBirthdaysError;
   final List<UpcomingWorkAnniversary> upcomingWorkAnniversaries;
@@ -252,6 +254,10 @@ class FakeEmployeeRepository implements EmployeeRepository {
           activeEmployeeCount: 0,
         );
   }
+
+  @override
+  Future<int> getActiveEmployeeDelta({int days = 7}) async =>
+      activeEmployeeDelta;
 
   @override
   Future<List<Employee>> getMyDirectReports() async => directReports;

@@ -55,6 +55,17 @@ export class TypeOrmPerformanceReviewRepository
       .getMany();
   }
 
+  countPendingAsOf(cutoff: Date): Promise<number> {
+    return this.repository
+      .createQueryBuilder('review')
+      .where('review.createdAt <= :cutoff', { cutoff })
+      .andWhere(
+        '(review.completedAt IS NULL OR review.completedAt > :cutoff)',
+        { cutoff },
+      )
+      .getCount();
+  }
+
   save(review: PerformanceReview): Promise<PerformanceReview> {
     return this.repository.save(review);
   }

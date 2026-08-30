@@ -44,6 +44,7 @@ Widget _authenticatedApp({
   FakeEmployeeRepository? employeeRepository,
   FakeRequestRepository? requestRepository,
   FakeTaskRepository? taskRepository,
+  FakeFreelancersRepository? freelancersRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -77,7 +78,7 @@ Widget _authenticatedApp({
       ),
       payrollRepositoryProvider.overrideWithValue(FakePayrollRepository()),
       freelancersRepositoryProvider.overrideWithValue(
-        FakeFreelancersRepository(),
+        freelancersRepository ?? FakeFreelancersRepository(),
       ),
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
     ],
@@ -187,6 +188,84 @@ void main() {
   );
 
   testWidgets(
+    "admin dashboard shows the Active tile's weekly delta",
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          employeeRepository: FakeEmployeeRepository(
+            employees: [buildTestEmployee(employmentStatus: 'active')],
+            activeEmployeeDelta: 1,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final activeCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Active'),
+      );
+      expect(activeCard.secondaryValue, '+1 in last 7 days');
+    },
+  );
+
+  testWidgets(
+    "shows a negative Active tile delta as e.g. '-1 in last 7 days'",
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          employeeRepository: FakeEmployeeRepository(
+            employees: [buildTestEmployee(employmentStatus: 'resigned')],
+            activeEmployeeDelta: -1,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final activeCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Active'),
+      );
+      expect(activeCard.secondaryValue, '-1 in last 7 days');
+    },
+  );
+
+  testWidgets(
+    "shows 'No change in last 7 days' for a zero Active tile delta",
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          employeeRepository: FakeEmployeeRepository(activeEmployeeDelta: 0),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final activeCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Active'),
+      );
+      expect(activeCard.secondaryValue, 'No change in last 7 days');
+    },
+  );
+
+  testWidgets(
     'admin dashboard shows monthly and daily payroll for an employees.manage holder',
     (WidgetTester tester) async {
       const admin = AuthUser(
@@ -263,6 +342,36 @@ void main() {
 
       expect(find.text('Pending Performance Reviews'), findsOneWidget);
       expect(find.text('2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "shows the Pending Performance Reviews tile's weekly delta "
+    '(e.g. 15 -> 14 shows -1)',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: ['performance.manage'],
+      );
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          performanceReviewRepository: FakePerformanceReviewRepository(
+            allPendingReviews: [buildTestPerformanceReview(id: 'review-1')],
+            pendingReviewsDelta: -1,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final pendingCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate(
+          (w) => w is MetricCard && w.label == 'Pending Performance Reviews',
+        ),
+      );
+      expect(pendingCard.secondaryValue, '-1 in last 7 days');
     },
   );
 
@@ -423,6 +532,54 @@ void main() {
     },
   );
 
+  testWidgets('shows Logs in the nav for a Super Admin', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: const AuthUser(
+          id: 'admin-1',
+          email: 'admin@zeracreative.com',
+          role: 'Super Admin',
+          permissions: [],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Logs'), findsOneWidget);
+  });
+
+  testWidgets('shows Logs in the nav for HR/Manager too', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: const AuthUser(
+          id: 'hr-1',
+          email: 'hr@zeracreative.com',
+          role: 'HR/Manager',
+          permissions: [],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // HR/Manager shares Logs with Super Admin, same as Clients & Projects
+    // and Payroll.
+    expect(find.text('Employees'), findsOneWidget);
+    expect(find.text('Logs'), findsOneWidget);
+  });
+
+  testWidgets('hides Logs from the nav for a plain employee', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_authenticatedApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Logs'), findsNothing);
+  });
+
   testWidgets(
     'shows Admin Business Management stats for a holder of every module '
     'permission',
@@ -448,6 +605,10 @@ void main() {
       expect(find.text('Latest Payroll Run'), findsOneWidget);
       expect(find.text('Draft'), findsOneWidget);
       expect(find.text('Total Freelancers'), findsOneWidget);
+      // A payroll.manage holder also sees the Work Mode section's own
+      // Freelancers tile (same active-freelancer count as Total Freelancers
+      // above, shown in a second place).
+      expect(find.text('Freelancers'), findsOneWidget);
     },
   );
 
@@ -471,6 +632,38 @@ void main() {
       expect(find.text('Active Projects'), findsNothing);
       expect(find.text('Latest Payroll Run'), findsNothing);
       expect(find.text('Total Freelancers'), findsNothing);
+      expect(find.text('Freelancers'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'the Work Mode Freelancers tile only counts active freelancers',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: const AuthUser(
+            id: 'admin-1',
+            email: 'admin@zeracreative.com',
+            role: 'Super Admin',
+            permissions: ['payroll.manage'],
+          ),
+          freelancersRepository: FakeFreelancersRepository(
+            freelancers: [
+              buildTestFreelancer(id: 'f1', isActive: true),
+              buildTestFreelancer(id: 'f2', isActive: true),
+              buildTestFreelancer(id: 'f3', isActive: false),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final freelancersCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate(
+          (w) => w is MetricCard && w.label == 'Freelancers',
+        ),
+      );
+      expect(freelancersCard.value, '2');
     },
   );
 

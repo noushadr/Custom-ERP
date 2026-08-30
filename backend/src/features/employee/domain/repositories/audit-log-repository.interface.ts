@@ -21,5 +21,14 @@ export interface AuditLogRepository {
    * the field label, old/new values, and the actor's name. */
   findAllPaginated(params: AuditLogSearchParams): Promise<AuditLogSearchResult>;
 
+  /** Every change to [fieldLabel] recorded on or after [since], oldest
+   * first — lets a caller reconstruct "what was this field's value as of
+   * [since]" per employee by taking the first entry per `employeeId` (its
+   * `oldValue` is the value immediately before the window started). */
+  findFieldChangesSince(
+    fieldLabel: string,
+    since: Date,
+  ): Promise<EmployeeAuditLog[]>;
+
   saveMany(entries: EmployeeAuditLog[]): Promise<EmployeeAuditLog[]>;
 }

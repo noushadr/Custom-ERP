@@ -55,6 +55,14 @@ final upcomingWorkAnniversariesProvider =
       return ref.watch(employeeRepositoryProvider).getUpcomingWorkAnniversaries();
     });
 
+/// How the company-wide active-employee count has changed over the last 7
+/// days — see `EmployeesService.getActiveEmployeeDelta` for how "7 days ago"
+/// is reconstructed from the existing audit log rather than a new snapshot.
+final employeeActiveDeltaProvider = FutureProvider.autoDispose<int>((ref) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getActiveEmployeeDelta();
+});
+
 final payrollSummaryProvider = FutureProvider.autoDispose<PayrollSummary>((
   ref,
 ) {

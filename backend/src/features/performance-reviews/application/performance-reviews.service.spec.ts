@@ -99,6 +99,7 @@ describe('PerformanceReviewsService', () => {
       findById: jest.fn(),
       findByStatus: jest.fn().mockResolvedValue([]),
       findLatestPerEmployee: jest.fn().mockResolvedValue([]),
+      countPendingAsOf: jest.fn().mockResolvedValue(0),
       save: jest.fn((item) => Promise.resolve(item)),
     };
     responseRepository = {
@@ -520,6 +521,49 @@ describe('PerformanceReviewsService', () => {
         PerformanceReviewStatus.PENDING,
       );
       expect(result).toHaveLength(2);
+    });
+  });
+
+  describe('getPendingReviewsDelta', () => {
+    it('is negative when reviews have been completed since the cutoff (15 -> 14 is -1)', async () => {
+      reviewRepository.findByStatus.mockResolvedValue(
+        Array.from({ length: 14 }, (_, i) =>
+          buildReview({ id: `review-${i}`, status: PerformanceReviewStatus.PENDING }),
+        ),
+      );
+      reviewRepository.countPendingAsOf.mockResolvedValue(15);
+
+      const result = await service.getPendingReviewsDelta(7);
+
+      expect(result).toEqual({ delta: -1 });
+    });
+
+    it('is positive when more reviews became due than were completed', async () => {
+      reviewRepository.findByStatus.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) =>
+          buildReview({ id: `review-${i}`, status: PerformanceReviewStatus.PENDING }),
+        ),
+      );
+      reviewRepository.countPendingAsOf.mockResolvedValue(3);
+
+      const result = await service.getPendingReviewsDelta(7);
+
+      expect(result).toEqual({ delta: 2 });
+    });
+
+    it('passes a cutoff roughly `days` ago to the repository', async () => {
+      reviewRepository.findByStatus.mockResolvedValue([]);
+      reviewRepository.countPendingAsOf.mockResolvedValue(0);
+
+      await service.getPendingReviewsDelta(7);
+
+      expect(reviewRepository.countPendingAsOf).toHaveBeenCalledTimes(1);
+      const cutoff = reviewRepository.countPendingAsOf.mock.calls[0][0];
+      const expectedCutoff = new Date();
+      expectedCutoff.setDate(expectedCutoff.getDate() - 7);
+      expect(
+        Math.abs(cutoff.getTime() - expectedCutoff.getTime()),
+      ).toBeLessThan(5000);
     });
   });
 

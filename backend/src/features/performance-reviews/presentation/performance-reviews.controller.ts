@@ -88,6 +88,16 @@ export class PerformanceReviewsController {
     return this.performanceReviewsService.getAllPendingReviews();
   }
 
+  // Must come before @Get(':id') below — otherwise "pending-delta" would be
+  // captured as the :id parameter instead of matching this route.
+  @Get('pending-delta')
+  @Permissions(PERMISSION)
+  getPendingReviewsDelta(@Query('days') days?: string) {
+    return this.performanceReviewsService.getPendingReviewsDelta(
+      days ? parseInt(days, 10) : 7,
+    );
+  }
+
   @Get('finalized')
   @Permissions(PERMISSION)
   getFinalizedReviews() {

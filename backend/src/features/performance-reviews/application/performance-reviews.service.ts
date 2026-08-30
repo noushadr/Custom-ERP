@@ -406,6 +406,25 @@ export class PerformanceReviewsService {
     return reviews.map(toPerformanceReviewResponse);
   }
 
+  /** How the company-wide pending-review count has changed over the last
+   * [days] days, for the Admin Dashboard's Overview stats — reconstructed
+   * from `createdAt`/`completedAt` rather than a separate snapshot table,
+   * the same "derive from what's already stored" approach as
+   * `EmployeesService.getActiveEmployeeDelta`. */
+  async getPendingReviewsDelta(days: number): Promise<{ delta: number }> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    const [pendingNow, pendingAsOfCutoff] = await Promise.all([
+      this.reviewRepository
+        .findByStatus(PerformanceReviewStatus.PENDING)
+        .then((reviews) => reviews.length),
+      this.reviewRepository.countPendingAsOf(cutoff),
+    ]);
+
+    return { delta: pendingNow - pendingAsOfCutoff };
+  }
+
   /** Every review that has completed the full workflow — rated and signed
    * off by HR/Admin — for a company-wide review-history view. */
   async getFinalizedReviews(): Promise<PerformanceReviewResponseDto[]> {

@@ -17,6 +17,7 @@ import 'features/employee/application/employee_providers.dart';
 import 'features/employee/presentation/pages/admin_dashboard_page.dart';
 import 'features/employee/presentation/pages/employee_directory_page.dart';
 import 'features/employee/presentation/pages/employee_profile_page.dart';
+import 'features/employee/presentation/pages/logs_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
 import 'features/financial_reports/presentation/pages/financial_reports_page.dart';
@@ -157,6 +158,11 @@ const _allDestinations = [
     icon: Icons.account_balance_outlined,
     selectedIcon: Icons.account_balance_outlined,
   ),
+  AppNavDestination(
+    label: 'Logs',
+    icon: Icons.history_outlined,
+    selectedIcon: Icons.history_outlined,
+  ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
@@ -170,6 +176,7 @@ const _adminOnlyLabels = {
   'Payroll',
   'Leads',
   'Financial Reports',
+  'Logs',
 };
 
 // Hidden from Super Admin/HR/Manager — they use Dashboard instead.
@@ -188,15 +195,19 @@ const _nonAdminOnlyLabels = {'User Dashboard'};
 // removed from seed.ts in the same change.
 const _superAdminOnlyLabels = {'Financial Reports', 'Leads'};
 
-// The other half of Admin Business Management: shared between Super Admin
-// and HR/Manager, but still off-limits to Team Lead/Employee (who are
-// already excluded via _adminOnlyLabels above). Used only to give the
-// Super Admin's own sidebar a third, distinctly-labeled group — see
-// ResponsiveScaffold.hrAdminSectionCount — so it's obvious at a glance which
-// modules are Super-Admin-exclusive vs. shared with HR/Manager vs. general.
+// Modules shared between Super Admin and HR/Manager, but still off-limits to
+// Team Lead/Employee (who are already excluded via _adminOnlyLabels above) —
+// the original two are Admin Business Management modules; 'Logs' (the
+// company-wide audit trail, formerly an Admin-Dashboard-only section) joined
+// 2026-08-30 and isn't part of that section, just the same access tier. Used
+// only to give the Super Admin's own sidebar a third, distinctly-labeled
+// group — see ResponsiveScaffold.hrAdminSectionCount — so it's obvious at a
+// glance which modules are Super-Admin-exclusive vs. shared with HR/Manager
+// vs. general.
 const _hrAndAdminOnlyLabels = {
   'Clients & Projects',
   'Payroll',
+  'Logs',
 };
 
 bool _isAdminOrHr(WidgetRef ref) {
@@ -316,6 +327,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const LeadsPage();
       case 'Financial Reports':
         return const FinancialReportsPage();
+      case 'Logs':
+        return const LogsPage();
       default:
         return _ComingSoon(destination: destination);
     }

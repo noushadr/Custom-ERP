@@ -44,7 +44,10 @@ const DEFAULT_PERMISSIONS = [
 // 2026-08-25) and 'leads.manage' (Leads, made Super-Admin-exclusive
 // 2026-08-28 per explicit instruction — previously shared with HR/Manager
 // since its 2026-08-23 launch) are both exceptions to that exception — each
-// is Super-Admin-only, deliberately absent from HR/Manager too.
+// is Super-Admin-only, deliberately absent from HR/Manager too. 'audit.viewAll'
+// (the company-wide change log, moved out of the Admin Dashboard into its own
+// "Logs" nav destination 2026-08-30) joined HR/Manager's grant the same day —
+// it had been Super-Admin-only since it was first built.
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
   { name: 'Super Admin', permissions: [] }, // always granted every known permission, see below
   {
@@ -54,6 +57,7 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'employees.read',
       'employees.manage',
       'departments.manage',
+      'audit.viewAll',
       'notices.manage',
       'leave.manage',
       'performance.manage',

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
 import { EmployeeAuditLog } from '../../domain/entities/employee-audit-log.entity';
 import {
   AuditLogRepository,
@@ -48,6 +48,16 @@ export class TypeOrmAuditLogRepository implements AuditLogRepository {
 
     const [items, total] = await query.getManyAndCount();
     return { items, total };
+  }
+
+  findFieldChangesSince(
+    fieldLabel: string,
+    since: Date,
+  ): Promise<EmployeeAuditLog[]> {
+    return this.repository.find({
+      where: { fieldLabel, createdAt: MoreThanOrEqual(since) },
+      order: { createdAt: 'ASC' },
+    });
   }
 
   saveMany(entries: EmployeeAuditLog[]): Promise<EmployeeAuditLog[]> {
