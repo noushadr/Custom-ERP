@@ -23,17 +23,6 @@ class RequestRepositoryImpl implements RequestRepository {
   );
 
   @override
-  Future<EmployeeRequest> submitItemRequest({
-    required String itemName,
-    required String purpose,
-  }) => _guard(
-    () => _remoteDataSource.submitItemRequest(
-      itemName: itemName,
-      purpose: purpose,
-    ),
-  );
-
-  @override
   Future<EmployeeRequest> submitProfileChangeRequest(
     Map<String, dynamic> changes,
   ) => _guard(() => _remoteDataSource.submitProfileChangeRequest(changes));

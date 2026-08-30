@@ -13,9 +13,13 @@ import '../../domain/entities/employee_request.dart';
 import '../../domain/exceptions/request_exception.dart';
 
 /// Consolidates everything about employee requests in one place: the
-/// viewer's own submitted requests (general, item, and profile-change), any
+/// viewer's own submitted requests (general and profile-change), any
 /// requests awaiting their approval as a reporting manager, and — for
-/// HR/Admin — requests awaiting the final HR/Admin decision.
+/// HR/Admin — requests awaiting the final HR/Admin decision. "Request an
+/// item" used to be a second, separate submission flow that skipped manager
+/// approval; it was merged into the one plain "New request" form 2026-08-30
+/// so there's a single feature (an item is just a Category value now), and
+/// every request goes through the same Manager-then-HR workflow.
 class RequestsPage extends ConsumerWidget {
   const RequestsPage({super.key});
 
@@ -104,15 +108,6 @@ class _MyRequestsSection extends ConsumerWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: () => showDialog<void>(
-                    context: context,
-                    builder: (_) => const _RequestItemDialog(),
-                  ),
-                  icon: const Icon(Icons.inventory_2_outlined, size: 16),
-                  label: const Text('Request an item'),
-                ),
-                const SizedBox(width: 8),
                 TextButton.icon(
                   onPressed: () => showDialog<void>(
                     context: context,
@@ -309,7 +304,7 @@ class _SubmitRequestDialogState extends ConsumerState<_SubmitRequestDialog> {
                 controller: _typeController,
                 decoration: const InputDecoration(
                   labelText: 'Category (optional)',
-                  hintText: 'e.g. Equipment, Document, Access',
+                  hintText: 'e.g. Item, Equipment, Document, Access',
                 ),
               ),
               const SizedBox(height: 12),
@@ -319,119 +314,6 @@ class _SubmitRequestDialogState extends ConsumerState<_SubmitRequestDialog> {
                 decoration: const InputDecoration(labelText: 'Description'),
                 validator: (value) =>
                     (value == null || value.isEmpty) ? 'Required' : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _submitting ? null : _submit,
-          child: _submitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Submit'),
-        ),
-      ],
-    );
-  }
-}
-
-class _RequestItemDialog extends ConsumerStatefulWidget {
-  const _RequestItemDialog();
-
-  @override
-  ConsumerState<_RequestItemDialog> createState() =>
-      _RequestItemDialogState();
-}
-
-class _RequestItemDialogState extends ConsumerState<_RequestItemDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _itemController = TextEditingController();
-  final _purposeController = TextEditingController();
-  bool _submitting = false;
-  String? _errorMessage;
-
-  @override
-  void dispose() {
-    _itemController.dispose();
-    _purposeController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _submitting = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await ref
-          .read(requestRepositoryProvider)
-          .submitItemRequest(
-            itemName: _itemController.text.trim(),
-            purpose: _purposeController.text.trim(),
-          );
-      ref.invalidate(myRequestsProvider);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-    } on RequestException catch (error) {
-      setState(() => _errorMessage = error.message);
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Request an item'),
-      content: SizedBox(
-        width: 420,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_errorMessage != null) ...[
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              TextFormField(
-                controller: _itemController,
-                decoration: const InputDecoration(
-                  labelText: 'Item needed',
-                  hintText: 'e.g. Stationery, a new keyboard',
-                ),
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty)
-                    ? 'Required'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _purposeController,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Purpose'),
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty)
-                    ? 'Required'
-                    : null,
               ),
             ],
           ),

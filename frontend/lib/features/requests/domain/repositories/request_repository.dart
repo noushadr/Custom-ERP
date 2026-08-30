@@ -8,13 +8,6 @@ abstract interface class RequestRepository {
     String? type,
   });
 
-  /// Item requests (e.g. stationery) skip the reporting-manager step and go
-  /// straight to HR/Admin.
-  Future<EmployeeRequest> submitItemRequest({
-    required String itemName,
-    required String purpose,
-  });
-
   /// A self-service profile edit submitted for HR/Admin approval instead of
   /// applied immediately. [changes] is the same partial-update shape used by
   /// [EmployeeRepository.updateMe] (only the fields being changed).

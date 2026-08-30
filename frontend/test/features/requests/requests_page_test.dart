@@ -75,32 +75,6 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
   });
 
-  testWidgets('submitting an item request calls the repository', (
-    tester,
-  ) async {
-    final requestRepository = FakeRequestRepository();
-    await tester.pumpWidget(_app(requestRepository: requestRepository));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Request an item'));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Item needed'),
-      'Stapler',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Purpose'),
-      'Mine broke.',
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
-    await tester.pumpAndSettle();
-
-    expect(requestRepository.lastItemName, 'Stapler');
-    expect(requestRepository.lastItemPurpose, 'Mine broke.');
-    expect(find.byType(AlertDialog), findsNothing);
-  });
-
   testWidgets('approving a pending request calls approveAsManager', (
     tester,
   ) async {
@@ -227,7 +201,6 @@ void main() {
 
       expect(find.text('My Requests'), findsNothing);
       expect(find.text('New request'), findsNothing);
-      expect(find.text('Request an item'), findsNothing);
       // A Super Admin still needs to see and act on everyone else's requests.
       expect(find.text('Requests Awaiting HR Approval'), findsOneWidget);
     },
