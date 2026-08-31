@@ -145,4 +145,39 @@ void main() {
     expect(find.text('In Progress'), findsOneWidget);
     expect(find.text('Medium'), findsOneWidget);
   });
+
+  testWidgets('shows who assigned each task', (tester) async {
+    final repository = FakeTaskRepository(
+      myTasks: [buildTestTask(assignedByName: 'Nauman Meghani')],
+    );
+
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Assigned by Nauman Meghani'), findsOneWidget);
+  });
+
+  testWidgets(
+    'changing status from the row calls the repository directly, without '
+    "opening the task's detail page",
+    (tester) async {
+      final repository = FakeTaskRepository(
+        myTasks: [buildTestTask(status: TaskStatus.todo)],
+      );
+
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('To Do'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('In Progress').last);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastStatusUpdatedId, 'task-1');
+      expect(repository.lastStatusUpdatedStatus, TaskStatus.inProgress);
+      // Still on the list — no task detail AppBar ("Task") was pushed.
+      expect(find.text('Task'), findsNothing);
+    },
+  );
 }

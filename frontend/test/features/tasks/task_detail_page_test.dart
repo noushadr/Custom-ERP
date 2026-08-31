@@ -139,6 +139,61 @@ void main() {
     expect(find.text('Edit'), findsOneWidget);
   });
 
+  testWidgets('shows the Edit button for a tasks.manage holder', (
+    tester,
+  ) async {
+    final repository = FakeTaskRepository(
+      taskById: buildTestTask(assignedByUserId: 'someone-else'),
+    );
+
+    await tester.pumpWidget(
+      _app(
+        user: const AuthUser(
+          id: 'admin-1',
+          email: 'admin@zeracreative.com',
+          role: 'Super Admin',
+          permissions: ['tasks.manage'],
+        ),
+        repository: repository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Neither this task's assigner nor its assignee's department head —
+    // tasks.manage alone is what grants Edit here.
+    expect(find.text('Edit'), findsOneWidget);
+  });
+
+  testWidgets(
+    "shows the Edit button for the assignee's department head (a Team Lead) "
+    'without tasks.manage',
+    (tester) async {
+      final repository = FakeTaskRepository(
+        taskById: buildTestTask(
+          assigneeEmployeeId: 'employee-1',
+          assignedByUserId: 'someone-else',
+          departmentId: 'dept-1',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          departments: const [
+            Department(
+              id: 'dept-1',
+              name: 'Engineering',
+              headEmployeeId: 'employee-1',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit'), findsOneWidget);
+    },
+  );
+
   testWidgets('hides the Edit button for a plain assignee viewer', (
     tester,
   ) async {

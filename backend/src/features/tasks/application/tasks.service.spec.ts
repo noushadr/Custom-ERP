@@ -575,6 +575,79 @@ describe('TasksService', () => {
     });
   });
 
+  describe('updateTask', () => {
+    it('lets a tasks.manage holder (admin/HR) edit the task', async () => {
+      const task = buildTask({ title: 'Old title' });
+      taskRepository.findById.mockResolvedValue(task);
+
+      const result = await service.updateTask(
+        'task-1',
+        { title: 'New title' },
+        'admin-user-1',
+        true,
+      );
+
+      expect(result.title).toBe('New title');
+    });
+
+    it("lets the task's own assigner edit it without tasks.manage", async () => {
+      const task = buildTask({
+        title: 'Old title',
+        assignedByUserId: 'manager-1',
+      });
+      taskRepository.findById.mockResolvedValue(task);
+
+      const result = await service.updateTask(
+        'task-1',
+        { title: 'New title' },
+        'manager-1',
+        false,
+      );
+
+      expect(result.title).toBe('New title');
+    });
+
+    it("lets the assignee's department head (a Team Lead) edit it without tasks.manage", async () => {
+      const task = buildTask({ title: 'Old title' });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'head-1' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+      ]);
+
+      const result = await service.updateTask(
+        'task-1',
+        { title: 'New title' },
+        'head-user-1',
+        false,
+      );
+
+      expect(result.title).toBe('New title');
+    });
+
+    it('rejects an unrelated employee (not assigner, department head, or tasks.manage)', async () => {
+      const task = buildTask({ assignedByUserId: 'manager-1' });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'stranger-1', departmentId: 'dept-2' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: null }),
+      ]);
+
+      await expect(
+        service.updateTask(
+          'task-1',
+          { title: 'New title' },
+          'stranger-user-1',
+          false,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
   describe('project linking', () => {
     it('links a new task to a project on create', async () => {
       employeeRepository.findByUserId.mockResolvedValue(
