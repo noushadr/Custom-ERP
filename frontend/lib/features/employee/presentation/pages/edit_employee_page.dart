@@ -11,8 +11,6 @@ import '../widgets/employee_avatar.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 
-final _companyEmailRegExp = RegExp(r'^[a-z]+\.[a-z]+@zeracreative\.com$');
-
 const _employmentTypes = {
   'full_time': 'Full-time',
   'part_time': 'Part-time',
@@ -347,7 +345,6 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                           enabled: !isSubmitting,
                           decoration: const InputDecoration(
                             labelText: 'Company email',
-                            hintText: 'firstname.lastname@zeracreative.com',
                           ),
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) {
@@ -355,9 +352,12 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                             if (trimmed.isEmpty) {
                               return 'Company email is required';
                             }
-                            return _companyEmailRegExp.hasMatch(trimmed)
+                            final emailRegExp = RegExp(
+                              r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$',
+                            );
+                            return emailRegExp.hasMatch(trimmed)
                                 ? null
-                                : 'Must match firstname.lastname@zeracreative.com';
+                                : 'Enter a valid email address';
                           },
                         ),
                       ],
