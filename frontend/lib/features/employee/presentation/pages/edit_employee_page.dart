@@ -352,12 +352,13 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                             if (trimmed.isEmpty) {
                               return 'Company email is required';
                             }
-                            final emailRegExp = RegExp(
-                              r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$',
+                            final domainEmailRegExp = RegExp(
+                              r'^[\w.+-]+@zeracreative\.com$',
+                              caseSensitive: false,
                             );
-                            return emailRegExp.hasMatch(trimmed)
+                            return domainEmailRegExp.hasMatch(trimmed)
                                 ? null
-                                : 'Enter a valid email address';
+                                : 'Must be a @zeracreative.com email';
                           },
                         ),
                       ],
