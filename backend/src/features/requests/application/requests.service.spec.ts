@@ -114,36 +114,6 @@ describe('RequestsService', () => {
     });
   });
 
-  describe('submitItemRequest', () => {
-    it('creates a MANAGER_APPROVED request, skipping the manager step', async () => {
-      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
-      requestRepository.save.mockImplementation((r) => Promise.resolve(r));
-      requestRepository.findById.mockImplementation((id) =>
-        Promise.resolve(
-          buildRequest({
-            id,
-            status: RequestStatus.MANAGER_APPROVED,
-            kind: RequestKind.ITEM,
-          }),
-        ),
-      );
-
-      const result = await service.submitItemRequest('user-1', {
-        itemName: 'Stapler',
-        purpose: 'My old one broke.',
-      });
-
-      expect(requestRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          employeeId: 'employee-1',
-          kind: RequestKind.ITEM,
-          status: RequestStatus.MANAGER_APPROVED,
-        }),
-      );
-      expect(result.status).toBe(RequestStatus.MANAGER_APPROVED);
-    });
-  });
-
   describe('submitProfileChangeRequest', () => {
     it('throws BadRequestException when nothing actually changed', async () => {
       employeeRepository.findByUserId.mockResolvedValue(buildEmployee());

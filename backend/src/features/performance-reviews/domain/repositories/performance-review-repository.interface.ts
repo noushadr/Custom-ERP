@@ -20,5 +20,12 @@ export interface PerformanceReviewRepository {
    * shouldn't pay for a full snapshot join per employee. */
   findLatestPerEmployee(): Promise<PerformanceReview[]>;
 
+  /** Count of reviews that were still pending as of [cutoff]: created on or
+   * before it, and either never completed or completed after it. Lets a
+   * caller compute a "pending count N days ago" baseline without a separate
+   * snapshot table — `completedAt` is a one-way marker (a review never goes
+   * back to pending once set), so this is exact, not an approximation. */
+  countPendingAsOf(cutoff: Date): Promise<number>;
+
   save(review: PerformanceReview): Promise<PerformanceReview>;
 }

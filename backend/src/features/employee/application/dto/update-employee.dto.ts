@@ -16,9 +16,8 @@ import { UpdateMyProfileDto } from './update-my-profile.dto';
 export class UpdateEmployeeDto extends UpdateMyProfileDto {
   @IsOptional()
   @IsEmail()
-  @Matches(/^[a-z]+\.[a-z]+@zeracreative\.com$/, {
-    message:
-      'Company email must match the firstname.lastname@zeracreative.com format',
+  @Matches(/^[^\s@]+@zeracreative\.com$/i, {
+    message: 'Company email must be a @zeracreative.com address',
   })
   companyEmail?: string;
 

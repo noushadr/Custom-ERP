@@ -32,7 +32,9 @@ export class EmployeeRequest extends BaseEntity {
   status: RequestStatus;
 
   /** GENERAL requests go through the reporting-manager step; PROFILE_CHANGE
-   * and ITEM requests skip it and are created directly as MANAGER_APPROVED. */
+   * requests skip it and are created directly as MANAGER_APPROVED. (ITEM
+   * used to skip it the same way, but that kind is no longer created — see
+   * RequestKind.ITEM.) */
   @Column({
     type: 'enum',
     enum: RequestKind,

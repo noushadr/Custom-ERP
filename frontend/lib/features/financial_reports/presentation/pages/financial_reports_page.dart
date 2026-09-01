@@ -303,7 +303,6 @@ class _MoneyMetricCard extends StatelessWidget {
       // carry a full precise PKR figure plus its USD equivalent, which
       // runs much longer, so it's sized down to still read comfortably.
       valueFontSize: 16,
-      labelFirst: true,
     );
   }
 }
@@ -406,7 +405,6 @@ class _SummaryStatsRow extends StatelessWidget {
               // Matches the money tiles' size for visual consistency across
               // the row.
               valueFontSize: 16,
-              labelFirst: true,
             ),
           ],
         ),

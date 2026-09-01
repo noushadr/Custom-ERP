@@ -47,6 +47,10 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(() => _remoteDataSource.getPayrollSummary());
 
   @override
+  Future<int> getActiveEmployeeDelta({int days = 7}) =>
+      _guard(() => _remoteDataSource.getActiveEmployeeDelta(days: days));
+
+  @override
   Future<List<Employee>> getMyDirectReports() =>
       _guard(() => _remoteDataSource.getMyDirectReports());
 

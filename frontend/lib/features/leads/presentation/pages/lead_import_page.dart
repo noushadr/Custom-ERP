@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../application/leads_providers.dart';
+import '../../domain/entities/lead.dart';
 import '../../domain/entities/lead_import_row.dart';
 import '../../domain/exceptions/lead_exception.dart';
 
@@ -37,15 +38,25 @@ const _kImportColumnOrder = [
 ];
 
 /// One parsed line from the paste box: either a ready-to-send [row], or an
-/// [error] explaining why it was skipped. Never both.
+/// [error] explaining why it was skipped. Never both. A valid row can also
+/// carry a [duplicateReason] — set by [flagDuplicates], never by parsing
+/// itself, since checking for duplicates needs the already-loaded list of
+/// existing leads that the parser has no access to.
 class ParsedImportRow {
-  const ParsedImportRow({required this.raw, this.row, this.error});
+  const ParsedImportRow({
+    required this.raw,
+    this.row,
+    this.error,
+    this.duplicateReason,
+  });
 
   final List<String> raw;
   final LeadImportRow? row;
   final String? error;
+  final String? duplicateReason;
 
   bool get isValid => row != null;
+  bool get isDuplicate => duplicateReason != null;
 
   /// The full-name cell, for display in the preview list — falls back to a
   /// row index label when even that couldn't be read.
@@ -97,6 +108,76 @@ ParsedImportRow _parseImportLine(String line) {
   );
 }
 
+/// Flags each valid row in [rows] whose phone or email (normalized) matches
+/// either an existing lead already in the system or an earlier row in this
+/// same paste — a soft, informational check rather than a hard block. Rows
+/// with neither phone nor email can't be checked and are never flagged. An
+/// existing-lead match is checked before a within-batch match so the
+/// reported reason always points at the more useful match when both apply.
+List<ParsedImportRow> flagDuplicates(
+  List<ParsedImportRow> rows,
+  List<Lead> existingLeads,
+) {
+  final existingPhones = <String, Lead>{};
+  final existingEmails = <String, Lead>{};
+  for (final lead in existingLeads) {
+    final phoneKey = _normalizedPhoneKey(lead.phone);
+    if (phoneKey != null) existingPhones.putIfAbsent(phoneKey, () => lead);
+    final emailKey = _normalizedEmailKey(lead.email);
+    if (emailKey != null) existingEmails.putIfAbsent(emailKey, () => lead);
+  }
+
+  final seenPhones = <String, int>{};
+  final seenEmails = <String, int>{};
+
+  final result = <ParsedImportRow>[];
+  for (var i = 0; i < rows.length; i++) {
+    final row = rows[i];
+    if (!row.isValid) {
+      result.add(row);
+      continue;
+    }
+
+    final phoneKey = _normalizedPhoneKey(row.row!.phone);
+    final emailKey = _normalizedEmailKey(row.row!.email);
+    String? reason;
+
+    if (phoneKey != null && existingPhones.containsKey(phoneKey)) {
+      reason =
+          'Same phone as existing lead "${existingPhones[phoneKey]!.fullName}"';
+    } else if (emailKey != null && existingEmails.containsKey(emailKey)) {
+      reason =
+          'Same email as existing lead "${existingEmails[emailKey]!.fullName}"';
+    } else if (phoneKey != null && seenPhones.containsKey(phoneKey)) {
+      reason = 'Same phone as row ${seenPhones[phoneKey]! + 1} above';
+    } else if (emailKey != null && seenEmails.containsKey(emailKey)) {
+      reason = 'Same email as row ${seenEmails[emailKey]! + 1} above';
+    }
+
+    if (phoneKey != null) seenPhones.putIfAbsent(phoneKey, () => i);
+    if (emailKey != null) seenEmails.putIfAbsent(emailKey, () => i);
+
+    result.add(
+      ParsedImportRow(raw: row.raw, row: row.row, duplicateReason: reason),
+    );
+  }
+  return result;
+}
+
+/// Strips everything but digits so formatting differences ("+1 555-0100" vs
+/// "15550100") don't hide a real match — purely a comparison key, never
+/// stored or displayed.
+String? _normalizedPhoneKey(String? phone) {
+  if (phone == null) return null;
+  final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+  return digits.isEmpty ? null : digits;
+}
+
+String? _normalizedEmailKey(String? email) {
+  final trimmed = email?.trim().toLowerCase();
+  return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+}
+
 /// Tries ISO-ish formats first (`DateTime.tryParse` covers `yyyy-MM-dd` and
 /// friends), then falls back to the "MMM D, YYYY" shape (e.g. "Jul 15,
 /// 2026") used by every real lead dataset imported into this app so far.
@@ -129,9 +210,12 @@ String _isoDate(DateTime date) =>
 
 /// Bulk-import entry point for the Leads module: paste tab-separated rows
 /// (as copied out of Excel/Google Sheets) in a fixed column order, preview
-/// which parsed cleanly, then send only the valid rows in one request. No
-/// deduplication — every valid row becomes a new lead, matching how every
-/// past real-data batch has been imported into this app.
+/// which parsed cleanly, then send only the valid, non-duplicate rows in one
+/// request. A row is flagged as a possible duplicate — and excluded from the
+/// import by default — when its phone or email matches an existing lead
+/// already in the system, or an earlier row in the same paste (see
+/// [flagDuplicates]); the preview lets the user check a flagged row to
+/// import it anyway, e.g. two different people who share a household phone.
 class LeadImportPage extends ConsumerStatefulWidget {
   const LeadImportPage({super.key});
 
@@ -142,6 +226,7 @@ class LeadImportPage extends ConsumerStatefulWidget {
 class _LeadImportPageState extends ConsumerState<LeadImportPage> {
   final _textController = TextEditingController();
   List<ParsedImportRow> _parsed = const [];
+  final Set<int> _includedDespiteDuplicate = {};
   bool _importing = false;
   String? _errorMessage;
   int? _importedCount;
@@ -155,8 +240,17 @@ class _LeadImportPageState extends ConsumerState<LeadImportPage> {
   void _onTextChanged(String text) {
     setState(() {
       _parsed = parseImportText(text);
+      _includedDespiteDuplicate.clear();
       _importedCount = null;
       _errorMessage = null;
+    });
+  }
+
+  void _toggleDuplicate(int index) {
+    setState(() {
+      if (!_includedDespiteDuplicate.remove(index)) {
+        _includedDespiteDuplicate.add(index);
+      }
     });
   }
 
@@ -181,11 +275,17 @@ class _LeadImportPageState extends ConsumerState<LeadImportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final existingLeads = ref.watch(leadsListProvider).value ?? const <Lead>[];
+    final flagged = flagDuplicates(_parsed, existingLeads);
+
     final validRows = [
-      for (final row in _parsed)
-        if (row.row != null) row.row!,
+      for (var i = 0; i < flagged.length; i++)
+        if (flagged[i].isValid &&
+            (!flagged[i].isDuplicate || _includedDespiteDuplicate.contains(i)))
+          flagged[i].row!,
     ];
-    final errorCount = _parsed.length - validRows.length;
+    final errorCount = flagged.where((row) => !row.isValid).length;
+    final duplicateCount = flagged.where((row) => row.isDuplicate).length;
     final imported = _importedCount;
 
     return Scaffold(
@@ -218,9 +318,15 @@ class _LeadImportPageState extends ConsumerState<LeadImportPage> {
                           ),
                         ),
                       ),
-                      if (_parsed.isNotEmpty) ...[
+                      if (flagged.isNotEmpty) ...[
                         const SizedBox(height: 16),
-                        _ImportPreview(parsed: _parsed, errorCount: errorCount),
+                        _ImportPreview(
+                          parsed: flagged,
+                          errorCount: errorCount,
+                          duplicateCount: duplicateCount,
+                          includedDespiteDuplicate: _includedDespiteDuplicate,
+                          onToggleDuplicate: _toggleDuplicate,
+                        ),
                       ],
                       const SizedBox(height: 20),
                       Align(
@@ -268,7 +374,10 @@ class _ImportInstructions extends StatelessWidget {
           'Paste rows copied from Excel or Google Sheets — one lead per line, '
           'columns in this order: ${_kImportColumnOrder.join(', ')}. '
           'Date and Full Name are required; leave any other cell blank if it '
-          "doesn't apply.",
+          "doesn't apply. A row whose phone or email matches an existing "
+          'lead (or another row in this paste) is flagged as a possible '
+          'duplicate and excluded by default — check it in the preview to '
+          'import it anyway.',
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
@@ -286,14 +395,25 @@ class _ImportInstructions extends StatelessWidget {
 }
 
 class _ImportPreview extends StatelessWidget {
-  const _ImportPreview({required this.parsed, required this.errorCount});
+  const _ImportPreview({
+    required this.parsed,
+    required this.errorCount,
+    required this.duplicateCount,
+    required this.includedDespiteDuplicate,
+    required this.onToggleDuplicate,
+  });
 
   final List<ParsedImportRow> parsed;
   final int errorCount;
+  final int duplicateCount;
+  final Set<int> includedDespiteDuplicate;
+  final ValueChanged<int> onToggleDuplicate;
 
   @override
   Widget build(BuildContext context) {
     final validCount = parsed.length - errorCount;
+    final importCount =
+        validCount - duplicateCount + includedDespiteDuplicate.length;
     return FormSection(
       title: 'Preview',
       child: Column(
@@ -301,8 +421,11 @@ class _ImportPreview extends StatelessWidget {
         children: [
           Text(
             '${parsed.length} row${parsed.length == 1 ? '' : 's'} found — '
-            '$validCount ready to import'
-            '${errorCount > 0 ? ', $errorCount with errors (skipped)' : ''}.',
+            '$importCount ready to import'
+            '${errorCount > 0 ? ', $errorCount with errors (skipped)' : ''}'
+            '${duplicateCount > 0 ? ', $duplicateCount possible duplicate'
+                  '${duplicateCount == 1 ? '' : 's'} (excluded by default)' : ''}'
+            '.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -315,6 +438,29 @@ class _ImportPreview extends StatelessWidget {
               itemCount: parsed.length,
               itemBuilder: (context, index) {
                 final row = parsed[index];
+
+                if (row.isDuplicate) {
+                  final included = includedDespiteDuplicate.contains(index);
+                  return CheckboxListTile(
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: included,
+                    onChanged: (_) => onToggleDuplicate(index),
+                    secondary: const Icon(
+                      Icons.content_copy_outlined,
+                      color: AppColors.warning,
+                      size: 18,
+                    ),
+                    title: Text(row.displayName(index)),
+                    subtitle: Text(
+                      '${row.duplicateReason!} — '
+                      '${included ? 'will be imported' : 'skipped'}',
+                      style: const TextStyle(color: AppColors.warning),
+                    ),
+                  );
+                }
+
                 return ListTile(
                   dense: true,
                   visualDensity: VisualDensity.compact,

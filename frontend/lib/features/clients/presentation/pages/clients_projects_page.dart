@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/country_short_code.dart';
+import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/permission_gate.dart';
 import '../../../../shared/widgets/top_breakdown_panel.dart';
 import '../../../authentication/application/auth_providers.dart';
@@ -136,25 +137,25 @@ class _SummaryRow extends ConsumerWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
-        _StatTile(
+        MetricCard(
           label: 'Total Clients',
           value: '${clients.length}',
           color: AppColors.primary,
           icon: Icons.business_outlined,
         ),
-        _StatTile(
+        MetricCard(
           label: 'Active Clients',
           value: '$activeClientsCount',
           color: AppColors.success,
           icon: Icons.verified_outlined,
         ),
-        _StatTile(
+        MetricCard(
           label: 'Monthly Retainers',
           value: '$retainerCount',
           color: AppColors.secondary,
           icon: Icons.event_repeat_outlined,
         ),
-        _StatTile(
+        MetricCard(
           label: 'One-Time Projects',
           value: '$oneTimeCount',
           color: AppColors.accentTeal,
@@ -165,9 +166,11 @@ class _SummaryRow extends ConsumerWidget {
   }
 }
 
-/// Three "top N" categorical breakdowns for the whole module — countries
-/// and lead source come from `Client`, services from every `Project`'s
-/// assigned services — each its own panel with one representative hue,
+/// Four "top N" categorical breakdowns for the whole module — countries,
+/// lead source, and industry come from `Client`, services from every
+/// `Project`'s assigned services — each its own panel with one
+/// representative hue (reused across panels freely, since each is an
+/// independent magnitude breakdown, not one shared categorical legend),
 /// mirroring the Leads page's identical breakdown row (shared widgets, see
 /// `top_breakdown_panel.dart`).
 class _ClientsBreakdownRow extends ConsumerWidget {
@@ -207,57 +210,15 @@ class _ClientsBreakdownRow extends ConsumerWidget {
         color: AppColors.accentTeal,
         counts: computeTopCounts(clients, (c) => c.leadSource),
       ),
+      TopBreakdownPanel(
+        title: 'Top Industries',
+        icon: Icons.category_outlined,
+        color: AppColors.primary,
+        counts: computeTopCounts(clients, (c) => c.industry),
+      ),
     ];
 
     return TopBreakdownRow(panels: panels);
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 150),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -718,19 +679,19 @@ class _HealthTab extends ConsumerWidget {
               spacing: 10,
               runSpacing: 10,
               children: [
-                _StatTile(
+                MetricCard(
                   label: 'Healthy',
                   value: '${summary.healthyCount}',
                   color: AppColors.success,
                   icon: Icons.favorite_border,
                 ),
-                _StatTile(
+                MetricCard(
                   label: 'Attention Required',
                   value: '${summary.attentionRequiredCount}',
                   color: AppColors.warning,
                   icon: Icons.warning_amber_outlined,
                 ),
-                _StatTile(
+                MetricCard(
                   label: 'At Risk',
                   value: '${summary.atRiskCount}',
                   color: AppColors.error,

@@ -95,9 +95,13 @@ void main() {
     expect(find.text('Monthly Retainers'), findsOneWidget);
     expect(find.text('One-Time Projects'), findsOneWidget);
     // Total Clients: 2, Active Clients: 1 (only Acme Co has an active
-    // project), Monthly Retainers: 1, One-Time Projects: 1.
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('1'), findsNWidgets(3));
+    // project), Monthly Retainers: 1, One-Time Projects: 1. Scoped to the
+    // stat tiles' own Wrap — the "Top Industries" breakdown panel below
+    // also renders plain digit counts (both test clients default to the
+    // same "Retail" industry), so a bare `find.text` isn't unique anymore.
+    final statTiles = find.byType(Wrap).first;
+    expect(find.descendant(of: statTiles, matching: find.text('2')), findsOneWidget);
+    expect(find.descendant(of: statTiles, matching: find.text('1')), findsNWidgets(3));
   });
 
   testWidgets(
@@ -114,18 +118,21 @@ void main() {
                 companyName: 'Acme Co',
                 country: 'Pakistan',
                 leadSource: 'Whatsapp',
+                industry: 'E-commerce',
               ),
               buildTestClient(
                 id: 'c2',
                 companyName: 'Beta LLC',
                 country: 'saudia',
                 leadSource: 'Referral',
+                industry: 'Healthcare',
               ),
               buildTestClient(
                 id: 'c3',
                 companyName: 'Gamma Inc',
                 country: 'Pakistan',
                 leadSource: 'Whatsapp',
+                industry: 'E-commerce',
               ),
             ],
             projects: [
@@ -156,11 +163,12 @@ void main() {
       expect(find.text('Top Countries'), findsOneWidget);
       expect(find.text('Top Services'), findsOneWidget);
       expect(find.text('Top Lead Sources'), findsOneWidget);
+      expect(find.text('Top Industries'), findsOneWidget);
 
       // Scoped to each panel specifically — the Projects/Clients tables
-      // below now also show countries/services/lead sources as plain
-      // columns, so these values legitimately appear more than once on
-      // screen.
+      // below now also show countries/services/lead sources/industries as
+      // plain columns, so these values legitimately appear more than once
+      // on screen.
       // 2 clients are in Pakistan (flag + short code), 1 in Saudi Arabia.
       expect(_inPanel('Top Countries', '🇵🇰 PK'), findsOneWidget);
       expect(_inPanel('Top Countries', '🇸🇦 KSA'), findsOneWidget);
@@ -170,6 +178,9 @@ void main() {
       // 2 clients came via Whatsapp, 1 via Referral.
       expect(_inPanel('Top Lead Sources', 'Whatsapp'), findsOneWidget);
       expect(_inPanel('Top Lead Sources', 'Referral'), findsOneWidget);
+      // 2 clients are E-commerce, 1 is Healthcare.
+      expect(_inPanel('Top Industries', 'E-commerce'), findsOneWidget);
+      expect(_inPanel('Top Industries', 'Healthcare'), findsOneWidget);
     },
   );
 
@@ -269,8 +280,9 @@ void main() {
       // table also derives from this same client's country, so the flag
       // code legitimately appears twice on screen.
       expect(find.text('🇵🇰 PK'), findsWidgets);
-      expect(find.text('E-commerce'), findsOneWidget);
-      // Also mirrored in the "Top Lead Sources" breakdown panel above.
+      // Also mirrored in the "Top Industries"/"Top Lead Sources" breakdown
+      // panels above.
+      expect(find.text('E-commerce'), findsWidgets);
       expect(find.text('Referral'), findsWidgets);
     },
   );

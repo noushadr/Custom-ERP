@@ -47,6 +47,11 @@ abstract interface class PerformanceReviewRepository {
   /// completion — not filtered to the caller's own direct reports.
   Future<List<PerformanceReview>> getAllPendingReviews();
 
+  /// How the company-wide pending-review count has changed over the last
+  /// [days] days (e.g. -1 once a review that was pending gets completed).
+  /// Requires `performance.manage`.
+  Future<int> getPendingReviewsDelta({int days = 7});
+
   /// Requires `performance.manage`. Every review that has completed the
   /// full workflow (rated and signed off by HR/Admin), company-wide.
   Future<List<PerformanceReview>> getFinalizedReviews();

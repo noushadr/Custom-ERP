@@ -34,6 +34,11 @@ abstract interface class EmployeeRepository {
   /// current salary. Requires `employees.manage`.
   Future<PayrollSummary> getPayrollSummary();
 
+  /// How the company-wide active-employee count has changed over the last
+  /// [days] days (e.g. +1 for a new hire who's active today, -1 for someone
+  /// who left active status). Requires `employees.read`.
+  Future<int> getActiveEmployeeDelta({int days = 7});
+
   /// Employees who report to the current user, if any.
   Future<List<Employee>> getMyDirectReports();
 

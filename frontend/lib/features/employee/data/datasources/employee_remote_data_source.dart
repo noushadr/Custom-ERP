@@ -59,6 +59,14 @@ class EmployeeRemoteDataSource {
         .toList();
   }
 
+  Future<int> getActiveEmployeeDelta({int days = 7}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/employees/stats/active-delta',
+      queryParameters: {'days': days},
+    );
+    return response.data!['delta'] as int;
+  }
+
   Future<PayrollSummaryModel> getPayrollSummary() async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/employees/payroll/summary',

@@ -7,7 +7,7 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/clients/presentation/pages/project_editor_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
-import 'package:zera_erp/features/employee/domain/entities/department.dart';
+import 'package:zera_erp/shared/models/named_ref.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_clients.dart';
@@ -28,9 +28,10 @@ Widget _app({FakeClientsRepository? repository}) {
       ),
       employeeRepositoryProvider.overrideWithValue(
         FakeEmployeeRepository(
-          employees: [buildTestEmployee()],
-          departments: const [
-            Department(id: 'dept-1', name: 'Engineering'),
+          employees: [
+            buildTestEmployee(
+              department: const NamedRef(id: 'dept-1', name: 'Engineering'),
+            ),
           ],
         ),
       ),
@@ -59,19 +60,19 @@ void main() {
     expect(find.text('Required'), findsWidgets);
   });
 
-  testWidgets('lets the admin toggle an employee, department, and service chip', (
+  testWidgets('lets the admin toggle an employee and service chip', (
     tester,
   ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
     final employeeChip = find.widgetWithText(FilterChip, 'Jane Doe');
-    final departmentChip = find.widgetWithText(FilterChip, 'Engineering');
     final serviceChip = find.widgetWithText(FilterChip, 'SEO');
 
     expect(employeeChip, findsOneWidget);
-    expect(departmentChip, findsOneWidget);
     expect(serviceChip, findsOneWidget);
+    // No department chip to pick — it's derived from assigned employees.
+    expect(find.widgetWithText(FilterChip, 'Engineering'), findsNothing);
 
     FilterChip chipWidget(Finder finder) => tester.widget<FilterChip>(finder);
     expect(chipWidget(employeeChip).selected, isFalse);
@@ -82,6 +83,40 @@ void main() {
 
     expect(chipWidget(find.widgetWithText(FilterChip, 'Jane Doe')).selected, isTrue);
   });
+
+  testWidgets(
+    'shows "Departments" as read-only, derived from whichever employees '
+    'are assigned',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Follows whichever employees are assigned above.'),
+        findsOneWidget,
+      );
+      expect(find.text('Engineering'), findsNothing);
+
+      final employeeChip = find.widgetWithText(FilterChip, 'Jane Doe');
+      await tester.ensureVisible(employeeChip);
+      await tester.tap(employeeChip);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Follows whichever employees are assigned above.'),
+        findsNothing,
+      );
+      expect(find.text('Engineering'), findsOneWidget);
+
+      await tester.tap(employeeChip);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Follows whichever employees are assigned above.'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('pre-fills fields when editing an existing project', (
     tester,

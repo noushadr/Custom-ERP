@@ -23,7 +23,6 @@ import {
   REQUEST_REPOSITORY,
   type RequestRepository,
 } from '../domain/repositories/request-repository.interface';
-import { CreateItemRequestDto } from './dto/create-item-request.dto';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { RequestResponse } from './request-response.interface';
 import { toRequestResponse } from './request.mapper';
@@ -54,28 +53,6 @@ export class RequestsService {
     request.type = dto.type;
     request.kind = RequestKind.GENERAL;
     request.status = RequestStatus.SUBMITTED;
-
-    const saved = await this.requestRepository.save(request);
-    const reloaded = await this.requestRepository.findById(saved.id);
-    return toRequestResponse(reloaded!);
-  }
-
-  /** Item requests (e.g. stationery) skip the reporting-manager step and go
-   * straight into the HR/Admin approval queue. */
-  async submitItemRequest(
-    actorUserId: string,
-    dto: CreateItemRequestDto,
-  ): Promise<RequestResponse> {
-    const employee = await this.employeeRepository.findByUserId(actorUserId);
-    if (!employee) throw new NotFoundException('Employee profile not found');
-
-    const request = new EmployeeRequest();
-    request.employeeId = employee.id;
-    request.subject = `Item request: ${dto.itemName}`;
-    request.description = dto.purpose;
-    request.type = 'Item';
-    request.kind = RequestKind.ITEM;
-    request.status = RequestStatus.MANAGER_APPROVED;
 
     const saved = await this.requestRepository.save(request);
     const reloaded = await this.requestRepository.findById(saved.id);

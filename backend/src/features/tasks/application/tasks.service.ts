@@ -258,9 +258,11 @@ export class TasksService {
   /** Edits core fields (title/description/priority/due date/assignee) — not
    * status, which has its own narrower/broader authority (see
    * `updateStatus`). Editing requires being the assigner, heading the
-   * task's *current* assignee's department, or holding `tasks.manage`;
-   * reassigning additionally requires the same authority over the *new*
-   * assignee's department. */
+   * task's *current* assignee's department (a Team Lead's authority), or
+   * holding `tasks.manage` (Super Admin/HR-Manager) — i.e. exactly the same
+   * three-tier authority `updateStatus`'s non-self branch uses; reassigning
+   * additionally requires that same authority over the *new* assignee's
+   * department. */
   async updateTask(
     id: string,
     dto: UpdateTaskDto,
@@ -427,7 +429,10 @@ export class TasksService {
 
   /** Narrower than `canView` — excludes the assignee themself, since editing
    * the task's core fields is a creator/manager action, not a self action
-   * (self gets its own status-only carve-out in `updateStatus`). */
+   * (self gets its own status-only carve-out in `updateStatus`). Shared by
+   * `updateTask` and `updateStatus`'s non-self branch — both editing and
+   * overriding someone else's status are the same assigner/department-head/
+   * tasks.manage tier, admin+TL+HR by role. */
   private async canEdit(
     task: Task,
     actorUserId: string,

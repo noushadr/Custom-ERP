@@ -15,7 +15,6 @@ import '../../../payroll/domain/entities/payroll_run_summary.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
-import '../widgets/company_audit_log_section.dart';
 import '../widgets/company_notices_section.dart';
 
 class AdminDashboardPage extends ConsumerWidget {
@@ -25,9 +24,6 @@ class AdminDashboardPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final employeesAsync = ref.watch(employeeListProvider);
     final authState = ref.watch(authControllerProvider);
-    final canViewAllAudit =
-        authState is AuthAuthenticated &&
-        authState.user.hasPermission('audit.viewAll');
     final canViewPayroll =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('employees.manage');
@@ -56,7 +52,6 @@ class AdminDashboardPage extends ConsumerWidget {
             ),
             data: (employees) => _DashboardStats(
               employees: employees,
-              showCompanyAuditLog: canViewAllAudit,
               showPayroll: canViewPayroll,
               showPendingReviews: canViewPerformance,
               showClients: canViewClients,
@@ -72,7 +67,6 @@ class AdminDashboardPage extends ConsumerWidget {
 class _DashboardStats extends ConsumerWidget {
   const _DashboardStats({
     required this.employees,
-    required this.showCompanyAuditLog,
     required this.showPayroll,
     required this.showPendingReviews,
     required this.showClients,
@@ -80,7 +74,6 @@ class _DashboardStats extends ConsumerWidget {
   });
 
   final List<Employee> employees;
-  final bool showCompanyAuditLog;
   final bool showPayroll;
   final bool showPendingReviews;
   final bool showClients;
@@ -151,12 +144,7 @@ class _DashboardStats extends ConsumerWidget {
                 color: AppColors.primary,
                 icon: Icons.people_alt_outlined,
               ),
-              MetricCard(
-                label: 'Active',
-                value: '${byStatus['active'] ?? 0}',
-                color: AppColors.success,
-                icon: Icons.check_circle_outline,
-              ),
+              _ActiveEmployeesCard(count: byStatus['active'] ?? 0),
               MetricCard(
                 label: 'New Hires (This Month)',
                 value: '$newHiresThisMonth',
@@ -221,6 +209,7 @@ class _DashboardStats extends ConsumerWidget {
                 color: AppColors.textSecondary,
                 icon: Icons.sync_alt_outlined,
               ),
+              if (showPayrollRuns) const _WorkModeFreelancersCard(),
             ],
           ),
           const SizedBox(height: 18),
@@ -250,12 +239,44 @@ class _DashboardStats extends ConsumerWidget {
             const SizedBox(height: 18),
           ],
           const CompanyNoticesSection(),
-          if (showCompanyAuditLog) ...[
-            const SizedBox(height: 18),
-            const CompanyAuditLogSection(),
-          ],
         ],
       ),
+    );
+  }
+}
+
+/// Formats a stat tile's week-over-week trend for [MetricCard.secondaryValue]
+/// — e.g. "+1 in last 7 days", "-1 in last 7 days", or "No change in last 7
+/// days" once the delta loads; null while it's still loading or failed, so
+/// the tile just shows its main value with no secondary line rather than a
+/// flickering or broken one.
+String? _formatWeeklyDelta(AsyncValue<int> deltaAsync) {
+  final delta = deltaAsync.valueOrNull;
+  if (delta == null) return null;
+  if (delta == 0) return 'No change in last 7 days';
+  return '${delta > 0 ? '+' : ''}$delta in last 7 days';
+}
+
+/// Currently-active employee count, with a week-over-week trend line —
+/// [count] comes from the already-loaded employee list (like every other
+/// Overview tile), but the delta is a separate fetch reconstructed
+/// server-side from the audit log (see `getActiveEmployeeDelta`), so it's
+/// watched independently rather than derived from [count] itself.
+class _ActiveEmployeesCard extends ConsumerWidget {
+  const _ActiveEmployeesCard({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final deltaAsync = ref.watch(employeeActiveDeltaProvider);
+
+    return MetricCard(
+      label: 'Active',
+      value: '$count',
+      secondaryValue: _formatWeeklyDelta(deltaAsync),
+      color: AppColors.success,
+      icon: Icons.check_circle_outline,
     );
   }
 }
@@ -270,6 +291,7 @@ class _PendingReviewsCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reviewsAsync = ref.watch(allPendingPerformanceReviewsProvider);
+    final deltaAsync = ref.watch(pendingReviewsDeltaProvider);
 
     return MetricCard(
       label: 'Pending Performance Reviews',
@@ -278,6 +300,7 @@ class _PendingReviewsCard extends ConsumerWidget {
         loading: () => '…',
         error: (_, _) => '—',
       ),
+      secondaryValue: _formatWeeklyDelta(deltaAsync),
       color: AppColors.secondary,
       icon: Icons.rate_review_outlined,
     );
@@ -441,6 +464,36 @@ class _LatestPayrollRunCard extends ConsumerWidget {
       default:
         return status;
     }
+  }
+}
+
+/// Active freelancer count, shown as a 4th Work Mode tile alongside
+/// On-site/Remote/Hybrid — freelancers don't have a `workMode` of their own
+/// (they're not `Employee` rows at all), but headcount-wise they're a
+/// distinct "how people currently work here" bucket worth seeing next to
+/// the other three, not just buried under Admin Business Management below.
+/// Gated the same way as `_TotalFreelancersCard` (`showPayrollRuns`, i.e.
+/// `payroll.manage`) since that's the permission freelancer data lives
+/// behind — the two cards show the same active-freelancer count for two
+/// different sections, not two different figures.
+class _WorkModeFreelancersCard extends ConsumerWidget {
+  const _WorkModeFreelancersCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final freelancersAsync = ref.watch(freelancersListProvider);
+
+    return MetricCard(
+      label: 'Freelancers',
+      value: freelancersAsync.when(
+        data: (freelancers) =>
+            '${freelancers.where((f) => f.isActive).length}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.textSecondary,
+      icon: Icons.badge_outlined,
+    );
   }
 }
 

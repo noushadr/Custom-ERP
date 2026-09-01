@@ -295,6 +295,52 @@ export class EmployeesService {
       }));
   }
 
+  /** How the company-wide active-employee count has changed over the last
+   * [days] days, for the Admin Dashboard's Overview stats. Reconstructed
+   * entirely from data that already exists — no new snapshot table — by
+   * combining the current employee list with every "Employment Status"
+   * audit-log change recorded since the cutoff: an employee's status "as of
+   * the cutoff" is the `oldValue` of the *earliest* such change after the
+   * cutoff if one exists, else their current status unchanged; an employee
+   * created after the cutoff didn't exist yet, so they count as "not active
+   * back then" regardless of their current status (a new hire who's active
+   * today correctly shows up as part of the +1, not excluded from both
+   * sides). */
+  async getActiveEmployeeDelta(days: number): Promise<{ delta: number }> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    const [employees, changesSinceCutoff] = await Promise.all([
+      this.employeeRepository.findAll(),
+      this.auditLogRepository.findFieldChangesSince(
+        'Employment Status',
+        cutoff,
+      ),
+    ]);
+
+    const earliestChangeByEmployee = new Map<string, string | null>();
+    for (const change of changesSinceCutoff) {
+      if (!earliestChangeByEmployee.has(change.employeeId)) {
+        earliestChangeByEmployee.set(change.employeeId, change.oldValue);
+      }
+    }
+
+    const activeNow = employees.filter(
+      (e) => e.employmentStatus === EmploymentStatus.ACTIVE,
+    ).length;
+
+    const activeAsOfCutoff = employees.filter((e) => {
+      if (e.createdAt > cutoff) return false;
+      const statusBeforeWindow = earliestChangeByEmployee.get(e.id);
+      if (statusBeforeWindow !== undefined) {
+        return statusBeforeWindow === EmploymentStatus.ACTIVE;
+      }
+      return e.employmentStatus === EmploymentStatus.ACTIVE;
+    }).length;
+
+    return { delta: activeNow - activeAsOfCutoff };
+  }
+
   /** Days until (or since, if negative) the closest occurrence — last
    * year's, this year's, or next year's — of the month/day encoded in
    * [dateStr], along with the calendar year that occurrence falls in

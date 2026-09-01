@@ -17,11 +17,13 @@ import '../widgets/task_badges.dart';
 import 'task_editor_page.dart';
 
 /// Whether the viewer may edit this task's core fields (title/description/
-/// assignee/priority/due date) — a `tasks.manage` holder, the task's
-/// assigner, or the head of the task's (assignee's) department. Narrower
-/// than who may view the task or change its status (the assignee alone
-/// cannot edit these fields — see TasksService.canEdit on the backend,
-/// which this mirrors).
+/// assignee/priority/due date) — a `tasks.manage` holder (Super Admin/
+/// HR-Manager), the task's assigner, or the head of the task's (assignee's)
+/// department (a Team Lead's authority) — i.e. admin, TLs, and HR can all
+/// edit. Narrower than who may view the task or change its status only in
+/// that the assignee alone cannot edit these fields (they get their own
+/// status-only self-service in `updateStatus`) — see TasksService.canEdit
+/// on the backend, which this mirrors.
 bool _canEditTask(WidgetRef ref, Task task) {
   final authState = ref.watch(authControllerProvider);
   final authUser = authState is AuthAuthenticated ? authState.user : null;

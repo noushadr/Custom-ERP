@@ -161,6 +161,7 @@ describe('EmployeesService', () => {
     auditLogRepository = {
       findByEmployeeId: jest.fn(),
       findAllPaginated: jest.fn().mockResolvedValue({ items: [], total: 0 }),
+      findFieldChangesSince: jest.fn().mockResolvedValue([]),
       saveMany: jest.fn().mockResolvedValue([]),
     };
     salaryRecordRepository = {
@@ -884,6 +885,157 @@ describe('EmployeesService', () => {
       const result = await service.getUpcomingWorkAnniversaries(7);
 
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('getActiveEmployeeDelta', () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    /** A timestamp [days] days before now, nudged half a day further back so
+     * it's unambiguously on one side of a `days`-ago cutoff regardless of
+     * how much wall-clock time elapses while the test runs. */
+    function daysAgo(days: number): Date {
+      return new Date(Date.now() - days * DAY_MS - DAY_MS / 2);
+    }
+
+    function buildAuditEntry(overrides: {
+      employeeId: string;
+      oldValue: string | null;
+      createdAt: Date;
+    }): EmployeeAuditLog {
+      return {
+        id: `log-${overrides.employeeId}-${overrides.createdAt.getTime()}`,
+        employeeId: overrides.employeeId,
+        actorUserId: 'admin-1',
+        actorName: 'Admin',
+        fieldLabel: 'Employment Status',
+        oldValue: overrides.oldValue,
+        newValue: 'active',
+        createdAt: overrides.createdAt,
+      } as EmployeeAuditLog;
+    }
+
+    it('is 0 when nothing changed in the window', async () => {
+      const stable = buildEmployee({
+        id: 'employee-stable',
+        employmentStatus: EmploymentStatus.ACTIVE,
+        createdAt: daysAgo(30),
+      });
+      employeeRepository.findAll.mockResolvedValue([stable]);
+      auditLogRepository.findFieldChangesSince.mockResolvedValue([]);
+
+      const result = await service.getActiveEmployeeDelta(7);
+
+      expect(result).toEqual({ delta: 0 });
+      expect(auditLogRepository.findFieldChangesSince).toHaveBeenCalledWith(
+        'Employment Status',
+        expect.any(Date),
+      );
+    });
+
+    it('counts a new hire who is active today as +1 — they did not exist as of the cutoff', async () => {
+      const newHire = buildEmployee({
+        id: 'employee-new',
+        employmentStatus: EmploymentStatus.ACTIVE,
+        createdAt: daysAgo(3), // created after a 7-day cutoff
+      });
+      employeeRepository.findAll.mockResolvedValue([newHire]);
+      auditLogRepository.findFieldChangesSince.mockResolvedValue([]);
+
+      const result = await service.getActiveEmployeeDelta(7);
+
+      expect(result).toEqual({ delta: 1 });
+    });
+
+    it('counts an employee who became active via a status change in the window as +1', async () => {
+      const employee = buildEmployee({
+        id: 'employee-1',
+        employmentStatus: EmploymentStatus.ACTIVE,
+        createdAt: daysAgo(30),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+      auditLogRepository.findFieldChangesSince.mockResolvedValue([
+        buildAuditEntry({
+          employeeId: 'employee-1',
+          oldValue: EmploymentStatus.ON_LEAVE,
+          createdAt: daysAgo(3),
+        }),
+      ]);
+
+      const result = await service.getActiveEmployeeDelta(7);
+
+      expect(result).toEqual({ delta: 1 });
+    });
+
+    it('counts an employee who left active status in the window as -1', async () => {
+      const employee = buildEmployee({
+        id: 'employee-1',
+        employmentStatus: EmploymentStatus.RESIGNED,
+        createdAt: daysAgo(30),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+      auditLogRepository.findFieldChangesSince.mockResolvedValue([
+        buildAuditEntry({
+          employeeId: 'employee-1',
+          oldValue: EmploymentStatus.ACTIVE,
+          createdAt: daysAgo(3),
+        }),
+      ]);
+
+      const result = await service.getActiveEmployeeDelta(7);
+
+      expect(result).toEqual({ delta: -1 });
+    });
+
+    it('uses the earliest change in the window, not a later one, as the pre-window value', async () => {
+      const employee = buildEmployee({
+        id: 'employee-1',
+        employmentStatus: EmploymentStatus.ACTIVE,
+        createdAt: daysAgo(30),
+      });
+      employeeRepository.findAll.mockResolvedValue([employee]);
+      // Two changes inside the window: on_leave -> active (day 5), then
+      // active -> active again is impossible, so use a 3-state path:
+      // resigned -> on_leave (day 5) -> active (day 2). The pre-window value
+      // is "resigned" (the earliest change's oldValue), not "on_leave".
+      auditLogRepository.findFieldChangesSince.mockResolvedValue([
+        buildAuditEntry({
+          employeeId: 'employee-1',
+          oldValue: EmploymentStatus.RESIGNED,
+          createdAt: daysAgo(5),
+        }),
+        buildAuditEntry({
+          employeeId: 'employee-1',
+          oldValue: EmploymentStatus.ON_LEAVE,
+          createdAt: daysAgo(2),
+        }),
+      ]);
+
+      const result = await service.getActiveEmployeeDelta(7);
+
+      // Pre-window status was "resigned" (not active) → +1, not 0.
+      expect(result).toEqual({ delta: 1 });
+    });
+
+    it('leaves an employee with no status change in the window at their current status', async () => {
+      const stillActive = buildEmployee({
+        id: 'employee-1',
+        employmentStatus: EmploymentStatus.ACTIVE,
+        createdAt: daysAgo(30),
+      });
+      const stillResigned = buildEmployee({
+        id: 'employee-2',
+        employmentStatus: EmploymentStatus.RESIGNED,
+        createdAt: daysAgo(30),
+      });
+      employeeRepository.findAll.mockResolvedValue([
+        stillActive,
+        stillResigned,
+      ]);
+      auditLogRepository.findFieldChangesSince.mockResolvedValue([]);
+
+      const result = await service.getActiveEmployeeDelta(7);
+
+      expect(result).toEqual({ delta: 0 });
     });
   });
 

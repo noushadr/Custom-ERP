@@ -8,6 +8,8 @@ import '../../../employee/application/employee_providers.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../application/task_providers.dart';
 import '../../domain/entities/task.dart';
+import '../../domain/entities/task_status.dart';
+import '../../domain/exceptions/task_exception.dart';
 import '../widgets/task_badges.dart';
 import 'task_detail_page.dart';
 import 'task_editor_page.dart';
@@ -145,13 +147,42 @@ class _TaskListView extends StatelessWidget {
   }
 }
 
-class _TaskRow extends StatelessWidget {
+class _TaskRow extends ConsumerStatefulWidget {
   const _TaskRow({required this.task});
 
   final Task task;
 
   @override
+  ConsumerState<_TaskRow> createState() => _TaskRowState();
+}
+
+class _TaskRowState extends ConsumerState<_TaskRow> {
+  bool _updatingStatus = false;
+
+  Future<void> _changeStatus(String status) async {
+    if (status == widget.task.status) return;
+    setState(() => _updatingStatus = true);
+    try {
+      await ref
+          .read(taskRepositoryProvider)
+          .updateStatus(widget.task.id, status);
+      ref.invalidate(myTasksProvider);
+      ref.invalidate(tasksAssignedByMeProvider);
+      ref.invalidate(teamTasksProvider);
+    } on TaskException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _updatingStatus = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final task = widget.task;
     return InkWell(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => TaskDetailPage(taskId: task.id)),
@@ -178,9 +209,12 @@ class _TaskRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${task.assigneeName}'
+                    'Assigned to ${task.assigneeName}'
                     '${task.departmentName != null ? ' · ${task.departmentName}' : ''}'
-                    ' · Due ${formatDisplayDate(task.dueDate)}',
+                    ' · Due ${formatDisplayDate(task.dueDate)}'
+                    ' · Assigned by ${task.assignedByName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -191,12 +225,70 @@ class _TaskRow extends StatelessWidget {
             const SizedBox(width: 12),
             TaskPriorityBadge(priority: task.priority, dense: true),
             const SizedBox(width: 8),
-            TaskStatusBadge(status: task.status, dense: true),
+            _InlineStatusMenu(
+              status: task.status,
+              updating: _updatingStatus,
+              onChanged: _changeStatus,
+            ),
             const SizedBox(width: 8),
             const Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A `TaskStatusBadge` that doubles as a status-change control — tapping it
+/// opens a menu of every status, right from the list row, so changing a
+/// task's status no longer requires opening its detail page first (the
+/// detail page's own `_StatusControl` still exists for the same action
+/// there). The backend enforces exactly the same authority either way
+/// (assignee self-service, plus the assigner/department-head/tasks.manage
+/// tier), so this is purely a shortcut, not a new capability — an
+/// unauthorized attempt still surfaces the backend's rejection as a snackbar
+/// rather than silently failing.
+class _InlineStatusMenu extends StatelessWidget {
+  const _InlineStatusMenu({
+    required this.status,
+    required this.updating,
+    required this.onChanged,
+  });
+
+  final String status;
+  final bool updating;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (updating) {
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    return PopupMenuButton<String>(
+      tooltip: 'Change status',
+      padding: EdgeInsets.zero,
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        for (final value in TaskStatus.values)
+          PopupMenuItem(
+            value: value,
+            child: Row(
+              children: [
+                if (value == status)
+                  const Icon(Icons.check, size: 16, color: AppColors.primary)
+                else
+                  const SizedBox(width: 16),
+                const SizedBox(width: 8),
+                Text(formatTaskStatusLabel(value)),
+              ],
+            ),
+          ),
+      ],
+      child: TaskStatusBadge(status: status, dense: true),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/leads/application/leads_providers.dart';
 import 'package:zera_erp/features/leads/presentation/pages/leads_page.dart';
+import 'package:zera_erp/shared/utils/date_format.dart';
 import 'package:zera_erp/shared/widgets/form_section.dart';
 import 'package:zera_erp/shared/widgets/metric_card.dart';
 
@@ -212,12 +213,29 @@ void main() {
     };
 
     expect(cardValues['Total Leads'], '2');
+    expect(cardValues['Last Lead Received'], formatDisplayDate(isoDate(now)));
     expect(cardValues['New This Week'], '1');
     expect(cardValues['New This Month'], '1');
     expect(cardValues['Total Countries'], '2'); // Pakistan, UAE
     expect(cardValues['Total Services'], isNull); // removed from the stats row
     expect(cardValues['Total Lead Sources'], '2'); // Referral, Facebook
   });
+
+  testWidgets(
+    'shows an em dash for "Last Lead Received" when no lead date parses',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+
+      final cardValues = {
+        for (final card in tester.widgetList<MetricCard>(
+          find.byType(MetricCard),
+        ))
+          card.label: card.value,
+      };
+      expect(cardValues['Last Lead Received'], '—');
+    },
+  );
 
   testWidgets(
     'shows an access-denied message instead of any lead data for a viewer '
@@ -235,6 +253,36 @@ void main() {
             email: 'employee@zeracreative.com',
             role: 'Employee',
             permissions: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text("You don't have permission to view this page."),
+        findsOneWidget,
+      );
+      expect(find.text('Should Not Be Visible'), findsNothing);
+      expect(repository.getLeadsCallCount, 0);
+    },
+  );
+
+  testWidgets(
+    'shows an access-denied message for HR/Manager too — Leads became '
+    'Super-Admin-exclusive 2026-08-28, no longer shared with HR/Manager',
+    (tester) async {
+      final repository = FakeLeadsRepository(
+        leads: [buildTestLead(fullName: 'Should Not Be Visible')],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          viewer: const AuthUser(
+            id: 'hr-1',
+            email: 'hr@zeracreative.com',
+            role: 'HR/Manager',
+            permissions: ['clients.manage', 'payroll.manage'],
           ),
         ),
       );
@@ -277,8 +325,8 @@ void main() {
         findsOneWidget,
       );
 
-      final marBarX = tester.getCenter(find.text('Mar\n26')).dx;
-      final janBarX = tester.getCenter(find.text('Jan\n26')).dx;
+      final marBarX = tester.getCenter(find.text('Mar\n2026')).dx;
+      final janBarX = tester.getCenter(find.text('Jan\n2026')).dx;
       expect(marBarX, lessThan(janBarX)); // newest (Mar) is further left
     },
   );
