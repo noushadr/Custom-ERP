@@ -337,8 +337,10 @@ class _TeamMembersSection extends ConsumerWidget {
         reviewSummariesAsync.valueOrNull ??
         const <String, PerformanceReviewSummary>{};
 
+    final reportCount = reportsAsync.valueOrNull?.length;
+
     return FormSection(
-      title: 'My Team',
+      title: reportCount == null ? 'My Team' : 'My Team ($reportCount)',
       child: reportsAsync.when(
         loading: () => const Padding(
           padding: EdgeInsets.symmetric(vertical: 12),

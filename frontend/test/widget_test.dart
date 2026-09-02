@@ -114,7 +114,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Company Notices'), findsOneWidget);
-    expect(find.text('My Team'), findsOneWidget);
+    // No direct reports in the fake by default — the count still shows.
+    expect(find.text('My Team (0)'), findsOneWidget);
   });
 
   testWidgets('renders the admin dashboard stats for a Super Admin', (
