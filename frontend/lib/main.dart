@@ -423,6 +423,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         _goToDestination('Leaves');
       case 'performance_reviews':
         _goToDestination('Performance Reviews');
+      case 'requests':
+        _goToDestination('Requests');
     }
   }
 

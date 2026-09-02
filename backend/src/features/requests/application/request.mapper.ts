@@ -10,6 +10,7 @@ export function toRequestResponse(request: EmployeeRequest): RequestResponse {
     subject: request.subject,
     description: request.description,
     type: request.type ?? null,
+    kind: request.kind,
     status: request.status,
     managerDecisionAt: request.managerDecisionAt?.toISOString() ?? null,
     managerDecisionByName: request.managerDecisionByName ?? null,

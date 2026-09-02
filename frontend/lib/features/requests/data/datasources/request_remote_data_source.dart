@@ -60,6 +60,22 @@ class RequestRemoteDataSource {
         .toList();
   }
 
+  Future<List<EmployeeRequestModel>> getHistory() async {
+    final response = await _dio.get<List<dynamic>>('/requests/history');
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(EmployeeRequestModel.fromJson)
+        .toList();
+  }
+
+  Future<List<EmployeeRequestModel>> getHistoryForMyTeam() async {
+    final response = await _dio.get<List<dynamic>>('/requests/history/mine');
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(EmployeeRequestModel.fromJson)
+        .toList();
+  }
+
   Future<EmployeeRequestModel> approveAsManager(String requestId) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/requests/$requestId/manager-approve',

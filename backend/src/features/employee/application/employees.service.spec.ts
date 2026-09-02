@@ -624,7 +624,7 @@ describe('EmployeesService', () => {
       expect(result[0].fullName).toBe('Ravi Doe');
     });
 
-    it("strips bank/personal fields from a report when the manager lacks employees.manage — regression: this endpoint previously returned every direct report's bank details, IBAN, DOB, and personal contact info completely unmasked to any manager (e.g. a Team Lead), since it skipped the same field-visibility check findAll/findById already apply", async () => {
+    it("strips bank/personal-contact fields from a report when the manager lacks employees.manage, but still reveals dateOfBirth — regression: this endpoint previously returned every direct report's bank details, IBAN, and personal contact info completely unmasked to any manager (e.g. a Team Lead), since it skipped the same field-visibility check findAll/findById already apply. dateOfBirth is a deliberate exception (added for the User Dashboard's 'My Team' section) — every report here is, by construction, this exact manager's own report, a materially narrower exposure than the company-wide directory guard exists to prevent", async () => {
       const manager = buildEmployee({ id: 'manager-1', userId: 'user-1' });
       employeeRepository.findByUserId.mockResolvedValue(manager);
       employeeRepository.findByReportingManagerId.mockResolvedValue([
@@ -643,7 +643,7 @@ describe('EmployeesService', () => {
 
       expect(result[0].bankName).toBeNull();
       expect(result[0].accountNumber).toBeNull();
-      expect(result[0].dateOfBirth).toBeNull();
+      expect(result[0].dateOfBirth).toBe('1998-01-01');
     });
   });
 

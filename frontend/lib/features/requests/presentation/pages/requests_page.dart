@@ -7,6 +7,7 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../employee/application/employee_providers.dart';
 import '../../../employee/domain/entities/department.dart';
+import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../../employee/presentation/widgets/employee_status_badges.dart';
 import '../../application/request_providers.dart';
 import '../../domain/entities/employee_request.dart';
@@ -77,7 +78,12 @@ class RequestsPage extends ConsumerWidget {
                   const _PendingMyApprovalSection(),
                   const SizedBox(height: 16),
                 ],
-                if (canSeeHrApprovals) const _PendingHrApprovalSection(),
+                if (canSeeHrApprovals) ...[
+                  const _PendingHrApprovalSection(),
+                  const SizedBox(height: 16),
+                ],
+                if (canSeeHrApprovals || canSeeManagerApprovals)
+                  _RequestHistorySection(companyWide: canSeeHrApprovals),
               ],
             ),
           ),
@@ -188,6 +194,13 @@ class _MyRequestRow extends StatelessWidget {
             context,
           ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Manager Approval: ${_managerApprovalLabel(request)}',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        ),
         if (request.rejectionReason != null) ...[
           const SizedBox(height: 4),
           Text(
@@ -217,6 +230,64 @@ class _RequestStatusBadge extends StatelessWidget {
       _ => (status, AppColors.textSecondary),
     };
     return StatusBadge(label: label, color: color);
+  }
+}
+
+/// "No need" for a PROFILE_CHANGE request (skips the manager step
+/// entirely — see EmployeeRequest.kind's own doc comment), "Pending"
+/// while still awaiting the manager, "Rejected" if the manager was the one
+/// who rejected it, or "Approved" otherwise (manager-approved, completed,
+/// or rejected later by HR after the manager already approved).
+String _managerApprovalLabel(EmployeeRequest request) {
+  if (request.kind == 'profile_change') return 'No need';
+  if (request.status == 'submitted') return 'Pending';
+  if (request.status == 'rejected' && request.managerDecisionAt != null) {
+    return 'Rejected';
+  }
+  return 'Approved';
+}
+
+/// Avatar + requester name + submission date/time — shown on request rows
+/// someone other than the requester is reviewing, so the reviewer sees at a
+/// glance who this is from and when it came in.
+class _RequesterHeader extends StatelessWidget {
+  const _RequesterHeader({required this.request});
+
+  final EmployeeRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        EmployeeAvatar(
+          fullName: request.requesterName,
+          photoUrl: request.requesterPhotoUrl,
+          radius: 16,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                request.requesterName,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              Text(
+                formatDisplayDateTime(request.createdAt),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -428,8 +499,10 @@ class _PendingManagerRequestRowState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _RequesterHeader(request: request),
+              const SizedBox(height: 8),
               Text(
-                '${request.subject} — ${request.requesterName}',
+                request.subject,
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -552,8 +625,10 @@ class _PendingHrRequestRowState extends ConsumerState<_PendingHrRequestRow> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _RequesterHeader(request: request),
+              const SizedBox(height: 8),
               Text(
-                '${request.subject} — ${request.requesterName}',
+                request.subject,
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -565,7 +640,10 @@ class _PendingHrRequestRowState extends ConsumerState<_PendingHrRequestRow> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Approved by manager: ${request.managerDecisionByName ?? '—'}',
+                request.kind == 'profile_change'
+                    ? 'Manager Approval: No need'
+                    : 'Approved by manager: '
+                          '${request.managerDecisionByName ?? '—'}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -592,6 +670,121 @@ class _PendingHrRequestRowState extends ConsumerState<_PendingHrRequestRow> {
             child: const Text('Approve'),
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// Company-wide (for `users.manage` holders) or team-scoped (for a manager
+/// without that permission) record of already-decided requests — approved
+/// or rejected, and by whom — so a decision doesn't just vanish from every
+/// list the moment it's made.
+class _RequestHistorySection extends ConsumerWidget {
+  const _RequestHistorySection({required this.companyWide});
+
+  final bool companyWide;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final requestsAsync = ref.watch(
+      companyWide ? requestHistoryProvider : requestHistoryForMyTeamProvider,
+    );
+
+    return FormSection(
+      title: 'Request History',
+      child: requestsAsync.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: LinearProgressIndicator(),
+        ),
+        error: (_, _) => const Text('Could not load request history.'),
+        data: (requests) {
+          if (requests.isEmpty) {
+            return Text(
+              'No requests have been decided yet.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < requests.length; i++) ...[
+                _RequestHistoryRow(request: requests[i]),
+                if (i < requests.length - 1)
+                  const Divider(height: 20, color: AppColors.borderSubtle),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RequestHistoryRow extends StatelessWidget {
+  const _RequestHistoryRow({required this.request});
+
+  final EmployeeRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    // Whichever decision actually settled it — HR's if the request reached
+    // that stage, else the manager's own rejection.
+    final decidedByName = request.hrDecisionByName ?? request.managerDecisionByName;
+    final decidedAt = request.hrDecisionAt ?? request.managerDecisionAt;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _RequesterHeader(request: request),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      request.subject,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  _RequestStatusBadge(status: request.status),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                request.description,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                decidedAt == null
+                    ? 'Decided by $decidedByName'
+                    : 'Decided by $decidedByName · '
+                          '${formatDisplayDateTime(decidedAt)}',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+              if (request.status == 'rejected' &&
+                  request.rejectionReason != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Reason: ${request.rejectionReason}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.error),
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }

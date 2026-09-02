@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthenticationModule } from '../authentication/authentication.module';
 import { EmployeeModule } from '../employee/employee.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { RequestsService } from './application/requests.service';
 import { TypeOrmRequestRepository } from './data/repositories/request.repository';
 import { EmployeeRequest } from './domain/entities/employee-request.entity';
@@ -13,6 +14,7 @@ import { RequestsController } from './presentation/requests.controller';
     TypeOrmModule.forFeature([EmployeeRequest]),
     AuthenticationModule,
     EmployeeModule,
+    NotificationsModule,
   ],
   controllers: [RequestsController],
   providers: [
