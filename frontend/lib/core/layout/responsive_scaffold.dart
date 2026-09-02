@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/announcement_banner.dart';
 import '../../shared/widgets/app_footer.dart';
 import '../../shared/widgets/zera_logo.dart';
 import '../theme/app_colors.dart';
@@ -128,6 +129,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
             child: Column(
               children: [
                 _TopBar(title: _currentLabel, actions: widget.actions),
+                const AnnouncementBanner(),
                 Expanded(child: _canvas(widget.body)),
                 const AppFooter(),
               ],
@@ -149,37 +151,46 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
         ),
         actions: widget.actions,
       ),
-      body: Row(
+      body: Column(
         children: [
-          SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: MediaQuery.sizeOf(context).height,
-              ),
-              child: IntrinsicHeight(
-                child: _railExpanded
-                    ? _NavRail(
-                        key: const Key('navRail'),
-                        destinations: widget.destinations,
-                        railIcon: _railIcon,
-                        adminSectionCount: widget.adminSectionCount,
-                        hrAdminSectionCount: widget.hrAdminSectionCount,
-                        selectedIndex: widget.selectedIndex,
-                        onDestinationSelected: widget.onDestinationSelected,
-                      )
-                    : NavigationRail(
-                        extended: _railExpanded,
-                        labelType: _railExpanded
-                            ? NavigationRailLabelType.none
-                            : NavigationRailLabelType.all,
-                        selectedIndex: widget.selectedIndex,
-                        onDestinationSelected: widget.onDestinationSelected,
-                        destinations: _railDestinations,
-                      ),
-              ),
+          const AnnouncementBanner(),
+          Expanded(
+            child: Row(
+              children: [
+                SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: MediaQuery.sizeOf(context).height,
+                    ),
+                    child: IntrinsicHeight(
+                      child: _railExpanded
+                          ? _NavRail(
+                              key: const Key('navRail'),
+                              destinations: widget.destinations,
+                              railIcon: _railIcon,
+                              adminSectionCount: widget.adminSectionCount,
+                              hrAdminSectionCount: widget.hrAdminSectionCount,
+                              selectedIndex: widget.selectedIndex,
+                              onDestinationSelected:
+                                  widget.onDestinationSelected,
+                            )
+                          : NavigationRail(
+                              extended: _railExpanded,
+                              labelType: _railExpanded
+                                  ? NavigationRailLabelType.none
+                                  : NavigationRailLabelType.all,
+                              selectedIndex: widget.selectedIndex,
+                              onDestinationSelected:
+                                  widget.onDestinationSelected,
+                              destinations: _railDestinations,
+                            ),
+                    ),
+                  ),
+                ),
+                Expanded(child: _contentWithFooter(widget.body)),
+              ],
             ),
           ),
-          Expanded(child: _contentWithFooter(widget.body)),
         ],
       ),
     );
@@ -191,7 +202,12 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
         title: _TitleWithLogo(title: _currentLabel),
         actions: widget.actions,
       ),
-      body: _contentWithFooter(widget.body),
+      body: Column(
+        children: [
+          const AnnouncementBanner(),
+          Expanded(child: _contentWithFooter(widget.body)),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: widget.selectedIndex,
         onDestinationSelected: widget.onDestinationSelected,
