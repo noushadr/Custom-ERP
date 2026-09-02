@@ -354,17 +354,15 @@ class _TeamMembersSection extends ConsumerWidget {
               ),
             );
           }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          return Wrap(
+            spacing: 16,
+            runSpacing: 16,
             children: [
-              for (var i = 0; i < reports.length; i++) ...[
+              for (final report in reports)
                 _TeamMemberTile(
-                  employee: reports[i],
-                  reviewSummary: reviewSummaries[reports[i].id],
+                  employee: report,
+                  reviewSummary: reviewSummaries[report.id],
                 ),
-                if (i < reports.length - 1)
-                  const Divider(height: 24, color: AppColors.borderSubtle),
-              ],
             ],
           );
         },
@@ -372,6 +370,8 @@ class _TeamMembersSection extends ConsumerWidget {
     );
   }
 }
+
+const _teamTileWidth = 260.0;
 
 class _TeamMemberTile extends StatelessWidget {
   const _TeamMemberTile({required this.employee, this.reviewSummary});
@@ -381,81 +381,112 @@ class _TeamMemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            EmployeeAvatar(
-              fullName: employee.fullName,
-              photoUrl: employee.profilePhotoUrl,
-              radius: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    employee.fullName,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  Text(
-                    employee.designation ?? employee.role,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      InfoChip(
-                        icon: Icons.email_outlined,
-                        label: employee.email,
-                        maxWidth: constraints.maxWidth,
-                      ),
-                      InfoChip(
-                        icon: Icons.timelapse_outlined,
-                        label: formatTenure(employee.joiningDate),
-                        maxWidth: constraints.maxWidth,
-                      ),
-                      InfoChip(
-                        icon: Icons.cake_outlined,
-                        label: employee.dateOfBirth == null
-                            ? '—'
-                            : formatMonthDay(employee.dateOfBirth!),
-                        maxWidth: constraints.maxWidth,
-                      ),
-                      InfoChip(
-                        icon: Icons.fact_check_outlined,
-                        label: _reviewLabel(reviewSummary),
-                        maxWidth: constraints.maxWidth,
-                      ),
-                    ],
-                  ),
-                ],
+    // The Wrap's chips need an explicit max width to know when to
+    // ellipsize; derive it from the box width instead of an inner
+    // LayoutBuilder, matching the Employee Directory card's own approach.
+    const contentWidth = _teamTileWidth - 32;
+
+    return Container(
+      width: _teamTileWidth,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              EmployeeAvatar(
+                fullName: employee.fullName,
+                photoUrl: employee.profilePhotoUrl,
+                radius: 20,
               ),
-            ),
-          ],
-        );
-      },
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      employee.fullName,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    Text(
+                      employee.designation ?? employee.role,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              WorkModeBadge(workMode: employee.workMode, dense: true),
+              StatusBadge(
+                label: formatEmploymentType(employee.employmentType),
+                color: AppColors.textSecondary,
+                icon: Icons.work_outline,
+                dense: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              InfoChip(
+                icon: Icons.email_outlined,
+                label: employee.email,
+                maxWidth: contentWidth,
+              ),
+              InfoChip(
+                icon: Icons.timelapse_outlined,
+                label: formatTenure(employee.joiningDate),
+                maxWidth: contentWidth,
+              ),
+              InfoChip(
+                icon: Icons.cake_outlined,
+                label: employee.dateOfBirth == null
+                    ? '—'
+                    : formatMonthDay(employee.dateOfBirth!),
+                maxWidth: contentWidth,
+              ),
+              InfoChip(
+                icon: Icons.fact_check_outlined,
+                label: _reviewLabel(reviewSummary),
+                maxWidth: contentWidth,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  /// "Last Review: " followed by the date once completed/finalized, "Last
-  /// Review: Pending" while awaiting it, or "No review yet" before their
-  /// first work anniversary — same wording as the Employee Directory's own
-  /// review chip.
+  /// "Last Performance Review: " followed by the date once
+  /// completed/finalized, "Last Performance Review: Pending" while awaiting
+  /// it, or "No review yet" before their first work anniversary.
   String _reviewLabel(PerformanceReviewSummary? summary) {
     if (summary == null) return 'No review yet';
-    if (summary.status == 'pending') return 'Last Review: Pending';
+    if (summary.status == 'pending') {
+      return 'Last Performance Review: Pending';
+    }
     final doneAt = summary.finalizedAt ?? summary.completedAt;
-    if (doneAt == null) return 'Last Review: Pending';
-    return 'Last Review: ${formatDisplayDateOnly(doneAt)}';
+    if (doneAt == null) return 'Last Performance Review: Pending';
+    return 'Last Performance Review: ${formatDisplayDateOnly(doneAt)}';
   }
 }
