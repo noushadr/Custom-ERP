@@ -431,11 +431,17 @@ export class EmployeesService {
 
   /** Financial/personal-contact fields are only visible to `employees.manage`
    * holders or to the employee themselves — not to a plain `employees.read`
-   * viewer (e.g. Team Lead), who only needs directory-level fields. */
+   * viewer (e.g. Team Lead), who only needs directory-level fields.
+   * [revealBirthday] is set by `getMyDirectReports` — a reporting manager
+   * seeing their own reports' birthdays (for the "My Team" dashboard
+   * section) is a much narrower exposure than the company-wide directory
+   * `dateOfBirth: null` guards against, since the caller is already scoped
+   * to just that manager's own reports. */
   private applyFieldVisibility(
     response: EmployeeResponse,
     employee: Employee,
     viewer: JwtPayload,
+    options?: { revealBirthday?: boolean },
   ): EmployeeResponse {
     const isSelf = employee.userId === viewer.sub;
     const canManage = viewer.permissions.includes('employees.manage');
@@ -443,7 +449,7 @@ export class EmployeesService {
 
     return {
       ...response,
-      dateOfBirth: null,
+      dateOfBirth: options?.revealBirthday ? response.dateOfBirth : null,
       personalEmail: null,
       phoneNumber: null,
       emergencyContactName: null,
@@ -471,7 +477,9 @@ export class EmployeesService {
       employee.id,
     );
     return reports.map((report) =>
-      this.applyFieldVisibility(toEmployeeResponse(report), report, viewer),
+      this.applyFieldVisibility(toEmployeeResponse(report), report, viewer, {
+        revealBirthday: true,
+      }),
     );
   }
 

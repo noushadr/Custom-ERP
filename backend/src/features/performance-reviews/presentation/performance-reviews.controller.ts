@@ -76,6 +76,15 @@ export class PerformanceReviewsController {
     return this.performanceReviewsService.getPendingManagerAction(user.sub);
   }
 
+  // Must come before @Get(':id') below. No @Permissions guard, same as
+  // pending-manager-action above — scoped server-side to the caller's own
+  // direct reports, so a Team Lead can see it without holding
+  // `performance.manage`.
+  @Get('my-team/latest')
+  getLatestForMyTeam(@CurrentUser() user: JwtPayload) {
+    return this.performanceReviewsService.getLatestForMyTeam(user.sub);
+  }
+
   @Get('pending-hr-finalization')
   @Permissions(PERMISSION)
   getPendingHrFinalization() {

@@ -57,13 +57,15 @@ void main() {
   });
 
   testWidgets(
-    'shows an access-denied message for a viewer without audit.viewAll',
+    'shows the viewer\'s own change history for a viewer without '
+    'audit.viewAll, not the company-wide section or an access-denied '
+    'message',
     (tester) async {
       final repository = FakeEmployeeRepository(
         auditLog: [
           AuditLogEntry(
             id: 'log-1',
-            employeeName: 'Should Not Be Visible',
+            employeeName: 'Employee User',
             actorName: 'Admin User',
             fieldLabel: 'Designation',
             oldValue: 'Engineer',
@@ -86,11 +88,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Change History'), findsOneWidget);
+      expect(find.text('Designation'), findsOneWidget);
+      expect(find.text('Company-wide Changes'), findsNothing);
       expect(
         find.text("You don't have permission to view this page."),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(find.textContaining('Should Not Be Visible'), findsNothing);
     },
   );
 }

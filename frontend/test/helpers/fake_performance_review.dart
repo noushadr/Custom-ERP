@@ -103,6 +103,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
     this.pendingHrFinalization = const [],
     this.employeeReviews = const [],
     this.latestReviewSummaries = const [],
+    this.latestForMyTeam = const [],
     this.allPendingReviews = const [],
     this.pendingReviewsDelta = 0,
     this.finalizedReviews = const [],
@@ -127,6 +128,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   final List<PerformanceReview> pendingHrFinalization;
   final List<PerformanceReview> employeeReviews;
   final List<PerformanceReviewSummary> latestReviewSummaries;
+  final List<PerformanceReviewSummary> latestForMyTeam;
   final List<PerformanceReview> allPendingReviews;
   final int pendingReviewsDelta;
   final List<PerformanceReview> finalizedReviews;
@@ -224,6 +226,10 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   @override
   Future<List<PerformanceReviewSummary>> getLatestReviewSummaries() async =>
       latestReviewSummaries;
+
+  @override
+  Future<List<PerformanceReviewSummary>> getLatestForMyTeam() async =>
+      latestForMyTeam;
 
   @override
   Future<List<PerformanceReview>> getAllPendingReviews() async =>

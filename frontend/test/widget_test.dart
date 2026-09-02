@@ -114,7 +114,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Company Notices'), findsOneWidget);
-    expect(find.text('Team Members'), findsOneWidget);
+    expect(find.text('My Team'), findsOneWidget);
   });
 
   testWidgets('renders the admin dashboard stats for a Super Admin', (
@@ -571,14 +571,20 @@ void main() {
     expect(find.text('Logs'), findsOneWidget);
   });
 
-  testWidgets('hides Logs from the nav for a plain employee', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(_authenticatedApp());
-    await tester.pumpAndSettle();
+  testWidgets(
+    'shows Logs in the nav for a plain employee too, unlike other '
+    'admin-only destinations',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(_authenticatedApp());
+      await tester.pumpAndSettle();
 
-    expect(find.text('Logs'), findsNothing);
-  });
+      // Everyone gets a Logs destination now (their own change history for
+      // non-audit.viewAll holders — see LogsPage) — only the company-wide
+      // admin modules stay hidden from a plain employee.
+      expect(find.text('Logs'), findsOneWidget);
+      expect(find.text('Payroll'), findsNothing);
+    },
+  );
 
   testWidgets(
     'shows Admin Business Management stats for a holder of every module '

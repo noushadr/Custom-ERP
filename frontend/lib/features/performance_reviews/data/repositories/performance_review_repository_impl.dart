@@ -91,6 +91,10 @@ class PerformanceReviewRepositoryImpl implements PerformanceReviewRepository {
       _guard(() => _remoteDataSource.getLatestReviewSummaries());
 
   @override
+  Future<List<PerformanceReviewSummary>> getLatestForMyTeam() =>
+      _guard(() => _remoteDataSource.getLatestForMyTeam());
+
+  @override
   Future<List<Map<String, dynamic>>> previewDueCheck() =>
       _guard(() => _remoteDataSource.previewDueCheck());
 

@@ -152,6 +152,16 @@ class PerformanceReviewRemoteDataSource {
         .toList();
   }
 
+  Future<List<PerformanceReviewSummaryModel>> getLatestForMyTeam() async {
+    final response = await _dio.get<List<dynamic>>(
+      '/performance-reviews/my-team/latest',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(PerformanceReviewSummaryModel.fromJson)
+        .toList();
+  }
+
   Future<List<Map<String, dynamic>>> previewDueCheck() async {
     final response = await _dio.get<List<dynamic>>(
       '/performance-reviews/due-check/preview',

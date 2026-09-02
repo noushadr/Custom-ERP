@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/models/named_ref.dart';
+import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../leave/presentation/widgets/leave_balances_section.dart';
+import '../../../performance_reviews/application/performance_review_providers.dart';
+import '../../../performance_reviews/domain/entities/performance_review_summary.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/exceptions/employee_exception.dart';
 import '../widgets/company_notices_section.dart';
-import '../widgets/employee_audit_log_panel.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_status_badges.dart';
 import 'employee_profile_page.dart';
@@ -68,8 +70,6 @@ class _UserDashboardBody extends StatelessWidget {
           const CompanyNoticesSection(),
           const SizedBox(height: 16),
           const _TeamMembersSection(),
-          const SizedBox(height: 16),
-          const EmployeeAuditLogPanel(),
         ],
       ),
     );
@@ -330,9 +330,15 @@ class _TeamMembersSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reportsAsync = ref.watch(myDirectReportsProvider);
+    final reviewSummariesAsync = ref.watch(
+      latestPerformanceReviewsForMyTeamProvider,
+    );
+    final reviewSummaries =
+        reviewSummariesAsync.valueOrNull ??
+        const <String, PerformanceReviewSummary>{};
 
     return FormSection(
-      title: 'Team Members',
+      title: 'My Team',
       child: reportsAsync.when(
         loading: () => const Padding(
           padding: EdgeInsets.symmetric(vertical: 12),
@@ -348,11 +354,17 @@ class _TeamMembersSection extends ConsumerWidget {
               ),
             );
           }
-          return Wrap(
-            spacing: 16,
-            runSpacing: 12,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final report in reports) _TeamMemberTile(employee: report),
+              for (var i = 0; i < reports.length; i++) ...[
+                _TeamMemberTile(
+                  employee: reports[i],
+                  reviewSummary: reviewSummaries[reports[i].id],
+                ),
+                if (i < reports.length - 1)
+                  const Divider(height: 24, color: AppColors.borderSubtle),
+              ],
             ],
           );
         },
@@ -362,45 +374,88 @@ class _TeamMembersSection extends ConsumerWidget {
 }
 
 class _TeamMemberTile extends StatelessWidget {
-  const _TeamMemberTile({required this.employee});
+  const _TeamMemberTile({required this.employee, this.reviewSummary});
 
   final Employee employee;
+  final PerformanceReviewSummary? reviewSummary;
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 220),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          EmployeeAvatar(
-            fullName: employee.fullName,
-            photoUrl: employee.profilePhotoUrl,
-            radius: 18,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  employee.fullName,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                Text(
-                  employee.designation ?? employee.role,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            EmployeeAvatar(
+              fullName: employee.fullName,
+              photoUrl: employee.profilePhotoUrl,
+              radius: 20,
             ),
-          ),
-        ],
-      ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    employee.fullName,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  Text(
+                    employee.designation ?? employee.role,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      InfoChip(
+                        icon: Icons.email_outlined,
+                        label: employee.email,
+                        maxWidth: constraints.maxWidth,
+                      ),
+                      InfoChip(
+                        icon: Icons.timelapse_outlined,
+                        label: formatTenure(employee.joiningDate),
+                        maxWidth: constraints.maxWidth,
+                      ),
+                      InfoChip(
+                        icon: Icons.cake_outlined,
+                        label: employee.dateOfBirth == null
+                            ? '—'
+                            : formatMonthDay(employee.dateOfBirth!),
+                        maxWidth: constraints.maxWidth,
+                      ),
+                      InfoChip(
+                        icon: Icons.fact_check_outlined,
+                        label: _reviewLabel(reviewSummary),
+                        maxWidth: constraints.maxWidth,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  /// "Last Review: " followed by the date once completed/finalized, "Last
+  /// Review: Pending" while awaiting it, or "No review yet" before their
+  /// first work anniversary — same wording as the Employee Directory's own
+  /// review chip.
+  String _reviewLabel(PerformanceReviewSummary? summary) {
+    if (summary == null) return 'No review yet';
+    if (summary.status == 'pending') return 'Last Review: Pending';
+    final doneAt = summary.finalizedAt ?? summary.completedAt;
+    if (doneAt == null) return 'Last Review: Pending';
+    return 'Last Review: ${formatDisplayDateOnly(doneAt)}';
   }
 }
