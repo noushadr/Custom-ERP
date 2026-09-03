@@ -756,45 +756,51 @@ class _RequestHistoryRow extends StatelessWidget {
     final captionStyle = Theme.of(
       context,
     ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary);
+    final nameStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600);
 
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Text(
-                '${request.subject} — ${request.requesterName}',
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                request.requesterName,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                style: nameStyle,
               ),
-            ),
-            const SizedBox(width: 8),
+              const SizedBox(height: 2),
+              Text(
+                request.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 2),
+              if (decidedAt != null)
+                Text(formatDisplayDateTime(decidedAt), style: captionStyle),
+              if (request.status == 'rejected' && request.rejectionReason != null)
+                Text(
+                  'Reason: ${request.rejectionReason}',
+                  style: captionStyle?.copyWith(color: AppColors.error),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
             _RequestStatusBadge(status: request.status, dense: true),
+            if (decidedByName != null) ...[
+              const SizedBox(height: 2),
+              Text('Approved by $decidedByName', style: captionStyle),
+            ],
           ],
         ),
-        const SizedBox(height: 2),
-        Text(
-          request.description,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          decidedAt == null
-              ? 'Decided by $decidedByName'
-              : 'Decided by $decidedByName · ${formatDisplayDateTime(decidedAt)}',
-          style: captionStyle,
-        ),
-        if (request.status == 'rejected' && request.rejectionReason != null)
-          Text(
-            'Reason: ${request.rejectionReason}',
-            style: captionStyle?.copyWith(color: AppColors.error),
-          ),
       ],
     );
   }

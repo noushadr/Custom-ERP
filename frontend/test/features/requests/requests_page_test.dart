@@ -282,7 +282,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Request History'), findsOneWidget);
-      expect(find.textContaining('Decided by Noushad Ranani'), findsOneWidget);
+      expect(
+        find.textContaining('Approved by Noushad Ranani'),
+        findsOneWidget,
+      );
       expect(
         find.text('Reason: Needs a valid phone number'),
         findsOneWidget,
@@ -314,7 +317,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Request History'), findsOneWidget);
-      expect(find.textContaining('Decided by Noushad Ranani'), findsOneWidget);
+      expect(
+        find.textContaining('Approved by Noushad Ranani'),
+        findsOneWidget,
+      );
     },
   );
 
@@ -339,7 +345,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Decided by Noushad Ranani'), findsOneWidget);
+      expect(
+        find.textContaining('Approved by Noushad Ranani'),
+        findsOneWidget,
+      );
       expect(
         find.textContaining('noushad.ranani@zeracreative.com'),
         findsNothing,
