@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/department.dart';
+import 'package:zera_erp/features/employee/presentation/widgets/employee_avatar.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/requests/presentation/pages/requests_page.dart';
 
@@ -316,6 +317,57 @@ void main() {
       expect(find.textContaining('Decided by Noushad Ranani'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'derives a display name from an email for an older decision recorded '
+    'before actor-name resolution existed',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          permissions: ['users.manage'],
+          requestRepository: FakeRequestRepository(
+            history: [
+              buildTestRequest(
+                id: 'request-old',
+                status: 'completed',
+                hrDecisionByName: 'noushad.ranani@zeracreative.com',
+                hrDecisionAt: DateTime(2026, 8, 9),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Decided by Noushad Ranani'), findsOneWidget);
+      expect(
+        find.textContaining('noushad.ranani@zeracreative.com'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets('does not show an avatar in Request History', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        permissions: ['users.manage'],
+        requestRepository: FakeRequestRepository(
+          history: [
+            buildTestRequest(
+              id: 'request-1',
+              status: 'completed',
+              hrDecisionByName: 'Noushad Ranani',
+              hrDecisionAt: DateTime(2026, 9, 2),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Request History'), findsOneWidget);
+    expect(find.byType(EmployeeAvatar), findsNothing);
+  });
 
   testWidgets(
     'hides My Requests and its submission buttons for a Super Admin',

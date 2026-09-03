@@ -216,9 +216,10 @@ class _MyRequestRow extends StatelessWidget {
 }
 
 class _RequestStatusBadge extends StatelessWidget {
-  const _RequestStatusBadge({required this.status});
+  const _RequestStatusBadge({required this.status, this.dense = false});
 
   final String status;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -229,8 +230,22 @@ class _RequestStatusBadge extends StatelessWidget {
       'rejected' => ('Rejected', AppColors.error),
       _ => (status, AppColors.textSecondary),
     };
-    return StatusBadge(label: label, color: color);
+    return StatusBadge(label: label, color: color, dense: dense);
   }
+}
+
+/// "Noushad Ranani" as-is, or a Title-Case name derived from the local part
+/// of an email address (e.g. "noushad.ranani" → "Noushad Ranani") — some
+/// older decisions were recorded before actor names were resolved from an
+/// employee profile, so the raw login email got snapshotted instead.
+String _displayActorName(String name) {
+  if (!name.contains('@')) return name;
+  final localPart = name.split('@').first;
+  final words = localPart.split(RegExp(r'[._-]+')).where((w) => w.isNotEmpty);
+  if (words.isEmpty) return name;
+  return words
+      .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
+      .join(' ');
 }
 
 /// "No need" for a PROFILE_CHANGE request (skips the manager step
@@ -713,7 +728,7 @@ class _RequestHistorySection extends ConsumerWidget {
               for (var i = 0; i < requests.length; i++) ...[
                 _RequestHistoryRow(request: requests[i]),
                 if (i < requests.length - 1)
-                  const Divider(height: 20, color: AppColors.borderSubtle),
+                  const Divider(height: 10, color: AppColors.borderSubtle),
               ],
             ],
           );
@@ -732,59 +747,54 @@ class _RequestHistoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     // Whichever decision actually settled it — HR's if the request reached
     // that stage, else the manager's own rejection.
-    final decidedByName = request.hrDecisionByName ?? request.managerDecisionByName;
+    final decidedByName = switch (request.hrDecisionByName ??
+        request.managerDecisionByName) {
+      final name? => _displayActorName(name),
+      null => null,
+    };
     final decidedAt = request.hrDecisionAt ?? request.managerDecisionAt;
+    final captionStyle = Theme.of(
+      context,
+    ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary);
 
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _RequesterHeader(request: request),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      request.subject,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  _RequestStatusBadge(status: request.status),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                request.description,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                decidedAt == null
-                    ? 'Decided by $decidedByName'
-                    : 'Decided by $decidedByName · '
-                          '${formatDisplayDateTime(decidedAt)}',
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                '${request.subject} — ${request.requesterName}',
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(
                   context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
               ),
-              if (request.status == 'rejected' &&
-                  request.rejectionReason != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Reason: ${request.rejectionReason}',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.error),
-                ),
-              ],
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            _RequestStatusBadge(status: request.status, dense: true),
+          ],
         ),
+        const SizedBox(height: 2),
+        Text(
+          request.description,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          decidedAt == null
+              ? 'Decided by $decidedByName'
+              : 'Decided by $decidedByName · ${formatDisplayDateTime(decidedAt)}',
+          style: captionStyle,
+        ),
+        if (request.status == 'rejected' && request.rejectionReason != null)
+          Text(
+            'Reason: ${request.rejectionReason}',
+            style: captionStyle?.copyWith(color: AppColors.error),
+          ),
       ],
     );
   }
