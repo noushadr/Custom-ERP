@@ -402,7 +402,10 @@ class _DepartmentPayrollTotals extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var i = 0; i < payroll.departmentTotals.length; i++) ...[
-                _DepartmentPayrollRow(total: payroll.departmentTotals[i]),
+                _DepartmentPayrollRow(
+                  total: payroll.departmentTotals[i],
+                  totalMonthlyPayroll: payroll.totalMonthlyPayroll,
+                ),
                 if (i < payroll.departmentTotals.length - 1)
                   const Divider(height: 16, color: AppColors.borderSubtle),
               ],
@@ -415,17 +418,28 @@ class _DepartmentPayrollTotals extends ConsumerWidget {
 }
 
 class _DepartmentPayrollRow extends StatelessWidget {
-  const _DepartmentPayrollRow({required this.total});
+  const _DepartmentPayrollRow({
+    required this.total,
+    required this.totalMonthlyPayroll,
+  });
 
   final DepartmentPayrollTotal total;
+
+  /// The company-wide monthly payroll total — [total]'s share of it is
+  /// shown as a percentage alongside the PKR figure.
+  final double totalMonthlyPayroll;
 
   @override
   Widget build(BuildContext context) {
     final employeeLabel = total.employeeCount == 1
         ? '1 employee'
         : '${total.employeeCount} employees';
+    final percentage = totalMonthlyPayroll == 0
+        ? 0.0
+        : total.totalMonthlyPayroll / totalMonthlyPayroll * 100;
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Text(
@@ -435,9 +449,23 @@ class _DepartmentPayrollRow extends StatelessWidget {
             ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
-        Text(
-          'PKR ${formatWholeAmount(total.totalMonthlyPayroll)} · $employeeLabel',
-          style: Theme.of(context).textTheme.bodyMedium,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '${percentage.toStringAsFixed(1)}% of payroll',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+            Text(
+              'PKR ${formatWholeAmount(total.totalMonthlyPayroll)} · $employeeLabel',
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
         ),
       ],
     );

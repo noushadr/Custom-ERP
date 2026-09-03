@@ -341,8 +341,10 @@ void main() {
 
       expect(find.text('Payroll by Department'), findsOneWidget);
       expect(find.text('Engineering'), findsOneWidget);
+      expect(find.text('60.0% of payroll'), findsOneWidget);
       expect(find.text('PKR 150,000 · 2 employees'), findsOneWidget);
       expect(find.text('Unassigned'), findsOneWidget);
+      expect(find.text('8.0% of payroll'), findsOneWidget);
       expect(find.text('PKR 20,000 · 1 employee'), findsOneWidget);
     },
   );
