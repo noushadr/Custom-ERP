@@ -65,7 +65,8 @@ function buildLineItem(overrides: Partial<PayrollLineItem> = {}): PayrollLineIte
     baseSalary: '50000.00',
     quantity: null,
     perUnitRate: null,
-    netPay: '50000.00',
+    additions: '0.00',
+    deductions: '0.00',
     notes: null,
     createdAt: new Date('2026-08-01T00:00:00.000Z'),
     updatedAt: new Date('2026-08-01T00:00:00.000Z'),
@@ -162,7 +163,7 @@ describe('PayrollService', () => {
       ]);
       employeesService.getSalaryAsOf.mockResolvedValue(75000);
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ employeeId: 'e1', baseSalary: '75000.00', netPay: '75000.00' }),
+        buildLineItem({ employeeId: 'e1', baseSalary: '75000.00' }),
       ]);
 
       const result = await service.generateRun(
@@ -191,18 +192,21 @@ describe('PayrollService', () => {
   });
 
   describe('updateLineItem', () => {
-    it('edits netPay directly for an employee line item', async () => {
+    it('edits additions/deductions for an employee line item, and netPay reflects both', async () => {
       runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
       lineItemRepository.findById.mockResolvedValue(buildLineItem());
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ baseSalary: '50000.00', netPay: '48500.00' }),
+        buildLineItem({ baseSalary: '50000.00', additions: '500.00', deductions: '2000.00' }),
       ]);
 
       const result = await service.updateLineItem('run-1', 'item-1', {
-        netPay: 48500,
+        additions: 500,
+        deductions: 2000,
       });
 
       expect(result.lineItems[0].baseSalary).toBe(50000);
+      expect(result.lineItems[0].additions).toBe(500);
+      expect(result.lineItems[0].deductions).toBe(2000);
       expect(result.lineItems[0].netPay).toBe(48500);
     });
 
@@ -214,14 +218,12 @@ describe('PayrollService', () => {
           baseSalary: '0.00',
           quantity: 5,
           perUnitRate: '1000.00',
-          netPay: '5000.00',
         }),
       ]);
 
       const result = await service.updateLineItem('run-1', 'item-1', {
         quantity: 5,
         perUnitRate: 1000,
-        netPay: 5000,
       });
 
       expect(result.lineItems[0].baseSalary).toBe(5000);
@@ -240,7 +242,6 @@ describe('PayrollService', () => {
           freelancerId: 'freelancer-1',
           freelancer: buildFreelancer(),
           baseSalary: '27300.00',
-          netPay: '27300.00',
         }),
       ]);
 
@@ -267,7 +268,7 @@ describe('PayrollService', () => {
       );
 
       await expect(
-        service.updateLineItem('run-1', 'item-1', { netPay: 100 }),
+        service.updateLineItem('run-1', 'item-1', { additions: 100 }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -278,13 +279,13 @@ describe('PayrollService', () => {
       );
 
       await expect(
-        service.updateLineItem('run-1', 'item-1', { netPay: 100 }),
+        service.updateLineItem('run-1', 'item-1', { additions: 100 }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('addFreelancerToRun', () => {
-    it("adds a freelancer line item with the entered amount as baseSalary and netPay, employeeId null", async () => {
+    it("adds a freelancer line item with the entered amount as baseSalary, additions/deductions at 0, employeeId null", async () => {
       runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
       freelancerRepository.findById.mockResolvedValue(buildFreelancer());
       // First call is the pre-add duplicate check (no existing items yet);
@@ -298,7 +299,6 @@ describe('PayrollService', () => {
             freelancerId: 'freelancer-1',
             freelancer: buildFreelancer(),
             baseSalary: '27300.00',
-            netPay: '27300.00',
           }),
         ]);
 
@@ -313,11 +313,13 @@ describe('PayrollService', () => {
           employeeId: null,
           freelancerId: 'freelancer-1',
           baseSalary: '27300.00',
-          netPay: '27300.00',
+          additions: '0.00',
+          deductions: '0.00',
         }),
       );
       expect(result.lineItems[0].isFreelancer).toBe(true);
       expect(result.lineItems[0].employeeName).toBe('Kulsum Zehra');
+      expect(result.lineItems[0].netPay).toBe(27300);
     });
 
     it('throws NotFoundException for an unknown freelancerId', async () => {
@@ -446,14 +448,76 @@ describe('PayrollService', () => {
     it('returns a summary with totalNetPay across all line items', async () => {
       runRepository.findAll.mockResolvedValue([buildRun()]);
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ baseSalary: '50000.00', netPay: '52000.00' }),
-        buildLineItem({ id: 'item-2', baseSalary: '60000.00', netPay: '60000.00' }),
+        buildLineItem({ baseSalary: '50000.00', additions: '2000.00' }),
+        buildLineItem({ id: 'item-2', baseSalary: '60000.00' }),
       ]);
 
       const result = await service.getRuns();
 
       expect(result[0].employeeCount).toBe(2);
       expect(result[0].totalNetPay).toBe(112000); // 52000 + 60000
+    });
+  });
+
+  describe('getRun', () => {
+    it("breaks the run's netPay down by department, freelancers and unassigned employees each in their own bucket", async () => {
+      runRepository.findById.mockResolvedValue(buildRun());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({
+          id: 'item-eng-1',
+          employee: buildEmployee({
+            id: 'e1',
+            departmentId: 'dept-eng',
+            department: { id: 'dept-eng', name: 'Engineering' } as never,
+          }),
+          baseSalary: '60000.00',
+        }),
+        buildLineItem({
+          id: 'item-eng-2',
+          employee: buildEmployee({
+            id: 'e2',
+            departmentId: 'dept-eng',
+            department: { id: 'dept-eng', name: 'Engineering' } as never,
+          }),
+          baseSalary: '50000.00',
+        }),
+        buildLineItem({
+          id: 'item-no-dept',
+          employee: buildEmployee({ id: 'e3' }),
+          baseSalary: '20000.00',
+        }),
+        buildLineItem({
+          id: 'item-freelancer',
+          employeeId: null,
+          employee: null,
+          freelancerId: 'freelancer-1',
+          freelancer: buildFreelancer(),
+          baseSalary: '30000.00',
+        }),
+      ]);
+
+      const result = await service.getRun('run-1');
+
+      expect(result.departmentTotals).toEqual([
+        {
+          departmentId: 'dept-eng',
+          departmentName: 'Engineering',
+          totalNetPay: 110000,
+          itemCount: 2,
+        },
+        {
+          departmentId: null,
+          departmentName: 'Freelancers',
+          totalNetPay: 30000,
+          itemCount: 1,
+        },
+        {
+          departmentId: null,
+          departmentName: 'Unassigned',
+          totalNetPay: 20000,
+          itemCount: 1,
+        },
+      ]);
     });
   });
 });

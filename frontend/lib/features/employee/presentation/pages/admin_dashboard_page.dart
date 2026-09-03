@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
-import '../../../../shared/widgets/form_section.dart';
+import '../../../../shared/widgets/department_breakdown_section.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
@@ -16,7 +16,6 @@ import '../../../payroll/domain/entities/payroll_run_summary.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
-import '../../domain/entities/payroll_summary.dart';
 import '../widgets/company_notices_section.dart';
 
 class AdminDashboardPage extends ConsumerWidget {
@@ -382,7 +381,9 @@ class _PayrollStats extends ConsumerWidget {
 /// Each department's share of the current monthly payroll, sorted highest
 /// total first (as returned by the backend) — shown right below the
 /// headline payroll figures so HR/Admin can see where the payroll actually
-/// goes without opening the full Payroll module.
+/// goes without opening the full Payroll module. Renders via the shared
+/// [DepartmentBreakdownSection] so this and the single-run breakdown on
+/// `PayrollRunDetailPage` stay visually identical.
 class _DepartmentPayrollTotals extends ConsumerWidget {
   const _DepartmentPayrollTotals();
 
@@ -393,81 +394,19 @@ class _DepartmentPayrollTotals extends ConsumerWidget {
     return payrollAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(),
-      data: (payroll) {
-        if (payroll.departmentTotals.isEmpty) return const SizedBox.shrink();
-
-        return FormSection(
-          title: 'Payroll by Department',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < payroll.departmentTotals.length; i++) ...[
-                _DepartmentPayrollRow(
-                  total: payroll.departmentTotals[i],
-                  totalMonthlyPayroll: payroll.totalMonthlyPayroll,
-                ),
-                if (i < payroll.departmentTotals.length - 1)
-                  const Divider(height: 16, color: AppColors.borderSubtle),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _DepartmentPayrollRow extends StatelessWidget {
-  const _DepartmentPayrollRow({
-    required this.total,
-    required this.totalMonthlyPayroll,
-  });
-
-  final DepartmentPayrollTotal total;
-
-  /// The company-wide monthly payroll total — [total]'s share of it is
-  /// shown as a percentage alongside the PKR figure.
-  final double totalMonthlyPayroll;
-
-  @override
-  Widget build(BuildContext context) {
-    final employeeLabel = total.employeeCount == 1
-        ? '1 employee'
-        : '${total.employeeCount} employees';
-    final percentage = totalMonthlyPayroll == 0
-        ? 0.0
-        : total.totalMonthlyPayroll / totalMonthlyPayroll * 100;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Text(
-            total.departmentName,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '${percentage.toStringAsFixed(1)}% of payroll',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
+      data: (payroll) => DepartmentBreakdownSection(
+        title: 'Payroll by Department',
+        totalAmount: payroll.totalMonthlyPayroll,
+        countLabel: (count) => count == 1 ? '1 employee' : '$count employees',
+        rows: [
+          for (final total in payroll.departmentTotals)
+            DepartmentBreakdownRow(
+              name: total.departmentName,
+              amount: total.totalMonthlyPayroll,
+              count: total.employeeCount,
             ),
-            Text(
-              'PKR ${formatWholeAmount(total.totalMonthlyPayroll)} · $employeeLabel',
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

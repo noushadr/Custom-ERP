@@ -15,11 +15,15 @@ export interface PayrollLineItemResponseDto {
   /** Piece-rate units this run; `null` for salaried employees. */
   quantity: number | null;
   perUnitRate: number | null;
-  /** What was actually paid — a plain stored figure, not computed from any
-   * deduction/addition breakdown (this app has no attendance module and
-   * deliberately doesn't track fines/deductions/allowances per line item).
-   * Defaults to `baseSalary` when the line item is created, then freely
-   * editable for every line item while the run is Draft. */
+  /** A one-off amount added on top of `baseSalary` this run — freely
+   * editable while the run is Draft, defaults to 0. */
+  additions: number;
+  /** A one-off amount subtracted from `baseSalary` this run — freely
+   * editable while the run is Draft, defaults to 0. */
+  deductions: number;
+  /** `baseSalary + additions - deductions` — computed here, not stored
+   * (this app deliberately has no attendance module or itemized
+   * fines/allowances breakdown beyond this one addition/deduction pair). */
   netPay: number;
   notes: string | null;
 }
@@ -40,6 +44,19 @@ export interface PayrollRunSummaryDto {
   createdAt: string;
 }
 
+export interface PayrollDepartmentTotal {
+  departmentId: string | null;
+  /** "Unassigned" for an employee with no department, "Freelancers" for
+   * every freelancer line item grouped together (freelancers don't belong
+   * to a department at all). */
+  departmentName: string;
+  totalNetPay: number;
+  itemCount: number;
+}
+
 export interface PayrollRunDetailDto extends PayrollRunSummaryDto {
   lineItems: PayrollLineItemResponseDto[];
+  /** This run's totalNetPay broken down by department, sorted
+   * highest-total first. */
+  departmentTotals: PayrollDepartmentTotal[];
 }

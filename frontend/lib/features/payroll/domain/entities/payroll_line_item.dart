@@ -9,6 +9,8 @@ class PayrollLineItem {
     required this.baseSalary,
     required this.quantity,
     required this.perUnitRate,
+    required this.additions,
+    required this.deductions,
     required this.netPay,
     required this.notes,
   });
@@ -34,9 +36,16 @@ class PayrollLineItem {
   final int? quantity;
   final double? perUnitRate;
 
-  /// What was actually paid — a plain, directly-entered figure (defaults
-  /// to [baseSalary] when the line item is created), not computed from any
-  /// deduction/addition breakdown.
+  /// A one-off amount added on top of [baseSalary] this run — freely
+  /// editable while the run is Draft, defaults to 0.
+  final double additions;
+
+  /// A one-off amount subtracted from [baseSalary] this run — freely
+  /// editable while the run is Draft, defaults to 0.
+  final double deductions;
+
+  /// `baseSalary + additions - deductions` — computed server-side, not
+  /// independently editable.
   final double netPay;
   final String? notes;
 }

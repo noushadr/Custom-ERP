@@ -37,7 +37,8 @@ class PayrollRemoteDataSource {
     double? baseSalary,
     int? quantity,
     double? perUnitRate,
-    double? netPay,
+    double? additions,
+    double? deductions,
     String? notes,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
@@ -46,7 +47,8 @@ class PayrollRemoteDataSource {
         'baseSalary': ?baseSalary,
         'quantity': ?quantity,
         'perUnitRate': ?perUnitRate,
-        'netPay': ?netPay,
+        'additions': ?additions,
+        'deductions': ?deductions,
         'notes': ?notes,
       },
     );

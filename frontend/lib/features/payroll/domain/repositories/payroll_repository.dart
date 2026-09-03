@@ -14,7 +14,8 @@ abstract interface class PayrollRepository {
     double? baseSalary,
     int? quantity,
     double? perUnitRate,
-    double? netPay,
+    double? additions,
+    double? deductions,
     String? notes,
   });
 

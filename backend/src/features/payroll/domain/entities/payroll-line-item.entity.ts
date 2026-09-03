@@ -8,13 +8,14 @@ import { PayrollRun } from './payroll-run.entity';
  * snapshot taken at generation time (the employee's SalaryRecord in effect
  * that month) — it never changes afterwards even if the employee's salary
  * is later amended, since this is meant to be exactly what that month's
- * payroll actually paid. Deliberately minimal: no deductions/fines/
- * attendance tracking of any kind (removed 2026-08-26 per explicit
- * instruction — "get rid of all the deductions, fines, absents etc." —
- * this app has no attendance module, and the granular breakdown wasn't
- * wanted). `netPay` is a plain, directly-entered figure — defaults to
- * `baseSalary` when the line item is created, then freely editable for
- * every line item (not just freelancers') while the run is Draft. */
+ * payroll actually paid. Deliberately minimal: no attendance/fines
+ * tracking of any kind (that granular breakdown was removed 2026-08-26 per
+ * explicit instruction and isn't wanted back — this app still has no
+ * attendance module). A single `additions`/`deductions` pair was added
+ * back 2026-09-03, also per explicit instruction, purely so `netPay` can be
+ * justified with a one-line "why" rather than being an opaque directly-
+ * entered figure — `netPay` itself is computed in the mapper as
+ * `baseSalary + additions - deductions`, not stored. */
 @Entity('payroll_line_items')
 export class PayrollLineItem extends BaseEntity {
   @Column()
@@ -61,11 +62,16 @@ export class PayrollLineItem extends BaseEntity {
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   perUnitRate?: string | null;
 
-  /** What was actually paid — plain and directly entered, not computed
-   * from any deduction/addition breakdown. Defaults to `baseSalary` at
-   * creation. */
-  @Column({ type: 'numeric', precision: 12, scale: 2 })
-  netPay: string;
+  /** A one-off amount added on top of `baseSalary` this run (bonus,
+   * reimbursement, etc.) — freely editable while the run is Draft, defaults
+   * to 0. */
+  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
+  additions: string;
+
+  /** A one-off amount subtracted from `baseSalary` this run — freely
+   * editable while the run is Draft, defaults to 0. */
+  @Column({ type: 'numeric', precision: 12, scale: 2, default: '0.00' })
+  deductions: string;
 
   @Column({ type: 'text', nullable: true })
   notes?: string | null;

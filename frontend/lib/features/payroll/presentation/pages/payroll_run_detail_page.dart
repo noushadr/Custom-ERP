@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../../shared/widgets/department_breakdown_section.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../freelancers/application/freelancers_providers.dart';
 import '../../application/payroll_providers.dart';
@@ -136,6 +137,20 @@ class _RunDetailBody extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+          DepartmentBreakdownSection(
+            title: 'Payroll by Department',
+            totalAmount: run.totalNetPay,
+            countLabel: (count) => count == 1 ? '1 person' : '$count people',
+            rows: [
+              for (final total in run.departmentTotals)
+                DepartmentBreakdownRow(
+                  name: total.departmentName,
+                  amount: total.totalNetPay,
+                  count: total.itemCount,
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
           FormSection(
             title: 'Line items',
             trailing: run.status == PayrollRunStatus.draft
@@ -158,6 +173,8 @@ class _RunDetailBody extends ConsumerWidget {
                 columns: const [
                   DataColumn(label: Text('Employee')),
                   DataColumn(label: Text('Base'), numeric: true),
+                  DataColumn(label: Text('Additions'), numeric: true),
+                  DataColumn(label: Text('Deductions'), numeric: true),
                   DataColumn(label: Text('Net Pay'), numeric: true),
                 ],
                 rows: [
@@ -210,6 +227,26 @@ class _RunDetailBody extends ConsumerWidget {
                         DataCell(Text(formatAmount(item.baseSalary))),
                         DataCell(
                           Text(
+                            item.additions == 0
+                                ? '—'
+                                : '+${formatAmount(item.additions)}',
+                            style: item.additions == 0
+                                ? null
+                                : const TextStyle(color: AppColors.success),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            item.deductions == 0
+                                ? '—'
+                                : '-${formatAmount(item.deductions)}',
+                            style: item.deductions == 0
+                                ? null
+                                : const TextStyle(color: AppColors.error),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
                             formatAmount(item.netPay),
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
@@ -241,7 +278,8 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
   late final TextEditingController _baseSalaryController;
   late final TextEditingController _quantityController;
   late final TextEditingController _perUnitRateController;
-  late final TextEditingController _netPayController;
+  late final TextEditingController _additionsController;
+  late final TextEditingController _deductionsController;
   late final TextEditingController _notesController;
   bool _saving = false;
   String? _errorMessage;
@@ -258,10 +296,40 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
     _perUnitRateController = TextEditingController(
       text: widget.item.perUnitRate?.toStringAsFixed(2) ?? '',
     );
-    _netPayController = TextEditingController(
-      text: widget.item.netPay.toStringAsFixed(2),
+    _additionsController = TextEditingController(
+      text: widget.item.additions.toStringAsFixed(2),
+    );
+    _deductionsController = TextEditingController(
+      text: widget.item.deductions.toStringAsFixed(2),
     );
     _notesController = TextEditingController(text: widget.item.notes ?? '');
+    for (final controller in [
+      _baseSalaryController,
+      _quantityController,
+      _perUnitRateController,
+      _additionsController,
+      _deductionsController,
+    ]) {
+      controller.addListener(_onFieldChanged);
+    }
+  }
+
+  void _onFieldChanged() => setState(() {});
+
+  /// Mirrors the backend mapper: Quantity × Per unit replaces the salary
+  /// snapshot as this run's base pay when both are set, then
+  /// additions/deductions are applied on top — kept in sync here purely so
+  /// the dialog can preview Net Pay live as the admin types.
+  double get _previewNetPay {
+    final quantity = int.tryParse(_quantityController.text);
+    final perUnitRate = double.tryParse(_perUnitRateController.text);
+    final baseSalary = double.tryParse(_baseSalaryController.text) ?? 0;
+    final effectiveBase = (quantity != null && quantity > 0 && perUnitRate != null)
+        ? quantity * perUnitRate
+        : baseSalary;
+    final additions = double.tryParse(_additionsController.text) ?? 0;
+    final deductions = double.tryParse(_deductionsController.text) ?? 0;
+    return effectiveBase + additions - deductions;
   }
 
   @override
@@ -269,7 +337,8 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
     _baseSalaryController.dispose();
     _quantityController.dispose();
     _perUnitRateController.dispose();
-    _netPayController.dispose();
+    _additionsController.dispose();
+    _deductionsController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -290,7 +359,8 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
                 : null,
             quantity: int.tryParse(_quantityController.text),
             perUnitRate: double.tryParse(_perUnitRateController.text),
-            netPay: double.tryParse(_netPayController.text),
+            additions: double.tryParse(_additionsController.text),
+            deductions: double.tryParse(_deductionsController.text),
             notes: _notesController.text.trim().isEmpty
                 ? null
                 : _notesController.text.trim(),
@@ -370,12 +440,37 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              const _SectionLabel('Net Pay'),
+              const _SectionLabel('Additions & Deductions'),
               const SizedBox(height: 8),
-              _AmountField(
-                label: 'Net salary paid',
-                controller: _netPayController,
-                enabled: !_saving,
+              Row(
+                children: [
+                  Expanded(
+                    child: _AmountField(
+                      label: 'Additions',
+                      controller: _additionsController,
+                      enabled: !_saving,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _AmountField(
+                      label: 'Deductions',
+                      controller: _deductionsController,
+                      enabled: !_saving,
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Net Pay = Base + Additions − Deductions: '
+                  'PKR ${formatAmount(_previewNetPay)}',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               TextField(

@@ -1,3 +1,4 @@
+import 'payroll_department_total.dart';
 import 'payroll_line_item.dart';
 import 'payroll_run_summary.dart';
 
@@ -16,7 +17,12 @@ class PayrollRunDetail extends PayrollRunSummary {
     required super.paidAt,
     required super.createdAt,
     required this.lineItems,
+    required this.departmentTotals,
   });
 
   final List<PayrollLineItem> lineItems;
+
+  /// This run's totalNetPay broken down by department, sorted
+  /// highest-total first.
+  final List<PayrollDepartmentTotal> departmentTotals;
 }
