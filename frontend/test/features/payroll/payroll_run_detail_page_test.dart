@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
 import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
+import 'package:zera_erp/features/payroll/domain/entities/payroll_department_total.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_run_status.dart';
 import 'package:zera_erp/features/payroll/presentation/pages/payroll_run_detail_page.dart';
 
@@ -51,7 +52,7 @@ void main() {
           buildTestPayrollLineItem(
             employeeName: 'Jane Doe',
             baseSalary: 50000,
-            netPay: 48000,
+            deductions: 2000,
           ),
         ],
       ),
@@ -112,33 +113,43 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Mark Paid'), findsNothing);
   });
 
-  testWidgets('editing a line item in a draft run submits the new net pay', (
-    tester,
-  ) async {
-    final repository = FakePayrollRepository(
-      runDetail: buildTestPayrollRunDetail(
-        status: PayrollRunStatus.draft,
-        lineItems: [buildTestPayrollLineItem(id: 'item-9', employeeName: 'Jane Doe')],
-      ),
-    );
-    await tester.pumpWidget(_app(repository: repository));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'editing a line item in a draft run submits new additions/deductions',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(
+          status: PayrollRunStatus.draft,
+          lineItems: [buildTestPayrollLineItem(id: 'item-9', employeeName: 'Jane Doe')],
+        ),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Jane Doe'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Jane Doe'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Jane Doe'), findsWidgets); // dialog title + table cell
+      expect(find.text('Jane Doe'), findsWidgets); // dialog title + table cell
 
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Net salary paid (PKR)'),
-      '48500',
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Additions (PKR)'),
+        '500',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Deductions (PKR)'),
+        '2000',
+      );
+      await tester.pumpAndSettle();
 
-    expect(repository.lastUpdatedLineItemId, 'item-9');
-    expect(repository.lastUpdatedNetPay, 48500);
-  });
+      expect(find.textContaining('PKR 48,500.00'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedLineItemId, 'item-9');
+      expect(repository.lastUpdatedAdditions, 500);
+      expect(repository.lastUpdatedDeductions, 2000);
+    },
+  );
 
   testWidgets(
     'editing piece-rate quantity and per-unit rate submits both',
@@ -185,11 +196,11 @@ void main() {
     await tester.tap(find.text('Jane Doe'));
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(TextField, 'Net salary paid (PKR)'), findsNothing);
+    expect(find.widgetWithText(TextField, 'Additions (PKR)'), findsNothing);
   });
 
   testWidgets(
-    'the line items table shows only Employee, Base, and Net Pay',
+    'the line items table shows Employee, Base, Additions, Deductions, and Net Pay',
     (tester) async {
       final repository = FakePayrollRepository(
         runDetail: buildTestPayrollRunDetail(
@@ -198,7 +209,7 @@ void main() {
             buildTestPayrollLineItem(
               employeeName: 'Jane Doe',
               baseSalary: 50000,
-              netPay: 48000,
+              deductions: 2000,
             ),
           ],
         ),
@@ -208,7 +219,10 @@ void main() {
 
       expect(find.text('Employee'), findsOneWidget);
       expect(find.text('Base'), findsOneWidget);
+      expect(find.text('Additions'), findsOneWidget);
+      expect(find.text('Deductions'), findsOneWidget);
       expect(find.text('Net Pay'), findsOneWidget);
+      expect(find.text('-2,000.00'), findsOneWidget);
       expect(find.text('Fines'), findsNothing);
       expect(find.text('Absent'), findsNothing);
       expect(find.text('Late Days'), findsNothing);
@@ -301,4 +315,42 @@ void main() {
       expect(repository.lastAddedFreelancerBaseSalary, 27300);
     },
   );
+
+  testWidgets('shows a Payroll by Department breakdown for this run', (
+    tester,
+  ) async {
+    final repository = FakePayrollRepository(
+      runDetail: buildTestPayrollRunDetail(
+        status: PayrollRunStatus.draft,
+        lineItems: [
+          buildTestPayrollLineItem(baseSalary: 80000),
+          buildTestPayrollLineItem(id: 'item-2', baseSalary: 20000),
+        ],
+        departmentTotals: const [
+          PayrollDepartmentTotal(
+            departmentId: 'dept-eng',
+            departmentName: 'Engineering',
+            totalNetPay: 80000,
+            itemCount: 1,
+          ),
+          PayrollDepartmentTotal(
+            departmentId: null,
+            departmentName: 'Freelancers',
+            totalNetPay: 20000,
+            itemCount: 1,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Payroll by Department'), findsOneWidget);
+    expect(find.text('Engineering'), findsOneWidget);
+    expect(find.text('80.0% of payroll'), findsOneWidget);
+    expect(find.text('PKR 80,000 · 1 person'), findsOneWidget);
+    expect(find.text('Freelancers'), findsOneWidget);
+    expect(find.text('20.0% of payroll'), findsOneWidget);
+    expect(find.text('PKR 20,000 · 1 person'), findsOneWidget);
+  });
 }

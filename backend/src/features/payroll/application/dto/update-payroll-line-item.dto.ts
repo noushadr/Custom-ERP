@@ -19,11 +19,15 @@ export class UpdatePayrollLineItemDto {
   @Min(0)
   perUnitRate?: number;
 
-  /** What was actually paid — freely editable for every line item. */
   @IsOptional()
   @IsNumber()
   @Min(0)
-  netPay?: number;
+  additions?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  deductions?: number;
 
   @IsOptional()
   @IsString()

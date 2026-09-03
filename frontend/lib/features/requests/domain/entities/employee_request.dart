@@ -7,6 +7,7 @@ class EmployeeRequest {
     required this.subject,
     required this.description,
     this.type,
+    required this.kind,
     required this.status,
     this.managerDecisionAt,
     this.managerDecisionByName,
@@ -23,6 +24,11 @@ class EmployeeRequest {
   final String subject;
   final String description;
   final String? type;
+
+  /// `general` or `profile_change` — a `profile_change` request skips
+  /// manager approval entirely and is created straight at
+  /// `manager_approved`, awaiting HR/Admin only.
+  final String kind;
 
   /// One of: `submitted`, `manager_approved`, `completed`, `rejected`.
   final String status;

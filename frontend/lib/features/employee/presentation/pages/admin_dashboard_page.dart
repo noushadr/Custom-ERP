@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
+import '../../../../shared/widgets/department_breakdown_section.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
@@ -217,6 +218,8 @@ class _DashboardStats extends ConsumerWidget {
             const _SectionHeader('Payroll'),
             const SizedBox(height: 10),
             const _PayrollStats(),
+            const SizedBox(height: 10),
+            const _DepartmentPayrollTotals(),
             const SizedBox(height: 18),
           ],
           if (showClients || showPayrollRuns) ...[
@@ -371,6 +374,39 @@ class _PayrollStats extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Each department's share of the current monthly payroll, sorted highest
+/// total first (as returned by the backend) — shown right below the
+/// headline payroll figures so HR/Admin can see where the payroll actually
+/// goes without opening the full Payroll module. Renders via the shared
+/// [DepartmentBreakdownSection] so this and the single-run breakdown on
+/// `PayrollRunDetailPage` stay visually identical.
+class _DepartmentPayrollTotals extends ConsumerWidget {
+  const _DepartmentPayrollTotals();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payrollAsync = ref.watch(payrollSummaryProvider);
+
+    return payrollAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (payroll) => DepartmentBreakdownSection(
+        title: 'Payroll by Department',
+        totalAmount: payroll.totalMonthlyPayroll,
+        countLabel: (count) => count == 1 ? '1 employee' : '$count employees',
+        rows: [
+          for (final total in payroll.departmentTotals)
+            DepartmentBreakdownRow(
+              name: total.departmentName,
+              amount: total.totalMonthlyPayroll,
+              count: total.employeeCount,
+            ),
+        ],
+      ),
     );
   }
 }

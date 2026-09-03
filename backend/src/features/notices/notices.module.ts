@@ -19,5 +19,6 @@ import { NoticesController } from './presentation/notices.controller';
     NoticesService,
     { provide: NOTICE_REPOSITORY, useClass: TypeOrmNoticeRepository },
   ],
+  exports: [NoticesService],
 })
 export class NoticesModule {}

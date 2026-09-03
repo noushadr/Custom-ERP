@@ -439,14 +439,41 @@ export class PerformanceReviewsService {
    * without an N+1 fetch per employee. */
   async getLatestReviewSummaries(): Promise<PerformanceReviewSummaryDto[]> {
     const reviews = await this.reviewRepository.findLatestPerEmployee();
-    return reviews.map((review) => ({
+    return reviews.map((review) => this.toSummaryDto(review));
+  }
+
+  /** Same shape as `getLatestReviewSummaries`, but scoped to just the
+   * caller's own direct reports rather than every employee company-wide —
+   * deliberately no `performance.manage` guard, mirroring
+   * `getPendingManagerAction`'s identity-scoped access, since a Team Lead's
+   * "My Team" dashboard section needs this without holding the
+   * company-wide permission. */
+  async getLatestForMyTeam(
+    actorUserId: string,
+  ): Promise<PerformanceReviewSummaryDto[]> {
+    const manager = await this.employeeRepository.findByUserId(actorUserId);
+    if (!manager) return [];
+
+    const reports = await this.employeeRepository.findByReportingManagerId(
+      manager.id,
+    );
+    const reportIds = new Set(reports.map((report) => report.id));
+
+    const reviews = await this.reviewRepository.findLatestPerEmployee();
+    return reviews
+      .filter((review) => reportIds.has(review.employeeId))
+      .map((review) => this.toSummaryDto(review));
+  }
+
+  private toSummaryDto(review: PerformanceReview): PerformanceReviewSummaryDto {
+    return {
       employeeId: review.employeeId,
       reviewYear: review.reviewYear,
       dueDate: review.dueDate,
       status: review.status,
       completedAt: review.completedAt?.toISOString() ?? null,
       finalizedAt: review.finalizedAt?.toISOString() ?? null,
-    }));
+    };
   }
 
   // ---- Workflow transitions ----

@@ -31,7 +31,8 @@ class PayrollRepositoryImpl implements PayrollRepository {
     double? baseSalary,
     int? quantity,
     double? perUnitRate,
-    double? netPay,
+    double? additions,
+    double? deductions,
     String? notes,
   }) => _guard(
     () => _remoteDataSource.updateLineItem(
@@ -40,7 +41,8 @@ class PayrollRepositoryImpl implements PayrollRepository {
       baseSalary: baseSalary,
       quantity: quantity,
       perUnitRate: perUnitRate,
-      netPay: netPay,
+      additions: additions,
+      deductions: deductions,
       notes: notes,
     ),
   );

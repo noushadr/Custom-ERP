@@ -11,6 +11,8 @@ class PayrollLineItemModel extends PayrollLineItem {
     required super.baseSalary,
     required super.quantity,
     required super.perUnitRate,
+    required super.additions,
+    required super.deductions,
     required super.netPay,
     required super.notes,
   });
@@ -26,6 +28,8 @@ class PayrollLineItemModel extends PayrollLineItem {
         baseSalary: (json['baseSalary'] as num).toDouble(),
         quantity: json['quantity'] as int?,
         perUnitRate: (json['perUnitRate'] as num?)?.toDouble(),
+        additions: (json['additions'] as num).toDouble(),
+        deductions: (json['deductions'] as num).toDouble(),
         netPay: (json['netPay'] as num).toDouble(),
         notes: json['notes'] as String?,
       );

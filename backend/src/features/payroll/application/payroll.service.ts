@@ -140,7 +140,8 @@ export class PayrollService {
         item.baseSalary = baseSalary.toFixed(2);
         item.quantity = null;
         item.perUnitRate = null;
-        item.netPay = baseSalary.toFixed(2);
+        item.additions = '0.00';
+        item.deductions = '0.00';
         return item;
       }),
     );
@@ -183,7 +184,10 @@ export class PayrollService {
     if (dto.perUnitRate !== undefined) {
       item.perUnitRate = dto.perUnitRate.toFixed(2);
     }
-    if (dto.netPay !== undefined) item.netPay = dto.netPay.toFixed(2);
+    if (dto.additions !== undefined) item.additions = dto.additions.toFixed(2);
+    if (dto.deductions !== undefined) {
+      item.deductions = dto.deductions.toFixed(2);
+    }
     if (dto.notes !== undefined) item.notes = dto.notes;
 
     await this.lineItemRepository.save(item);
@@ -227,7 +231,8 @@ export class PayrollService {
     item.baseSalary = dto.baseSalary.toFixed(2);
     item.quantity = null;
     item.perUnitRate = null;
-    item.netPay = dto.baseSalary.toFixed(2);
+    item.additions = '0.00';
+    item.deductions = '0.00';
     item.notes = dto.notes ?? null;
     await this.lineItemRepository.save(item);
 

@@ -1,3 +1,4 @@
+import 'package:zera_erp/features/payroll/domain/entities/payroll_department_total.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_line_item.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_run_detail.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_run_status.dart';
@@ -14,7 +15,8 @@ PayrollLineItem buildTestPayrollLineItem({
   double baseSalary = 50000,
   int? quantity,
   double? perUnitRate,
-  double? netPay,
+  double additions = 0,
+  double deductions = 0,
   String? notes,
 }) {
   final effectiveBaseSalary =
@@ -31,7 +33,9 @@ PayrollLineItem buildTestPayrollLineItem({
     baseSalary: effectiveBaseSalary,
     quantity: quantity,
     perUnitRate: perUnitRate,
-    netPay: netPay ?? effectiveBaseSalary,
+    additions: additions,
+    deductions: deductions,
+    netPay: effectiveBaseSalary + additions - deductions,
     notes: notes,
   );
 }
@@ -78,6 +82,7 @@ PayrollRunDetail buildTestPayrollRunDetail({
   DateTime? paidAt,
   DateTime? createdAt,
   List<PayrollLineItem>? lineItems,
+  List<PayrollDepartmentTotal>? departmentTotals,
 }) {
   final resolvedLineItems = lineItems ?? [buildTestPayrollLineItem()];
   return PayrollRunDetail(
@@ -94,6 +99,7 @@ PayrollRunDetail buildTestPayrollRunDetail({
     paidAt: paidAt,
     createdAt: createdAt ?? DateTime(2026, 8, 1),
     lineItems: resolvedLineItems,
+    departmentTotals: departmentTotals ?? const [],
   );
 }
 
@@ -111,7 +117,8 @@ class FakePayrollRepository implements PayrollRepository {
   double? lastUpdatedBaseSalary;
   int? lastUpdatedQuantity;
   double? lastUpdatedPerUnitRate;
-  double? lastUpdatedNetPay;
+  double? lastUpdatedAdditions;
+  double? lastUpdatedDeductions;
 
   String? lastFinalizedRunId;
   String? lastPaidRunId;
@@ -152,14 +159,16 @@ class FakePayrollRepository implements PayrollRepository {
     double? baseSalary,
     int? quantity,
     double? perUnitRate,
-    double? netPay,
+    double? additions,
+    double? deductions,
     String? notes,
   }) async {
     lastUpdatedLineItemId = lineItemId;
     lastUpdatedBaseSalary = baseSalary;
     lastUpdatedQuantity = quantity;
     lastUpdatedPerUnitRate = perUnitRate;
-    lastUpdatedNetPay = netPay;
+    lastUpdatedAdditions = additions;
+    lastUpdatedDeductions = deductions;
     return runDetail ?? buildTestPayrollRunDetail(id: runId);
   }
 

@@ -16,6 +16,8 @@ import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
+import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
+import { NotificationsService } from '../../notifications/application/notifications.service';
 import { EmployeeRequest } from '../domain/entities/employee-request.entity';
 import { RequestKind } from '../domain/enums/request-kind.enum';
 import { RequestStatus } from '../domain/enums/request-status.enum';
@@ -27,6 +29,19 @@ import { CreateRequestDto } from './dto/create-request.dto';
 import { RequestResponse } from './request-response.interface';
 import { toRequestResponse } from './request.mapper';
 
+/** Caps how far back Request History reaches, the same "bounded history,
+ * not a time-window cutoff" approach the notification bell's own
+ * `_maxDecidedHistory` uses — nothing vanishes just because time passed,
+ * it just stops appearing once far enough down the list. */
+const _HISTORY_LIMIT = 30;
+
+/** The moment a REJECTED or COMPLETED request was actually decided — HR's
+ * decision (the only path to COMPLETED, and one of the two paths to
+ * REJECTED) if set, else the manager's rejection. */
+function decidedAt(request: EmployeeRequest): Date {
+  return request.hrDecisionAt ?? request.managerDecisionAt ?? request.createdAt;
+}
+
 @Injectable()
 export class RequestsService {
   constructor(
@@ -37,6 +52,7 @@ export class RequestsService {
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
     private readonly employeesService: EmployeesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async submit(
@@ -56,6 +72,25 @@ export class RequestsService {
 
     const saved = await this.requestRepository.save(request);
     const reloaded = await this.requestRepository.findById(saved.id);
+
+    // GENERAL requests need the reporting manager's approval first — let
+    // them know right away rather than relying on them to notice it in the
+    // Requests page's own "Awaiting My Approval" list. PROFILE_CHANGE
+    // requests skip this step entirely (see submitProfileChangeRequest), so
+    // there's no manager to notify there.
+    if (employee.reportingManagerId) {
+      const manager = await this.employeeRepository.findById(
+        employee.reportingManagerId,
+      );
+      if (manager) {
+        await this.notificationsService.create({
+          recipientUserId: manager.userId,
+          message: `${employee.firstName} ${employee.lastName} submitted a request — "${dto.subject}" — awaiting your approval`,
+          linkTarget: NotificationLinkTarget.REQUESTS,
+        });
+      }
+    }
+
     return toRequestResponse(reloaded!);
   }
 
@@ -80,8 +115,10 @@ export class RequestsService {
     request.employeeId = employee.id;
     request.subject = 'Profile update request';
     request.description = changes
-      .map(
-        (c) => `${c.fieldLabel}: ${c.oldValue ?? '—'} → ${c.newValue ?? '—'}`,
+      .map((c) =>
+        c.oldValue == null
+          ? `${c.fieldLabel} → ${c.newValue ?? '—'}`
+          : `${c.fieldLabel}: ${c.oldValue} → ${c.newValue ?? '—'}`,
       )
       .join('\n');
     request.type = 'Profile Change';
@@ -121,6 +158,43 @@ export class RequestsService {
       RequestStatus.MANAGER_APPROVED,
     );
     return requests.map(toRequestResponse);
+  }
+
+  /** Every decided request company-wide (approved-and-completed or
+   * rejected, at either stage) — newest decision first, capped so this
+   * doesn't grow unbounded the way the paginated company-wide audit log
+   * does. `users.manage`-gated at the controller, same tier as
+   * findPendingHrApproval, since HR/Admin is the only role that ever
+   * finalizes every request regardless of who it's from. */
+  async getHistory(): Promise<RequestResponse[]> {
+    const decided = await this.findDecided();
+    return decided.slice(0, _HISTORY_LIMIT).map(toRequestResponse);
+  }
+
+  /** Same as getHistory, but scoped to just the caller's own direct
+   * reports' decided requests — deliberately no `@Permissions` guard
+   * (mirrors getPendingManagerAction/getLatestForMyTeam's identity-scoped
+   * pattern), so a Team Lead can see what they've approved/rejected
+   * without holding `users.manage`. */
+  async getHistoryForMyTeam(actorUserId: string): Promise<RequestResponse[]> {
+    const manager = await this.employeeRepository.findByUserId(actorUserId);
+    if (!manager) return [];
+
+    const decided = await this.findDecided();
+    return decided
+      .filter((request) => request.employee.reportingManagerId === manager.id)
+      .slice(0, _HISTORY_LIMIT)
+      .map(toRequestResponse);
+  }
+
+  private async findDecided(): Promise<EmployeeRequest[]> {
+    const [rejected, completed] = await Promise.all([
+      this.requestRepository.findByStatus(RequestStatus.REJECTED),
+      this.requestRepository.findByStatus(RequestStatus.COMPLETED),
+    ]);
+    return [...rejected, ...completed].sort(
+      (a, b) => decidedAt(b).getTime() - decidedAt(a).getTime(),
+    );
   }
 
   async approveAsManager(

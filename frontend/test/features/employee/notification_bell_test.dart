@@ -38,6 +38,7 @@ EmployeeRequest _buildRequest({
     requesterName: requesterName,
     subject: 'New laptop',
     description: 'My laptop is broken.',
+    kind: 'general',
     status: 'submitted',
     createdAt: DateTime(2026, 1, 1),
   );

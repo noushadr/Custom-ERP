@@ -9,6 +9,7 @@ class EmployeeRequestModel extends EmployeeRequest {
     required super.subject,
     required super.description,
     super.type,
+    required super.kind,
     required super.status,
     super.managerDecisionAt,
     super.managerDecisionByName,
@@ -27,6 +28,7 @@ class EmployeeRequestModel extends EmployeeRequest {
         subject: json['subject'] as String,
         description: json['description'] as String,
         type: json['type'] as String?,
+        kind: json['kind'] as String,
         status: json['status'] as String,
         managerDecisionAt: json['managerDecisionAt'] == null
             ? null

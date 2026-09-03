@@ -166,8 +166,8 @@ const _allDestinations = [
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
-// entirely from User Dashboard and Requests. Notifications live in the top
-// bar (see NotificationBell), not the nav.
+// entirely from User Dashboard, Requests, and (since 2026-09-02) Logs.
+// Notifications live in the top bar (see NotificationBell), not the nav.
 const _adminOnlyLabels = {
   'Dashboard',
   'Employees',
@@ -176,8 +176,15 @@ const _adminOnlyLabels = {
   'Payroll',
   'Leads',
   'Financial Reports',
-  'Logs',
 };
+
+// 'Logs' deliberately isn't in _adminOnlyLabels above (unlike before
+// 2026-09-02) — every role sees it now: Super Admin/HR-Manager get the
+// company-wide change feed (LogsPage's own `audit.viewAll` check), everyone
+// else gets just their own change history, moved here from the bottom of
+// User Dashboard the same day. It stays in _hrAndAdminOnlyLabels below only
+// so the Super Admin's own sidebar keeps grouping it under "HR & Admin
+// Features" rather than "General Features".
 
 // Hidden from Super Admin/HR/Manager — they use Dashboard instead.
 // Visible to everyone else.
@@ -416,6 +423,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         _goToDestination('Leaves');
       case 'performance_reviews':
         _goToDestination('Performance Reviews');
+      case 'requests':
+        _goToDestination('Requests');
     }
   }
 

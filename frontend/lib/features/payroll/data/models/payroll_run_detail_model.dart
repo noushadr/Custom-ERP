@@ -1,4 +1,5 @@
 import '../../domain/entities/payroll_run_detail.dart';
+import 'payroll_department_total_model.dart';
 import 'payroll_line_item_model.dart';
 
 class PayrollRunDetailModel extends PayrollRunDetail {
@@ -16,6 +17,7 @@ class PayrollRunDetailModel extends PayrollRunDetail {
     required super.paidAt,
     required super.createdAt,
     required super.lineItems,
+    required super.departmentTotals,
   });
 
   factory PayrollRunDetailModel.fromJson(Map<String, dynamic> json) =>
@@ -39,6 +41,10 @@ class PayrollRunDetailModel extends PayrollRunDetail {
         lineItems: (json['lineItems'] as List<dynamic>)
             .cast<Map<String, dynamic>>()
             .map(PayrollLineItemModel.fromJson)
+            .toList(),
+        departmentTotals: (json['departmentTotals'] as List<dynamic>)
+            .cast<Map<String, dynamic>>()
+            .map(PayrollDepartmentTotalModel.fromJson)
             .toList(),
       );
 }

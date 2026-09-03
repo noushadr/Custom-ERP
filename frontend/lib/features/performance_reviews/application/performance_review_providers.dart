@@ -111,3 +111,15 @@ final latestPerformanceReviewsByEmployeeProvider = FutureProvider.autoDispose<
       .getLatestReviewSummaries();
   return {for (final summary in summaries) summary.employeeId: summary};
 });
+
+/// Same as [latestPerformanceReviewsByEmployeeProvider], but scoped to the
+/// caller's own direct reports and reachable without `performance.manage` —
+/// for the "My Team" section on a Team Lead's User Dashboard.
+final latestPerformanceReviewsForMyTeamProvider = FutureProvider.autoDispose<
+    Map<String, PerformanceReviewSummary>>((ref) async {
+  ref.watch(authControllerProvider);
+  final summaries = await ref
+      .watch(performanceReviewRepositoryProvider)
+      .getLatestForMyTeam();
+  return {for (final summary in summaries) summary.employeeId: summary};
+});

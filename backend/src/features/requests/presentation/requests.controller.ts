@@ -40,6 +40,17 @@ export class RequestsController {
     return this.requestsService.findPendingHrApproval();
   }
 
+  @Get('history')
+  @Permissions('users.manage')
+  getHistory() {
+    return this.requestsService.getHistory();
+  }
+
+  @Get('history/mine')
+  getHistoryForMyTeam(@CurrentUser() user: JwtPayload) {
+    return this.requestsService.getHistoryForMyTeam(user.sub);
+  }
+
   @Patch(':id/manager-approve')
   approveAsManager(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.requestsService.approveAsManager(id, user.sub);

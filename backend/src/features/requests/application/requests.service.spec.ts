@@ -6,6 +6,7 @@ import {
 import { Employee } from '../../employee/domain/entities/employee.entity';
 import type { EmployeesService } from '../../employee/application/employees.service';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
+import type { NotificationsService } from '../../notifications/application/notifications.service';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
 import { EmployeeRequest } from '../domain/entities/employee-request.entity';
 import { RequestKind } from '../domain/enums/request-kind.enum';
@@ -49,6 +50,7 @@ describe('RequestsService', () => {
       'previewProfileChanges' | 'applyApprovedProfileChange'
     >
   >;
+  let notificationsService: jest.Mocked<Pick<NotificationsService, 'create'>>;
 
   beforeEach(() => {
     requestRepository = {
@@ -75,12 +77,16 @@ describe('RequestsService', () => {
       previewProfileChanges: jest.fn(),
       applyApprovedProfileChange: jest.fn(),
     };
+    notificationsService = {
+      create: jest.fn(),
+    };
 
     service = new RequestsService(
       requestRepository,
       employeeRepository,
       userRepository,
       employeesService as unknown as EmployeesService,
+      notificationsService as unknown as NotificationsService,
     );
   });
 
@@ -111,6 +117,43 @@ describe('RequestsService', () => {
       );
       expect(result.status).toBe(RequestStatus.SUBMITTED);
       expect(result.requesterName).toBe('Jane Doe');
+    });
+
+    it("notifies the reporting manager that a request needs their approval", async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ id: 'manager-1', userId: 'manager-user-1' }),
+      );
+      requestRepository.save.mockResolvedValue(buildRequest());
+      requestRepository.findById.mockResolvedValue(buildRequest());
+
+      await service.submit('user-1', {
+        subject: 'New laptop',
+        description: 'Current one is broken.',
+      });
+
+      expect(employeeRepository.findById).toHaveBeenCalledWith('manager-1');
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientUserId: 'manager-user-1',
+          linkTarget: 'requests',
+        }),
+      );
+    });
+
+    it('does not notify anyone when the requester has no reporting manager', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ reportingManagerId: undefined }),
+      );
+      requestRepository.save.mockResolvedValue(buildRequest());
+      requestRepository.findById.mockResolvedValue(buildRequest());
+
+      await service.submit('user-1', {
+        subject: 'New laptop',
+        description: 'Current one is broken.',
+      });
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
     });
   });
 
@@ -173,6 +216,66 @@ describe('RequestsService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('request-1');
+    });
+  });
+
+  describe('getHistory', () => {
+    it('returns rejected and completed requests, newest decision first', async () => {
+      requestRepository.findByStatus.mockImplementation(async (status) => {
+        if (status === RequestStatus.REJECTED) {
+          return [
+            buildRequest({
+              id: 'rejected-1',
+              status: RequestStatus.REJECTED,
+              managerDecisionAt: new Date('2026-01-01T00:00:00Z'),
+            }),
+          ];
+        }
+        if (status === RequestStatus.COMPLETED) {
+          return [
+            buildRequest({
+              id: 'completed-1',
+              status: RequestStatus.COMPLETED,
+              hrDecisionAt: new Date('2026-01-03T00:00:00Z'),
+            }),
+          ];
+        }
+        return [];
+      });
+
+      const result = await service.getHistory();
+
+      expect(result.map((r) => r.id)).toEqual(['completed-1', 'rejected-1']);
+    });
+  });
+
+  describe('getHistoryForMyTeam', () => {
+    it("only returns decided requests reporting to this manager", async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'manager-1' }),
+      );
+      requestRepository.findByStatus.mockImplementation(async (status) => {
+        if (status === RequestStatus.REJECTED) {
+          return [
+            buildRequest({
+              id: 'mine',
+              status: RequestStatus.REJECTED,
+              managerDecisionAt: new Date('2026-01-01T00:00:00Z'),
+            }),
+            buildRequest({
+              id: 'not-mine',
+              status: RequestStatus.REJECTED,
+              managerDecisionAt: new Date('2026-01-01T00:00:00Z'),
+              employee: buildEmployee({ reportingManagerId: 'someone-else' }),
+            }),
+          ];
+        }
+        return [];
+      });
+
+      const result = await service.getHistoryForMyTeam('user-1');
+
+      expect(result.map((r) => r.id)).toEqual(['mine']);
     });
   });
 

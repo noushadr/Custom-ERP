@@ -63,6 +63,10 @@ abstract interface class PerformanceReviewRepository {
   /// review, whatever its status) — for a directory-style list.
   Future<List<PerformanceReviewSummary>> getLatestReviewSummaries();
 
+  /// No special permission needed — scoped server-side to the caller's own
+  /// direct reports, for the "My Team" dashboard section.
+  Future<List<PerformanceReviewSummary>> getLatestForMyTeam();
+
   /// Requires `performance.manage`. Dry run — returns what would be created
   /// without persisting anything.
   Future<List<Map<String, dynamic>>> previewDueCheck();

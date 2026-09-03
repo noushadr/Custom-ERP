@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/department.dart';
+import 'package:zera_erp/features/employee/presentation/widgets/employee_avatar.dart';
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/requests/presentation/pages/requests_page.dart';
 
@@ -183,6 +184,198 @@ void main() {
 
     expect(requestRepository.lastDecidedRequestId, 'request-hr');
     expect(requestRepository.lastDecisionApproved, isTrue);
+  });
+
+  testWidgets(
+    'shows "No need" for manager approval on a profile-change request '
+    'awaiting HR',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          permissions: ['users.manage'],
+          requestRepository: FakeRequestRepository(
+            pendingHrApproval: [
+              buildTestRequest(
+                id: 'request-pc',
+                subject: 'Profile update request',
+                kind: 'profile_change',
+                status: 'manager_approved',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manager Approval: No need'), findsOneWidget);
+      expect(find.textContaining('Approved by manager:'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'shows who approved as manager on a general request awaiting HR',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          permissions: ['users.manage'],
+          requestRepository: FakeRequestRepository(
+            pendingHrApproval: [
+              buildTestRequest(
+                id: 'request-gen',
+                subject: 'New laptop',
+                status: 'manager_approved',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Approved by manager:'), findsOneWidget);
+      expect(find.text('Manager Approval: No need'), findsNothing);
+    },
+  );
+
+  testWidgets('shows the requester\'s name on a request awaiting approval', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        role: 'Team Lead',
+        requestRepository: FakeRequestRepository(
+          pendingManagerApproval: [
+            buildTestRequest(
+              id: 'request-1',
+              subject: 'Time off',
+              requesterName: 'Babar Hussain',
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Babar Hussain'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows who rejected a request and why in Request History for HR',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          permissions: ['users.manage'],
+          requestRepository: FakeRequestRepository(
+            history: [
+              buildTestRequest(
+                id: 'request-rejected',
+                subject: 'Emergency Contact Name change',
+                kind: 'profile_change',
+                status: 'rejected',
+                hrDecisionByName: 'Noushad Ranani',
+                hrDecisionAt: DateTime(2026, 9, 2, 14, 0),
+                rejectionReason: 'Needs a valid phone number',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Request History'), findsOneWidget);
+      expect(
+        find.textContaining('Approved by Noushad Ranani'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Reason: Needs a valid phone number'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'shows a team-scoped Request History for a manager without users.manage',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          role: 'Team Lead',
+          requestRepository: FakeRequestRepository(
+            historyForMyTeam: [
+              buildTestRequest(
+                id: 'request-approved',
+                subject: 'Time off',
+                status: 'completed',
+                managerDecisionByName: 'Muhammad Bilal Rathore',
+                managerDecisionAt: DateTime(2026, 9, 1),
+                hrDecisionByName: 'Noushad Ranani',
+                hrDecisionAt: DateTime(2026, 9, 2),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Request History'), findsOneWidget);
+      expect(
+        find.textContaining('Approved by Noushad Ranani'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'derives a display name from an email for an older decision recorded '
+    'before actor-name resolution existed',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          permissions: ['users.manage'],
+          requestRepository: FakeRequestRepository(
+            history: [
+              buildTestRequest(
+                id: 'request-old',
+                status: 'completed',
+                hrDecisionByName: 'noushad.ranani@zeracreative.com',
+                hrDecisionAt: DateTime(2026, 8, 9),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Approved by Noushad Ranani'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('noushad.ranani@zeracreative.com'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets('does not show an avatar in Request History', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        permissions: ['users.manage'],
+        requestRepository: FakeRequestRepository(
+          history: [
+            buildTestRequest(
+              id: 'request-1',
+              status: 'completed',
+              hrDecisionByName: 'Noushad Ranani',
+              hrDecisionAt: DateTime(2026, 9, 2),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Request History'), findsOneWidget);
+    expect(find.byType(EmployeeAvatar), findsNothing);
   });
 
   testWidgets(

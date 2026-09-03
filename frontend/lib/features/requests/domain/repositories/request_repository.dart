@@ -24,6 +24,14 @@ abstract interface class RequestRepository {
   /// Requires `users.manage`.
   Future<List<EmployeeRequest>> getPendingHrApproval();
 
+  /// Every decided request company-wide, newest decision first. Requires
+  /// `users.manage`.
+  Future<List<EmployeeRequest>> getHistory();
+
+  /// Same as [getHistory], but scoped to just this viewer's own direct
+  /// reports — no special permission needed.
+  Future<List<EmployeeRequest>> getHistoryForMyTeam();
+
   Future<EmployeeRequest> approveAsManager(String requestId);
 
   Future<EmployeeRequest> rejectAsManager(String requestId, {String? reason});

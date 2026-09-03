@@ -7,9 +7,13 @@ EmployeeRequest buildTestRequest({
   String requesterName = 'Jane Doe',
   String subject = 'New laptop',
   String description = 'Current one is broken.',
+  String kind = 'general',
   String status = 'submitted',
   DateTime? managerDecisionAt,
+  String? managerDecisionByName,
   DateTime? hrDecisionAt,
+  String? hrDecisionByName,
+  String? rejectionReason,
   DateTime? createdAt,
 }) {
   return EmployeeRequest(
@@ -18,9 +22,13 @@ EmployeeRequest buildTestRequest({
     requesterName: requesterName,
     subject: subject,
     description: description,
+    kind: kind,
     status: status,
     managerDecisionAt: managerDecisionAt,
+    managerDecisionByName: managerDecisionByName,
     hrDecisionAt: hrDecisionAt,
+    hrDecisionByName: hrDecisionByName,
+    rejectionReason: rejectionReason,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
   );
 }
@@ -30,6 +38,8 @@ class FakeRequestRepository implements RequestRepository {
     this.mine = const [],
     this.pendingManagerApproval = const [],
     this.pendingHrApproval = const [],
+    this.history = const [],
+    this.historyForMyTeam = const [],
     this.submitError,
     this.decisionError,
   });
@@ -37,6 +47,8 @@ class FakeRequestRepository implements RequestRepository {
   final List<EmployeeRequest> mine;
   final List<EmployeeRequest> pendingManagerApproval;
   final List<EmployeeRequest> pendingHrApproval;
+  final List<EmployeeRequest> history;
+  final List<EmployeeRequest> historyForMyTeam;
   final Object? submitError;
   final Object? decisionError;
 
@@ -65,6 +77,8 @@ class FakeRequestRepository implements RequestRepository {
     return buildTestRequest(
       subject: 'Profile update request',
       description: 'Pending changes',
+      kind: 'profile_change',
+      status: 'manager_approved',
     );
   }
 
@@ -78,6 +92,13 @@ class FakeRequestRepository implements RequestRepository {
   @override
   Future<List<EmployeeRequest>> getPendingHrApproval() async =>
       pendingHrApproval;
+
+  @override
+  Future<List<EmployeeRequest>> getHistory() async => history;
+
+  @override
+  Future<List<EmployeeRequest>> getHistoryForMyTeam() async =>
+      historyForMyTeam;
 
   @override
   Future<EmployeeRequest> approveAsManager(String requestId) async {

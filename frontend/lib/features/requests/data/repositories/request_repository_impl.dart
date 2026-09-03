@@ -40,6 +40,14 @@ class RequestRepositoryImpl implements RequestRepository {
       _guard(() => _remoteDataSource.getPendingHrApproval());
 
   @override
+  Future<List<EmployeeRequest>> getHistory() =>
+      _guard(() => _remoteDataSource.getHistory());
+
+  @override
+  Future<List<EmployeeRequest>> getHistoryForMyTeam() =>
+      _guard(() => _remoteDataSource.getHistoryForMyTeam());
+
+  @override
   Future<EmployeeRequest> approveAsManager(String requestId) =>
       _guard(() => _remoteDataSource.approveAsManager(requestId));
 

@@ -114,7 +114,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Company Notices'), findsOneWidget);
-    expect(find.text('Team Members'), findsOneWidget);
+    // No direct reports in the fake by default — the count still shows.
+    expect(find.text('My Team (0)'), findsOneWidget);
   });
 
   testWidgets('renders the admin dashboard stats for a Super Admin', (
@@ -281,6 +282,7 @@ void main() {
             totalMonthlyPayroll: 250000,
             dailyPayroll: 8333.33,
             activeEmployeeCount: 4,
+            departmentTotals: [],
           ),
         ),
       );
@@ -299,6 +301,51 @@ void main() {
       expect(find.text('Average Salary'), findsOneWidget);
       expect(find.text('PKR 62,500'), findsOneWidget);
       expect(find.text('≈ \$224'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'admin dashboard shows departmental payroll totals for an employees.manage holder',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: ['employees.manage'],
+      );
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          payrollSummary: const PayrollSummary(
+            totalMonthlyPayroll: 250000,
+            dailyPayroll: 8333.33,
+            activeEmployeeCount: 4,
+            departmentTotals: [
+              DepartmentPayrollTotal(
+                departmentId: 'dept-eng',
+                departmentName: 'Engineering',
+                totalMonthlyPayroll: 150000,
+                employeeCount: 2,
+              ),
+              DepartmentPayrollTotal(
+                departmentId: null,
+                departmentName: 'Unassigned',
+                totalMonthlyPayroll: 20000,
+                employeeCount: 1,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payroll by Department'), findsOneWidget);
+      expect(find.text('Engineering'), findsOneWidget);
+      expect(find.text('60.0% of payroll'), findsOneWidget);
+      expect(find.text('PKR 150,000 · 2 employees'), findsOneWidget);
+      expect(find.text('Unassigned'), findsOneWidget);
+      expect(find.text('8.0% of payroll'), findsOneWidget);
+      expect(find.text('PKR 20,000 · 1 employee'), findsOneWidget);
     },
   );
 
@@ -571,14 +618,20 @@ void main() {
     expect(find.text('Logs'), findsOneWidget);
   });
 
-  testWidgets('hides Logs from the nav for a plain employee', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(_authenticatedApp());
-    await tester.pumpAndSettle();
+  testWidgets(
+    'shows Logs in the nav for a plain employee too, unlike other '
+    'admin-only destinations',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(_authenticatedApp());
+      await tester.pumpAndSettle();
 
-    expect(find.text('Logs'), findsNothing);
-  });
+      // Everyone gets a Logs destination now (their own change history for
+      // non-audit.viewAll holders — see LogsPage) — only the company-wide
+      // admin modules stay hidden from a plain employee.
+      expect(find.text('Logs'), findsOneWidget);
+      expect(find.text('Payroll'), findsNothing);
+    },
+  );
 
   testWidgets(
     'shows Admin Business Management stats for a holder of every module '
