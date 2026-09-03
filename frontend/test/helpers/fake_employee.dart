@@ -252,6 +252,7 @@ class FakeEmployeeRepository implements EmployeeRepository {
           totalMonthlyPayroll: 0,
           dailyPayroll: 0,
           activeEmployeeCount: 0,
+          departmentTotals: [],
         );
   }
 

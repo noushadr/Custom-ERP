@@ -81,7 +81,10 @@ import { EducationRecordResponse } from './education-record-response.interface';
 import { toEducationRecordResponse } from './education-record.mapper';
 import { SalaryRecordResponse } from './salary-record-response.interface';
 import { toSalaryRecordResponse } from './salary-record.mapper';
-import { PayrollSummaryResponse } from './payroll-summary-response.interface';
+import {
+  DepartmentPayrollTotal,
+  PayrollSummaryResponse,
+} from './payroll-summary-response.interface';
 import { UpcomingBirthdayResponse } from './upcoming-birthday-response.interface';
 import { UpcomingWorkAnniversaryResponse } from './upcoming-work-anniversary-response.interface';
 
@@ -396,10 +399,31 @@ export class EmployeesService {
       0,
     ).getDate();
 
+    const departmentTotalsByKey = new Map<string, DepartmentPayrollTotal>();
+    activeEmployees.forEach((employee, index) => {
+      const key = employee.departmentId ?? 'unassigned';
+      const existing = departmentTotalsByKey.get(key);
+      if (existing) {
+        existing.totalMonthlyPayroll += currentSalaries[index];
+        existing.employeeCount += 1;
+      } else {
+        departmentTotalsByKey.set(key, {
+          departmentId: employee.departmentId ?? null,
+          departmentName: employee.department?.name ?? 'Unassigned',
+          totalMonthlyPayroll: currentSalaries[index],
+          employeeCount: 1,
+        });
+      }
+    });
+    const departmentTotals = [...departmentTotalsByKey.values()].sort(
+      (a, b) => b.totalMonthlyPayroll - a.totalMonthlyPayroll,
+    );
+
     return {
       totalMonthlyPayroll,
       dailyPayroll: totalMonthlyPayroll / daysInMonth,
       activeEmployeeCount: activeEmployees.length,
+      departmentTotals,
     };
   }
 

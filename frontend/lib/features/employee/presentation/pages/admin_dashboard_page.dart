@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
+import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
@@ -15,6 +16,7 @@ import '../../../payroll/domain/entities/payroll_run_summary.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
+import '../../domain/entities/payroll_summary.dart';
 import '../widgets/company_notices_section.dart';
 
 class AdminDashboardPage extends ConsumerWidget {
@@ -217,6 +219,8 @@ class _DashboardStats extends ConsumerWidget {
             const _SectionHeader('Payroll'),
             const SizedBox(height: 10),
             const _PayrollStats(),
+            const SizedBox(height: 10),
+            const _DepartmentPayrollTotals(),
             const SizedBox(height: 18),
           ],
           if (showClients || showPayrollRuns) ...[
@@ -371,6 +375,71 @@ class _PayrollStats extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Each department's share of the current monthly payroll, sorted highest
+/// total first (as returned by the backend) — shown right below the
+/// headline payroll figures so HR/Admin can see where the payroll actually
+/// goes without opening the full Payroll module.
+class _DepartmentPayrollTotals extends ConsumerWidget {
+  const _DepartmentPayrollTotals();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payrollAsync = ref.watch(payrollSummaryProvider);
+
+    return payrollAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (payroll) {
+        if (payroll.departmentTotals.isEmpty) return const SizedBox.shrink();
+
+        return FormSection(
+          title: 'Payroll by Department',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < payroll.departmentTotals.length; i++) ...[
+                _DepartmentPayrollRow(total: payroll.departmentTotals[i]),
+                if (i < payroll.departmentTotals.length - 1)
+                  const Divider(height: 16, color: AppColors.borderSubtle),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DepartmentPayrollRow extends StatelessWidget {
+  const _DepartmentPayrollRow({required this.total});
+
+  final DepartmentPayrollTotal total;
+
+  @override
+  Widget build(BuildContext context) {
+    final employeeLabel = total.employeeCount == 1
+        ? '1 employee'
+        : '${total.employeeCount} employees';
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            total.departmentName,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+        Text(
+          'PKR ${formatWholeAmount(total.totalMonthlyPayroll)} · $employeeLabel',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
     );
   }
 }

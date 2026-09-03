@@ -1118,6 +1118,56 @@ describe('EmployeesService', () => {
 
       expect(result.dailyPayroll).toBeCloseTo(62000 / daysInMonth);
     });
+
+    it('breaks the total down by department, highest total first', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({
+          id: 'employee-eng-1',
+          departmentId: 'dept-eng',
+          department: { id: 'dept-eng', name: 'Engineering' } as never,
+        }),
+        buildEmployee({
+          id: 'employee-eng-2',
+          departmentId: 'dept-eng',
+          department: { id: 'dept-eng', name: 'Engineering' } as never,
+        }),
+        buildEmployee({
+          id: 'employee-design-1',
+          departmentId: 'dept-design',
+          department: { id: 'dept-design', name: 'Design' } as never,
+        }),
+        buildEmployee({ id: 'employee-no-dept' }),
+      ]);
+      mockSalaryByEmployee({
+        'employee-eng-1': ['60000.00'],
+        'employee-eng-2': ['50000.00'],
+        'employee-design-1': ['80000.00'],
+        'employee-no-dept': ['20000.00'],
+      });
+
+      const result = await service.getPayrollSummary();
+
+      expect(result.departmentTotals).toEqual([
+        {
+          departmentId: 'dept-eng',
+          departmentName: 'Engineering',
+          totalMonthlyPayroll: 110000,
+          employeeCount: 2,
+        },
+        {
+          departmentId: 'dept-design',
+          departmentName: 'Design',
+          totalMonthlyPayroll: 80000,
+          employeeCount: 1,
+        },
+        {
+          departmentId: null,
+          departmentName: 'Unassigned',
+          totalMonthlyPayroll: 20000,
+          employeeCount: 1,
+        },
+      ]);
+    });
   });
 
   describe('getSalaryAsOf', () => {

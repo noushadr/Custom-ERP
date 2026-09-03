@@ -282,6 +282,7 @@ void main() {
             totalMonthlyPayroll: 250000,
             dailyPayroll: 8333.33,
             activeEmployeeCount: 4,
+            departmentTotals: [],
           ),
         ),
       );
@@ -300,6 +301,49 @@ void main() {
       expect(find.text('Average Salary'), findsOneWidget);
       expect(find.text('PKR 62,500'), findsOneWidget);
       expect(find.text('≈ \$224'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'admin dashboard shows departmental payroll totals for an employees.manage holder',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: ['employees.manage'],
+      );
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          payrollSummary: const PayrollSummary(
+            totalMonthlyPayroll: 250000,
+            dailyPayroll: 8333.33,
+            activeEmployeeCount: 4,
+            departmentTotals: [
+              DepartmentPayrollTotal(
+                departmentId: 'dept-eng',
+                departmentName: 'Engineering',
+                totalMonthlyPayroll: 150000,
+                employeeCount: 2,
+              ),
+              DepartmentPayrollTotal(
+                departmentId: null,
+                departmentName: 'Unassigned',
+                totalMonthlyPayroll: 20000,
+                employeeCount: 1,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payroll by Department'), findsOneWidget);
+      expect(find.text('Engineering'), findsOneWidget);
+      expect(find.text('PKR 150,000 · 2 employees'), findsOneWidget);
+      expect(find.text('Unassigned'), findsOneWidget);
+      expect(find.text('PKR 20,000 · 1 employee'), findsOneWidget);
     },
   );
 
