@@ -8,6 +8,7 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/exceptions/employee_exception.dart';
 import 'package:zera_erp/features/employee/presentation/pages/user_dashboard_page.dart';
+import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notices/domain/entities/notice.dart';
@@ -15,6 +16,7 @@ import 'package:zera_erp/shared/models/named_ref.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_goal.dart';
 import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
 
@@ -56,6 +58,7 @@ Widget _app({
       leaveRepositoryProvider.overrideWithValue(
         leaveRepository ?? FakeLeaveRepository(),
       ),
+      goalRepositoryProvider.overrideWithValue(FakeGoalRepository()),
     ],
     child: const MaterialApp(home: Scaffold(body: UserDashboardPage())),
   );

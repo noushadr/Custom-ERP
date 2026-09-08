@@ -9,6 +9,7 @@ import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
 import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
+import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leads/application/leads_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
@@ -26,6 +27,7 @@ import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_employee.dart';
 import 'helpers/fake_freelancers.dart';
+import 'helpers/fake_goal.dart';
 import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leads.dart';
 import 'helpers/fake_leave.dart';
@@ -45,6 +47,7 @@ Widget _authenticatedApp({
   FakeRequestRepository? requestRepository,
   FakeTaskRepository? taskRepository,
   FakeFreelancersRepository? freelancersRepository,
+  FakeGoalRepository? goalRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -81,6 +84,9 @@ Widget _authenticatedApp({
         freelancersRepository ?? FakeFreelancersRepository(),
       ),
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
+      goalRepositoryProvider.overrideWithValue(
+        goalRepository ?? FakeGoalRepository(),
+      ),
     ],
     child: const ZeraApp(),
   );
@@ -116,6 +122,31 @@ void main() {
     expect(find.text('Company Notices'), findsOneWidget);
     // No direct reports in the fake by default — the count still shows.
     expect(find.text('My Team (0)'), findsOneWidget);
+    expect(find.text('My Goals'), findsOneWidget);
+    expect(find.text('No goals have been set for you yet.'), findsOneWidget);
+  });
+
+  testWidgets('shows a goal set for the employee on their dashboard', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        goalRepository: FakeGoalRepository(
+          mine: [
+            buildTestGoal(
+              title: 'English speaking',
+              description: 'Practice daily with the team',
+              createdByName: 'Muhammad Bilal Rathore',
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('English speaking'), findsOneWidget);
+    expect(find.text('Practice daily with the team'), findsOneWidget);
+    expect(find.text('Set by Muhammad Bilal Rathore'), findsOneWidget);
   });
 
   testWidgets('renders the admin dashboard stats for a Super Admin', (
@@ -632,6 +663,15 @@ void main() {
       expect(find.text('Payroll'), findsNothing);
     },
   );
+
+  testWidgets('shows Goals in the nav for every role, including a plain employee', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_authenticatedApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Goals'), findsOneWidget);
+  });
 
   testWidgets(
     'shows Admin Business Management stats for a holder of every module '

@@ -6,6 +6,7 @@ import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/domain/exceptions/auth_exception.dart';
+import '../../../goals/application/goal_providers.dart';
 import '../../../leave/presentation/widgets/leave_balances_section.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../../performance_reviews/domain/entities/performance_review_summary.dart';
@@ -66,6 +67,8 @@ class _UserDashboardBody extends StatelessWidget {
             title: 'Leave Balances',
             child: LeaveBalancesSection(),
           ),
+          const SizedBox(height: 16),
+          const _MyGoalsSection(),
           const SizedBox(height: 16),
           const CompanyNoticesSection(),
           const SizedBox(height: 16),
@@ -320,6 +323,67 @@ class _ChangePasswordDialogState
               : const Text('Change password'),
         ),
       ],
+    );
+  }
+}
+
+/// Read-only — goals are set by Admin/HR or the viewer's own Team Lead
+/// (see `GoalsPage`), the employee just sees them here.
+class _MyGoalsSection extends ConsumerWidget {
+  const _MyGoalsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final goalsAsync = ref.watch(myGoalsProvider);
+
+    return FormSection(
+      title: 'My Goals',
+      child: goalsAsync.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: LinearProgressIndicator(),
+        ),
+        error: (_, _) => const Text('Could not load your goals.'),
+        data: (goals) {
+          if (goals.isEmpty) {
+            return Text(
+              'No goals have been set for you yet.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < goals.length; i++) ...[
+                Text(
+                  goals[i].title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                if (goals[i].description != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    goals[i].description!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+                const SizedBox(height: 2),
+                Text(
+                  'Set by ${goals[i].createdByName}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (i < goals.length - 1)
+                  const Divider(height: 20, color: AppColors.borderSubtle),
+              ],
+            ],
+          );
+        },
+      ),
     );
   }
 }

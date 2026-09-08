@@ -14,6 +14,7 @@ import { DepartmentsModule } from './features/departments/departments.module';
 import { EmployeeModule } from './features/employee/employee.module';
 import { FinancialReportsModule } from './features/financial-reports/financial-reports.module';
 import { FreelancersModule } from './features/freelancers/freelancers.module';
+import { GoalsModule } from './features/goals/goals.module';
 import { HolidaysModule } from './features/holidays/holidays.module';
 import { KnowledgeBaseModule } from './features/knowledge-base/knowledge-base.module';
 import { LeadsModule } from './features/leads/leads.module';
@@ -52,6 +53,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     LeadsModule,
     FinancialReportsModule,
     FreelancersModule,
+    GoalsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
