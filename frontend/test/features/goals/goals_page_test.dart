@@ -203,4 +203,93 @@ void main() {
     expect(goalRepository.lastDeletedGoalId, 'goal-9');
     expect(goalRepository.lastActionWasManagerScoped, isFalse);
   });
+
+  testWidgets('shows the employee photo/initials next to each goal', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        permissions: ['goals.manage'],
+        goalRepository: FakeGoalRepository(
+          all: [buildTestGoal(employeeName: 'Babar Hussain')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircleAvatar), findsOneWidget);
+  });
+
+  testWidgets('searching by employee name filters the goals list', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        permissions: ['goals.manage'],
+        goalRepository: FakeGoalRepository(
+          all: [
+            buildTestGoal(id: 'goal-1', employeeName: 'Babar Hussain'),
+            buildTestGoal(id: 'goal-2', employeeName: 'Aamna Irfan'),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Babar Hussain —'), findsOneWidget);
+    expect(find.textContaining('Aamna Irfan —'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Search by employee name'),
+      'babar',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Babar Hussain —'), findsOneWidget);
+    expect(find.textContaining('Aamna Irfan —'), findsNothing);
+  });
+
+  testWidgets('filtering by department shows only that department\'s goals', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        permissions: ['goals.manage'],
+        goalRepository: FakeGoalRepository(
+          all: [
+            buildTestGoal(
+              id: 'goal-1',
+              employeeName: 'Babar Hussain',
+              departmentId: 'dept-seo',
+            ),
+            buildTestGoal(
+              id: 'goal-2',
+              employeeName: 'Aamna Irfan',
+              departmentId: 'dept-marketing',
+            ),
+          ],
+        ),
+        employeeRepository: FakeEmployeeRepository(
+          departments: [
+            const Department(id: 'dept-seo', name: 'SEO'),
+            const Department(id: 'dept-marketing', name: 'Marketing'),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Babar Hussain —'), findsOneWidget);
+    expect(find.textContaining('Aamna Irfan —'), findsOneWidget);
+
+    await tester.tap(
+      find.widgetWithText(DropdownButtonFormField<String?>, 'Department'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SEO').last);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Babar Hussain —'), findsOneWidget);
+    expect(find.textContaining('Aamna Irfan —'), findsNothing);
+  });
 }

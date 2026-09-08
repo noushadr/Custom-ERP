@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 
-/// Shows the employee's photo when available, otherwise their initials.
-class EmployeeAvatar extends StatelessWidget {
+/// Shows the employee's photo when available, otherwise their initials —
+/// also falls back to initials if the photo fails to load (a missing/404'd
+/// file), rather than staying blank forever.
+class EmployeeAvatar extends StatefulWidget {
   const EmployeeAvatar({
     super.key,
     required this.fullName,
@@ -15,23 +17,39 @@ class EmployeeAvatar extends StatelessWidget {
   final double radius;
 
   @override
+  State<EmployeeAvatar> createState() => _EmployeeAvatarState();
+}
+
+class _EmployeeAvatarState extends State<EmployeeAvatar> {
+  bool _imageFailed = false;
+
+  @override
+  void didUpdateWidget(EmployeeAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.photoUrl != widget.photoUrl) _imageFailed = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (photoUrl != null) {
+    if (widget.photoUrl != null && !_imageFailed) {
       return CircleAvatar(
-        radius: radius,
-        backgroundImage: NetworkImage(photoUrl!),
+        radius: widget.radius,
+        backgroundImage: NetworkImage(widget.photoUrl!),
+        onBackgroundImageError: (_, _) {
+          if (mounted) setState(() => _imageFailed = true);
+        },
       );
     }
 
     return CircleAvatar(
-      radius: radius,
+      radius: widget.radius,
       backgroundColor: AppColors.primary.withValues(alpha: 0.15),
       child: Text(
-        _initials(fullName),
+        _initials(widget.fullName),
         style: TextStyle(
           color: AppColors.primary,
           fontWeight: FontWeight.w600,
-          fontSize: radius * 0.7,
+          fontSize: widget.radius * 0.7,
         ),
       ),
     );

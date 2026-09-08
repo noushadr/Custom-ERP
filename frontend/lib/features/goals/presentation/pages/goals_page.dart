@@ -86,44 +86,128 @@ class GoalsPage extends ConsumerWidget {
   }
 }
 
-class _GoalsList extends ConsumerWidget {
+class _GoalsList extends ConsumerStatefulWidget {
   const _GoalsList({required this.canManageGoals});
 
   final bool canManageGoals;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_GoalsList> createState() => _GoalsListState();
+}
+
+class _GoalsListState extends ConsumerState<_GoalsList> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  String? _departmentFilter;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Goal> _applyFilters(List<Goal> goals) {
+    return goals.where((goal) {
+      final matchesSearch =
+          _searchQuery.isEmpty ||
+          goal.employeeName.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesDepartment =
+          _departmentFilter == null || goal.departmentId == _departmentFilter;
+      return matchesSearch && matchesDepartment;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final goalsAsync = ref.watch(
-      canManageGoals ? allGoalsProvider : teamGoalsProvider,
+      widget.canManageGoals ? allGoalsProvider : teamGoalsProvider,
     );
+    final departmentsAsync = ref.watch(departmentsProvider);
 
     return FormSection(
-      child: goalsAsync.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
-          child: LinearProgressIndicator(),
-        ),
-        error: (_, _) => const Text('Could not load goals.'),
-        data: (goals) {
-          if (goals.isEmpty) {
-            return Text(
-              'No goals set yet.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-            );
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              for (var i = 0; i < goals.length; i++) ...[
-                _GoalRow(goal: goals[i], canManageGoals: canManageGoals),
-                if (i < goals.length - 1)
-                  const Divider(height: 20, color: AppColors.borderSubtle),
-              ],
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    labelText: 'Search by employee name',
+                    prefixIcon: Icon(Icons.search, size: 18),
+                    isDense: true,
+                  ),
+                  onChanged: (value) =>
+                      setState(() => _searchQuery = value.trim()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 220,
+                child: departmentsAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                  data: (departments) => DropdownButtonFormField<String?>(
+                    initialValue: _departmentFilter,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Department',
+                      isDense: true,
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('All departments'),
+                      ),
+                      for (final department in departments)
+                        DropdownMenuItem(
+                          value: department.id,
+                          child: Text(department.name),
+                        ),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => _departmentFilter = value),
+                  ),
+                ),
+              ),
             ],
-          );
-        },
+          ),
+          const SizedBox(height: 16),
+          goalsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: LinearProgressIndicator(),
+            ),
+            error: (_, _) => const Text('Could not load goals.'),
+            data: (goals) {
+              final filtered = _applyFilters(goals);
+              if (filtered.isEmpty) {
+                return Text(
+                  goals.isEmpty
+                      ? 'No goals set yet.'
+                      : 'No goals match your filters.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < filtered.length; i++) ...[
+                    _GoalRow(
+                      goal: filtered[i],
+                      canManageGoals: widget.canManageGoals,
+                    ),
+                    if (i < filtered.length - 1)
+                      const Divider(height: 20, color: AppColors.borderSubtle),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -161,7 +245,7 @@ class _GoalRow extends ConsumerWidget {
         EmployeeAvatar(
           fullName: goal.employeeName,
           photoUrl: goal.employeePhotoUrl,
-          radius: 16,
+          radius: 20,
         ),
         const SizedBox(width: 12),
         Expanded(
