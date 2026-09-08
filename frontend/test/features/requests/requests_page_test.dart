@@ -76,6 +76,62 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
   });
 
+  testWidgets(
+    'hides "Nominate Employee of the Month" for someone with no direct reports',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Nominate Employee of the Month'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'a Team Lead can nominate one of their direct reports for Employee of the Month',
+    (tester) async {
+      final requestRepository = FakeRequestRepository();
+      await tester.pumpWidget(
+        _app(
+          role: 'Team Lead',
+          requestRepository: requestRepository,
+          employeeRepository: FakeEmployeeRepository(
+            directReports: [
+              buildTestEmployee(id: 'report-1', fullName: 'Babar Hussain'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Nominate Employee of the Month'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Nominee'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Babar Hussain').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Why this person?'),
+        'Consistently exceeded targets this month.',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+      await tester.pumpAndSettle();
+
+      expect(requestRepository.lastNominatedEmployeeId, 'report-1');
+      expect(
+        requestRepository.lastNominationReason,
+        'Consistently exceeded targets this month.',
+      );
+      expect(find.byType(AlertDialog), findsNothing);
+    },
+  );
+
   testWidgets('approving a pending request calls approveAsManager', (
     tester,
   ) async {
@@ -199,6 +255,32 @@ void main() {
                 id: 'request-pc',
                 subject: 'Profile update request',
                 kind: 'profile_change',
+                status: 'manager_approved',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manager Approval: No need'), findsOneWidget);
+      expect(find.textContaining('Approved by manager:'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'shows "No need" for manager approval on an Employee of the Month '
+    'nomination awaiting HR',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          permissions: ['users.manage'],
+          requestRepository: FakeRequestRepository(
+            pendingHrApproval: [
+              buildTestRequest(
+                id: 'request-eotm',
+                subject: 'Babar Hussain — Employee of the Month',
+                kind: 'employee_of_month_nomination',
                 status: 'manager_approved',
               ),
             ],

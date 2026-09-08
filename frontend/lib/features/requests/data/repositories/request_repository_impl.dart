@@ -28,6 +28,17 @@ class RequestRepositoryImpl implements RequestRepository {
   ) => _guard(() => _remoteDataSource.submitProfileChangeRequest(changes));
 
   @override
+  Future<EmployeeRequest> submitEmployeeOfMonthNomination({
+    required String nomineeEmployeeId,
+    required String reason,
+  }) => _guard(
+    () => _remoteDataSource.submitEmployeeOfMonthNomination(
+      nomineeEmployeeId: nomineeEmployeeId,
+      reason: reason,
+    ),
+  );
+
+  @override
   Future<List<EmployeeRequest>> getMine() =>
       _guard(() => _remoteDataSource.getMine());
 

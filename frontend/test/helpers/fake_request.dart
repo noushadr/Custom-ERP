@@ -56,6 +56,8 @@ class FakeRequestRepository implements RequestRepository {
   Map<String, dynamic>? lastProfileChanges;
   String? lastDecidedRequestId;
   bool? lastDecisionApproved;
+  String? lastNominatedEmployeeId;
+  String? lastNominationReason;
 
   @override
   Future<EmployeeRequest> submit({
@@ -78,6 +80,22 @@ class FakeRequestRepository implements RequestRepository {
       subject: 'Profile update request',
       description: 'Pending changes',
       kind: 'profile_change',
+      status: 'manager_approved',
+    );
+  }
+
+  @override
+  Future<EmployeeRequest> submitEmployeeOfMonthNomination({
+    required String nomineeEmployeeId,
+    required String reason,
+  }) async {
+    lastNominatedEmployeeId = nomineeEmployeeId;
+    lastNominationReason = reason;
+    if (submitError != null) throw submitError!;
+    return buildTestRequest(
+      subject: 'Employee of the Month nomination',
+      description: reason,
+      kind: 'employee_of_month_nomination',
       status: 'manager_approved',
     );
   }

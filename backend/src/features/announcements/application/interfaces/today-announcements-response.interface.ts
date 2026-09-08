@@ -22,9 +22,18 @@ export interface TodayNotice {
   authorName: string;
 }
 
+export interface TodayEmployeeOfMonth {
+  employeeId: string;
+  fullName: string;
+  profilePhotoUrl: string | null;
+}
+
 export interface TodayAnnouncementsResponse {
   birthdays: TodayBirthday[];
   workAnniversaries: TodayWorkAnniversary[];
   holiday: TodayHoliday | null;
   notices: TodayNotice[];
+  /** Non-null for 7 days after HR/Admin approves an Employee of the Month
+   * nomination, then falls away — see `RequestsService.getCurrentEmployeeOfTheMonth`. */
+  employeeOfTheMonth: TodayEmployeeOfMonth | null;
 }

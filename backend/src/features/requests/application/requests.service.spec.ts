@@ -199,6 +199,160 @@ describe('RequestsService', () => {
     });
   });
 
+  describe('submitEmployeeOfMonthNomination', () => {
+    it('throws NotFoundException when the caller has no employee profile', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await expect(
+        service.submitEmployeeOfMonthNomination('user-1', {
+          nomineeEmployeeId: 'report-1',
+          reason: 'Great work',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("throws ForbiddenException when the nominee isn't the caller's direct report", async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'manager-1' }),
+      );
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ id: 'report-1', reportingManagerId: 'someone-else' }),
+      );
+
+      await expect(
+        service.submitEmployeeOfMonthNomination('user-1', {
+          nomineeEmployeeId: 'report-1',
+          reason: 'Great work',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('creates a MANAGER_APPROVED request naming the nominee, skipping manager approval', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'manager-1' }),
+      );
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({
+          id: 'report-1',
+          firstName: 'Babar',
+          lastName: 'Hussain',
+          reportingManagerId: 'manager-1',
+        }),
+      );
+      requestRepository.save.mockImplementation((r) => Promise.resolve(r));
+      requestRepository.findById.mockImplementation((id) =>
+        Promise.resolve(
+          buildRequest({
+            id,
+            employeeId: 'manager-1',
+            nomineeEmployeeId: 'report-1',
+            subject: 'Babar Hussain — Employee of the Month',
+            description: 'Great work',
+            kind: RequestKind.EMPLOYEE_OF_MONTH_NOMINATION,
+            status: RequestStatus.MANAGER_APPROVED,
+          }),
+        ),
+      );
+
+      const result = await service.submitEmployeeOfMonthNomination('user-1', {
+        nomineeEmployeeId: 'report-1',
+        reason: 'Great work',
+      });
+
+      expect(requestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          employeeId: 'manager-1',
+          nomineeEmployeeId: 'report-1',
+          subject: 'Babar Hussain — Employee of the Month',
+          kind: RequestKind.EMPLOYEE_OF_MONTH_NOMINATION,
+          status: RequestStatus.MANAGER_APPROVED,
+        }),
+      );
+      expect(result.status).toBe(RequestStatus.MANAGER_APPROVED);
+      expect(result.kind).toBe(RequestKind.EMPLOYEE_OF_MONTH_NOMINATION);
+    });
+  });
+
+  describe('getCurrentEmployeeOfTheMonth', () => {
+    it('returns null when nothing has ever been approved', async () => {
+      requestRepository.findByStatus.mockResolvedValue([]);
+
+      const result = await service.getCurrentEmployeeOfTheMonth();
+
+      expect(result).toBeNull();
+    });
+
+    it('returns the most recently approved nomination within its 7-day window', async () => {
+      const now = new Date();
+      const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+      const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+      requestRepository.findByStatus.mockResolvedValue([
+        buildRequest({
+          id: 'older',
+          kind: RequestKind.EMPLOYEE_OF_MONTH_NOMINATION,
+          status: RequestStatus.COMPLETED,
+          hrDecisionAt: fiveDaysAgo,
+          nominee: buildEmployee({
+            id: 'nominee-older',
+            firstName: 'Older',
+            lastName: 'Winner',
+          }),
+        }),
+        buildRequest({
+          id: 'newer',
+          kind: RequestKind.EMPLOYEE_OF_MONTH_NOMINATION,
+          status: RequestStatus.COMPLETED,
+          hrDecisionAt: twoDaysAgo,
+          nominee: buildEmployee({
+            id: 'nominee-newer',
+            firstName: 'Newer',
+            lastName: 'Winner',
+            profilePhotoUrl: 'photo.jpg',
+          }),
+        }),
+      ]);
+
+      const result = await service.getCurrentEmployeeOfTheMonth();
+
+      expect(result).toEqual({
+        employeeId: 'nominee-newer',
+        fullName: 'Newer Winner',
+        profilePhotoUrl: 'photo.jpg',
+        approvedAt: twoDaysAgo.toISOString(),
+      });
+    });
+
+    it('returns null once the approval is more than 7 days old', async () => {
+      const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+      requestRepository.findByStatus.mockResolvedValue([
+        buildRequest({
+          kind: RequestKind.EMPLOYEE_OF_MONTH_NOMINATION,
+          status: RequestStatus.COMPLETED,
+          hrDecisionAt: eightDaysAgo,
+          nominee: buildEmployee({ id: 'nominee-1' }),
+        }),
+      ]);
+
+      const result = await service.getCurrentEmployeeOfTheMonth();
+
+      expect(result).toBeNull();
+    });
+
+    it('ignores completed requests of other kinds', async () => {
+      requestRepository.findByStatus.mockResolvedValue([
+        buildRequest({
+          kind: RequestKind.GENERAL,
+          status: RequestStatus.COMPLETED,
+          hrDecisionAt: new Date(),
+        }),
+      ]);
+
+      const result = await service.getCurrentEmployeeOfTheMonth();
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('findPendingManagerApproval', () => {
     it('only returns submitted requests reporting to this manager', async () => {
       employeeRepository.findByUserId.mockResolvedValue(
@@ -381,6 +535,37 @@ describe('RequestsService', () => {
       expect(
         employeesService.applyApprovedProfileChange,
       ).not.toHaveBeenCalled();
+    });
+
+    it('notifies the nominee when an Employee of the Month nomination is approved', async () => {
+      requestRepository.findById.mockResolvedValue(
+        buildRequest({
+          status: RequestStatus.MANAGER_APPROVED,
+          kind: RequestKind.EMPLOYEE_OF_MONTH_NOMINATION,
+          nomineeEmployeeId: 'report-1',
+          nominee: buildEmployee({ id: 'report-1', userId: 'report-user-1' }),
+        }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      requestRepository.save.mockImplementation((r) => Promise.resolve(r));
+
+      await service.approveAsHr('request-1', 'hr-1');
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'report-user-1' }),
+      );
+    });
+
+    it('does not notify anyone for a non-nomination request', async () => {
+      requestRepository.findById.mockResolvedValue(
+        buildRequest({ status: RequestStatus.MANAGER_APPROVED }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      requestRepository.save.mockImplementation((r) => Promise.resolve(r));
+
+      await service.approveAsHr('request-1', 'hr-1');
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
     });
   });
 

@@ -15,6 +15,14 @@ abstract interface class RequestRepository {
     Map<String, dynamic> changes,
   );
 
+  /// Nominates one of the caller's own direct reports for Employee of the
+  /// Month — throws [RequestException] if [nomineeEmployeeId] isn't
+  /// actually one of them.
+  Future<EmployeeRequest> submitEmployeeOfMonthNomination({
+    required String nomineeEmployeeId,
+    required String reason,
+  });
+
   Future<List<EmployeeRequest>> getMine();
 
   /// Requests submitted by one of this viewer's direct reports, awaiting

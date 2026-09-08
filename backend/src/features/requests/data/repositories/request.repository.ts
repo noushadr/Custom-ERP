@@ -15,14 +15,14 @@ export class TypeOrmRequestRepository implements RequestRepository {
   findById(id: string): Promise<EmployeeRequest | null> {
     return this.repository.findOne({
       where: { id },
-      relations: { employee: true },
+      relations: { employee: true, nominee: true },
     });
   }
 
   findByEmployeeId(employeeId: string): Promise<EmployeeRequest[]> {
     return this.repository.find({
       where: { employeeId },
-      relations: { employee: true },
+      relations: { employee: true, nominee: true },
       order: { createdAt: 'DESC' },
     });
   }
@@ -30,7 +30,7 @@ export class TypeOrmRequestRepository implements RequestRepository {
   findByStatus(status: RequestStatus): Promise<EmployeeRequest[]> {
     return this.repository.find({
       where: { status },
-      relations: { employee: true },
+      relations: { employee: true, nominee: true },
       order: { createdAt: 'ASC' },
     });
   }

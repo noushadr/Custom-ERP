@@ -6,10 +6,13 @@ class TodayAnnouncementsModel extends TodayAnnouncements {
     required super.workAnniversaries,
     required super.holiday,
     required super.notices,
+    required super.employeeOfTheMonth,
   });
 
   factory TodayAnnouncementsModel.fromJson(Map<String, dynamic> json) {
     final holidayJson = json['holiday'] as Map<String, dynamic>?;
+    final employeeOfTheMonthJson =
+        json['employeeOfTheMonth'] as Map<String, dynamic>?;
     return TodayAnnouncementsModel(
       birthdays: (json['birthdays'] as List<dynamic>)
           .cast<Map<String, dynamic>>()
@@ -48,6 +51,14 @@ class TodayAnnouncementsModel extends TodayAnnouncements {
             ),
           )
           .toList(),
+      employeeOfTheMonth: employeeOfTheMonthJson == null
+          ? null
+          : TodayEmployeeOfMonth(
+              employeeId: employeeOfTheMonthJson['employeeId'] as String,
+              fullName: employeeOfTheMonthJson['fullName'] as String,
+              profilePhotoUrl:
+                  employeeOfTheMonthJson['profilePhotoUrl'] as String?,
+            ),
     );
   }
 }

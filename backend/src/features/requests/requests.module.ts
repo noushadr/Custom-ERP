@@ -21,5 +21,6 @@ import { RequestsController } from './presentation/requests.controller';
     RequestsService,
     { provide: REQUEST_REPOSITORY, useClass: TypeOrmRequestRepository },
   ],
+  exports: [RequestsService],
 })
 export class RequestsModule {}

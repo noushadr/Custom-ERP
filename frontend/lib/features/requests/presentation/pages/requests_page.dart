@@ -99,6 +99,9 @@ class _MyRequestsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final requestsAsync = ref.watch(myRequestsProvider);
+    final directReportsAsync = ref.watch(myDirectReportsProvider);
+    final hasDirectReports =
+        directReportsAsync.valueOrNull?.isNotEmpty ?? false;
 
     return Card(
       child: Padding(
@@ -114,6 +117,15 @@ class _MyRequestsSection extends ConsumerWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                if (hasDirectReports)
+                  TextButton.icon(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => const _NominateEmployeeOfMonthDialog(),
+                    ),
+                    icon: const Icon(Icons.emoji_events_outlined, size: 16),
+                    label: const Text('Nominate Employee of the Month'),
+                  ),
                 TextButton.icon(
                   onPressed: () => showDialog<void>(
                     context: context,
@@ -253,8 +265,16 @@ String _displayActorName(String name) {
 /// while still awaiting the manager, "Rejected" if the manager was the one
 /// who rejected it, or "Approved" otherwise (manager-approved, completed,
 /// or rejected later by HR after the manager already approved).
+/// `profile_change` and `employee_of_month_nomination` requests are both
+/// created directly at `manager_approved` — the submitter either is the
+/// reporting manager already (a nomination) or there's no manager step to
+/// begin with (a self-service profile edit) — so neither ever has a real
+/// manager decision to show.
+bool _skipsManagerApproval(String kind) =>
+    kind == 'profile_change' || kind == 'employee_of_month_nomination';
+
 String _managerApprovalLabel(EmployeeRequest request) {
-  if (request.kind == 'profile_change') return 'No need';
+  if (_skipsManagerApproval(request.kind)) return 'No need';
   if (request.status == 'submitted') return 'Pending';
   if (request.status == 'rejected' && request.managerDecisionAt != null) {
     return 'Rejected';
@@ -398,6 +418,137 @@ class _SubmitRequestDialogState extends ConsumerState<_SubmitRequestDialog> {
                 controller: _descriptionController,
                 maxLines: 4,
                 decoration: const InputDecoration(labelText: 'Description'),
+                validator: (value) =>
+                    (value == null || value.isEmpty) ? 'Required' : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Submit'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Lets a Team Lead nominate one of their own direct reports for Employee
+/// of the Month — the dropdown is scoped to [myDirectReportsProvider], and
+/// the backend independently re-checks the nominee actually reports to the
+/// caller, so this can't be used to nominate anyone else.
+class _NominateEmployeeOfMonthDialog extends ConsumerStatefulWidget {
+  const _NominateEmployeeOfMonthDialog();
+
+  @override
+  ConsumerState<_NominateEmployeeOfMonthDialog> createState() =>
+      _NominateEmployeeOfMonthDialogState();
+}
+
+class _NominateEmployeeOfMonthDialogState
+    extends ConsumerState<_NominateEmployeeOfMonthDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _reasonController = TextEditingController();
+  String? _selectedEmployeeId;
+  bool _submitting = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final nomineeId = _selectedEmployeeId;
+    if (nomineeId == null) {
+      setState(() => _errorMessage = 'Choose who you\'re nominating');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await ref
+          .read(requestRepositoryProvider)
+          .submitEmployeeOfMonthNomination(
+            nomineeEmployeeId: nomineeId,
+            reason: _reasonController.text,
+          );
+      ref.invalidate(myRequestsProvider);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } on RequestException catch (error) {
+      setState(() => _errorMessage = error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final directReportsAsync = ref.watch(myDirectReportsProvider);
+
+    return AlertDialog(
+      title: const Text('Nominate Employee of the Month'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_errorMessage != null) ...[
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              directReportsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, _) => const Text('Could not load your team.'),
+                data: (reports) => DropdownButtonFormField<String>(
+                  initialValue: _selectedEmployeeId,
+                  decoration: const InputDecoration(labelText: 'Nominee'),
+                  items: [
+                    for (final report in reports)
+                      DropdownMenuItem(
+                        value: report.id,
+                        child: Text(report.fullName),
+                      ),
+                  ],
+                  onChanged: _submitting
+                      ? null
+                      : (value) =>
+                            setState(() => _selectedEmployeeId = value),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _reasonController,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Why this person?',
+                ),
                 validator: (value) =>
                     (value == null || value.isEmpty) ? 'Required' : null,
               ),
@@ -655,7 +806,7 @@ class _PendingHrRequestRowState extends ConsumerState<_PendingHrRequestRow> {
               ),
               const SizedBox(height: 4),
               Text(
-                request.kind == 'profile_change'
+                _skipsManagerApproval(request.kind)
                     ? 'Manager Approval: No need'
                     : 'Approved by manager: '
                           '${request.managerDecisionByName ?? '—'}',

@@ -45,6 +45,18 @@ class TodayNotice {
   final String authorName;
 }
 
+class TodayEmployeeOfMonth {
+  const TodayEmployeeOfMonth({
+    required this.employeeId,
+    required this.fullName,
+    this.profilePhotoUrl,
+  });
+
+  final String employeeId;
+  final String fullName;
+  final String? profilePhotoUrl;
+}
+
 /// Same-day-only slice of birthdays/anniversaries/holiday/notices, powering
 /// the top-bar announcement banner — everyone sees this, unlike the HR-only
 /// "Celebrations" feed in the notification bell.
@@ -54,6 +66,7 @@ class TodayAnnouncements {
     required this.workAnniversaries,
     required this.holiday,
     required this.notices,
+    required this.employeeOfTheMonth,
   });
 
   final List<TodayBirthday> birthdays;
@@ -61,9 +74,14 @@ class TodayAnnouncements {
   final TodayHoliday? holiday;
   final List<TodayNotice> notices;
 
+  /// Non-null for 7 days after HR/Admin approves an Employee of the Month
+  /// nomination, then falls away.
+  final TodayEmployeeOfMonth? employeeOfTheMonth;
+
   bool get isEmpty =>
       birthdays.isEmpty &&
       workAnniversaries.isEmpty &&
       holiday == null &&
-      notices.isEmpty;
+      notices.isEmpty &&
+      employeeOfTheMonth == null;
 }

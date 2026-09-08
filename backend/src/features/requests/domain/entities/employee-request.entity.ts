@@ -64,4 +64,14 @@ export class EmployeeRequest extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   rejectionReason?: string;
+
+  /** Only set for an EMPLOYEE_OF_MONTH_NOMINATION request — the employee
+   * being nominated, distinct from `employeeId` (the Team Lead who
+   * submitted the nomination). */
+  @Column({ type: 'uuid', nullable: true })
+  nomineeEmployeeId?: string | null;
+
+  @ManyToOne(() => Employee, { nullable: true })
+  @JoinColumn({ name: 'nomineeEmployeeId' })
+  nominee?: Employee | null;
 }

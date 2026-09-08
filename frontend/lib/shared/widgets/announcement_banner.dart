@@ -110,6 +110,17 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
         ),
       );
     }
+    if (data.employeeOfTheMonth != null) {
+      items.add(
+        _BannerItem(
+          icon: Icons.emoji_events_outlined,
+          color: AppColors.success,
+          text:
+              '${data.employeeOfTheMonth!.fullName} is Employee of the '
+              'Month! 🏆',
+        ),
+      );
+    }
     for (final notice in data.notices) {
       items.add(
         _BannerItem(

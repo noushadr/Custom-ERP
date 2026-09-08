@@ -26,8 +26,14 @@ import {
   type RequestRepository,
 } from '../domain/repositories/request-repository.interface';
 import { CreateRequestDto } from './dto/create-request.dto';
+import { SubmitEmployeeOfMonthNominationDto } from './dto/submit-employee-of-month-nomination.dto';
+import { EmployeeOfMonthResponse } from './employee-of-month-response.interface';
 import { RequestResponse } from './request-response.interface';
 import { toRequestResponse } from './request.mapper';
+
+/** How long an approved Employee of the Month nomination stays showing in
+ * the announcement banner, from the moment HR/Admin approved it. */
+const _EMPLOYEE_OF_MONTH_WINDOW_DAYS = 7;
 
 /** Caps how far back Request History reaches, the same "bounded history,
  * not a time-window cutoff" approach the notification bell's own
@@ -129,6 +135,75 @@ export class RequestsService {
     const saved = await this.requestRepository.save(request);
     const reloaded = await this.requestRepository.findById(saved.id);
     return toRequestResponse(reloaded!);
+  }
+
+  /** A Team Lead nominating one of their own direct reports for Employee of
+   * the Month — identity-scoped like every other TL-facing endpoint in this
+   * app (no `@Permissions` guard; the caller can only nominate someone who
+   * actually reports to them). Skips manager approval the same way a
+   * profile-change request does, straight to HR/Admin. */
+  async submitEmployeeOfMonthNomination(
+    actorUserId: string,
+    dto: SubmitEmployeeOfMonthNominationDto,
+  ): Promise<RequestResponse> {
+    const manager = await this.employeeRepository.findByUserId(actorUserId);
+    if (!manager) throw new NotFoundException('Employee profile not found');
+
+    const nominee = await this.employeeRepository.findById(
+      dto.nomineeEmployeeId,
+    );
+    if (!nominee || nominee.reportingManagerId !== manager.id) {
+      throw new ForbiddenException(
+        'You can only nominate one of your own direct reports',
+      );
+    }
+
+    const request = new EmployeeRequest();
+    request.employeeId = manager.id;
+    request.nomineeEmployeeId = nominee.id;
+    request.subject = `${nominee.firstName} ${nominee.lastName} — Employee of the Month`;
+    request.description = dto.reason;
+    request.kind = RequestKind.EMPLOYEE_OF_MONTH_NOMINATION;
+    request.status = RequestStatus.MANAGER_APPROVED;
+
+    const saved = await this.requestRepository.save(request);
+    const reloaded = await this.requestRepository.findById(saved.id);
+    return toRequestResponse(reloaded!);
+  }
+
+  /** The currently-showing Employee of the Month for the announcement
+   * banner — the most recently HR/Admin-approved nomination, as long as
+   * it's within its 7-day display window; `null` once that window has
+   * passed or nothing has ever been approved. Computed on every read from
+   * `hrDecisionAt`, not a stored expiry flag — same convention this app
+   * uses everywhere else for "is this still current" (netPay, tenure,
+   * profitPercent). */
+  async getCurrentEmployeeOfTheMonth(): Promise<EmployeeOfMonthResponse | null> {
+    const completed = await this.requestRepository.findByStatus(
+      RequestStatus.COMPLETED,
+    );
+    const nominations = completed
+      .filter(
+        (request) =>
+          request.kind === RequestKind.EMPLOYEE_OF_MONTH_NOMINATION &&
+          request.nominee &&
+          request.hrDecisionAt,
+      )
+      .sort((a, b) => b.hrDecisionAt!.getTime() - a.hrDecisionAt!.getTime());
+
+    const latest = nominations[0];
+    if (!latest) return null;
+
+    const daysSinceApproval =
+      (Date.now() - latest.hrDecisionAt!.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceApproval > _EMPLOYEE_OF_MONTH_WINDOW_DAYS) return null;
+
+    return {
+      employeeId: latest.nominee!.id,
+      fullName: `${latest.nominee!.firstName} ${latest.nominee!.lastName}`,
+      profilePhotoUrl: latest.nominee!.profilePhotoUrl ?? null,
+      approvedAt: latest.hrDecisionAt!.toISOString(),
+    };
   }
 
   async findMine(actorUserId: string): Promise<RequestResponse[]> {
@@ -258,6 +333,17 @@ export class RequestsService {
     request.hrDecisionByName = actorName;
 
     const saved = await this.requestRepository.save(request);
+
+    if (
+      request.kind === RequestKind.EMPLOYEE_OF_MONTH_NOMINATION &&
+      request.nominee
+    ) {
+      await this.notificationsService.create({
+        recipientUserId: request.nominee.userId,
+        message: `Congratulations — you've been named Employee of the Month!`,
+      });
+    }
+
     return toRequestResponse(saved);
   }
 

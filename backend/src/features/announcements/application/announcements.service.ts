@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { EmployeesService } from '../../employee/application/employees.service';
 import { HolidaysService } from '../../holidays/application/holidays.service';
 import { NoticesService } from '../../notices/application/notices.service';
+import { RequestsService } from '../../requests/application/requests.service';
 import type { TodayAnnouncementsResponse } from './interfaces/today-announcements-response.interface';
 
 /** Same "local calendar day" comparison `EmployeesService`'s own
@@ -29,17 +30,19 @@ export class AnnouncementsService {
     private readonly employeesService: EmployeesService,
     private readonly holidaysService: HolidaysService,
     private readonly noticesService: NoticesService,
+    private readonly requestsService: RequestsService,
   ) {}
 
   async getToday(): Promise<TodayAnnouncementsResponse> {
     const today = todayIso();
 
-    const [birthdays, workAnniversaries, holidays, notices] =
+    const [birthdays, workAnniversaries, holidays, notices, employeeOfTheMonth] =
       await Promise.all([
         this.employeesService.getUpcomingBirthdays(0, 0),
         this.employeesService.getUpcomingWorkAnniversaries(0, 0),
         this.holidaysService.getAll(new Date().getFullYear()),
         this.noticesService.findAll(),
+        this.requestsService.getCurrentEmployeeOfTheMonth(),
       ]);
 
     const holidayToday = holidays.find((h) => h.date === today) ?? null;
@@ -62,6 +65,13 @@ export class AnnouncementsService {
       notices: notices
         .filter((n) => todayIsoFromDate(n.createdAt) === today)
         .map((n) => ({ id: n.id, title: n.title, authorName: n.authorName })),
+      employeeOfTheMonth: employeeOfTheMonth
+        ? {
+            employeeId: employeeOfTheMonth.employeeId,
+            fullName: employeeOfTheMonth.fullName,
+            profilePhotoUrl: employeeOfTheMonth.profilePhotoUrl,
+          }
+        : null,
     };
   }
 }

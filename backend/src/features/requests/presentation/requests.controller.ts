@@ -5,6 +5,7 @@ import type { JwtPayload } from '../../authentication/presentation/strategies/jw
 import { CreateProfileChangeRequestDto } from '../application/dto/create-profile-change-request.dto';
 import { CreateRequestDto } from '../application/dto/create-request.dto';
 import { RejectRequestDto } from '../application/dto/reject-request.dto';
+import { SubmitEmployeeOfMonthNominationDto } from '../application/dto/submit-employee-of-month-nomination.dto';
 import { RequestsService } from '../application/requests.service';
 
 @Controller('requests')
@@ -22,6 +23,17 @@ export class RequestsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.requestsService.submitProfileChangeRequest(user.sub, dto);
+  }
+
+  @Post('employee-of-the-month')
+  submitEmployeeOfMonthNomination(
+    @Body() dto: SubmitEmployeeOfMonthNominationDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.requestsService.submitEmployeeOfMonthNomination(
+      user.sub,
+      dto,
+    );
   }
 
   @Get('mine')
