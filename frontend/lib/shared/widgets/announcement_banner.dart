@@ -116,8 +116,8 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
           icon: Icons.emoji_events_outlined,
           color: AppColors.success,
           text:
-              '${data.employeeOfTheMonth!.fullName} is Employee of the '
-              'Month! 🏆',
+              'Congrats ${data.employeeOfTheMonth!.fullName}, Employee of '
+              'the Month! 🏆',
         ),
       );
     }
