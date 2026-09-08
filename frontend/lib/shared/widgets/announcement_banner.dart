@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../features/announcements/application/announcement_providers.dart';
 import '../../features/announcements/domain/entities/today_announcements.dart';
 import '../../features/authentication/application/auth_providers.dart';
+import '../../features/employee/presentation/widgets/employee_avatar.dart';
 
 const _rotateInterval = Duration(seconds: 6);
 
@@ -14,11 +15,20 @@ class _BannerItem {
     required this.icon,
     required this.color,
     required this.text,
+    this.personName,
+    this.personPhotoUrl,
   });
 
   final IconData icon;
   final Color color;
   final String text;
+
+  /// Set whenever this item is about a specific person (birthday,
+  /// anniversary, Employee of the Month) — shown as a small circular photo
+  /// next to the icon. `null` for holiday/notice items, which aren't about
+  /// any one person.
+  final String? personName;
+  final String? personPhotoUrl;
 }
 
 final _dismissalStorageProvider = Provider<AnnouncementDismissalStorage>(
@@ -73,6 +83,13 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
     });
   }
 
+  /// Manual prev/next navigation — also restarts the auto-rotate timer so
+  /// it doesn't immediately advance again right after a manual tap.
+  void _step(int delta, int itemCount) {
+    setState(() => _index = (_index + delta + itemCount) % itemCount);
+    _startRotating(itemCount);
+  }
+
   Future<void> _dismiss() async {
     setState(() => _dismissedForToday = true);
     await ref.read(_dismissalStorageProvider).dismissForToday();
@@ -96,6 +113,8 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
           icon: Icons.cake_outlined,
           color: AppColors.secondary,
           text: 'Happy Birthday, ${birthday.fullName}! 🎉',
+          personName: birthday.fullName,
+          personPhotoUrl: birthday.profilePhotoUrl,
         ),
       );
     }
@@ -107,6 +126,8 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
           text:
               'Happy ${anniversary.yearsOfService}-Year Anniversary, '
               '${anniversary.fullName}! 🎊',
+          personName: anniversary.fullName,
+          personPhotoUrl: anniversary.profilePhotoUrl,
         ),
       );
     }
@@ -118,6 +139,8 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
           text:
               'Congrats ${data.employeeOfTheMonth!.fullName}, Employee of '
               'the Month! 🏆',
+          personName: data.employeeOfTheMonth!.fullName,
+          personPhotoUrl: data.employeeOfTheMonth!.profilePhotoUrl,
         ),
       );
     }
@@ -163,6 +186,14 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
       child: Row(
         children: [
           Icon(item.icon, size: 16, color: item.color),
+          if (item.personName != null) ...[
+            const SizedBox(width: 6),
+            EmployeeAvatar(
+              fullName: item.personName!,
+              photoUrl: item.personPhotoUrl,
+              radius: 9,
+            ),
+          ],
           const SizedBox(width: 8),
           Expanded(
             child: AnimatedSwitcher(
@@ -178,21 +209,25 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
             ),
           ),
           if (items.length > 1) ...[
-            const SizedBox(width: 8),
-            for (var i = 0; i < items.length; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: i == _index
-                        ? item.color
-                        : item.color.withValues(alpha: 0.3),
-                  ),
-                ),
+            const SizedBox(width: 4),
+            InkWell(
+              onTap: () => _step(-1, items.length),
+              borderRadius: BorderRadius.circular(12),
+              child: Icon(
+                Icons.chevron_left,
+                size: 18,
+                color: item.color,
               ),
+            ),
+            InkWell(
+              onTap: () => _step(1, items.length),
+              borderRadius: BorderRadius.circular(12),
+              child: Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: item.color,
+              ),
+            ),
           ],
           const SizedBox(width: 8),
           InkWell(
