@@ -8,6 +8,7 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/authentication/domain/exceptions/auth_exception.dart';
 import 'package:zera_erp/features/authentication/presentation/pages/login_page.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
+import 'package:zera_erp/features/email/application/email_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
@@ -23,6 +24,7 @@ import 'package:zera_erp/main.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_clients.dart';
+import '../../helpers/fake_email.dart';
 import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_goal.dart';
 import '../../helpers/fake_knowledge_base.dart';
@@ -70,6 +72,7 @@ Widget _appWith(FakeAuthRepository repository) {
       payrollRepositoryProvider.overrideWithValue(FakePayrollRepository()),
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
       goalRepositoryProvider.overrideWithValue(FakeGoalRepository()),
+      emailRepositoryProvider.overrideWithValue(FakeEmailRepository()),
     ],
     child: const ZeraApp(),
   );

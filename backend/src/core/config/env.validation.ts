@@ -58,6 +58,9 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   CORS_ORIGIN?: string;
+
+  @IsString()
+  EMAIL_CREDENTIAL_KEY: string;
 }
 
 export function validate(config: Record<string, unknown>) {

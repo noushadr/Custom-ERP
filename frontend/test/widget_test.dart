@@ -5,6 +5,7 @@ import 'package:zera_erp/features/authentication/application/auth_providers.dart
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
+import 'package:zera_erp/features/email/application/email_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
@@ -25,6 +26,7 @@ import 'package:zera_erp/shared/widgets/metric_card.dart';
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
+import 'helpers/fake_email.dart';
 import 'helpers/fake_employee.dart';
 import 'helpers/fake_freelancers.dart';
 import 'helpers/fake_goal.dart';
@@ -48,6 +50,7 @@ Widget _authenticatedApp({
   FakeTaskRepository? taskRepository,
   FakeFreelancersRepository? freelancersRepository,
   FakeGoalRepository? goalRepository,
+  FakeEmailRepository? emailRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -86,6 +89,9 @@ Widget _authenticatedApp({
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
       goalRepositoryProvider.overrideWithValue(
         goalRepository ?? FakeGoalRepository(),
+      ),
+      emailRepositoryProvider.overrideWithValue(
+        emailRepository ?? FakeEmailRepository(),
       ),
     ],
     child: const ZeraApp(),
@@ -671,6 +677,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Goals'), findsOneWidget);
+  });
+
+  testWidgets('shows Email in the nav for every role, including a plain employee', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_authenticatedApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Email'), findsOneWidget);
   });
 
   testWidgets(

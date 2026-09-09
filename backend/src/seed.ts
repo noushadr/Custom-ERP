@@ -34,6 +34,7 @@ const DEFAULT_PERMISSIONS = [
   'leads.manage',
   'finances.manage',
   'goals.manage',
+  'email.manage',
 ];
 
 // 'clients.manage' and 'payroll.manage' (Clients & Projects / Client Health /
@@ -54,6 +55,16 @@ const DEFAULT_PERMISSIONS = [
 // goal-setting for their direct reports goes through separate, unguarded
 // identity-scoped routes (GoalsController's '/team' endpoints) rather than
 // this permission, the same split `EmployeeOfTheMonth` nominations use.
+// 'email.manage' (Email, 2026-09-09) follows the identical split: it only
+// gates setting up or removing a mailbox *on behalf of another employee* —
+// every employee (Team Lead and plain Employee included) can already set up
+// and use their own mailbox through EmailController's unguarded '/me'
+// routes, since a mailbox is entered manually per-person after the account
+// is created by hand in cPanel (no auto-provisioning in this lighter
+// version). Mailbox passwords are stored AES-256-GCM encrypted
+// (EMAIL_CREDENTIAL_KEY), never in plain text — the one deliberate exception
+// to this project's "no real passwords stored" precedent, made because a
+// mailbox is unusable without the app being able to authenticate with it.
 const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
   { name: 'Super Admin', permissions: [] }, // always granted every known permission, see below
   {
@@ -72,6 +83,7 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'clients.manage',
       'payroll.manage',
       'goals.manage',
+      'email.manage',
     ],
   },
   { name: 'Team Lead', permissions: ['employees.read', 'knowledge_base.manage'] },

@@ -20,6 +20,7 @@ import 'features/employee/presentation/pages/employee_profile_page.dart';
 import 'features/employee/presentation/pages/logs_page.dart';
 import 'features/employee/presentation/pages/user_dashboard_page.dart';
 import 'features/employee/presentation/widgets/notification_bell.dart';
+import 'features/email/presentation/pages/email_page.dart';
 import 'features/financial_reports/presentation/pages/financial_reports_page.dart';
 import 'features/goals/presentation/pages/goals_page.dart';
 import 'features/knowledge_base/presentation/pages/knowledge_base_page.dart';
@@ -118,6 +119,11 @@ const _allDestinations = [
     label: 'Goals',
     icon: Icons.flag_outlined,
     selectedIcon: Icons.flag_outlined,
+  ),
+  AppNavDestination(
+    label: 'Email',
+    icon: Icons.email_outlined,
+    selectedIcon: Icons.email_outlined,
   ),
   AppNavDestination(
     label: 'Leaves',
@@ -324,6 +330,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const RequestsPage();
       case 'Goals':
         return const GoalsPage();
+      case 'Email':
+        return const EmailPage();
       case 'Leaves':
         return const LeavePage();
       case 'Tasks':

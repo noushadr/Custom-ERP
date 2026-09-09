@@ -5,6 +5,7 @@ import 'package:zera_erp/features/authentication/application/auth_providers.dart
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
+import 'package:zera_erp/features/email/application/email_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
 import 'package:zera_erp/features/goals/application/goal_providers.dart';
@@ -21,6 +22,7 @@ import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
+import 'helpers/fake_email.dart';
 import 'helpers/fake_employee.dart';
 import 'helpers/fake_freelancers.dart';
 import 'helpers/fake_goal.dart';
@@ -68,6 +70,7 @@ Widget _authenticatedApp({AuthUser? user}) {
       ),
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
       goalRepositoryProvider.overrideWithValue(FakeGoalRepository()),
+      emailRepositoryProvider.overrideWithValue(FakeEmailRepository()),
     ],
     child: const ZeraApp(),
   );

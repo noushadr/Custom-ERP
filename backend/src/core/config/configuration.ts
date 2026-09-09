@@ -18,6 +18,9 @@ export default () => ({
     superAdminEmail: process.env.SEED_SUPER_ADMIN_EMAIL,
     superAdminPassword: process.env.SEED_SUPER_ADMIN_PASSWORD,
   },
+  // AES-256-GCM key (32-byte hex) used to encrypt mailbox passwords at rest
+  // for the Email feature.
+  emailCredentialKey: process.env.EMAIL_CREDENTIAL_KEY,
   // Comma-separated list of allowed frontend origins. Falls back to the
   // local Flutter-web dev server when unset — never wide open by default.
   corsOrigin: process.env.CORS_ORIGIN,

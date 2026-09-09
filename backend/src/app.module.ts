@@ -11,6 +11,7 @@ import { AuthenticationModule } from './features/authentication/authentication.m
 import { ChecklistsModule } from './features/checklists/checklists.module';
 import { ClientsModule } from './features/clients/clients.module';
 import { DepartmentsModule } from './features/departments/departments.module';
+import { EmailModule } from './features/email/email.module';
 import { EmployeeModule } from './features/employee/employee.module';
 import { FinancialReportsModule } from './features/financial-reports/financial-reports.module';
 import { FreelancersModule } from './features/freelancers/freelancers.module';
@@ -54,6 +55,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     FinancialReportsModule,
     FreelancersModule,
     GoalsModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],
