@@ -274,6 +274,8 @@ Full regression: 391 backend tests (10 new: `GoalsService`) + `nest build` clean
 
 Live-verified against the real, kept SEO department goals: confirmed all 9 rows now read "Verbal English Communication" with clearly-visible initials avatars (previously several were blank due to the bug above), confirmed typing "bilal" in search narrows to just Muhammad Bilal Rathore, and confirmed selecting "SEO" in the department dropdown shows exactly those same 9 real employees. Full regression: 391 backend tests (unchanged, additive response fields only) + `nest build` clean, 405 frontend tests (3 new: avatar-present, search-filters, department-filter) + `flutter analyze` clean.
 
+**Employee of the Month's banner avatar removed, same week**, per explicit instruction ("picture of the employee of the month should removed from the top bar") — `_BannerItem`'s `personName`/`personPhotoUrl` are no longer passed for the Employee of the Month item specifically (birthday and work anniversary items are unaffected, still show their avatar). The trophy icon now sits directly next to the "Congrats …" text with nothing in between.
+
 ## Development Workflow
 1. Understand the requirement.
 2. Design the architecture.

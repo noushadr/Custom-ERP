@@ -139,8 +139,6 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
           text:
               'Congrats ${data.employeeOfTheMonth!.fullName}, Employee of '
               'the Month! 🏆',
-          personName: data.employeeOfTheMonth!.fullName,
-          personPhotoUrl: data.employeeOfTheMonth!.profilePhotoUrl,
         ),
       );
     }
