@@ -192,18 +192,9 @@ class _GoalsListState extends ConsumerState<_GoalsList> {
                   ),
                 );
               }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < filtered.length; i++) ...[
-                    _GoalRow(
-                      goal: filtered[i],
-                      canManageGoals: widget.canManageGoals,
-                    ),
-                    if (i < filtered.length - 1)
-                      const Divider(height: 20, color: AppColors.borderSubtle),
-                  ],
-                ],
+              return _GoalCardGrid(
+                goals: filtered,
+                canManageGoals: widget.canManageGoals,
               );
             },
           ),
@@ -213,19 +204,81 @@ class _GoalsListState extends ConsumerState<_GoalsList> {
   }
 }
 
-class _GoalRow extends ConsumerWidget {
-  const _GoalRow({required this.goal, required this.canManageGoals});
+/// Responsive card grid — three per row once there's comfortable room,
+/// stepping down on narrower screens, same breakpoints and
+/// IntrinsicHeight-row approach as `EmployeeDirectoryPage`'s card grid, so
+/// every card in a row matches height regardless of its content length.
+class _GoalCardGrid extends StatelessWidget {
+  const _GoalCardGrid({required this.goals, required this.canManageGoals});
+
+  final List<Goal> goals;
+  final bool canManageGoals;
+
+  @override
+  Widget build(BuildContext context) {
+    const spacing = 12.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 900
+            ? 3
+            : constraints.maxWidth >= 600
+            ? 2
+            : 1;
+        final cardWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+        final rows = <List<Goal>>[
+          for (var i = 0; i < goals.length; i += columns)
+            goals.sublist(
+              i,
+              i + columns > goals.length ? goals.length : i + columns,
+            ),
+        ];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final row in rows) ...[
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < row.length; i++) ...[
+                      SizedBox(
+                        width: cardWidth,
+                        child: _GoalCard(
+                          goal: row[i],
+                          canManageGoals: canManageGoals,
+                        ),
+                      ),
+                      if (i != row.length - 1) const SizedBox(width: spacing),
+                    ],
+                  ],
+                ),
+              ),
+              if (row != rows.last) const SizedBox(height: spacing),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _GoalCard extends ConsumerWidget {
+  const _GoalCard({required this.goal, required this.canManageGoals});
 
   final Goal goal;
   final bool canManageGoals;
 
-  Future<void> _delete(WidgetRef ref, BuildContext context) async {
+  Future<void> _archive(WidgetRef ref, BuildContext context) async {
     try {
       final repository = ref.read(goalRepositoryProvider);
       if (canManageGoals) {
-        await repository.delete(goal.id);
+        await repository.archive(goal.id);
       } else {
-        await repository.deleteAsManager(goal.id);
+        await repository.archiveAsManager(goal.id);
       }
       ref.invalidate(allGoalsProvider);
       ref.invalidate(teamGoalsProvider);
@@ -239,58 +292,111 @@ class _GoalRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        EmployeeAvatar(
-          fullName: goal.employeeName,
-          photoUrl: goal.employeePhotoUrl,
-          radius: 20,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${goal.employeeName} — ${goal.title}',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              if (goal.description != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  goal.description!,
-                  style: Theme.of(context).textTheme.bodySmall,
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                EmployeeAvatar(
+                  fullName: goal.employeeName,
+                  photoUrl: goal.employeePhotoUrl,
+                  radius: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        goal.employeeName,
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (goal.departmentName != null)
+                        Text(
+                          goal.departmentName!,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: AppColors.textSecondary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => _EditGoalDialog(
+                      goal: goal,
+                      canManageGoals: canManageGoals,
+                    ),
+                  ),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  tooltip: 'Edit',
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  onPressed: () => _archive(ref, context),
+                  icon: const Icon(Icons.archive_outlined, size: 18),
+                  tooltip: 'Archive',
+                  visualDensity: VisualDensity.compact,
                 ),
               ],
-              const SizedBox(height: 2),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              goal.title,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            if (goal.description != null) ...[
+              const SizedBox(height: 4),
               Text(
-                'Set by ${goal.createdByName} · '
-                '${formatDisplayDateTime(goal.createdAt)}',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                goal.description!,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
-          ),
+            const Spacer(),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: goal.achievementPercentage / 100,
+                      minHeight: 6,
+                      backgroundColor: AppColors.borderSubtle,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${goal.achievementPercentage}%',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Set by ${goal.createdByName} · '
+              '${formatDisplayDateTime(goal.createdAt)}',
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
         ),
-        IconButton(
-          onPressed: () => showDialog<void>(
-            context: context,
-            builder: (_) =>
-                _EditGoalDialog(goal: goal, canManageGoals: canManageGoals),
-          ),
-          icon: const Icon(Icons.edit_outlined, size: 18),
-          tooltip: 'Edit',
-        ),
-        IconButton(
-          onPressed: () => _delete(ref, context),
-          icon: const Icon(Icons.delete_outline, size: 18),
-          tooltip: 'Delete',
-        ),
-      ],
+      ),
     );
   }
 }
@@ -486,6 +592,7 @@ class _EditGoalDialog extends ConsumerStatefulWidget {
 class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
+  late int _achievementPercentage;
   bool _submitting = false;
   String? _errorMessage;
 
@@ -496,6 +603,7 @@ class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
     _descriptionController = TextEditingController(
       text: widget.goal.description ?? '',
     );
+    _achievementPercentage = widget.goal.achievementPercentage;
   }
 
   @override
@@ -520,6 +628,7 @@ class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
           widget.goal.id,
           title: _titleController.text,
           description: description,
+          achievementPercentage: _achievementPercentage,
         );
       } else {
         await repository.updateAsManager(
@@ -570,6 +679,35 @@ class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
                 labelText: 'Description (optional)',
               ),
             ),
+            if (widget.canManageGoals) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    'Achieved',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const Spacer(),
+                  Text(
+                    '$_achievementPercentage%',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              Slider(
+                value: _achievementPercentage.toDouble(),
+                min: 0,
+                max: 100,
+                divisions: 20,
+                label: '$_achievementPercentage%',
+                onChanged: _submitting
+                    ? null
+                    : (value) =>
+                          setState(() => _achievementPercentage = value.round()),
+              ),
+            ],
           ],
         ),
       ),

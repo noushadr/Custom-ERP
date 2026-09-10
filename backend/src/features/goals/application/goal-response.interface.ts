@@ -7,6 +7,7 @@ export interface GoalResponse {
   departmentName: string | null;
   title: string;
   description: string | null;
+  achievementPercentage: number;
   createdByName: string;
   createdAt: string;
 }

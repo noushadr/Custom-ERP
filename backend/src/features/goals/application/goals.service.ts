@@ -153,17 +153,30 @@ export class GoalsService {
     const goal = await this.loadForWrite(goalId, actorUserId, options);
     if (dto.title !== undefined) goal.title = dto.title;
     if (dto.description !== undefined) goal.description = dto.description;
+    // Achievement % is Admin/HR only — a Team Lead's own edit route always
+    // passes requireOwnDirectReport: true, so this silently no-ops for them
+    // even if a request body includes it.
+    if (
+      dto.achievementPercentage !== undefined &&
+      !options.requireOwnDirectReport
+    ) {
+      goal.achievementPercentage = dto.achievementPercentage;
+    }
     const saved = await this.goalRepository.save(goal);
     return toGoalResponse(saved);
   }
 
-  async delete(
+  /** Soft-hides the goal instead of deleting it — same authorization split
+   * as `update`: Admin/HR can archive any goal, a Team Lead only their own
+   * direct reports'. */
+  async archive(
     goalId: string,
     actorUserId: string,
     options: { requireOwnDirectReport: boolean },
   ): Promise<void> {
     const goal = await this.loadForWrite(goalId, actorUserId, options);
-    await this.goalRepository.remove(goal);
+    goal.archived = true;
+    await this.goalRepository.save(goal);
   }
 
   private create(

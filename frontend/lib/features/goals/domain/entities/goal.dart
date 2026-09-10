@@ -8,6 +8,7 @@ class Goal {
     this.departmentName,
     required this.title,
     this.description,
+    required this.achievementPercentage,
     required this.createdByName,
     required this.createdAt,
   });
@@ -20,6 +21,10 @@ class Goal {
   final String? departmentName;
   final String title;
   final String? description;
+
+  /// 0-100 — set only by Admin/HR (via the edit dialog's percentage field);
+  /// a Team Lead or the employee themselves see it read-only.
+  final int achievementPercentage;
 
   /// Snapshot of whoever set this goal — Admin/HR or the employee's own
   /// Team Lead.

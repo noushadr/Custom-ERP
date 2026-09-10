@@ -10,6 +10,7 @@ Goal buildTestGoal({
   String? departmentName,
   String title = 'English speaking',
   String? description,
+  int achievementPercentage = 0,
   String createdByName = 'Noushad Ranani',
   DateTime? createdAt,
 }) {
@@ -22,6 +23,7 @@ Goal buildTestGoal({
     departmentName: departmentName,
     title: title,
     description: description,
+    achievementPercentage: achievementPercentage,
     createdByName: createdByName,
     createdAt: createdAt ?? DateTime(2026, 9, 8),
   );
@@ -45,7 +47,8 @@ class FakeGoalRepository implements GoalRepository {
   String? lastBulkDepartmentId;
   String? lastBulkTitle;
   String? lastUpdatedGoalId;
-  String? lastDeletedGoalId;
+  int? lastUpdatedAchievementPercentage;
+  String? lastArchivedGoalId;
   bool? lastActionWasManagerScoped;
 
   @override
@@ -96,11 +99,21 @@ class FakeGoalRepository implements GoalRepository {
   }
 
   @override
-  Future<Goal> update(String goalId, {String? title, String? description}) async {
+  Future<Goal> update(
+    String goalId, {
+    String? title,
+    String? description,
+    int? achievementPercentage,
+  }) async {
     lastUpdatedGoalId = goalId;
+    lastUpdatedAchievementPercentage = achievementPercentage;
     lastActionWasManagerScoped = false;
     if (actionError != null) throw actionError!;
-    return buildTestGoal(id: goalId, title: title ?? 'English speaking');
+    return buildTestGoal(
+      id: goalId,
+      title: title ?? 'English speaking',
+      achievementPercentage: achievementPercentage ?? 0,
+    );
   }
 
   @override
@@ -116,15 +129,15 @@ class FakeGoalRepository implements GoalRepository {
   }
 
   @override
-  Future<void> delete(String goalId) async {
-    lastDeletedGoalId = goalId;
+  Future<void> archive(String goalId) async {
+    lastArchivedGoalId = goalId;
     lastActionWasManagerScoped = false;
     if (actionError != null) throw actionError!;
   }
 
   @override
-  Future<void> deleteAsManager(String goalId) async {
-    lastDeletedGoalId = goalId;
+  Future<void> archiveAsManager(String goalId) async {
+    lastArchivedGoalId = goalId;
     lastActionWasManagerScoped = true;
     if (actionError != null) throw actionError!;
   }

@@ -370,7 +370,30 @@ class _MyGoalsSection extends ConsumerWidget {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
-                const SizedBox(height: 2),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: goals[i].achievementPercentage / 100,
+                          minHeight: 6,
+                          backgroundColor: AppColors.borderSubtle,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${goals[i].achievementPercentage}%',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 Text(
                   'Set by ${goals[i].createdByName}',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(

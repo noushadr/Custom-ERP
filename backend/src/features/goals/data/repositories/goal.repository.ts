@@ -13,6 +13,7 @@ export class TypeOrmGoalRepository implements GoalRepository {
 
   findAll(): Promise<EmployeeGoal[]> {
     return this.repository.find({
+      where: { archived: false },
       relations: { employee: true },
       order: { createdAt: 'DESC' },
     });
@@ -27,7 +28,7 @@ export class TypeOrmGoalRepository implements GoalRepository {
 
   findByEmployeeId(employeeId: string): Promise<EmployeeGoal[]> {
     return this.repository.find({
-      where: { employeeId },
+      where: { employeeId, archived: false },
       relations: { employee: true },
       order: { createdAt: 'DESC' },
     });
@@ -39,9 +40,5 @@ export class TypeOrmGoalRepository implements GoalRepository {
 
   saveMany(goals: EmployeeGoal[]): Promise<EmployeeGoal[]> {
     return this.repository.save(goals);
-  }
-
-  async remove(goal: EmployeeGoal): Promise<void> {
-    await this.repository.remove(goal);
   }
 }

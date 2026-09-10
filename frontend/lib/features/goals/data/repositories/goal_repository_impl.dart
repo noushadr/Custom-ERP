@@ -58,14 +58,19 @@ class GoalRepositoryImpl implements GoalRepository {
   );
 
   @override
-  Future<Goal> update(String goalId, {String? title, String? description}) =>
-      _guard(
-        () => _remoteDataSource.update(
-          goalId,
-          title: title,
-          description: description,
-        ),
-      );
+  Future<Goal> update(
+    String goalId, {
+    String? title,
+    String? description,
+    int? achievementPercentage,
+  }) => _guard(
+    () => _remoteDataSource.update(
+      goalId,
+      title: title,
+      description: description,
+      achievementPercentage: achievementPercentage,
+    ),
+  );
 
   @override
   Future<Goal> updateAsManager(
@@ -81,12 +86,12 @@ class GoalRepositoryImpl implements GoalRepository {
   );
 
   @override
-  Future<void> delete(String goalId) =>
-      _guard(() => _remoteDataSource.delete(goalId));
+  Future<void> archive(String goalId) =>
+      _guard(() => _remoteDataSource.archive(goalId));
 
   @override
-  Future<void> deleteAsManager(String goalId) =>
-      _guard(() => _remoteDataSource.deleteAsManager(goalId));
+  Future<void> archiveAsManager(String goalId) =>
+      _guard(() => _remoteDataSource.archiveAsManager(goalId));
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

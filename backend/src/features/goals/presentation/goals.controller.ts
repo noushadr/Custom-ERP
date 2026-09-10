@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
@@ -73,17 +73,17 @@ export class GoalsController {
     });
   }
 
-  @Delete(':id')
+  @Patch(':id/archive')
   @Permissions('goals.manage')
-  delete(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.goalsService.delete(id, user.sub, {
+  archive(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.goalsService.archive(id, user.sub, {
       requireOwnDirectReport: false,
     });
   }
 
-  @Delete(':id/team')
-  deleteAsManager(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.goalsService.delete(id, user.sub, {
+  @Patch(':id/team/archive')
+  archiveAsManager(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.goalsService.archive(id, user.sub, {
       requireOwnDirectReport: true,
     });
   }

@@ -73,10 +73,15 @@ class GoalRemoteDataSource {
     String goalId, {
     String? title,
     String? description,
+    int? achievementPercentage,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/goals/$goalId',
-      data: {'title': ?title, 'description': ?description},
+      data: {
+        'title': ?title,
+        'description': ?description,
+        'achievementPercentage': ?achievementPercentage,
+      },
     );
     return GoalModel.fromJson(response.data!);
   }
@@ -93,8 +98,9 @@ class GoalRemoteDataSource {
     return GoalModel.fromJson(response.data!);
   }
 
-  Future<void> delete(String goalId) => _dio.delete('/goals/$goalId');
+  Future<void> archive(String goalId) =>
+      _dio.patch('/goals/$goalId/archive');
 
-  Future<void> deleteAsManager(String goalId) =>
-      _dio.delete('/goals/$goalId/team');
+  Future<void> archiveAsManager(String goalId) =>
+      _dio.patch('/goals/$goalId/team/archive');
 }

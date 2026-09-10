@@ -4,9 +4,10 @@ import { Employee } from '../../../employee/domain/entities/employee.entity';
 
 /** One goal set for one employee — by Admin/HR (any employee) or a Team
  * Lead (only for their own direct reports, enforced in `GoalsService`, not
- * a DB constraint). No status/progress tracking — just what the goal is,
- * who set it, and when; the employee sees it read-only on their own
- * dashboard. */
+ * a DB constraint). Tracks how much of it is done via `achievementPercentage`
+ * — settable only by Admin/HR (`GoalsService.update`), never by a Team Lead
+ * (`updateAsManager` ignores it) or the employee themselves, who see it
+ * read-only on their own dashboard. */
 @Entity('employee_goals')
 export class EmployeeGoal extends BaseEntity {
   @Column()
@@ -21,6 +22,15 @@ export class EmployeeGoal extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   description?: string | null;
+
+  @Column({ type: 'int', default: 0 })
+  achievementPercentage: number;
+
+  /** Soft-hidden instead of deleted — `GoalsService.archive` sets this
+   * rather than removing the row, so past goal-setting is never destroyed.
+   * Every read query filters `archived: false`. */
+  @Column({ default: false })
+  archived: boolean;
 
   @Column()
   createdByUserId: string;

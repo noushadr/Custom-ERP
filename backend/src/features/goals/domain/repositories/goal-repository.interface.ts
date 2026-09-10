@@ -8,5 +8,4 @@ export interface GoalRepository {
   findByEmployeeId(employeeId: string): Promise<EmployeeGoal[]>;
   save(goal: EmployeeGoal): Promise<EmployeeGoal>;
   saveMany(goals: EmployeeGoal[]): Promise<EmployeeGoal[]>;
-  remove(goal: EmployeeGoal): Promise<void>;
 }

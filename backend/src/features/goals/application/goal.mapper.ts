@@ -11,6 +11,7 @@ export function toGoalResponse(goal: EmployeeGoal): GoalResponse {
     departmentName: goal.employee.department?.name ?? null,
     title: goal.title,
     description: goal.description ?? null,
+    achievementPercentage: goal.achievementPercentage,
     createdByName: goal.createdByName,
     createdAt: goal.createdAt.toISOString(),
   };

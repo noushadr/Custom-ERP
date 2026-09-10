@@ -26,6 +26,8 @@ function buildGoal(overrides: Partial<EmployeeGoal> = {}): EmployeeGoal {
     employee: buildEmployee(),
     title: 'English speaking',
     description: null,
+    achievementPercentage: 0,
+    archived: false,
     createdByUserId: 'admin-1',
     createdByName: 'Noushad Ranani',
     createdAt: new Date('2026-09-08T00:00:00Z'),
@@ -50,7 +52,6 @@ describe('GoalsService', () => {
           goals.map((g, i) => ({ ...g, id: g.id ?? `goal-${i + 1}` })),
         ),
       ),
-      remove: jest.fn().mockResolvedValue(undefined),
     };
     employeeRepository = {
       findAll: jest.fn().mockResolvedValue([]),
@@ -212,16 +213,66 @@ describe('GoalsService', () => {
       expect(result.title).toBe('Fluent English');
       expect(result.description).toBe('Practice daily');
     });
+
+    it('lets Admin/HR set the achievement percentage', async () => {
+      goalRepository.findById.mockResolvedValue(buildGoal());
+
+      const result = await service.update(
+        'goal-1',
+        { achievementPercentage: 75 },
+        'admin-1',
+        { requireOwnDirectReport: false },
+      );
+
+      expect(result.achievementPercentage).toBe(75);
+    });
+
+    it("ignores the achievement percentage on a Team Lead's own-report edit", async () => {
+      goalRepository.findById.mockResolvedValue(
+        buildGoal({
+          employee: buildEmployee({ reportingManagerId: 'manager-1' }),
+        }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'manager-1' }),
+      );
+
+      const result = await service.update(
+        'goal-1',
+        { achievementPercentage: 90 },
+        'user-1',
+        { requireOwnDirectReport: true },
+      );
+
+      expect(result.achievementPercentage).toBe(0);
+    });
   });
 
-  describe('delete', () => {
-    it('removes the goal when authorized', async () => {
+  describe('archive', () => {
+    it('soft-archives the goal instead of removing it', async () => {
       const goal = buildGoal();
       goalRepository.findById.mockResolvedValue(goal);
 
-      await service.delete('goal-1', 'admin-1', { requireOwnDirectReport: false });
+      await service.archive('goal-1', 'admin-1', {
+        requireOwnDirectReport: false,
+      });
 
-      expect(goalRepository.remove).toHaveBeenCalledWith(goal);
+      expect(goalRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ archived: true }),
+      );
+    });
+
+    it("throws ForbiddenException when a manager archives someone else's report's goal", async () => {
+      goalRepository.findById.mockResolvedValue(
+        buildGoal({ employee: buildEmployee({ reportingManagerId: 'someone-else' }) }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'manager-1' }),
+      );
+
+      await expect(
+        service.archive('goal-1', 'user-1', { requireOwnDirectReport: true }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 

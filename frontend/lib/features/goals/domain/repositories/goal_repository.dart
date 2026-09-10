@@ -32,21 +32,27 @@ abstract interface class GoalRepository {
     String? description,
   });
 
-  /// Requires `goals.manage`.
-  Future<Goal> update(String goalId, {String? title, String? description});
+  /// Requires `goals.manage`. [achievementPercentage] (0-100) is also
+  /// Admin/HR only — pass it through `updateAsManager` and it's ignored.
+  Future<Goal> update(
+    String goalId, {
+    String? title,
+    String? description,
+    int? achievementPercentage,
+  });
 
   /// A Team Lead editing a goal belonging to one of their own direct
-  /// reports.
+  /// reports — no [achievementPercentage] param; that's Admin/HR only.
   Future<Goal> updateAsManager(
     String goalId, {
     String? title,
     String? description,
   });
 
-  /// Requires `goals.manage`.
-  Future<void> delete(String goalId);
+  /// Soft-hides the goal rather than deleting it. Requires `goals.manage`.
+  Future<void> archive(String goalId);
 
-  /// A Team Lead deleting a goal belonging to one of their own direct
+  /// A Team Lead archiving a goal belonging to one of their own direct
   /// reports.
-  Future<void> deleteAsManager(String goalId);
+  Future<void> archiveAsManager(String goalId);
 }

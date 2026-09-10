@@ -77,7 +77,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('All Goals'), findsOneWidget);
-      expect(find.textContaining('Babar Hussain — English speaking'), findsOneWidget);
+      expect(find.text('Babar Hussain'), findsOneWidget);
+      expect(find.text('English speaking'), findsOneWidget);
 
       await tester.tap(find.text('Add Goal'));
       await tester.pumpAndSettle();
@@ -188,7 +189,7 @@ void main() {
     },
   );
 
-  testWidgets('deleting a goal as Admin/HR calls the unscoped delete', (
+  testWidgets('archiving a goal as Admin/HR calls the unscoped archive', (
     tester,
   ) async {
     final goalRepository = FakeGoalRepository(all: [buildTestGoal(id: 'goal-9')]);
@@ -197,11 +198,58 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Delete'));
+    await tester.tap(find.byTooltip('Archive'));
     await tester.pumpAndSettle();
 
-    expect(goalRepository.lastDeletedGoalId, 'goal-9');
+    expect(goalRepository.lastArchivedGoalId, 'goal-9');
     expect(goalRepository.lastActionWasManagerScoped, isFalse);
+  });
+
+  testWidgets(
+    'Admin/HR can edit the achievement percentage; a Team Lead cannot',
+    (tester) async {
+      final goalRepository = FakeGoalRepository(
+        all: [buildTestGoal(id: 'goal-9', achievementPercentage: 20)],
+      );
+      await tester.pumpWidget(
+        _app(permissions: ['goals.manage'], goalRepository: goalRepository),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Edit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Achieved'), findsOneWidget);
+      expect(find.byType(Slider), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(goalRepository.lastUpdatedAchievementPercentage, 20);
+    },
+  );
+
+  testWidgets("a Team Lead's edit dialog has no achievement percentage field", (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        role: 'Team Lead',
+        goalRepository: FakeGoalRepository(
+          team: [buildTestGoal(id: 'goal-9')],
+        ),
+        employeeRepository: FakeEmployeeRepository(
+          directReports: [buildTestEmployee(id: 'report-1')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Edit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Achieved'), findsNothing);
+    expect(find.byType(Slider), findsNothing);
   });
 
   testWidgets('shows the employee photo/initials next to each goal', (
@@ -236,8 +284,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Babar Hussain —'), findsOneWidget);
-    expect(find.textContaining('Aamna Irfan —'), findsOneWidget);
+    expect(find.text('Babar Hussain'), findsOneWidget);
+    expect(find.text('Aamna Irfan'), findsOneWidget);
 
     await tester.enterText(
       find.widgetWithText(TextField, 'Search by employee name'),
@@ -245,8 +293,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Babar Hussain —'), findsOneWidget);
-    expect(find.textContaining('Aamna Irfan —'), findsNothing);
+    expect(find.text('Babar Hussain'), findsOneWidget);
+    expect(find.text('Aamna Irfan'), findsNothing);
   });
 
   testWidgets('filtering by department shows only that department\'s goals', (
@@ -279,8 +327,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Babar Hussain —'), findsOneWidget);
-    expect(find.textContaining('Aamna Irfan —'), findsOneWidget);
+    expect(find.text('Babar Hussain'), findsOneWidget);
+    expect(find.text('Aamna Irfan'), findsOneWidget);
 
     await tester.tap(
       find.widgetWithText(DropdownButtonFormField<String?>, 'Department'),
@@ -289,7 +337,7 @@ void main() {
     await tester.tap(find.text('SEO').last);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Babar Hussain —'), findsOneWidget);
-    expect(find.textContaining('Aamna Irfan —'), findsNothing);
+    expect(find.text('Babar Hussain'), findsOneWidget);
+    expect(find.text('Aamna Irfan'), findsNothing);
   });
 }
