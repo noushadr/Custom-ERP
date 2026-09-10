@@ -27,12 +27,13 @@ class EmailPage extends ConsumerWidget {
         authState is AuthAuthenticated &&
         authState.user.hasPermission('email.manage');
     final accountAsync = ref.watch(myEmailAccountProvider);
+    final myProfileAsync = ref.watch(myProfileProvider);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: const BoxConstraints(maxWidth: 1200),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,9 +54,28 @@ class EmailPage extends ConsumerWidget {
                     child: Center(child: CircularProgressIndicator()),
                   ),
                   error: (_, _) => const Text('Could not load your mailbox.'),
-                  data: (account) => account == null
-                      ? const _MailboxSetupCard(forEmployeeId: null)
-                      : _MailboxWorkspace(account: account),
+                  data: (account) {
+                    if (account != null) {
+                      return _MailboxWorkspace(account: account);
+                    }
+                    // Wait for the viewer's own profile too, so the mailbox
+                    // address prefill (firstname@zeracreative.com) isn't
+                    // built once with a still-null first name and then
+                    // stuck that way — this state's TextEditingController
+                    // is only ever seeded on first build.
+                    return myProfileAsync.when(
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      error: (_, _) => const _MailboxSetupCard(
+                        forEmployeeId: null,
+                      ),
+                      data: (profile) => _MailboxSetupCard(
+                        forEmployeeId: null,
+                        defaultFirstName: profile.firstName,
+                      ),
+                    );
+                  },
                 ),
                 if (canManageEmail) ...[
                   const SizedBox(height: 20),
@@ -81,6 +101,7 @@ class _MailboxWorkspace extends ConsumerStatefulWidget {
 
 class _MailboxWorkspaceState extends ConsumerState<_MailboxWorkspace> {
   bool _editingSettings = false;
+  int? _selectedUid;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +121,7 @@ class _MailboxWorkspaceState extends ConsumerState<_MailboxWorkspace> {
           FilledButton.icon(
             onPressed: () => showDialog<void>(
               context: context,
-              builder: (_) => const _ComposeDialog(),
+              builder: (_) => _ComposeDialog(account: widget.account),
             ),
             icon: const Icon(Icons.edit_outlined, size: 16),
             label: const Text('Compose'),
@@ -112,23 +133,56 @@ class _MailboxWorkspaceState extends ConsumerState<_MailboxWorkspace> {
           ),
         ],
       ),
-      child: const _InboxList(),
+      // A fixed height so the list and the reading pane can each scroll on
+      // their own — the page's own scroll view (in EmailPage) gives this
+      // Row unbounded height otherwise, which a two-pane split can't lay
+      // out against.
+      child: SizedBox(
+        height: 640,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 320,
+              child: _InboxList(
+                selectedUid: _selectedUid,
+                onSelect: (uid) => setState(() => _selectedUid = uid),
+              ),
+            ),
+            const VerticalDivider(width: 1, color: AppColors.borderSubtle),
+            Expanded(
+              child: _selectedUid == null
+                  ? Center(
+                      child: Text(
+                        'Select a message to read it.',
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: AppColors.textSecondary),
+                      ),
+                    )
+                  : _MessageDetailPane(
+                      uid: _selectedUid!,
+                      account: widget.account,
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class _InboxList extends ConsumerWidget {
-  const _InboxList();
+  const _InboxList({required this.selectedUid, required this.onSelect});
+
+  final int? selectedUid;
+  final ValueChanged<int> onSelect;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final inboxAsync = ref.watch(inboxMessagesProvider);
 
     return inboxAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Text(
@@ -142,15 +196,19 @@ class _InboxList extends ConsumerWidget {
             child: Text('No messages yet.'),
           );
         }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < messages.length; i++) ...[
-              _InboxRow(message: messages[i]),
-              if (i < messages.length - 1)
-                const Divider(height: 16, color: AppColors.borderSubtle),
-            ],
-          ],
+        return ListView.separated(
+          padding: EdgeInsets.zero,
+          itemCount: messages.length,
+          separatorBuilder: (_, _) =>
+              const Divider(height: 1, color: AppColors.borderSubtle),
+          itemBuilder: (context, index) {
+            final message = messages[index];
+            return _InboxRow(
+              message: message,
+              selected: message.uid == selectedUid,
+              onTap: () => onSelect(message.uid),
+            );
+          },
         );
       },
     );
@@ -158,36 +216,40 @@ class _InboxList extends ConsumerWidget {
 }
 
 class _InboxRow extends StatelessWidget {
-  const _InboxRow({required this.message});
+  const _InboxRow({
+    required this.message,
+    required this.selected,
+    required this.onTap,
+  });
 
   final InboxMessage message;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => showDialog<void>(
-        context: context,
-        builder: (_) => _MessageDetailDialog(uid: message.uid),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
+      onTap: onTap,
+      child: Container(
+        color: selected ? AppColors.primary.withValues(alpha: 0.08) : null,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              message.isUnread
-                  ? Icons.mark_email_unread_outlined
-                  : Icons.mark_email_read_outlined,
-              size: 18,
-              color: message.isUnread
-                  ? AppColors.primary
-                  : AppColors.textSecondary,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+            Row(
+              children: [
+                Icon(
+                  message.isUnread
+                      ? Icons.mark_email_unread_outlined
+                      : Icons.mark_email_read_outlined,
+                  size: 14,
+                  color: message.isUnread
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
                     message.fromName?.isNotEmpty == true
                         ? message.fromName!
                         : message.from,
@@ -196,15 +258,18 @@ class _InboxRow extends StatelessWidget {
                           ? FontWeight.w700
                           : FontWeight.w500,
                     ),
-                  ),
-                  Text(
-                    message.subject,
-                    style: Theme.of(context).textTheme.bodySmall,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+            const SizedBox(height: 2),
+            Text(
+              message.subject,
+              style: Theme.of(context).textTheme.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
             Text(
               formatDisplayDateTime(message.date),
               style: Theme.of(
@@ -218,44 +283,72 @@ class _InboxRow extends StatelessWidget {
   }
 }
 
-class _MessageDetailDialog extends ConsumerWidget {
-  const _MessageDetailDialog({required this.uid});
+class _MessageDetailPane extends ConsumerWidget {
+  const _MessageDetailPane({required this.uid, required this.account});
 
   final int uid;
+  final EmailAccount account;
+
+  /// Strips a leading "Re: " (any casing, possibly repeated) so replying to
+  /// a reply doesn't pile up "Re: Re: Re: ...".
+  String _replySubject(String subject) {
+    final stripped = subject.replaceFirst(
+      RegExp(r'^(re:\s*)+', caseSensitive: false),
+      '',
+    );
+    return 'Re: $stripped';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repository = ref.read(emailRepositoryProvider);
-    return AlertDialog(
-      content: SizedBox(
-        width: 520,
-        child: FutureBuilder(
-          future: repository.getMessage(uid),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const SizedBox(
-                height: 120,
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (snapshot.hasError) {
-              final error = snapshot.error;
-              return Text(
-                error is EmailException
-                    ? error.message
-                    : 'Could not load this message.',
-              );
-            }
-            final message = snapshot.data!;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: FutureBuilder(
+        // Keyed off `uid` implicitly via this widget's own rebuild (a new
+        // uid means a new `_MessageDetailPane` instance further up), so the
+        // fetch reruns whenever the selected message changes.
+        future: repository.getMessage(uid),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            final error = snapshot.error;
+            return Text(
+              error is EmailException
+                  ? error.message
+                  : 'Could not load this message.',
+            );
+          }
+          final message = snapshot.data!;
+          return SingleChildScrollView(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  message.subject,
-                  style: Theme.of(context).textTheme.titleMedium,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        message.subject,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => _ComposeDialog(
+                          account: account,
+                          initialTo: message.from,
+                          initialSubject: _replySubject(message.subject),
+                        ),
+                      ),
+                      icon: const Icon(Icons.reply_outlined, size: 16),
+                      label: const Text('Reply'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
                 Text(
                   'From ${message.from} · ${formatDisplayDateTime(message.date)}',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -265,22 +358,24 @@ class _MessageDetailDialog extends ConsumerWidget {
                 const SizedBox(height: 12),
                 SelectableText(message.text),
               ],
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
-        ),
-      ],
     );
   }
 }
 
 class _ComposeDialog extends ConsumerStatefulWidget {
-  const _ComposeDialog();
+  const _ComposeDialog({
+    required this.account,
+    this.initialTo,
+    this.initialSubject,
+  });
+
+  final EmailAccount account;
+  final String? initialTo;
+  final String? initialSubject;
 
   @override
   ConsumerState<_ComposeDialog> createState() => _ComposeDialogState();
@@ -288,11 +383,36 @@ class _ComposeDialog extends ConsumerStatefulWidget {
 
 class _ComposeDialogState extends ConsumerState<_ComposeDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _toController = TextEditingController();
-  final _subjectController = TextEditingController();
+  late final _toController = TextEditingController(
+    text: widget.initialTo ?? '',
+  );
+  late final _subjectController = TextEditingController(
+    text: widget.initialSubject ?? '',
+  );
   final _bodyController = TextEditingController();
   bool _submitting = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    // A blank couple of lines to type into, followed by the viewer's
+    // signature — built from their own profile (name, title) and this
+    // mailbox's address, nothing else appended. Read once here rather than
+    // in a field initializer, since `ref` isn't wired up until initState.
+    final profile = ref.read(myProfileProvider).valueOrNull;
+    final signatureLines = [
+      '--',
+      if (profile != null) profile.fullName,
+      if (profile?.designation case final title? when title.isNotEmpty)
+        title,
+      widget.account.emailAddress,
+      'Zera Creative',
+    ];
+    _bodyController
+      ..text = '\n\n${signatureLines.join('\n')}'
+      ..selection = const TextSelection.collapsed(offset: 0);
+  }
 
   @override
   void dispose() {
@@ -397,30 +517,43 @@ class _MailboxSetupCard extends ConsumerStatefulWidget {
     required this.forEmployeeId,
     this.existing,
     this.onDone,
+    this.defaultFirstName,
   });
 
   final String? forEmployeeId;
   final EmailAccount? existing;
   final VoidCallback? onDone;
 
+  /// Used only when [existing] is null, to prefill the mailbox address as
+  /// `firstname@zeracreative.com` — the company's real naming convention.
+  final String? defaultFirstName;
+
   @override
   ConsumerState<_MailboxSetupCard> createState() => _MailboxSetupCardState();
 }
 
+/// This company's own mail server — prefilled so the common case (every
+/// mailbox lives on the same Verpex cPanel host) needs no typing; still
+/// fully editable for the rare mailbox hosted elsewhere.
+const _defaultMailHost = 'mail.zeracreative.com';
+
 class _MailboxSetupCardState extends ConsumerState<_MailboxSetupCard> {
   final _formKey = GlobalKey<FormState>();
   late final _emailController = TextEditingController(
-    text: widget.existing?.emailAddress ?? '',
+    text: widget.existing?.emailAddress ??
+        (widget.defaultFirstName == null
+            ? ''
+            : '${widget.defaultFirstName!.toLowerCase()}@zeracreative.com'),
   );
   final _passwordController = TextEditingController();
   late final _smtpHostController = TextEditingController(
-    text: widget.existing?.smtpHost ?? '',
+    text: widget.existing?.smtpHost ?? _defaultMailHost,
   );
   late final _smtpPortController = TextEditingController(
-    text: '${widget.existing?.smtpPort ?? 587}',
+    text: '${widget.existing?.smtpPort ?? 465}',
   );
   late final _imapHostController = TextEditingController(
-    text: widget.existing?.imapHost ?? '',
+    text: widget.existing?.imapHost ?? _defaultMailHost,
   );
   late final _imapPortController = TextEditingController(
     text: '${widget.existing?.imapPort ?? 993}',
@@ -670,6 +803,14 @@ class _AdminMailboxManager extends ConsumerStatefulWidget {
       _AdminMailboxManagerState();
 }
 
+String? _firstNameOf(List<Employee>? employees, String employeeId) {
+  if (employees == null) return null;
+  for (final employee in employees) {
+    if (employee.id == employeeId) return employee.firstName;
+  }
+  return null;
+}
+
 class _AdminMailboxManagerState extends ConsumerState<_AdminMailboxManager> {
   String? _selectedEmployeeId;
 
@@ -705,6 +846,10 @@ class _AdminMailboxManagerState extends ConsumerState<_AdminMailboxManager> {
             _AdminEmployeeMailboxEditor(
               key: ValueKey(_selectedEmployeeId),
               employeeId: _selectedEmployeeId!,
+              firstName: _firstNameOf(
+                employeesAsync.valueOrNull,
+                _selectedEmployeeId!,
+              ),
             ),
           ],
         ],
@@ -714,9 +859,14 @@ class _AdminMailboxManagerState extends ConsumerState<_AdminMailboxManager> {
 }
 
 class _AdminEmployeeMailboxEditor extends ConsumerWidget {
-  const _AdminEmployeeMailboxEditor({super.key, required this.employeeId});
+  const _AdminEmployeeMailboxEditor({
+    super.key,
+    required this.employeeId,
+    this.firstName,
+  });
 
   final String employeeId;
+  final String? firstName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -740,6 +890,7 @@ class _AdminEmployeeMailboxEditor extends ConsumerWidget {
         return _MailboxSetupCard(
           forEmployeeId: employeeId,
           existing: snapshot.data,
+          defaultFirstName: firstName,
         );
       },
     );
