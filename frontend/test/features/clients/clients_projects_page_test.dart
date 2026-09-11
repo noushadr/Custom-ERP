@@ -90,18 +90,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Active Projects'), findsOneWidget);
     expect(find.text('Total Clients'), findsOneWidget);
     expect(find.text('Active Clients'), findsOneWidget);
     expect(find.text('Monthly Retainers'), findsOneWidget);
     expect(find.text('One-Time Projects'), findsOneWidget);
-    // Total Clients: 2, Active Clients: 1 (only Acme Co has an active
-    // project), Monthly Retainers: 1, One-Time Projects: 1. Scoped to the
-    // stat tiles' own Wrap — the "Top Industries" breakdown panel below
-    // also renders plain digit counts (both test clients default to the
-    // same "Retail" industry), so a bare `find.text` isn't unique anymore.
+    // Active Projects: 1 (only p1 is active), Total Clients: 2, Active
+    // Clients: 1 (only Acme Co has an active project), Monthly Retainers: 1,
+    // One-Time Projects: 1. Scoped to the stat tiles' own Wrap — the "Top
+    // Industries" breakdown panel below also renders plain digit counts
+    // (both test clients default to the same "Retail" industry), so a bare
+    // `find.text` isn't unique anymore.
     final statTiles = find.byType(Wrap).first;
     expect(find.descendant(of: statTiles, matching: find.text('2')), findsOneWidget);
-    expect(find.descendant(of: statTiles, matching: find.text('1')), findsNWidgets(3));
+    expect(find.descendant(of: statTiles, matching: find.text('1')), findsNWidgets(4));
   });
 
   testWidgets(

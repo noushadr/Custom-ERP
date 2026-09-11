@@ -110,7 +110,7 @@ export class ChecklistsService {
    * [markCompleted] pre-marks every created item as already done — used by
    * the one-time backfill for employees who existed before this feature
    * shipped, since they already went through onboarding/offboarding in
-   * reality. New instances created via the normal invite/status-change hooks
+   * reality. New instances created via the normal add-employee/status-change hooks
    * leave this false, so new employees start unchecked. */
   async createInstance(
     employeeId: string,

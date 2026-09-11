@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import '../../domain/entities/add_employee_input.dart';
 import '../../domain/entities/asset.dart';
 import '../../domain/entities/audit_log_entry.dart';
 import '../../domain/entities/department.dart';
 import '../../domain/entities/education_record.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/entities/employee_document.dart';
-import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/paginated_audit_log.dart';
 import '../../domain/entities/payroll_summary.dart';
 import '../../domain/entities/salary_record.dart';
@@ -84,9 +84,9 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(() => _remoteDataSource.uploadPhoto(id, bytes, fileName));
 
   @override
-  Future<({Employee employee, String temporaryPassword})> invite(
-    InviteEmployeeInput input,
-  ) => _guard(() => _remoteDataSource.invite(input));
+  Future<({Employee employee, String temporaryPassword})> addEmployee(
+    AddEmployeeInput input,
+  ) => _guard(() => _remoteDataSource.addEmployee(input));
 
   @override
   Future<List<Department>> getDepartments({bool includeArchived = false}) =>

@@ -41,6 +41,17 @@ abstract interface class LeaveRepository {
 
   Future<LeaveRequest> cancelLeaveRequest(String requestId);
 
+  /// HR/Admin applying leave directly on an employee's behalf — created
+  /// already APPROVED, with no manager/HR approval stage to wait on, and
+  /// the balance deducted immediately. Requires `leave.manage`.
+  Future<LeaveRequest> applyLeaveForEmployee(
+    String employeeId, {
+    required String leaveTypeId,
+    required String startDate,
+    required String endDate,
+    required String reason,
+  });
+
   Future<List<LeaveRequest>> getMyLeaveRequests();
 
   /// Requests submitted by one of this viewer's direct reports, awaiting

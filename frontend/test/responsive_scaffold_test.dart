@@ -218,7 +218,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Generate Payroll'), findsOneWidget);
-        expect(find.text('Invite Employee'), findsNothing);
+        expect(find.text('Add Employee'), findsNothing);
       },
     );
 
@@ -241,7 +241,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Invite Employee'), findsOneWidget);
+        expect(find.text('Add Employee'), findsOneWidget);
       },
     );
   });

@@ -14,12 +14,17 @@ class MetricCard extends StatelessWidget {
     this.secondaryValue,
     this.valueFontSize,
     this.valueSpans,
+    this.onTap,
   });
 
   final String label;
   final String value;
   final Color color;
   final IconData? icon;
+
+  /// When set, the whole tile becomes tappable (e.g. the Dashboard's Notice
+  /// Period tile jumping to the filtered Employees list).
+  final VoidCallback? onTap;
 
   /// Renders [value] as rich text instead of a plain string — e.g. a
   /// bracketed USD conversion styled smaller/lighter than the headline PKR
@@ -57,7 +62,7 @@ class MetricCard extends StatelessWidget {
         ? Text.rich(TextSpan(style: baseValueStyle, children: valueSpans))
         : Text(value, style: baseValueStyle);
 
-    return Container(
+    final content = Container(
       constraints: const BoxConstraints(minWidth: 150),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -92,6 +97,17 @@ class MetricCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: content,
       ),
     );
   }

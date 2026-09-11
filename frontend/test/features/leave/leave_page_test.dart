@@ -9,6 +9,7 @@ import 'package:zera_erp/features/holidays/application/holiday_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/leave/domain/repositories/leave_repository.dart';
 import 'package:zera_erp/features/leave/presentation/pages/leave_page.dart';
+import 'package:zera_erp/shared/widgets/metric_card.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
@@ -35,6 +36,7 @@ Widget _app({
   List<String> permissions = const [],
   FakeLeaveRepository? leaveRepository,
   FakeHolidayRepository? holidayRepository,
+  FakeEmployeeRepository? employeeRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -50,7 +52,9 @@ Widget _app({
       // to decide whether to show the "My Team" toggle — no test in this
       // file cares about that, so a plain, deterministic fake avoids a real
       // network call for myProfileProvider/departmentsProvider.
-      employeeRepositoryProvider.overrideWithValue(FakeEmployeeRepository()),
+      employeeRepositoryProvider.overrideWithValue(
+        employeeRepository ?? FakeEmployeeRepository(),
+      ),
       // The apply-leave dialog previews the working-day count against
       // configured holidays — default to none so tests stay deterministic.
       holidayRepositoryProvider.overrideWithValue(
@@ -94,6 +98,185 @@ void main() {
 
     expect(find.text('No leave balances yet.'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows the company-wide On Leave stat for a leave.manage holder '
+    '(moved here from the Dashboard)',
+    (tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          role: 'HR/Manager',
+          permissions: const ['leave.manage'],
+          employeeRepository: FakeEmployeeRepository(
+            employees: [
+              buildTestEmployee(id: 'employee-1', employmentStatus: 'on_leave'),
+              buildTestEmployee(id: 'employee-2', employmentStatus: 'active'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final onLeaveCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate(
+          (w) => w is MetricCard && w.label == 'On Leave',
+        ),
+      );
+      expect(onLeaveCard.value, '1');
+    },
+  );
+
+  testWidgets(
+    'hides the On Leave stat from a viewer without leave.manage',
+    (tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+
+      expect(find.text('On Leave'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'shows the Apply Leave for Employee button only for a leave.manage holder',
+    (tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Apply Leave for Employee'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    "shows the selected employee's remaining leave balances in the Apply "
+    'Leave for Employee dialog',
+    (tester) async {
+      await _useTallSurface(tester);
+      final leaveRepository = FakeLeaveRepository(
+        leaveTypes: [buildTestLeaveType(id: 'type-1', name: 'Casual Leave')],
+        myBalances: [
+          buildTestLeaveBalance(
+            leaveTypeName: 'Casual Leave',
+            allocated: 10,
+            used: 3,
+            remaining: 7,
+          ),
+          buildTestLeaveBalance(
+            leaveTypeName: 'Sick Leave',
+            allocated: 8,
+            used: 8,
+            remaining: 0,
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        _app(
+          role: 'HR/Manager',
+          permissions: const ['leave.manage'],
+          leaveRepository: leaveRepository,
+          employeeRepository: FakeEmployeeRepository(
+            employees: [
+              buildTestEmployee(id: 'employee-1', fullName: 'Babar Hussain'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Apply Leave for Employee'));
+      await tester.pumpAndSettle();
+
+      // No employee picked yet — nothing to show.
+      expect(find.textContaining('left'), findsNothing);
+
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Babar Hussain').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Casual Leave: 7 left'), findsOneWidget);
+      expect(find.text('Sick Leave: 0 left'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'HR/Admin can apply already-approved leave directly for an employee, '
+    'with no manager or HR approval step',
+    (tester) async {
+      await _useTallSurface(tester);
+      final leaveRepository = FakeLeaveRepository(
+        leaveTypes: [buildTestLeaveType(id: 'type-1', name: 'Casual Leave')],
+      );
+      await tester.pumpWidget(
+        _app(
+          role: 'HR/Manager',
+          permissions: const ['leave.manage'],
+          leaveRepository: leaveRepository,
+          employeeRepository: FakeEmployeeRepository(
+            employees: [
+              buildTestEmployee(
+                id: 'employee-1',
+                fullName: 'Babar Hussain',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Apply Leave for Employee'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Created as already approved — no manager or HR review '
+          'needed, since you already are that final approval.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Babar Hussain').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Leave type'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Casual Leave').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('apply-for-employee-start-date')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('apply-for-employee-end-date')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Reason'),
+        'Pre-approved by manager over Slack',
+      );
+
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+
+      expect(leaveRepository.lastAppliedForEmployeeId, 'employee-1');
+      expect(leaveRepository.lastAppliedLeaveTypeId, 'type-1');
+      // Dialog closes on success.
+      expect(find.text('Apply Leave for Employee'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'previews the working-day count once both dates are selected',

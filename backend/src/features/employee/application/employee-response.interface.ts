@@ -25,6 +25,8 @@ export interface EmployeeResponse {
   workMode: WorkMode;
   joiningDate: string;
   dateOfLeaving: string | null;
+  probationEndDate: string | null;
+  probationStatus: 'on_probation' | 'completed' | null;
   dateOfBirth: string | null;
   personalEmail: string | null;
   phoneNumber: string | null;

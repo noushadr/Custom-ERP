@@ -1,11 +1,11 @@
 import 'dart:typed_data';
+import '../entities/add_employee_input.dart';
 import '../entities/asset.dart';
 import '../entities/audit_log_entry.dart';
 import '../entities/department.dart';
 import '../entities/education_record.dart';
 import '../entities/employee.dart';
 import '../entities/employee_document.dart';
-import '../entities/invite_employee_input.dart';
 import '../entities/paginated_audit_log.dart';
 import '../entities/payroll_summary.dart';
 import '../entities/salary_record.dart';
@@ -61,8 +61,10 @@ abstract interface class EmployeeRepository {
   /// Requires `employees.manage`.
   Future<Employee> uploadPhoto(String id, Uint8List bytes, String fileName);
 
-  Future<({Employee employee, String temporaryPassword})> invite(
-    InviteEmployeeInput input,
+  /// Adds an employee directly from the admin panel — no self-signup, no
+  /// email invite. Requires `employees.manage`.
+  Future<({Employee employee, String temporaryPassword})> addEmployee(
+    AddEmployeeInput input,
   );
 
   Future<List<Department>> getDepartments({bool includeArchived = false});

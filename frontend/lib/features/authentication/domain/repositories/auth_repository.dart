@@ -28,7 +28,7 @@ abstract interface class AuthRepository {
 
   /// Sets a new temporary password for [userId] and returns it, so it can be
   /// shared with them directly — there is no email delivery yet, same as
-  /// the invite flow. Requires `users.manage` (Super Admin or HR/Manager).
+  /// the add-employee flow. Requires `users.manage` (Super Admin or HR/Manager).
   /// Throws [AuthException] on failure.
   Future<String> resetPassword(String userId);
 

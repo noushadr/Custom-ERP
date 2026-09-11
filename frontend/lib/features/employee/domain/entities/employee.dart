@@ -20,6 +20,8 @@ class Employee {
     required this.workMode,
     required this.joiningDate,
     required this.dateOfLeaving,
+    required this.probationEndDate,
+    required this.probationStatus,
     required this.dateOfBirth,
     required this.personalEmail,
     required this.phoneNumber,
@@ -55,6 +57,17 @@ class Employee {
   final String workMode;
   final String joiningDate;
   final String? dateOfLeaving;
+
+  /// Every employee goes through probation, but not for a fixed company-wide
+  /// duration — this is that employee's own end date, `null` if it was
+  /// never set (e.g. a pre-existing record from before this field existed).
+  final String? probationEndDate;
+
+  /// Computed backend-side from [probationEndDate] against today —
+  /// `'on_probation'` / `'completed'` / `null` (no probation period on
+  /// file). Never derive this client-side; the backend is the single source
+  /// of truth for "today" to avoid client-clock drift.
+  final String? probationStatus;
   final String? dateOfBirth;
   final String? personalEmail;
   final String? phoneNumber;

@@ -60,4 +60,8 @@ export class UpdateEmployeeDto extends UpdateMyProfileDto {
   @IsOptional()
   @IsDateString()
   dateOfLeaving?: string;
+
+  @IsOptional()
+  @IsDateString()
+  probationEndDate?: string;
 }

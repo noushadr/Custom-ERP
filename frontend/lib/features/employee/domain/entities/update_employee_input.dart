@@ -16,6 +16,7 @@ class UpdateEmployeeInput {
     this.workMode,
     this.joiningDate,
     this.dateOfLeaving,
+    this.probationEndDate,
     this.personalEmail,
     this.phoneNumber,
     this.dateOfBirth,
@@ -41,6 +42,7 @@ class UpdateEmployeeInput {
   final String? workMode;
   final String? joiningDate;
   final String? dateOfLeaving;
+  final String? probationEndDate;
   final String? personalEmail;
   final String? phoneNumber;
   final String? dateOfBirth;
@@ -66,6 +68,7 @@ class UpdateEmployeeInput {
     'workMode': workMode,
     'joiningDate': joiningDate,
     'dateOfLeaving': dateOfLeaving,
+    'probationEndDate': probationEndDate,
     'personalEmail': personalEmail,
     'phoneNumber': phoneNumber,
     'dateOfBirth': dateOfBirth,

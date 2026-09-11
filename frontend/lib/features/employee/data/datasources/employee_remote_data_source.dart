@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import '../../domain/entities/add_employee_input.dart';
 import '../../domain/entities/employee_document.dart';
-import '../../domain/entities/invite_employee_input.dart';
 import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../models/asset_model.dart';
@@ -141,11 +141,11 @@ class EmployeeRemoteDataSource {
     return EmployeeModel.fromJson(response.data!);
   }
 
-  Future<({EmployeeModel employee, String temporaryPassword})> invite(
-    InviteEmployeeInput input,
+  Future<({EmployeeModel employee, String temporaryPassword})> addEmployee(
+    AddEmployeeInput input,
   ) async {
     final response = await _dio.post<Map<String, dynamic>>(
-      '/employees/invite',
+      '/employees',
       data: input.toJson(),
     );
     final data = response.data!;

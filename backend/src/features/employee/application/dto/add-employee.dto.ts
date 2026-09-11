@@ -10,7 +10,7 @@ import {
 } from 'class-validator';
 import { WorkMode } from '../../domain/enums/work-mode.enum';
 
-export class InviteEmployeeDto {
+export class AddEmployeeDto {
   @IsEmail()
   @Matches(/^[a-z]+\.[a-z]+@zeracreative\.com$/, {
     message:
@@ -41,6 +41,13 @@ export class InviteEmployeeDto {
   @IsOptional()
   @IsDateString()
   joiningDate?: string;
+
+  /** Every employee goes through probation, but not for a fixed company-wide
+   * duration — defaults to 3 months from `joiningDate` when omitted (see
+   * `EmployeesService.addEmployee`), freely adjustable afterward per employee. */
+  @IsOptional()
+  @IsDateString()
+  probationEndDate?: string;
 
   /** Determines which onboarding checklist items apply — defaults to
    * on-site, matching the Employee entity's own column default. */

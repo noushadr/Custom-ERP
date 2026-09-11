@@ -13,6 +13,7 @@ import { CurrentUser } from '../../authentication/presentation/decorators/curren
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
 import { AdjustLeaveBalanceDto } from '../application/dto/adjust-leave-balance.dto';
+import { ApplyLeaveForEmployeeDto } from '../application/dto/apply-leave-for-employee.dto';
 import { CreateLeaveTypeDto } from '../application/dto/create-leave-type.dto';
 import { DecideLeaveRequestDto } from '../application/dto/decide-leave-request.dto';
 import { SubmitLeaveRequestDto } from '../application/dto/submit-leave-request.dto';
@@ -53,6 +54,18 @@ export class LeaveController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.leaveService.submitLeaveRequest(user.sub, dto);
+  }
+
+  // HR/Admin applying leave directly on an employee's behalf — no manager
+  // or HR approval stage, since the actor already holds `leave.manage`.
+  @Post('requests/:employeeId/apply')
+  @Permissions('leave.manage')
+  applyLeaveForEmployee(
+    @Param('employeeId') employeeId: string,
+    @Body() dto: ApplyLeaveForEmployeeDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.leaveService.applyLeaveForEmployee(employeeId, dto, user.sub);
   }
 
   @Get('requests/mine')

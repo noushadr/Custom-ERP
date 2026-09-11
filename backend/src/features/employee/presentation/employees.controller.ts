@@ -19,10 +19,10 @@ import { CurrentUser } from '../../authentication/presentation/decorators/curren
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
 import { AddEducationRecordDto } from '../application/dto/add-education-record.dto';
+import { AddEmployeeDto } from '../application/dto/add-employee.dto';
 import { AddSalaryRecordDto } from '../application/dto/add-salary-record.dto';
 import { CompanyAuditLogQueryDto } from '../application/dto/company-audit-log-query.dto';
 import { CreateAssetDto } from '../application/dto/create-asset.dto';
-import { InviteEmployeeDto } from '../application/dto/invite-employee.dto';
 import { UpdateAssetDto } from '../application/dto/update-asset.dto';
 import { UpdateEmployeeDto } from '../application/dto/update-employee.dto';
 import { UpdateMyProfileDto } from '../application/dto/update-my-profile.dto';
@@ -35,10 +35,13 @@ import { documentUploadOptions } from './document-upload.config';
 export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
-  @Post('invite')
+  // Admin/HR add an employee directly from this panel — there is no
+  // self-signup and no email invite; a temporary password is generated and
+  // returned once so it can be shared with the new employee directly.
+  @Post()
   @Permissions('employees.manage')
-  invite(@Body() dto: InviteEmployeeDto) {
-    return this.employeesService.invite(dto);
+  addEmployee(@Body() dto: AddEmployeeDto) {
+    return this.employeesService.addEmployee(dto);
   }
 
   @Get()

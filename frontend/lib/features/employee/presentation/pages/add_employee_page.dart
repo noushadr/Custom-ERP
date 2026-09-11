@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/employee_providers.dart';
-import '../../application/invite_employee_controller.dart';
-import '../../application/invite_employee_state.dart';
-import '../../domain/entities/invite_employee_input.dart';
+import '../../application/add_employee_controller.dart';
+import '../../application/add_employee_state.dart';
+import '../../domain/entities/add_employee_input.dart';
 
 final _companyEmailRegExp = RegExp(r'^[a-z]+\.[a-z]+@zeracreative\.com$');
 
@@ -14,15 +14,18 @@ const _workModes = {
   'hybrid': 'Hybrid',
 };
 
-class InviteEmployeePage extends ConsumerStatefulWidget {
-  const InviteEmployeePage({super.key});
+/// HR/Admin add an employee directly from this form — there is no
+/// self-signup and no email invite. The account is created immediately with
+/// a generated temporary password, shown once on success for the admin to
+/// share with the new employee directly.
+class AddEmployeePage extends ConsumerStatefulWidget {
+  const AddEmployeePage({super.key});
 
   @override
-  ConsumerState<InviteEmployeePage> createState() =>
-      _InviteEmployeePageState();
+  ConsumerState<AddEmployeePage> createState() => _AddEmployeePageState();
 }
 
-class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
+class _AddEmployeePageState extends ConsumerState<AddEmployeePage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _firstNameController = TextEditingController();
@@ -44,9 +47,9 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
     if (!_formKey.currentState!.validate()) return;
 
     ref
-        .read(inviteEmployeeControllerProvider.notifier)
+        .read(addEmployeeControllerProvider.notifier)
         .submit(
-          InviteEmployeeInput(
+          AddEmployeeInput(
             companyEmail: _emailController.text.trim(),
             firstName: _firstNameController.text.trim(),
             lastName: _lastNameController.text.trim(),
@@ -61,21 +64,21 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(inviteEmployeeControllerProvider);
+    final state = ref.watch(addEmployeeControllerProvider);
 
-    if (state is InviteSuccess) {
-      return _InviteSuccessView(
+    if (state is AddEmployeeSuccess) {
+      return _AddEmployeeSuccessView(
         employeeName: state.employee.fullName,
         temporaryPassword: state.temporaryPassword,
       );
     }
 
-    final isSubmitting = state is InviteSubmitting;
-    final errorMessage = state is InviteError ? state.message : null;
+    final isSubmitting = state is AddEmployeeSubmitting;
+    final errorMessage = state is AddEmployeeError ? state.message : null;
     final departmentsAsync = ref.watch(departmentsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Invite Employee')),
+      appBar: AppBar(title: const Text('Add Employee')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Center(
@@ -185,7 +188,7 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Send invite'),
+                      : const Text('Add'),
                 ),
               ],
             ),
@@ -199,8 +202,8 @@ class _InviteEmployeePageState extends ConsumerState<InviteEmployeePage> {
   }
 }
 
-class _InviteSuccessView extends ConsumerWidget {
-  const _InviteSuccessView({
+class _AddEmployeeSuccessView extends ConsumerWidget {
+  const _AddEmployeeSuccessView({
     required this.employeeName,
     required this.temporaryPassword,
   });
@@ -211,7 +214,7 @@ class _InviteSuccessView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Invite Employee')),
+      appBar: AppBar(title: const Text('Add Employee')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -221,13 +224,15 @@ class _InviteSuccessView extends ConsumerWidget {
               const Icon(Icons.check_circle_outline, size: 48),
               const SizedBox(height: 16),
               Text(
-                '$employeeName has been invited.',
+                '$employeeName has been added.',
                 style: Theme.of(context).textTheme.titleMedium,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               const Text(
-                'Share this temporary password with them directly — there is no email invite yet, so this is the only place it will be shown.',
+                'Share this temporary password with them directly — '
+                'employees never sign up themselves, and no email is sent, '
+                'so this is the only place it will be shown.',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),

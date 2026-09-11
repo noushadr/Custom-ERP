@@ -21,7 +21,9 @@ import 'package:zera_erp/features/performance_reviews/application/performance_re
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/features/tasks/domain/entities/task_status.dart';
+import 'package:zera_erp/shared/models/named_ref.dart';
 import 'package:zera_erp/shared/widgets/metric_card.dart';
+import 'package:zera_erp/shared/widgets/monthly_bar_chart.dart';
 
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_auth.dart';
@@ -51,6 +53,7 @@ Widget _authenticatedApp({
   FakeFreelancersRepository? freelancersRepository,
   FakeGoalRepository? goalRepository,
   FakeEmailRepository? emailRepository,
+  FakePayrollRepository? payrollRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -82,7 +85,9 @@ Widget _authenticatedApp({
       notificationsRepositoryProvider.overrideWithValue(
         FakeNotificationsRepository(),
       ),
-      payrollRepositoryProvider.overrideWithValue(FakePayrollRepository()),
+      payrollRepositoryProvider.overrideWithValue(
+        payrollRepository ?? FakePayrollRepository(),
+      ),
       freelancersRepositoryProvider.overrideWithValue(
         freelancersRepository ?? FakeFreelancersRepository(),
       ),
@@ -170,12 +175,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Total Employees'), findsOneWidget);
-    expect(find.text('Active'), findsOneWidget);
+    expect(find.text('Avg. Profile Completion'), findsOneWidget);
   });
 
   testWidgets(
-    'admin dashboard Work Mode tiles only count active employees',
+    'admin dashboard shows a New Hires by month chart, counting only '
+    'hires within the last 12 months',
     (WidgetTester tester) async {
       const admin = AuthUser(
         id: 'admin-1',
@@ -183,192 +188,22 @@ void main() {
         role: 'Super Admin',
         permissions: [],
       );
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: admin,
-          employees: [
-            buildTestEmployee(
-              id: 'employee-1',
-              employmentStatus: 'active',
-              workMode: 'remote',
-            ),
-            buildTestEmployee(
-              id: 'employee-2',
-              employmentStatus: 'resigned',
-              workMode: 'remote',
-            ),
-            buildTestEmployee(
-              id: 'employee-3',
-              employmentStatus: 'terminated',
-              workMode: 'hybrid',
-            ),
-          ],
-        ),
-      );
-      await tester.pumpAndSettle();
+      final recentHireDate = DateTime.now().subtract(const Duration(days: 10));
+      final oldHireDate = DateTime.now().subtract(const Duration(days: 400));
+      String iso(DateTime date) => date.toIso8601String().substring(0, 10);
 
-      final onSiteCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'On-site'),
-      );
-      final remoteCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Remote'),
-      );
-      final hybridCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Hybrid'),
-      );
-
-      // Only employee-1 is active, so Remote reads 1 (not 2) and Hybrid
-      // reads 0 since its only member has left.
-      expect(onSiteCard.value, '0');
-      expect(remoteCard.value, '1');
-      expect(hybridCard.value, '0');
-    },
-  );
-
-  testWidgets(
-    "admin dashboard shows the Active tile's weekly delta",
-    (WidgetTester tester) async {
-      const admin = AuthUser(
-        id: 'admin-1',
-        email: 'admin@zeracreative.com',
-        role: 'Super Admin',
-        permissions: [],
-      );
       await tester.pumpWidget(
         _authenticatedApp(
           user: admin,
           employeeRepository: FakeEmployeeRepository(
-            employees: [buildTestEmployee(employmentStatus: 'active')],
-            activeEmployeeDelta: 1,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final activeCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Active'),
-      );
-      expect(activeCard.secondaryValue, '+1 in last 7 days');
-    },
-  );
-
-  testWidgets(
-    "shows a negative Active tile delta as e.g. '-1 in last 7 days'",
-    (WidgetTester tester) async {
-      const admin = AuthUser(
-        id: 'admin-1',
-        email: 'admin@zeracreative.com',
-        role: 'Super Admin',
-        permissions: [],
-      );
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: admin,
-          employeeRepository: FakeEmployeeRepository(
-            employees: [buildTestEmployee(employmentStatus: 'resigned')],
-            activeEmployeeDelta: -1,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final activeCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Active'),
-      );
-      expect(activeCard.secondaryValue, '-1 in last 7 days');
-    },
-  );
-
-  testWidgets(
-    "shows 'No change in last 7 days' for a zero Active tile delta",
-    (WidgetTester tester) async {
-      const admin = AuthUser(
-        id: 'admin-1',
-        email: 'admin@zeracreative.com',
-        role: 'Super Admin',
-        permissions: [],
-      );
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: admin,
-          employeeRepository: FakeEmployeeRepository(activeEmployeeDelta: 0),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final activeCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Active'),
-      );
-      expect(activeCard.secondaryValue, 'No change in last 7 days');
-    },
-  );
-
-  testWidgets(
-    'admin dashboard shows monthly and daily payroll for an employees.manage holder',
-    (WidgetTester tester) async {
-      const admin = AuthUser(
-        id: 'admin-1',
-        email: 'admin@zeracreative.com',
-        role: 'Super Admin',
-        permissions: ['employees.manage'],
-      );
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: admin,
-          payrollSummary: const PayrollSummary(
-            totalMonthlyPayroll: 250000,
-            dailyPayroll: 8333.33,
-            activeEmployeeCount: 4,
-            departmentTotals: [],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Not asserting on bare 'Payroll' here — the Admin Business
-      // Management "Payroll" nav item (Module 6) also renders that exact
-      // text for this Super Admin, so it's no longer unique to this
-      // dashboard section's own heading.
-      expect(find.text('Monthly Payroll'), findsOneWidget);
-      expect(find.text('PKR 250,000'), findsOneWidget);
-      expect(find.text('≈ \$899'), findsOneWidget);
-      expect(find.text('Daily Payroll'), findsOneWidget);
-      expect(find.text('PKR 8,333'), findsOneWidget);
-      expect(find.text('≈ \$29'), findsOneWidget);
-      expect(find.text('Average Salary'), findsOneWidget);
-      expect(find.text('PKR 62,500'), findsOneWidget);
-      expect(find.text('≈ \$224'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'admin dashboard shows departmental payroll totals for an employees.manage holder',
-    (WidgetTester tester) async {
-      const admin = AuthUser(
-        id: 'admin-1',
-        email: 'admin@zeracreative.com',
-        role: 'Super Admin',
-        permissions: ['employees.manage'],
-      );
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: admin,
-          payrollSummary: const PayrollSummary(
-            totalMonthlyPayroll: 250000,
-            dailyPayroll: 8333.33,
-            activeEmployeeCount: 4,
-            departmentTotals: [
-              DepartmentPayrollTotal(
-                departmentId: 'dept-eng',
-                departmentName: 'Engineering',
-                totalMonthlyPayroll: 150000,
-                employeeCount: 2,
+            employees: [
+              buildTestEmployee(
+                id: 'employee-1',
+                joiningDate: iso(recentHireDate),
               ),
-              DepartmentPayrollTotal(
-                departmentId: null,
-                departmentName: 'Unassigned',
-                totalMonthlyPayroll: 20000,
-                employeeCount: 1,
+              buildTestEmployee(
+                id: 'employee-2',
+                joiningDate: iso(oldHireDate),
               ),
             ],
           ),
@@ -376,18 +211,25 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Payroll by Department'), findsOneWidget);
-      expect(find.text('Engineering'), findsOneWidget);
-      expect(find.text('60.0% of payroll'), findsOneWidget);
-      expect(find.text('PKR 150,000 · 2 employees'), findsOneWidget);
-      expect(find.text('Unassigned'), findsOneWidget);
-      expect(find.text('8.0% of payroll'), findsOneWidget);
-      expect(find.text('PKR 20,000 · 1 employee'), findsOneWidget);
+      expect(find.text('New Hires (Last 12 Months)'), findsOneWidget);
+      // Only the recent hire counts — the 400-day-old one falls outside the
+      // 12-month window and shouldn't be reflected in any bar's count.
+      // Scoped to the chart itself, since other pre-built IndexedStack pages
+      // (see this file's own notes on that) can coincidentally show a bare
+      // "1" elsewhere on screen.
+      expect(
+        find.descendant(
+          of: find.byType(MonthlyBarChart),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
     },
   );
 
   testWidgets(
-    'hides the payroll stats from an admin dashboard viewer without employees.manage',
+    'admin dashboard shows an Employees by Department breakdown, counting '
+    'only active employees',
     (WidgetTester tester) async {
       const admin = AuthUser(
         id: 'admin-1',
@@ -395,10 +237,86 @@ void main() {
         role: 'Super Admin',
         permissions: [],
       );
-      await tester.pumpWidget(_authenticatedApp(user: admin));
+
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          employeeRepository: FakeEmployeeRepository(
+            employees: [
+              buildTestEmployee(
+                id: 'employee-1',
+                department: const NamedRef(id: 'dept-1', name: 'Engineering'),
+                employmentStatus: 'active',
+              ),
+              buildTestEmployee(
+                id: 'employee-2',
+                department: const NamedRef(id: 'dept-1', name: 'Engineering'),
+                employmentStatus: 'active',
+              ),
+              buildTestEmployee(
+                id: 'employee-3',
+                department: const NamedRef(id: 'dept-1', name: 'Engineering'),
+                employmentStatus: 'resigned',
+              ),
+            ],
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('Monthly Payroll'), findsNothing);
+      expect(find.text('Employees by Department'), findsOneWidget);
+      expect(find.text('Engineering'), findsOneWidget);
+      // Only the 2 active Engineering employees count — the resigned one
+      // doesn't.
+      expect(find.text('2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "tapping the Notice Period tile jumps to Employees, pre-filtered to "
+    'employees on notice period',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: ['employees.read'],
+      );
+      // The Employees page's header (Work Mode stats + status filter/search
+      // row) needs more height than the default test surface once landed
+      // there pre-filtered.
+      tester.view.physicalSize = const Size(900, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          employeeRepository: FakeEmployeeRepository(
+            employees: [
+              buildTestEmployee(id: 'employee-1', employmentStatus: 'active'),
+              buildTestEmployee(
+                id: 'employee-2',
+                fullName: 'Notice Person',
+                email: 'notice.person@zeracreative.com',
+                employmentStatus: 'notice_period',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byWidgetPredicate(
+          (w) => w is MetricCard && w.label == 'Notice Period',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Landed on Employees, showing only the notice-period employee.
+      expect(find.text('Notice Person'), findsOneWidget);
+      expect(find.text('Jane Doe'), findsNothing);
     },
   );
 
@@ -689,93 +607,6 @@ void main() {
   });
 
   testWidgets(
-    'shows Admin Business Management stats for a holder of every module '
-    'permission',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: [
-              'clients.manage',
-              'payroll.manage',
-            ],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Admin Business Management'), findsOneWidget);
-      expect(find.text('Active Projects'), findsOneWidget);
-      expect(find.text('Clients At Risk'), findsOneWidget);
-      expect(find.text('Latest Payroll Run'), findsOneWidget);
-      expect(find.text('Draft'), findsOneWidget);
-      expect(find.text('Total Freelancers'), findsOneWidget);
-      // A payroll.manage holder also sees the Work Mode section's own
-      // Freelancers tile (same active-freelancer count as Total Freelancers
-      // above, shown in a second place).
-      expect(find.text('Freelancers'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'hides Admin Business Management stats from an admin dashboard viewer '
-    'without any of those permissions',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: [],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Admin Business Management'), findsNothing);
-      expect(find.text('Active Projects'), findsNothing);
-      expect(find.text('Latest Payroll Run'), findsNothing);
-      expect(find.text('Total Freelancers'), findsNothing);
-      expect(find.text('Freelancers'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'the Work Mode Freelancers tile only counts active freelancers',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: ['payroll.manage'],
-          ),
-          freelancersRepository: FakeFreelancersRepository(
-            freelancers: [
-              buildTestFreelancer(id: 'f1', isActive: true),
-              buildTestFreelancer(id: 'f2', isActive: true),
-              buildTestFreelancer(id: 'f3', isActive: false),
-            ],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final freelancersCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate(
-          (w) => w is MetricCard && w.label == 'Freelancers',
-        ),
-      );
-      expect(freelancersCard.value, '2');
-    },
-  );
-
-  testWidgets(
     'a Super Admin sees only Dashboard, never User Dashboard',
     (WidgetTester tester) async {
       await tester.pumpWidget(
@@ -792,7 +623,7 @@ void main() {
 
       expect(find.text('Dashboard'), findsWidgets);
       expect(find.text('User Dashboard'), findsNothing);
-      expect(find.text('Total Employees'), findsOneWidget);
+      expect(find.text('Avg. Profile Completion'), findsOneWidget);
     },
   );
 
@@ -804,7 +635,7 @@ void main() {
 
       expect(find.text('User Dashboard'), findsWidgets);
       expect(find.text('Dashboard'), findsNothing);
-      expect(find.text('Total Employees'), findsNothing);
+      expect(find.text('Avg. Profile Completion'), findsNothing);
     },
   );
 

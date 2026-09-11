@@ -119,6 +119,9 @@ class _SummaryRow extends ConsumerWidget {
     final clients = clientsAsync.value ?? const [];
     final projects = projectsAsync.value ?? const [];
 
+    final activeProjectsCount = projects
+        .where((p) => p.status == ProjectStatus.active)
+        .length;
     final activeClientIds = projects
         .where((p) => p.status == ProjectStatus.active)
         .map((p) => p.clientId)
@@ -137,6 +140,14 @@ class _SummaryRow extends ConsumerWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
+        // Moved here from the Dashboard, so "how many projects are active"
+        // lives on the page about projects, not the company-wide overview.
+        MetricCard(
+          label: 'Active Projects',
+          value: '$activeProjectsCount',
+          color: AppColors.primary,
+          icon: Icons.work_outline,
+        ),
         MetricCard(
           label: 'Total Clients',
           value: '${clients.length}',

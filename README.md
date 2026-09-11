@@ -17,7 +17,7 @@ cd backend
 cp .env.example .env
 docker compose up -d      # starts PostgreSQL
 npm install
-npm run seed              # creates default roles + bootstrap Super Admin (registration is invite-only)
+npm run seed              # creates default roles + bootstrap Super Admin (registration is admin-added-only)
 npm run start:dev
 ```
 

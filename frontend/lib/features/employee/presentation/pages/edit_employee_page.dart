@@ -69,6 +69,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
   late String _workMode;
   late DateTime _joiningDate;
   DateTime? _dateOfLeaving;
+  DateTime? _probationEndDate;
   DateTime? _dateOfBirth;
   late String? _photoUrl;
   bool _isUploadingPhoto = false;
@@ -107,6 +108,9 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     _dateOfLeaving = e.dateOfLeaving == null
         ? null
         : DateTime.tryParse(e.dateOfLeaving!);
+    _probationEndDate = e.probationEndDate == null
+        ? null
+        : DateTime.tryParse(e.probationEndDate!);
     _dateOfBirth = e.dateOfBirth == null
         ? null
         : DateTime.tryParse(e.dateOfBirth!);
@@ -201,6 +205,9 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
             dateOfLeaving: _dateOfLeaving == null
                 ? null
                 : _isoDate(_dateOfLeaving!),
+            probationEndDate: _probationEndDate == null
+                ? null
+                : _isoDate(_probationEndDate!),
             personalEmail: _personalEmailController.text.trim().isEmpty
                 ? null
                 : _personalEmailController.text.trim(),
@@ -535,6 +542,49 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                                     ? null
                                     : () =>
                                         setState(() => _dateOfLeaving = null),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: isSubmitting
+                                    ? null
+                                    : () => _pickDate(
+                                        initial: _probationEndDate,
+                                        onPicked: (d) => setState(
+                                          () => _probationEndDate = d,
+                                        ),
+                                      ),
+                                child: InputDecorator(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Probation end date',
+                                    helperText:
+                                        'Every employee has their own '
+                                        'probation length — set or adjust it '
+                                        'here.',
+                                  ),
+                                  child: Text(
+                                    _probationEndDate == null
+                                        ? '—'
+                                        : formatDisplayDate(
+                                            _isoDate(_probationEndDate!),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_probationEndDate != null)
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                tooltip: 'Clear',
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => setState(
+                                        () => _probationEndDate = null,
+                                      ),
                               ),
                           ],
                         ),

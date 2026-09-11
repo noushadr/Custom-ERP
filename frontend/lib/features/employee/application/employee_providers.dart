@@ -55,13 +55,25 @@ final upcomingWorkAnniversariesProvider =
       return ref.watch(employeeRepositoryProvider).getUpcomingWorkAnniversaries();
     });
 
-/// How the company-wide active-employee count has changed over the last 7
-/// days — see `EmployeesService.getActiveEmployeeDelta` for how "7 days ago"
+/// How the company-wide active-employee count has changed over the last 30
+/// days — see `EmployeesService.getActiveEmployeeDelta` for how "30 days ago"
 /// is reconstructed from the existing audit log rather than a new snapshot.
 final employeeActiveDeltaProvider = FutureProvider.autoDispose<int>((ref) {
   ref.watch(authControllerProvider);
-  return ref.watch(employeeRepositoryProvider).getActiveEmployeeDelta();
+  return ref
+      .watch(employeeRepositoryProvider)
+      .getActiveEmployeeDelta(days: 30);
 });
+
+/// Set by a cross-section "jump to Employees, filtered" affordance (e.g. the
+/// Admin Dashboard's Notice Period tile) and consumed once by
+/// `_HomeShellState` to switch sections — reset to null immediately after.
+final pendingSectionNavigationProvider = StateProvider<String?>((ref) => null);
+
+/// Paired with [pendingSectionNavigationProvider]: the employment status the
+/// Employees page should pre-filter to once it becomes the active section.
+/// Read once by `EmployeeDirectoryPage` on init, then reset to null.
+final employeeStatusFilterProvider = StateProvider<String?>((ref) => null);
 
 final payrollSummaryProvider = FutureProvider.autoDispose<PayrollSummary>((
   ref,

@@ -71,6 +71,15 @@ export class Employee extends BaseEntity {
   @Column({ type: 'date', nullable: true })
   dateOfLeaving?: string;
 
+  /** Every employee goes through a probation period, but its length isn't
+   * uniform — this is the actual end date (settable per employee, not a
+   * fixed company-wide duration), defaulted when the employee is added but freely
+   * editable afterward (extension, early completion, etc.). Whether someone
+   * is currently "on probation" is computed from this against today's date,
+   * never stored, matching this codebase's netPay/tenure convention. */
+  @Column({ type: 'date', nullable: true })
+  probationEndDate?: string;
+
   @Column({ type: 'date', nullable: true })
   dateOfBirth?: string;
 

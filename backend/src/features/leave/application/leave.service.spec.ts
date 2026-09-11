@@ -326,6 +326,108 @@ describe('LeaveService', () => {
     });
   });
 
+  describe('applyLeaveForEmployee', () => {
+    const dto = {
+      leaveTypeId: 'leave-type-1',
+      startDate: '2026-03-02', // Monday
+      endDate: '2026-03-06', // Friday
+      reason: 'Applied by HR',
+    };
+
+    it('throws NotFoundException when the target employee does not exist', async () => {
+      employeeRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.applyLeaveForEmployee('employee-1', dto, 'hr-1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws NotFoundException for an archived leave type', async () => {
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+      leaveTypeRepository.findById.mockResolvedValue(
+        buildLeaveType({ isArchived: true }),
+      );
+
+      await expect(
+        service.applyLeaveForEmployee('employee-1', dto, 'hr-1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws BadRequestException when the employee lacks sufficient balance', async () => {
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+      leaveTypeRepository.findById.mockResolvedValue(buildLeaveType());
+      leaveBalanceRepository.findOne.mockResolvedValue(
+        buildBalance({ allocated: '5.0', used: '4.0' }), // only 1 day remaining
+      );
+
+      await expect(
+        service.applyLeaveForEmployee('employee-1', dto, 'hr-1'), // 5 working days
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('creates an already-APPROVED request, deducts the balance immediately, and skips the manager stage entirely', async () => {
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+      leaveTypeRepository.findById.mockResolvedValue(buildLeaveType());
+      leaveBalanceRepository.findOne.mockResolvedValue(
+        buildBalance({ allocated: '20.0', used: '0.0' }),
+      );
+      leaveBalanceRepository.save.mockImplementation((b) => Promise.resolve(b));
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ firstName: 'Zahra', lastName: 'Shiraz' }),
+      );
+      leaveRequestRepository.save.mockImplementation((r) => Promise.resolve(r));
+      leaveRequestRepository.findById.mockImplementation((id) =>
+        Promise.resolve(
+          buildLeaveRequest({
+            id,
+            status: LeaveRequestStatus.APPROVED,
+            hrDecisionByName: 'Zahra Shiraz',
+          }),
+        ),
+      );
+
+      const result = await service.applyLeaveForEmployee(
+        'employee-1',
+        dto,
+        'hr-1',
+      );
+
+      expect(leaveBalanceRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ used: '5.0' }),
+      );
+      expect(leaveRequestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: LeaveRequestStatus.APPROVED,
+          managerDecisionByName: undefined,
+        }),
+      );
+      expect(result.status).toBe(LeaveRequestStatus.APPROVED);
+      expect(result.hrDecisionByName).toBe('Zahra Shiraz');
+    });
+
+    it("notifies the employee it was applied for", async () => {
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ userId: 'user-employee-1' }),
+      );
+      leaveTypeRepository.findById.mockResolvedValue(buildLeaveType());
+      leaveBalanceRepository.findOne.mockResolvedValue(
+        buildBalance({ allocated: '20.0', used: '0.0' }),
+      );
+      leaveBalanceRepository.save.mockImplementation((b) => Promise.resolve(b));
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      leaveRequestRepository.save.mockImplementation((r) => Promise.resolve(r));
+      leaveRequestRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildLeaveRequest({ id, status: LeaveRequestStatus.APPROVED })),
+      );
+
+      await service.applyLeaveForEmployee('employee-1', dto, 'hr-1');
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'user-employee-1' }),
+      );
+    });
+  });
+
   describe('getPendingManagerApproval', () => {
     it('returns an empty array when the actor has no employee profile', async () => {
       employeeRepository.findByUserId.mockResolvedValue(null);

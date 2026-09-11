@@ -207,7 +207,7 @@ describe('EmployeesService', () => {
     jest.clearAllMocks();
   });
 
-  describe('invite', () => {
+  describe('addEmployee', () => {
     const dto = {
       companyEmail: 'new.hire@zeracreative.com',
       firstName: 'New',
@@ -217,7 +217,7 @@ describe('EmployeesService', () => {
     it('throws when a user already exists for that email', async () => {
       userRepository.findByEmail.mockResolvedValue(buildUser());
 
-      await expect(service.invite(dto)).rejects.toBeInstanceOf(
+      await expect(service.addEmployee(dto)).rejects.toBeInstanceOf(
         ConflictException,
       );
     });
@@ -226,7 +226,7 @@ describe('EmployeesService', () => {
       userRepository.findByEmail.mockResolvedValue(null);
       roleRepository.findByName.mockResolvedValue(null);
 
-      await expect(service.invite(dto)).rejects.toBeInstanceOf(
+      await expect(service.addEmployee(dto)).rejects.toBeInstanceOf(
         InternalServerErrorException,
       );
     });
@@ -246,7 +246,7 @@ describe('EmployeesService', () => {
         buildEmployee({ id: 'new-employee-id', employeeCode: 'ZC-00005' }),
       );
 
-      const result = await service.invite(dto);
+      const result = await service.addEmployee(dto);
 
       expect(userRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -275,7 +275,7 @@ describe('EmployeesService', () => {
         buildEmployee({ id: 'new-employee-id', workMode: WorkMode.REMOTE }),
       );
 
-      await service.invite(dto);
+      await service.addEmployee(dto);
 
       expect(checklistsService.createInstance).toHaveBeenCalledWith(
         'new-employee-id',
@@ -284,7 +284,7 @@ describe('EmployeesService', () => {
       );
     });
 
-    it('saves the invited employee with the given work mode', async () => {
+    it('saves the added employee with the given work mode', async () => {
       userRepository.findByEmail.mockResolvedValue(null);
       roleRepository.findByName.mockResolvedValue(buildRole());
       userRepository.save.mockImplementation(
@@ -296,7 +296,7 @@ describe('EmployeesService', () => {
       );
       employeeRepository.findById.mockResolvedValue(buildEmployee());
 
-      await service.invite({ ...dto, workMode: WorkMode.REMOTE });
+      await service.addEmployee({ ...dto, workMode: WorkMode.REMOTE });
 
       expect(employeeRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ workMode: WorkMode.REMOTE }),
@@ -315,10 +315,52 @@ describe('EmployeesService', () => {
       );
       employeeRepository.findById.mockResolvedValue(buildEmployee());
 
-      await service.invite(dto);
+      await service.addEmployee(dto);
 
       expect(employeeRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ workMode: WorkMode.ON_SITE }),
+      );
+    });
+
+    it('defaults probationEndDate to 3 months after joiningDate when not specified', async () => {
+      userRepository.findByEmail.mockResolvedValue(null);
+      roleRepository.findByName.mockResolvedValue(buildRole());
+      userRepository.save.mockImplementation(
+        (user) =>
+          Promise.resolve({ ...user, id: 'new-user-id' }) as Promise<User>,
+      );
+      employeeRepository.save.mockImplementation((employee) =>
+        Promise.resolve({ ...employee, id: 'new-employee-id' }),
+      );
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+
+      await service.addEmployee({ ...dto, joiningDate: '2026-01-15' });
+
+      expect(employeeRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ probationEndDate: '2026-04-15' }),
+      );
+    });
+
+    it('uses a provided probationEndDate instead of the 3-month default', async () => {
+      userRepository.findByEmail.mockResolvedValue(null);
+      roleRepository.findByName.mockResolvedValue(buildRole());
+      userRepository.save.mockImplementation(
+        (user) =>
+          Promise.resolve({ ...user, id: 'new-user-id' }) as Promise<User>,
+      );
+      employeeRepository.save.mockImplementation((employee) =>
+        Promise.resolve({ ...employee, id: 'new-employee-id' }),
+      );
+      employeeRepository.findById.mockResolvedValue(buildEmployee());
+
+      await service.addEmployee({
+        ...dto,
+        joiningDate: '2026-01-15',
+        probationEndDate: '2026-07-15',
+      });
+
+      expect(employeeRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ probationEndDate: '2026-07-15' }),
       );
     });
 
@@ -336,7 +378,7 @@ describe('EmployeesService', () => {
         buildEmployee({ id: 'new-employee-id', employeeCode: 'ZC-002' }),
       );
 
-      await service.invite({ ...dto, employeeCode: 'ZC-002' });
+      await service.addEmployee({ ...dto, employeeCode: 'ZC-002' });
 
       expect(employeeRepository.count).not.toHaveBeenCalled();
       expect(employeeRepository.save).toHaveBeenCalledWith(

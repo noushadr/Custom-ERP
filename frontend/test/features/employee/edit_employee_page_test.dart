@@ -79,6 +79,69 @@ void main() {
     expect(find.text('Something went wrong.'), findsOneWidget);
   });
 
+  testWidgets(
+    "pre-fills and lets HR/Admin adjust an employee's probation end date",
+    (tester) async {
+      await _useTallSurface(tester);
+      final employee = buildTestEmployee(
+        id: 'employee-2',
+        probationEndDate: '2026-04-01',
+        probationStatus: 'on_probation',
+      );
+      final repository = FakeEmployeeRepository(employees: [employee]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            employeeRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp(home: EditEmployeePage(employee: employee)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Apr 01, 2026'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Save changes'));
+      await tester.tap(find.text('Save changes'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdateEmployeeInput?.probationEndDate, '2026-04-01');
+    },
+  );
+
+  testWidgets(
+    'clearing the probation end date sends null on save',
+    (tester) async {
+      await _useTallSurface(tester);
+      final employee = buildTestEmployee(
+        id: 'employee-2',
+        probationEndDate: '2026-04-01',
+        probationStatus: 'on_probation',
+      );
+      final repository = FakeEmployeeRepository(employees: [employee]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            employeeRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp(home: EditEmployeePage(employee: employee)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.widgetWithIcon(IconButton, Icons.close).last,
+      );
+      await tester.ensureVisible(find.text('Save changes'));
+      await tester.tap(find.text('Save changes'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdateEmployeeInput?.probationEndDate, isNull);
+    },
+  );
+
   testWidgets('rejects an empty first name', (tester) async {
     await _useTallSurface(tester);
     final employee = buildTestEmployee(id: 'employee-2');

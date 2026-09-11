@@ -247,6 +247,25 @@ class _ProfileBody extends ConsumerWidget {
                     : formatDisplayDate(employee.dateOfLeaving!),
               ),
             ),
+            _LabeledRow(
+              label: 'Probation',
+              child: employee.probationEndDate == null
+                  ? const Text('—')
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Until ${formatDisplayDate(employee.probationEndDate!)}',
+                        ),
+                        const SizedBox(width: 8),
+                        if (employee.probationStatus != null)
+                          ProbationBadge(
+                            status: employee.probationStatus!,
+                            dense: true,
+                          ),
+                      ],
+                    ),
+            ),
           ],
         ),
         if (showAuditLog) ...[

@@ -70,10 +70,10 @@ import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util'
 import { generateTemporaryPassword } from '../../../core/utils/generate-temporary-password.util';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import { AddEducationRecordDto } from './dto/add-education-record.dto';
+import { AddEmployeeDto } from './dto/add-employee.dto';
 import { AddSalaryRecordDto } from './dto/add-salary-record.dto';
 import { CompanyAuditLogQueryDto } from './dto/company-audit-log-query.dto';
 import { CreateAssetDto } from './dto/create-asset.dto';
-import { InviteEmployeeDto } from './dto/invite-employee.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
@@ -88,7 +88,7 @@ import {
 import { UpcomingBirthdayResponse } from './upcoming-birthday-response.interface';
 import { UpcomingWorkAnniversaryResponse } from './upcoming-work-anniversary-response.interface';
 
-const DEFAULT_INVITE_ROLE = 'Employee';
+const DEFAULT_EMPLOYEE_ROLE = 'Employee';
 const COMPANY_AUDIT_LOG_DEFAULT_LIMIT = 10;
 
 const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
@@ -117,6 +117,7 @@ type EmployeeSnapshot = Pick<
   | 'workMode'
   | 'joiningDate'
   | 'dateOfLeaving'
+  | 'probationEndDate'
   | 'dateOfBirth'
   | 'personalEmail'
   | 'phoneNumber'
@@ -155,8 +156,12 @@ export class EmployeesService {
     private readonly checklistsService: ChecklistsService,
   ) {}
 
-  async invite(
-    dto: InviteEmployeeDto,
+  /** HR/Admin add an employee directly from the admin panel — there is no
+   * self-signup and no email invite; the account is created immediately
+   * with a generated temporary password, returned once so it can be shared
+   * with the new employee directly. */
+  async addEmployee(
+    dto: AddEmployeeDto,
   ): Promise<{ employee: EmployeeResponse; temporaryPassword: string }> {
     const existingUser = await this.userRepository.findByEmail(
       dto.companyEmail,
@@ -166,10 +171,10 @@ export class EmployeesService {
     }
 
     const employeeRole =
-      await this.roleRepository.findByName(DEFAULT_INVITE_ROLE);
+      await this.roleRepository.findByName(DEFAULT_EMPLOYEE_ROLE);
     if (!employeeRole) {
       throw new InternalServerErrorException(
-        `Default "${DEFAULT_INVITE_ROLE}" role is not seeded`,
+        `Default "${DEFAULT_EMPLOYEE_ROLE}" role is not seeded`,
       );
     }
 
@@ -194,6 +199,8 @@ export class EmployeesService {
     employee.reportingManagerId = dto.reportingManagerId;
     employee.joiningDate =
       dto.joiningDate ?? new Date().toISOString().slice(0, 10);
+    employee.probationEndDate =
+      dto.probationEndDate ?? this.defaultProbationEndDate(employee.joiningDate);
     employee.workMode = dto.workMode ?? WorkMode.ON_SITE;
     employee.skills = [];
     employee.certifications = [];
@@ -342,6 +349,16 @@ export class EmployeesService {
     }).length;
 
     return { delta: activeNow - activeAsOfCutoff };
+  }
+
+  /** 3 calendar months after [joiningDateStr] — the standard probation
+   * length used only as the default when adding an employee; the actual end date is
+   * freely editable per employee afterward (see `UpdateEmployeeDto`), since
+   * probation length isn't uniform across the company. */
+  private defaultProbationEndDate(joiningDateStr: string): string {
+    const date = new Date(joiningDateStr);
+    date.setMonth(date.getMonth() + 3);
+    return date.toISOString().slice(0, 10);
   }
 
   /** Days until (or since, if negative) the closest occurrence — last
@@ -1156,6 +1173,11 @@ export class EmployeesService {
       'Date of Leaving',
       before.dateOfLeaving ?? null,
       after.dateOfLeaving ?? null,
+    );
+    addIfChanged(
+      'Probation End Date',
+      before.probationEndDate ?? null,
+      after.probationEndDate ?? null,
     );
     addIfChanged(
       'Date of Birth',

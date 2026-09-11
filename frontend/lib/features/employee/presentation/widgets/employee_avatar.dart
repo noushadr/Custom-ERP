@@ -36,7 +36,13 @@ class _EmployeeAvatarState extends State<EmployeeAvatar> {
         radius: widget.radius,
         backgroundImage: NetworkImage(widget.photoUrl!),
         onBackgroundImageError: (_, _) {
-          if (mounted) setState(() => _imageFailed = true);
+          // This can fire synchronously during paint (e.g. an already-
+          // cached 404 resolves immediately) — setState right here trips
+          // Flutter's "Build scheduled during frame" assertion. Defer to
+          // the next frame instead.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _imageFailed = true);
+          });
         },
       );
     }

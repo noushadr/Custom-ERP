@@ -7,18 +7,22 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/presentation/pages/employee_directory_page.dart';
 import 'package:zera_erp/features/employee/presentation/widgets/employee_status_badges.dart';
+import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
 import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/shared/models/named_ref.dart';
 import 'package:zera_erp/shared/utils/date_format.dart';
+import 'package:zera_erp/shared/widgets/metric_card.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_freelancers.dart';
 import '../../helpers/fake_performance_review.dart';
 
-Widget _app({
+List<Override> _overridesFor({
   required List<String> permissions,
   required FakeEmployeeRepository repository,
   FakePerformanceReviewRepository? performanceReviewRepository,
+  FakeFreelancersRepository? freelancersRepository,
 }) {
   final user = AuthUser(
     id: 'user-1',
@@ -27,18 +31,46 @@ Widget _app({
     permissions: permissions,
   );
 
+  return [
+    authControllerProvider.overrideWith(
+      (ref) => PresetAuthController(AuthAuthenticated(user)),
+    ),
+    employeeRepositoryProvider.overrideWithValue(repository),
+    performanceReviewRepositoryProvider.overrideWithValue(
+      performanceReviewRepository ?? FakePerformanceReviewRepository(),
+    ),
+    freelancersRepositoryProvider.overrideWithValue(
+      freelancersRepository ?? FakeFreelancersRepository(),
+    ),
+  ];
+}
+
+Widget _app({
+  required List<String> permissions,
+  required FakeEmployeeRepository repository,
+  FakePerformanceReviewRepository? performanceReviewRepository,
+  FakeFreelancersRepository? freelancersRepository,
+}) {
   return ProviderScope(
-    overrides: [
-      authControllerProvider.overrideWith(
-        (ref) => PresetAuthController(AuthAuthenticated(user)),
-      ),
-      employeeRepositoryProvider.overrideWithValue(repository),
-      performanceReviewRepositoryProvider.overrideWithValue(
-        performanceReviewRepository ?? FakePerformanceReviewRepository(),
-      ),
-    ],
+    overrides: _overridesFor(
+      permissions: permissions,
+      repository: repository,
+      performanceReviewRepository: performanceReviewRepository,
+      freelancersRepository: freelancersRepository,
+    ),
     child: const MaterialApp(home: Scaffold(body: EmployeeDirectoryPage())),
   );
+}
+
+/// Widens the default 800x600 test surface — this page's header (Work Mode
+/// stats + status filter/search row) leaves too little room for the
+/// hierarchy tree below at the default height, same fix as leave_page_test's
+/// own `_useTallSurface`.
+Future<void> _useTallSurface(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(900, 1200);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }
 
 /// An ISO 'YYYY-MM-DD' exactly [years] years (and, optionally, [months])
@@ -57,7 +89,7 @@ String _joinedAgo(int years, {int months = 0}) {
 }
 
 void main() {
-  testWidgets('shows the employee list and invite button with full access', (
+  testWidgets('shows the employee list and add-employee button with full access', (
     tester,
   ) async {
     final repository = FakeEmployeeRepository(
@@ -73,10 +105,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Jane Doe'), findsOneWidget);
-    expect(find.text('Invite Employee'), findsOneWidget);
+    expect(find.text('Add Employee'), findsOneWidget);
   });
 
-  testWidgets('hides the invite button without employees.manage', (
+  testWidgets('hides the add-employee button without employees.manage', (
     tester,
   ) async {
     final repository = FakeEmployeeRepository(
@@ -89,7 +121,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Jane Doe'), findsOneWidget);
-    expect(find.text('Invite Employee'), findsNothing);
+    expect(find.text('Add Employee'), findsNothing);
   });
 
   testWidgets('hierarchy view nests reports under their manager', (
@@ -108,6 +140,7 @@ void main() {
     );
     final repository = FakeEmployeeRepository(employees: [manager, report]);
 
+    await _useTallSurface(tester);
     await tester.pumpWidget(
       _app(permissions: ['employees.read'], repository: repository),
     );
@@ -162,6 +195,47 @@ void main() {
 
     expect(find.text('No employees match your search.'), findsOneWidget);
   });
+
+  testWidgets(
+    "shows an employee's employment type and probation status on their card",
+    (tester) async {
+      final onProbation = buildTestEmployee(
+        id: 'employee-1',
+        fullName: 'Part Timer',
+        employmentType: 'part_time',
+        probationEndDate: '2026-06-01',
+        probationStatus: 'on_probation',
+      );
+      final pastProbation = buildTestEmployee(
+        id: 'employee-2',
+        fullName: 'Full Timer',
+        email: 'full.timer@zeracreative.com',
+        employmentType: 'full_time',
+        probationEndDate: '2025-01-01',
+        probationStatus: 'completed',
+      );
+      final noProbationOnFile = buildTestEmployee(
+        id: 'employee-3',
+        fullName: 'No Probation',
+        email: 'no.probation@zeracreative.com',
+      );
+      final repository = FakeEmployeeRepository(
+        employees: [onProbation, pastProbation, noProbationOnFile],
+      );
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Part-time'), findsOneWidget);
+      expect(find.text('On Probation'), findsOneWidget);
+      // "Full-time" appears for both Full Timer and No Probation (the
+      // default employmentType) — assert at least one, not uniqueness.
+      expect(find.text('Full-time'), findsWidgets);
+      expect(find.text('Probation Complete'), findsOneWidget);
+    },
+  );
 
   testWidgets('shows each employee\'s department and reporting manager', (
     tester,
@@ -314,10 +388,76 @@ void main() {
       await tester.pumpAndSettle();
 
       // Only employee-1 is active, so Remote should read 1 (not 2), and
-      // Hybrid should read 0 since its only member has left.
-      expect(find.text('On-site: 0'), findsOneWidget);
-      expect(find.text('Remote: 1'), findsOneWidget);
-      expect(find.text('Hybrid: 0'), findsOneWidget);
+      // Hybrid should read 0 since its only member has left. The work-mode
+      // breakdown is a row of MetricCard boxes (moved here from the
+      // Dashboard), not plain text.
+      final onSiteCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'On-site'),
+      );
+      final remoteCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Remote'),
+      );
+      final hybridCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate((w) => w is MetricCard && w.label == 'Hybrid'),
+      );
+      expect(onSiteCard.value, '0');
+      expect(remoteCard.value, '1');
+      expect(hybridCard.value, '0');
+    },
+  );
+
+  testWidgets(
+    'hides the Work Mode Freelancers tile without payroll.manage',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          permissions: ['employees.read'],
+          repository: FakeEmployeeRepository(
+            employees: [buildTestEmployee()],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // employees.read alone (no payroll.manage) doesn't get the
+      // Freelancers tile — GET /freelancers requires payroll.manage
+      // server-side.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is MetricCard && w.label == 'Freelancers',
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'the Work Mode Freelancers tile only counts active freelancers, for a '
+    'payroll.manage holder',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          permissions: ['employees.read', 'payroll.manage'],
+          repository: FakeEmployeeRepository(
+            employees: [buildTestEmployee()],
+          ),
+          freelancersRepository: FakeFreelancersRepository(
+            freelancers: [
+              buildTestFreelancer(id: 'f1', isActive: true),
+              buildTestFreelancer(id: 'f2', isActive: true),
+              buildTestFreelancer(id: 'f3', isActive: false),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final freelancersCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate(
+          (w) => w is MetricCard && w.label == 'Freelancers',
+        ),
+      );
+      expect(freelancersCard.value, '2');
     },
   );
 
@@ -457,6 +597,209 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No review yet'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "shows the Total Employees tile's active count and 30-day delta "
+    '(moved here from the Dashboard)',
+    (tester) async {
+      final repository = FakeEmployeeRepository(
+        employees: [
+          buildTestEmployee(id: 'employee-1', employmentStatus: 'active'),
+          buildTestEmployee(id: 'employee-2', employmentStatus: 'resigned'),
+        ],
+        activeEmployeeDelta: 1,
+      );
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      final totalCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate(
+          (w) => w is MetricCard && w.label == 'Total Employees',
+        ),
+      );
+      // Only employee-1 is active, so the tile reads 1 (not the full
+      // headcount of 2).
+      expect(totalCard.value, '1');
+      expect(totalCard.secondaryValue, '+1 in last 30 days');
+    },
+  );
+
+  testWidgets(
+    "shows a negative Total Employees tile delta as e.g. '-1 in last 30 "
+    "days'",
+    (tester) async {
+      final repository = FakeEmployeeRepository(
+        employees: [buildTestEmployee(employmentStatus: 'resigned')],
+        activeEmployeeDelta: -1,
+      );
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      final totalCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate(
+          (w) => w is MetricCard && w.label == 'Total Employees',
+        ),
+      );
+      expect(totalCard.secondaryValue, '-1 in last 30 days');
+    },
+  );
+
+  testWidgets(
+    "shows 'No change in last 30 days' for a zero Total Employees tile "
+    'delta',
+    (tester) async {
+      final repository = FakeEmployeeRepository(activeEmployeeDelta: 0);
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      final totalCard = tester.widget<MetricCard>(
+        find.byWidgetPredicate(
+          (w) => w is MetricCard && w.label == 'Total Employees',
+        ),
+      );
+      expect(totalCard.secondaryValue, 'No change in last 30 days');
+    },
+  );
+
+  testWidgets(
+    'a status filter dropdown narrows the list to one employment status',
+    (tester) async {
+      final active = buildTestEmployee(
+        id: 'employee-1',
+        fullName: 'Active Person',
+      );
+      final onNotice = buildTestEmployee(
+        id: 'employee-2',
+        fullName: 'Notice Person',
+        email: 'notice.person@zeracreative.com',
+        employmentStatus: 'notice_period',
+      );
+      final repository = FakeEmployeeRepository(
+        employees: [active, onNotice],
+      );
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active Person'), findsOneWidget);
+      expect(find.text('Notice Person'), findsOneWidget);
+
+      await tester.tap(
+        find.widgetWithText(
+          DropdownButtonFormField<String?>,
+          'Employment status',
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Notice Period').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active Person'), findsNothing);
+      expect(find.text('Notice Person'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "the status filter's 'On Probation' option filters by "
+    "probationStatus, not employmentStatus — a probationary employee's "
+    "employmentStatus stays 'active' so they still show up in payroll etc.",
+    (tester) async {
+      final onProbation = buildTestEmployee(
+        id: 'employee-1',
+        fullName: 'Probation Person',
+        probationEndDate: '2026-12-01',
+        probationStatus: 'on_probation',
+      );
+      final activeNotOnProbation = buildTestEmployee(
+        id: 'employee-2',
+        fullName: 'Confirmed Person',
+        email: 'confirmed.person@zeracreative.com',
+      );
+      final repository = FakeEmployeeRepository(
+        employees: [onProbation, activeNotOnProbation],
+      );
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.widgetWithText(
+          DropdownButtonFormField<String?>,
+          'Employment status',
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('On Probation').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Probation Person'), findsOneWidget);
+      expect(find.text('Confirmed Person'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'picks up a Notice Period pre-filter set on employeeStatusFilterProvider '
+    'after this page is already mounted (the real app never rebuilds this '
+    "page's initState for a later Dashboard tap — see main.dart's "
+    'IndexedStack-based nav)',
+    (tester) async {
+      final active = buildTestEmployee(
+        id: 'employee-1',
+        fullName: 'Active Person',
+      );
+      final onNotice = buildTestEmployee(
+        id: 'employee-2',
+        fullName: 'Notice Person',
+        email: 'notice.person@zeracreative.com',
+        employmentStatus: 'notice_period',
+      );
+      final repository = FakeEmployeeRepository(
+        employees: [active, onNotice],
+      );
+      final container = ProviderContainer(
+        overrides: _overridesFor(
+          permissions: ['employees.read'],
+          repository: repository,
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: Scaffold(body: EmployeeDirectoryPage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active Person'), findsOneWidget);
+      expect(find.text('Notice Person'), findsOneWidget);
+
+      // Exactly what the Dashboard's Notice Period tile does — set the
+      // provider well after this page was first built.
+      container.read(employeeStatusFilterProvider.notifier).state =
+          'notice_period';
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active Person'), findsNothing);
+      expect(find.text('Notice Person'), findsOneWidget);
     },
   );
 }

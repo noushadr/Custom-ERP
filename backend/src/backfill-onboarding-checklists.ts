@@ -9,7 +9,7 @@ import { EmploymentStatus } from './features/employee/domain/enums/employment-st
 
 /** One-time data fix for employees who existed before the onboarding/
  * offboarding checklist feature shipped: they never got a checklist instance
- * created for them at all (that only happens on invite / status-change), so
+ * created for them at all (that only happens when adding an employee / on status-change), so
  * their profile showed an empty, invisible checklist section. This creates
  * their onboarding checklist — and offboarding, if they'd already left before
  * this feature existed — with every item pre-marked complete, since they

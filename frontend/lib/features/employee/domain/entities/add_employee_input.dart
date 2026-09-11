@@ -1,5 +1,5 @@
-class InviteEmployeeInput {
-  const InviteEmployeeInput({
+class AddEmployeeInput {
+  const AddEmployeeInput({
     required this.companyEmail,
     required this.firstName,
     required this.lastName,

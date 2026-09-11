@@ -26,6 +26,7 @@ import { HolidaysService } from '../../holidays/application/holidays.service';
 import { NotificationsService } from '../../notifications/application/notifications.service';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
+import { ApplyLeaveForEmployeeDto } from './dto/apply-leave-for-employee.dto';
 import { CreateLeaveTypeDto } from './dto/create-leave-type.dto';
 import { SubmitLeaveRequestDto } from './dto/submit-leave-request.dto';
 import { UpdateLeaveTypeDto } from './dto/update-leave-type.dto';
@@ -202,6 +203,77 @@ export class LeaveService {
     return toLeaveRequestResponse(reloaded!);
   }
 
+  // ---------------------------------------------------------------------
+  // Leave requests — HR/Admin applying leave directly on someone's behalf
+  // (`leave.manage`) — skips the manager/HR approval pipeline entirely,
+  // since HR/Admin themselves are already the final decision-maker.
+  // ---------------------------------------------------------------------
+
+  async applyLeaveForEmployee(
+    employeeId: string,
+    dto: ApplyLeaveForEmployeeDto,
+    actorUserId: string,
+  ): Promise<LeaveRequestResponse> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    const leaveType = await this.leaveTypeRepository.findById(dto.leaveTypeId);
+    if (!leaveType || leaveType.isArchived) {
+      throw new NotFoundException('Leave type not found');
+    }
+
+    const start = new Date(`${dto.startDate}T00:00:00Z`);
+    const end = new Date(`${dto.endDate}T00:00:00Z`);
+    if (end.getTime() < start.getTime()) {
+      throw new BadRequestException(
+        'End date must be on or after the start date',
+      );
+    }
+
+    const numberOfDays = await this.countWorkingDays(
+      dto.startDate,
+      dto.endDate,
+    );
+    if (numberOfDays === 0) {
+      throw new BadRequestException('Selected range contains no working days');
+    }
+
+    const year = start.getUTCFullYear();
+    await this.deductFromBalance(employeeId, leaveType, year, numberOfDays);
+
+    const actorName = await resolveActorName(
+      this.employeeRepository,
+      this.userRepository,
+      actorUserId,
+    );
+
+    const request = new LeaveRequest();
+    request.employeeId = employeeId;
+    request.leaveTypeId = leaveType.id;
+    request.startDate = dto.startDate;
+    request.endDate = dto.endDate;
+    request.numberOfDays = numberOfDays.toFixed(1);
+    request.reason = dto.reason;
+    // Goes straight to APPROVED — there's no manager/HR stage left for it to
+    // wait on, since the actor applying it already holds `leave.manage`.
+    // managerDecisionAt/managerDecisionByName stay unset (never went through
+    // that stage, unlike a normal request that reaches HR via MANAGER_APPROVED).
+    request.status = LeaveRequestStatus.APPROVED;
+    request.hrDecisionAt = new Date();
+    request.hrDecisionByName = actorName;
+
+    const saved = await this.leaveRequestRepository.save(request);
+    const reloaded = await this.leaveRequestRepository.findById(saved.id);
+
+    await this.notificationsService.create({
+      recipientUserId: employee.userId,
+      message: `${actorName} applied ${numberOfDays} day(s) of ${leaveType.name} for you, from ${dto.startDate} to ${dto.endDate}.`,
+      linkTarget: NotificationLinkTarget.LEAVE,
+    });
+
+    return toLeaveRequestResponse(reloaded!);
+  }
+
   async cancelLeaveRequest(
     actorUserId: string,
     requestId: string,
@@ -326,20 +398,12 @@ export class LeaveService {
     );
 
     const year = new Date(`${request.startDate}T00:00:00Z`).getUTCFullYear();
-    const balance = await this.getOrCreateBalance(
+    await this.deductFromBalance(
       request.employeeId,
       request.leaveType,
       year,
+      Number(request.numberOfDays),
     );
-    const requestedDays = Number(request.numberOfDays);
-    const remaining = Number(balance.allocated) - Number(balance.used);
-    if (requestedDays > remaining) {
-      throw new BadRequestException(
-        `Insufficient balance: this request needs ${requestedDays} day(s) but only ${remaining} remain`,
-      );
-    }
-    balance.used = (Number(balance.used) + requestedDays).toFixed(1);
-    await this.leaveBalanceRepository.save(balance);
 
     request.status = LeaveRequestStatus.APPROVED;
     request.hrDecisionAt = new Date();
@@ -657,6 +721,28 @@ export class LeaveService {
     balance.allocated = leaveType.annualAllowanceDays;
     balance.used = '0.0';
     return balance;
+  }
+
+  /** Deducts [requestedDays] from the employee's balance for this leave
+   * type/year, creating the balance row if it doesn't exist yet. Throws if
+   * there isn't enough remaining. Shared by [approveAsHr] and
+   * [applyLeaveForEmployee] — both actually finalize a request's balance
+   * impact, just via different paths to get there. */
+  private async deductFromBalance(
+    employeeId: string,
+    leaveType: LeaveType,
+    year: number,
+    requestedDays: number,
+  ): Promise<void> {
+    const balance = await this.getOrCreateBalance(employeeId, leaveType, year);
+    const remaining = Number(balance.allocated) - Number(balance.used);
+    if (requestedDays > remaining) {
+      throw new BadRequestException(
+        `Insufficient balance: this request needs ${requestedDays} day(s) but only ${remaining} remain`,
+      );
+    }
+    balance.used = (Number(balance.used) + requestedDays).toFixed(1);
+    await this.leaveBalanceRepository.save(balance);
   }
 
   private async resolveCarryForward(

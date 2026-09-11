@@ -72,6 +72,23 @@ class LeaveRepositoryImpl implements LeaveRepository {
   );
 
   @override
+  Future<LeaveRequest> applyLeaveForEmployee(
+    String employeeId, {
+    required String leaveTypeId,
+    required String startDate,
+    required String endDate,
+    required String reason,
+  }) => _guard(
+    () => _remoteDataSource.applyLeaveForEmployee(
+      employeeId,
+      leaveTypeId: leaveTypeId,
+      startDate: startDate,
+      endDate: endDate,
+      reason: reason,
+    ),
+  );
+
+  @override
   Future<LeaveRequest> cancelLeaveRequest(String requestId) =>
       _guard(() => _remoteDataSource.cancelLeaveRequest(requestId));
 

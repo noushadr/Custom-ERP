@@ -35,6 +35,15 @@ final myLeaveBalancesProvider = FutureProvider.autoDispose<List<LeaveBalance>>(
   },
 );
 
+/// Requires `leave.manage` — used by the "Apply Leave for Employee" dialog
+/// so HR/Admin can see how many days someone has left before applying leave
+/// on their behalf.
+final employeeLeaveBalancesProvider = FutureProvider.autoDispose
+    .family<List<LeaveBalance>, String>((ref, employeeId) {
+      ref.watch(authControllerProvider);
+      return ref.watch(leaveRepositoryProvider).getEmployeeBalances(employeeId);
+    });
+
 final myLeaveRequestsProvider = FutureProvider.autoDispose<List<LeaveRequest>>(
   (ref) {
     ref.watch(authControllerProvider);

@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/exceptions/employee_exception.dart';
-import 'package:zera_erp/features/employee/presentation/pages/invite_employee_page.dart';
+import 'package:zera_erp/features/employee/presentation/pages/add_employee_page.dart';
 
 import '../../helpers/fake_employee.dart';
 
 Widget _app(FakeEmployeeRepository repository) {
   return ProviderScope(
     overrides: [employeeRepositoryProvider.overrideWithValue(repository)],
-    child: const MaterialApp(home: InviteEmployeePage()),
+    child: const MaterialApp(home: AddEmployeePage()),
   );
 }
 
@@ -36,7 +36,7 @@ void main() {
     await tester.pumpWidget(_app(FakeEmployeeRepository()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Send invite'));
+    await tester.tap(find.text('Add'));
     await tester.pump();
 
     expect(find.text('Company email is required'), findsOneWidget);
@@ -54,7 +54,7 @@ void main() {
       find.widgetWithText(TextFormField, 'Company email'),
       'not-the-right-format@zeracreative.com',
     );
-    await tester.tap(find.text('Send invite'));
+    await tester.tap(find.text('Add'));
     await tester.pump();
 
     expect(
@@ -65,7 +65,7 @@ void main() {
 
   testWidgets('shows the temporary password on success', (tester) async {
     final repository = FakeEmployeeRepository(
-      inviteResult: (
+      addEmployeeResult: (
         employee: buildTestEmployee(fullName: 'New Hire'),
         temporaryPassword: 'Sup3rSecret',
       ),
@@ -75,10 +75,10 @@ void main() {
     await tester.pumpAndSettle();
 
     await _fillRequiredFields(tester);
-    await tester.tap(find.text('Send invite'));
+    await tester.tap(find.text('Add'));
     await tester.pumpAndSettle();
 
-    expect(find.text('New Hire has been invited.'), findsOneWidget);
+    expect(find.text('New Hire has been added.'), findsOneWidget);
     expect(find.text('Sup3rSecret'), findsOneWidget);
   });
 
@@ -95,9 +95,11 @@ void main() {
     );
   });
 
-  testWidgets('shows an error message when the invite fails', (tester) async {
+  testWidgets('shows an error message when adding the employee fails', (
+    tester,
+  ) async {
     final repository = FakeEmployeeRepository(
-      inviteError: const EmployeeException(
+      addEmployeeError: const EmployeeException(
         'A user with this email already exists.',
       ),
     );
@@ -106,7 +108,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await _fillRequiredFields(tester);
-    await tester.tap(find.text('Send invite'));
+    await tester.tap(find.text('Add'));
     await tester.pumpAndSettle();
 
     expect(

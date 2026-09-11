@@ -84,6 +84,25 @@ class LeaveRemoteDataSource {
     return LeaveRequestModel.fromJson(response.data!);
   }
 
+  Future<LeaveRequestModel> applyLeaveForEmployee(
+    String employeeId, {
+    required String leaveTypeId,
+    required String startDate,
+    required String endDate,
+    required String reason,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/leave/requests/$employeeId/apply',
+      data: {
+        'leaveTypeId': leaveTypeId,
+        'startDate': startDate,
+        'endDate': endDate,
+        'reason': reason,
+      },
+    );
+    return LeaveRequestModel.fromJson(response.data!);
+  }
+
   Future<LeaveRequestModel> cancelLeaveRequest(String requestId) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/leave/requests/$requestId/cancel',

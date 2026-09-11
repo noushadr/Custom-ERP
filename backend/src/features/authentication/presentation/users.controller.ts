@@ -40,7 +40,7 @@ export class UsersController {
 
   /** Sets a new temporary password for any user, returned once so the
    * admin/HR can share it directly — there is no email delivery yet, same
-   * as the invite flow.
+   * as the add-employee flow.
    *
    * `users.manage` is held by HR/Manager as well as Super Admin, so without
    * the check below an HR/Manager could reset the Super Admin's own

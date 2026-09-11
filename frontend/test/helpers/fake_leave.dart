@@ -124,6 +124,8 @@ class FakeLeaveRepository implements LeaveRepository {
   String? lastCalendarScope;
 
   String? lastSubmittedLeaveTypeId;
+  String? lastAppliedForEmployeeId;
+  String? lastAppliedLeaveTypeId;
   String? lastCancelledRequestId;
   String? lastDecidedRequestId;
   bool? lastDecisionApproved;
@@ -181,6 +183,26 @@ class FakeLeaveRepository implements LeaveRepository {
       startDate: startDate,
       endDate: endDate,
       reason: reason,
+    );
+  }
+
+  @override
+  Future<LeaveRequest> applyLeaveForEmployee(
+    String employeeId, {
+    required String leaveTypeId,
+    required String startDate,
+    required String endDate,
+    required String reason,
+  }) async {
+    lastAppliedForEmployeeId = employeeId;
+    lastAppliedLeaveTypeId = leaveTypeId;
+    if (submitError != null) throw submitError!;
+    return buildTestLeaveRequest(
+      leaveTypeId: leaveTypeId,
+      startDate: startDate,
+      endDate: endDate,
+      reason: reason,
+      status: 'approved',
     );
   }
 

@@ -71,6 +71,54 @@ class EmploymentStatusBadge extends StatelessWidget {
   }
 }
 
+class EmploymentTypeBadge extends StatelessWidget {
+  const EmploymentTypeBadge({
+    super.key,
+    required this.employmentType,
+    this.dense = false,
+  });
+
+  final String employmentType;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    return StatusBadge(
+      label: formatEmploymentType(employmentType),
+      color: AppColors.textSecondary,
+      icon: Icons.work_outline,
+      dense: dense,
+    );
+  }
+}
+
+/// Shown only when [status] is non-null — a `null` `Employee.probationStatus`
+/// means no probation end date is on file for this employee at all (e.g. a
+/// pre-existing record from before this field existed), which is distinct
+/// from having *completed* probation.
+class ProbationBadge extends StatelessWidget {
+  const ProbationBadge({super.key, required this.status, this.dense = false});
+
+  final String status;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (status) {
+      'on_probation' => ('On Probation', AppColors.warning),
+      'completed' => ('Probation Complete', AppColors.success),
+      _ => (status, AppColors.textSecondary),
+    };
+
+    return StatusBadge(
+      label: label,
+      color: color,
+      icon: Icons.hourglass_bottom_outlined,
+      dense: dense,
+    );
+  }
+}
+
 class WorkModeBadge extends StatelessWidget {
   const WorkModeBadge({
     super.key,

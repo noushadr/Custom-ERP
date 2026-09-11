@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
+import '../../../../shared/widgets/department_breakdown_section.dart';
+import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/permission_gate.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
+import '../../../employee/application/employee_providers.dart';
 import '../../../freelancers/application/freelancers_providers.dart';
 import '../../../freelancers/domain/entities/freelancer.dart';
 import '../../../freelancers/domain/exceptions/freelancer_exception.dart';
 import '../../application/payroll_providers.dart';
+import '../../domain/entities/payroll_run_status.dart';
 import '../../domain/entities/payroll_run_summary.dart';
 import '../../domain/exceptions/payroll_exception.dart';
 import '../widgets/payroll_run_status_badge.dart';
@@ -35,27 +39,211 @@ class PayrollPage extends ConsumerWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 900),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const TabBar(
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  labelColor: AppColors.primary,
-                  unselectedLabelColor: AppColors.textSecondary,
-                  indicatorColor: AppColors.primary,
-                  tabs: [Tab(text: 'Runs'), Tab(text: 'Freelancers')],
-                ),
-                const SizedBox(height: 16),
-                const Expanded(
-                  child: TabBarView(
-                    children: [_RunsTab(), _FreelancersTab()],
+            // Scrollable, with the tab content given a fixed height instead
+            // of Expanded (which needs a bounded-height ancestor, not a
+            // scroll view) — same shape as ClientsProjectsPage, needed once
+            // _PayrollStats/_DepartmentPayrollTotals above the tabs made
+            // this page's content taller than a typical viewport.
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _PayrollStats(),
+                  const SizedBox(height: 10),
+                  const _DepartmentPayrollTotals(),
+                  const SizedBox(height: 20),
+                  const TabBar(
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: AppColors.textSecondary,
+                    indicatorColor: AppColors.primary,
+                    tabs: [Tab(text: 'Runs'), Tab(text: 'Freelancers')],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  const SizedBox(
+                    height: 640,
+                    child: TabBarView(
+                      children: [_RunsTab(), _FreelancersTab()],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Monthly and daily payroll of active employees, derived from each one's
+/// current salary — moved here from the Dashboard so headline payroll
+/// figures live on the page about payroll, not the company-wide overview.
+class _PayrollStats extends ConsumerWidget {
+  const _PayrollStats();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payrollAsync = ref.watch(payrollSummaryProvider);
+
+    return payrollAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: LinearProgressIndicator(),
+      ),
+      error: (_, _) => Text(
+        'Could not load payroll figures.',
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      ),
+      data: (payroll) {
+        final averageSalary = payroll.activeEmployeeCount == 0
+            ? 0.0
+            : payroll.totalMonthlyPayroll / payroll.activeEmployeeCount;
+
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            MetricCard(
+              label: 'Monthly Payroll',
+              value: 'PKR ${formatWholeAmount(payroll.totalMonthlyPayroll)}',
+              secondaryValue: formatUsdApprox(payroll.totalMonthlyPayroll),
+              color: AppColors.primary,
+              icon: Icons.account_balance_wallet_outlined,
+            ),
+            MetricCard(
+              label: 'Daily Payroll',
+              value: 'PKR ${formatWholeAmount(payroll.dailyPayroll)}',
+              secondaryValue: formatUsdApprox(payroll.dailyPayroll),
+              color: AppColors.accentTeal,
+              icon: Icons.today_outlined,
+            ),
+            MetricCard(
+              label: 'Average Salary',
+              value: 'PKR ${formatWholeAmount(averageSalary)}',
+              secondaryValue: formatUsdApprox(averageSalary),
+              color: AppColors.secondary,
+              icon: Icons.person_outline,
+            ),
+            const _LatestPayrollRunCard(),
+            const _TotalFreelancersCard(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// The most recently generated payroll run's status and total, sorted
+/// client-side since there's no dedicated "latest run" endpoint — moved
+/// here from the Dashboard alongside [_PayrollStats].
+class _LatestPayrollRunCard extends ConsumerWidget {
+  const _LatestPayrollRunCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final runsAsync = ref.watch(payrollRunsListProvider);
+    final latest = runsAsync.whenOrNull(
+      data: (runs) => runs.isEmpty ? null : _latestOf(runs),
+    );
+
+    return MetricCard(
+      label: 'Latest Payroll Run',
+      value: runsAsync.when(
+        data: (runs) =>
+            runs.isEmpty ? 'None yet' : _formatRunStatus(latest!.status),
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      secondaryValue: latest == null
+          ? null
+          : 'PKR ${formatWholeAmount(latest.totalNetPay)}',
+      color: AppColors.primary,
+      icon: Icons.receipt_outlined,
+    );
+  }
+
+  // Not `runs.reduce(...)`: at runtime `runs` is a `List<PayrollRunSummaryModel>`
+  // (the repository's concrete type), and `reduce`'s combine callback is
+  // checked against that runtime element type — a callback typed with the
+  // base `PayrollRunSummary` throws a TypeError there. A plain loop avoids
+  // binding the callback to either type.
+  PayrollRunSummary _latestOf(List<PayrollRunSummary> runs) {
+    var latest = runs.first;
+    for (final run in runs.skip(1)) {
+      if ((run.year * 12 + run.month) >= (latest.year * 12 + latest.month)) {
+        latest = run;
+      }
+    }
+    return latest;
+  }
+
+  String _formatRunStatus(String status) {
+    switch (status) {
+      case PayrollRunStatus.draft:
+        return 'Draft';
+      case PayrollRunStatus.finalized:
+        return 'Finalized';
+      case PayrollRunStatus.paid:
+        return 'Paid';
+      default:
+        return status;
+    }
+  }
+}
+
+/// Active freelancer count — moved here from the Dashboard alongside
+/// [_PayrollStats], since freelancers are managed from this page's own
+/// Freelancers tab.
+class _TotalFreelancersCard extends ConsumerWidget {
+  const _TotalFreelancersCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final freelancersAsync = ref.watch(freelancersListProvider);
+
+    return MetricCard(
+      label: 'Total Freelancers',
+      value: freelancersAsync.when(
+        data: (freelancers) =>
+            '${freelancers.where((f) => f.isActive).length}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.accentTeal,
+      icon: Icons.badge_outlined,
+    );
+  }
+}
+
+/// Each department's share of the current monthly payroll, sorted highest
+/// total first (as returned by the backend) — moved here from the Dashboard
+/// alongside [_PayrollStats]. Renders via the shared
+/// [DepartmentBreakdownSection] so this and the single-run breakdown on
+/// `PayrollRunDetailPage` stay visually identical.
+class _DepartmentPayrollTotals extends ConsumerWidget {
+  const _DepartmentPayrollTotals();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payrollAsync = ref.watch(payrollSummaryProvider);
+
+    return payrollAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (payroll) => DepartmentBreakdownSection(
+        title: 'Payroll by Department',
+        totalAmount: payroll.totalMonthlyPayroll,
+        countLabel: (count) => count == 1 ? '1 employee' : '$count employees',
+        rows: [
+          for (final total in payroll.departmentTotals)
+            DepartmentBreakdownRow(
+              name: total.departmentName,
+              amount: total.totalMonthlyPayroll,
+              count: total.employeeCount,
+            ),
+        ],
       ),
     );
   }

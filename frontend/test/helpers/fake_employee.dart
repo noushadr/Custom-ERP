@@ -1,11 +1,11 @@
 import 'dart:typed_data';
+import 'package:zera_erp/features/employee/domain/entities/add_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/asset.dart';
 import 'package:zera_erp/features/employee/domain/entities/audit_log_entry.dart';
 import 'package:zera_erp/features/employee/domain/entities/department.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee_document.dart';
 import 'package:zera_erp/features/employee/domain/entities/education_record.dart';
-import 'package:zera_erp/features/employee/domain/entities/invite_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/paginated_audit_log.dart';
 import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
 import 'package:zera_erp/features/employee/domain/entities/salary_record.dart';
@@ -30,8 +30,11 @@ Employee buildTestEmployee({
   List<String> skills = const [],
   List<String> certifications = const [],
   String joiningDate = '2026-01-01',
+  String employmentType = 'full_time',
   String employmentStatus = 'active',
   String workMode = 'on_site',
+  String? probationEndDate,
+  String? probationStatus,
   String? personalEmail,
   String? phoneNumber,
   String? dateOfBirth,
@@ -60,11 +63,13 @@ Employee buildTestEmployee({
     designation: designation,
     department: department,
     reportingManager: reportingManager,
-    employmentType: 'full_time',
+    employmentType: employmentType,
     employmentStatus: employmentStatus,
     workMode: workMode,
     joiningDate: joiningDate,
     dateOfLeaving: null,
+    probationEndDate: probationEndDate,
+    probationStatus: probationStatus,
     dateOfBirth: dateOfBirth,
     personalEmail: personalEmail,
     phoneNumber: phoneNumber,
@@ -107,8 +112,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.employees = const [],
     Employee? me,
     this.departments = const [],
-    this.inviteResult,
-    this.inviteError,
+    this.addEmployeeResult,
+    this.addEmployeeError,
     this.updateMeResult,
     this.updateMeError,
     this.updateEmployeeResult,
@@ -155,8 +160,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final PayrollSummary? payrollSummary;
   final Object? getPayrollSummaryError;
   final List<Department> departments;
-  final ({Employee employee, String temporaryPassword})? inviteResult;
-  final Object? inviteError;
+  final ({Employee employee, String temporaryPassword})? addEmployeeResult;
+  final Object? addEmployeeError;
   final Employee? updateMeResult;
   final Object? updateMeError;
   final Employee? updateEmployeeResult;
@@ -191,6 +196,9 @@ class FakeEmployeeRepository implements EmployeeRepository {
 
   /// The input passed to the most recent [updateMe] call.
   UpdateMyProfileInput? lastUpdateMeInput;
+
+  /// The input passed to the most recent [updateEmployee] call.
+  UpdateEmployeeInput? lastUpdateEmployeeInput;
   final Employee? uploadMyPhotoResult;
   final Object? uploadMyPhotoError;
   final Employee? uploadPhotoResult;
@@ -272,6 +280,7 @@ class FakeEmployeeRepository implements EmployeeRepository {
 
   @override
   Future<Employee> updateEmployee(String id, UpdateEmployeeInput input) async {
+    lastUpdateEmployeeInput = input;
     if (updateEmployeeError != null) throw updateEmployeeError!;
     return updateEmployeeResult ?? me;
   }
@@ -307,11 +316,11 @@ class FakeEmployeeRepository implements EmployeeRepository {
   }
 
   @override
-  Future<({Employee employee, String temporaryPassword})> invite(
-    InviteEmployeeInput input,
+  Future<({Employee employee, String temporaryPassword})> addEmployee(
+    AddEmployeeInput input,
   ) async {
-    if (inviteError != null) throw inviteError!;
-    return inviteResult!;
+    if (addEmployeeError != null) throw addEmployeeError!;
+    return addEmployeeResult!;
   }
 
   @override

@@ -310,7 +310,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
   int _selectedIndex = 0;
 
   // One Navigator per section (by _allDestinations index), so pushing a
-  // sub-page (profile, edit, invite) only replaces that section's content —
+  // sub-page (profile, edit, add employee) only replaces that section's content —
   // the sidebar, top bar, and footer stay mounted. Keys must be created once
   // and stay stable across rebuilds, so this is sized to the full fixed set
   // rather than whatever subset is visible for the current role.
@@ -446,6 +446,15 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // A page with no callback wiring of its own (e.g. the Admin Dashboard's
+    // Notice Period tile) sets this provider to request a section switch;
+    // consumed once here, then reset so it doesn't re-fire on rebuild.
+    ref.listen<String?>(pendingSectionNavigationProvider, (previous, next) {
+      if (next == null) return;
+      _goToDestination(next);
+      ref.read(pendingSectionNavigationProvider.notifier).state = null;
+    });
+
     final isAdminOrHr = _isAdminOrHr(ref);
     final isSuperAdmin = _isSuperAdmin(ref);
     final badgeCounts = _navBadgeCounts(ref);

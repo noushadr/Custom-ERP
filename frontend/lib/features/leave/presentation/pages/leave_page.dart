@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../../../shared/widgets/metric_card.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
+import '../../../employee/application/employee_providers.dart';
 import '../../../employee/presentation/widgets/employee_status_badges.dart';
 import '../../../holidays/application/holiday_providers.dart';
 import '../../application/leave_providers.dart';
@@ -41,6 +43,10 @@ class LeavePage extends ConsumerWidget {
               children: [
                 if (canSeeHrApprovals) ...[
                   const _ResetReminderBanner(),
+                  const SizedBox(height: 16),
+                  const _OnLeaveStatCard(),
+                  const SizedBox(height: 16),
+                  const _ApplyLeaveForEmployeeSection(),
                   const SizedBox(height: 16),
                 ],
                 if (!isSuperAdmin) ...[
@@ -132,6 +138,363 @@ class _ResetReminderBannerState extends ConsumerState<_ResetReminderBanner> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Company-wide count of employees currently on leave — moved here from the
+/// Admin Dashboard so this figure lives on the page about leave, not the
+/// company-wide overview. Shown only to `leave.manage` holders, same tier as
+/// the reset banner above it.
+class _OnLeaveStatCard extends ConsumerWidget {
+  const _OnLeaveStatCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final employeesAsync = ref.watch(employeeListProvider);
+    final onLeaveCount =
+        employeesAsync.valueOrNull
+            ?.where((employee) => employee.employmentStatus == 'on_leave')
+            .length ??
+        0;
+
+    return MetricCard(
+      label: 'On Leave',
+      value: '$onLeaveCount',
+      color: AppColors.warning,
+      icon: Icons.beach_access_outlined,
+    );
+  }
+}
+
+/// HR/Admin applying leave directly on an employee's behalf — the resulting
+/// request is created already APPROVED (see `LeaveService.applyLeaveForEmployee`),
+/// with no manager or HR review step, since the actor here already holds
+/// `leave.manage` and so already is that final decision-maker.
+class _ApplyLeaveForEmployeeSection extends StatelessWidget {
+  const _ApplyLeaveForEmployeeSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: OutlinedButton.icon(
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (_) => const _ApplyLeaveForEmployeeDialog(),
+        ),
+        icon: const Icon(Icons.event_available_outlined, size: 18),
+        label: const Text('Apply Leave for Employee'),
+      ),
+    );
+  }
+}
+
+class _ApplyLeaveForEmployeeDialog extends ConsumerStatefulWidget {
+  const _ApplyLeaveForEmployeeDialog();
+
+  @override
+  ConsumerState<_ApplyLeaveForEmployeeDialog> createState() =>
+      _ApplyLeaveForEmployeeDialogState();
+}
+
+class _ApplyLeaveForEmployeeDialogState
+    extends ConsumerState<_ApplyLeaveForEmployeeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _reasonController = TextEditingController();
+  String? _employeeId;
+  String? _leaveTypeId;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  bool _submitting = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate({required bool isStart}) async {
+    final initial = (isStart ? _startDate : _endDate) ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 730)),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        _startDate = picked;
+      } else {
+        _endDate = picked;
+      }
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_employeeId == null ||
+        _leaveTypeId == null ||
+        _startDate == null ||
+        _endDate == null) {
+      setState(() => _errorMessage = 'Please fill in every field.');
+      return;
+    }
+    if (_endDate!.isBefore(_startDate!)) {
+      setState(
+        () => _errorMessage = 'End date must be on or after the start date.',
+      );
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await ref
+          .read(leaveRepositoryProvider)
+          .applyLeaveForEmployee(
+            _employeeId!,
+            leaveTypeId: _leaveTypeId!,
+            startDate: isoDate(_startDate!),
+            endDate: isoDate(_endDate!),
+            reason: _reasonController.text.trim(),
+          );
+      ref.invalidate(pendingHrApprovalLeaveRequestsProvider);
+      ref.invalidate(pendingManagerApprovalLeaveRequestsProvider);
+      ref.invalidate(myLeaveRequestsProvider);
+      ref.invalidate(myLeaveBalancesProvider);
+      ref.invalidate(leaveCalendarProvider);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } on LeaveException catch (error) {
+      setState(() => _errorMessage = error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final employeesAsync = ref.watch(employeeListProvider);
+    final leaveTypesAsync = ref.watch(leaveTypesProvider(false));
+    final holidaysAsync = ref.watch(holidaysProvider);
+    final holidayDates = <String>{
+      for (final holiday in holidaysAsync.valueOrNull ?? const [])
+        holiday.date,
+    };
+
+    return AlertDialog(
+      title: const Text('Apply Leave for Employee'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Created as already approved — no manager or HR review '
+                'needed, since you already are that final approval.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_errorMessage != null) ...[
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 12),
+              ],
+              employeesAsync.when(
+                loading: () => const LinearProgressIndicator(),
+                error: (_, _) => const Text('Could not load employees.'),
+                data: (employees) {
+                  final active =
+                      employees
+                          .where((e) => e.employmentStatus == 'active')
+                          .toList()
+                        ..sort((a, b) => a.fullName.compareTo(b.fullName));
+                  return DropdownButtonFormField<String>(
+                    initialValue: _employeeId,
+                    decoration: const InputDecoration(labelText: 'Employee'),
+                    items: [
+                      for (final employee in active)
+                        DropdownMenuItem(
+                          value: employee.id,
+                          child: Text(employee.fullName),
+                        ),
+                    ],
+                    onChanged: _submitting
+                        ? null
+                        : (value) => setState(() => _employeeId = value),
+                    validator: (value) => value == null ? 'Required' : null,
+                  );
+                },
+              ),
+              if (_employeeId != null) ...[
+                const SizedBox(height: 8),
+                _EmployeeBalancesPreview(employeeId: _employeeId!),
+              ],
+              const SizedBox(height: 12),
+              leaveTypesAsync.when(
+                loading: () => const LinearProgressIndicator(),
+                error: (_, _) => const Text('Could not load leave types.'),
+                data: (leaveTypes) => DropdownButtonFormField<String>(
+                  initialValue: _leaveTypeId,
+                  decoration: const InputDecoration(labelText: 'Leave type'),
+                  items: [
+                    for (final type in leaveTypes)
+                      DropdownMenuItem(value: type.id, child: Text(type.name)),
+                  ],
+                  onChanged: _submitting
+                      ? null
+                      : (value) => setState(() => _leaveTypeId = value),
+                  validator: (value) => value == null ? 'Required' : null,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      key: const Key('apply-for-employee-start-date'),
+                      onTap: _submitting
+                          ? null
+                          : () => _pickDate(isStart: true),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Start date',
+                        ),
+                        child: Text(
+                          _startDate == null ? '—' : isoDate(_startDate!),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      key: const Key('apply-for-employee-end-date'),
+                      onTap: _submitting
+                          ? null
+                          : () => _pickDate(isStart: false),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'End date',
+                        ),
+                        child: Text(
+                          _endDate == null ? '—' : isoDate(_endDate!),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (_startDate != null &&
+                  _endDate != null &&
+                  !_endDate!.isBefore(_startDate!)) ...[
+                const SizedBox(height: 8),
+                _DaysSelectedLabel(
+                  startDate: _startDate!,
+                  endDate: _endDate!,
+                  holidayDates: holidayDates,
+                ),
+              ],
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _reasonController,
+                enabled: !_submitting,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Reason'),
+                validator: (value) =>
+                    (value == null || value.trim().isEmpty) ? 'Required' : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Apply'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shows the selected employee's current-year leave balances (all types, not
+/// just the one about to be applied) so HR/Admin can see how many days they
+/// have left before picking a leave type/range for them.
+class _EmployeeBalancesPreview extends ConsumerWidget {
+  const _EmployeeBalancesPreview({required this.employeeId});
+
+  final String employeeId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final balancesAsync = ref.watch(employeeLeaveBalancesProvider(employeeId));
+
+    return balancesAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 4),
+        child: LinearProgressIndicator(),
+      ),
+      error: (_, _) => Text(
+        'Could not load their leave balances.',
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+      ),
+      data: (balances) {
+        if (balances.isEmpty) {
+          return Text(
+            'No leave balances on file yet.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          );
+        }
+        return Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final balance in balances)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.fieldFill,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${balance.leaveTypeName}: ${formatLeaveDays(balance.remaining)} left',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/metric_card.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../freelancers/application/freelancers_providers.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../../performance_reviews/domain/entities/performance_review_summary.dart';
 import '../../application/employee_providers.dart';
@@ -11,10 +13,19 @@ import '../../domain/entities/employee.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_hierarchy_view.dart';
 import '../widgets/employee_status_badges.dart';
+import 'add_employee_page.dart';
 import 'employee_profile_page.dart';
-import 'invite_employee_page.dart';
 
 enum _DirectoryViewMode { list, hierarchy }
+
+/// A sentinel status-filter value, distinct from every real
+/// `Employee.employmentStatus` value — "on probation" isn't an employment
+/// status of its own (it stays `active`/whatever it already was, so
+/// probationary employees keep showing up in payroll, leave, etc.), just a
+/// computed read of [Employee.probationEndDate]. Reusing the exact string
+/// [Employee.probationStatus] already returns for "currently on probation"
+/// keeps this filter and that field in lockstep by construction.
+const _probationFilterValue = 'on_probation';
 
 class EmployeeDirectoryPage extends ConsumerStatefulWidget {
   const EmployeeDirectoryPage({super.key});
@@ -29,6 +40,7 @@ class _EmployeeDirectoryPageState
   _DirectoryViewMode _viewMode = _DirectoryViewMode.list;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  String? _statusFilter;
 
   @override
   void dispose() {
@@ -38,6 +50,18 @@ class _EmployeeDirectoryPageState
 
   @override
   Widget build(BuildContext context) {
+    // This page is built once, up front, and kept mounted in the app's
+    // IndexedStack-based nav (see main.dart's `_HomeShellState`) — it is
+    // never freshly constructed when the user actually navigates here, so
+    // `initState` cannot reliably pick up a pre-filter requested well after
+    // the app first mounted (e.g. the Dashboard's Notice Period tile).
+    // `ref.listen` reacts whenever the provider changes, regardless of when.
+    ref.listen<String?>(employeeStatusFilterProvider, (previous, next) {
+      if (next == null) return;
+      setState(() => _statusFilter = next);
+      ref.read(employeeStatusFilterProvider.notifier).state = null;
+    });
+
     final authState = ref.watch(authControllerProvider);
     final authUser = authState is AuthAuthenticated ? authState.user : null;
     final canRead = authUser?.hasPermission('employees.read') ?? false;
@@ -51,6 +75,10 @@ class _EmployeeDirectoryPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (canRead) ...[
+                const _WorkModeSection(),
+                const SizedBox(height: 16),
+              ],
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -85,15 +113,21 @@ class _EmployeeDirectoryPageState
                         ),
                       ),
                     ),
+                  if (canRead && _viewMode == _DirectoryViewMode.list)
+                    _StatusFilterRow(
+                      value: _statusFilter,
+                      onChanged: (value) =>
+                          setState(() => _statusFilter = value),
+                    ),
                   if (canManage)
                     ElevatedButton.icon(
                       onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const InviteEmployeePage(),
+                          builder: (_) => const AddEmployeePage(),
                         ),
                       ),
                       icon: const Icon(Icons.person_add_outlined, size: 18),
-                      label: const Text('Invite Employee'),
+                      label: const Text('Add Employee'),
                     ),
                 ],
               ),
@@ -103,6 +137,7 @@ class _EmployeeDirectoryPageState
                     ? _DirectoryBody(
                         viewMode: _viewMode,
                         searchQuery: _searchQuery,
+                        statusFilter: _statusFilter,
                       )
                     : const _NoDirectoryAccess(),
               ),
@@ -115,10 +150,15 @@ class _EmployeeDirectoryPageState
 }
 
 class _DirectoryBody extends ConsumerWidget {
-  const _DirectoryBody({required this.viewMode, required this.searchQuery});
+  const _DirectoryBody({
+    required this.viewMode,
+    required this.searchQuery,
+    required this.statusFilter,
+  });
 
   final _DirectoryViewMode viewMode;
   final String searchQuery;
+  final String? statusFilter;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -162,7 +202,7 @@ class _DirectoryBody extends ConsumerWidget {
           );
         }
 
-        final filtered = _filterEmployees(employees, searchQuery);
+        final filtered = _filterEmployees(employees, searchQuery, statusFilter);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -185,10 +225,24 @@ class _DirectoryBody extends ConsumerWidget {
     );
   }
 
-  List<Employee> _filterEmployees(List<Employee> employees, String query) {
-    if (query.isEmpty) return employees;
+  List<Employee> _filterEmployees(
+    List<Employee> employees,
+    String query,
+    String? statusFilter,
+  ) {
+    var filtered = employees;
+    if (statusFilter != null) {
+      filtered = filtered
+          .where(
+            (employee) => statusFilter == _probationFilterValue
+                ? employee.probationStatus == 'on_probation'
+                : employee.employmentStatus == statusFilter,
+          )
+          .toList();
+    }
+    if (query.isEmpty) return filtered;
     final needle = query.toLowerCase();
-    return employees
+    return filtered
         .where(
           (employee) =>
               employee.fullName.toLowerCase().contains(needle) ||
@@ -282,10 +336,61 @@ class _ViewModeSegment extends StatelessWidget {
   }
 }
 
+/// A dropdown to narrow the list to one employment status — e.g. landing
+/// here from the Dashboard's Notice Period tile pre-selects "Notice
+/// Period". Only shown in List view; a search-query narrows further on top
+/// of whatever status is selected here. "On Probation" rides along in this
+/// same list even though it isn't a real `employmentStatus` value — see
+/// [_probationFilterValue].
+class _StatusFilterRow extends StatelessWidget {
+  const _StatusFilterRow({required this.value, required this.onChanged});
+
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  static const _statuses = <String, String>{
+    'active': 'Active',
+    _probationFilterValue: 'On Probation',
+    'on_leave': 'On Leave',
+    'notice_period': 'Notice Period',
+    'resigned': 'Resigned',
+    'terminated': 'Terminated',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      child: DropdownButtonFormField<String?>(
+        initialValue: value,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: 'Employment status',
+          isDense: true,
+          suffixIcon: value == null
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Clear filter',
+                  onPressed: () => onChanged(null),
+                ),
+        ),
+        items: [
+          const DropdownMenuItem(value: null, child: Text('All statuses')),
+          for (final entry in _statuses.entries)
+            DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
 /// A "N employees" (or "Showing N of M") headline, followed by the same
-/// employment-status and work-mode breakdown the dashboard shows — as plain,
-/// well-spaced text rather than another row of boxes, since this page
-/// already has its own card grid below.
+/// employment-status breakdown the dashboard shows — as plain, well-spaced
+/// text rather than another row of boxes, since this page already has its
+/// own card grid below. Work-mode breakdown lives in [_WorkModeSection]
+/// above instead, as boxes (moved here from the Dashboard).
 class _DirectorySummary extends StatelessWidget {
   const _DirectorySummary({required this.employees, required this.shown});
 
@@ -296,22 +401,12 @@ class _DirectorySummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = employees.length;
     final byStatus = <String, int>{};
-    final byWorkMode = <String, int>{};
     for (final employee in employees) {
       byStatus.update(
         employee.employmentStatus,
         (count) => count + 1,
         ifAbsent: () => 1,
       );
-      // Work mode only makes sense for people currently working, so resigned/
-      // terminated/on-leave/notice-period employees aren't counted here.
-      if (employee.employmentStatus == 'active') {
-        byWorkMode.update(
-          employee.workMode,
-          (count) => count + 1,
-          ifAbsent: () => 1,
-        );
-      }
     }
 
     final headline = shown == total
@@ -355,26 +450,124 @@ class _DirectorySummary extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 18,
-          runSpacing: 6,
-          children: [
-            Text(
-              'On-site: ${byWorkMode['on_site'] ?? 0}',
-              style: statLabelStyle,
-            ),
-            Text(
-              'Remote: ${byWorkMode['remote'] ?? 0}',
-              style: statLabelStyle,
-            ),
-            Text(
-              'Hybrid: ${byWorkMode['hybrid'] ?? 0}',
-              style: statLabelStyle,
-            ),
-          ],
-        ),
       ],
+    );
+  }
+}
+
+/// Currently-active employee count (not the full headcount — resigned/
+/// terminated employees don't count as "total" here), with a 30-day trend
+/// line — moved here from the Dashboard. [count] comes from the
+/// already-loaded employee list (like every other tile in this section),
+/// but the delta is a separate fetch reconstructed server-side from the
+/// audit log (see `getActiveEmployeeDelta`), so it's watched independently
+/// rather than derived from [count] itself.
+class _TotalEmployeesCard extends ConsumerWidget {
+  const _TotalEmployeesCard({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final deltaAsync = ref.watch(employeeActiveDeltaProvider);
+    final delta = deltaAsync.valueOrNull;
+    final secondaryValue = delta == null
+        ? null
+        : delta == 0
+        ? 'No change in last 30 days'
+        : '${delta > 0 ? '+' : ''}$delta in last 30 days';
+
+    return MetricCard(
+      label: 'Total Employees',
+      value: '$count',
+      secondaryValue: secondaryValue,
+      color: AppColors.primary,
+      icon: Icons.people_alt_outlined,
+    );
+  }
+}
+
+/// Work-mode breakdown for currently-active employees, plus active
+/// freelancer count alongside them — moved here from the Dashboard so
+/// "how people currently work" lives on the page about people, not the
+/// company-wide overview. The Freelancers tile is gated on `payroll.manage`
+/// (same as it was on the Dashboard) since `GET /freelancers` requires that
+/// permission server-side — a Team Lead has `employees.read` (this whole
+/// page) without it.
+class _WorkModeSection extends ConsumerWidget {
+  const _WorkModeSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final employeesAsync = ref.watch(employeeListProvider);
+    final authState = ref.watch(authControllerProvider);
+    final canViewFreelancers =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('payroll.manage');
+
+    final employees = employeesAsync.valueOrNull ?? const <Employee>[];
+    final activeCount = employees
+        .where((employee) => employee.employmentStatus == 'active')
+        .length;
+    final byWorkMode = <String, int>{};
+    for (final employee in employees) {
+      // Work mode only makes sense for people currently working, so resigned/
+      // terminated/on-leave/notice-period employees aren't counted here.
+      if (employee.employmentStatus == 'active') {
+        byWorkMode.update(
+          employee.workMode,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+      }
+    }
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        _TotalEmployeesCard(count: activeCount),
+        MetricCard(
+          label: 'On-site',
+          value: '${byWorkMode['on_site'] ?? 0}',
+          color: AppColors.textSecondary,
+          icon: Icons.apartment_outlined,
+        ),
+        MetricCard(
+          label: 'Remote',
+          value: '${byWorkMode['remote'] ?? 0}',
+          color: AppColors.textSecondary,
+          icon: Icons.home_outlined,
+        ),
+        MetricCard(
+          label: 'Hybrid',
+          value: '${byWorkMode['hybrid'] ?? 0}',
+          color: AppColors.textSecondary,
+          icon: Icons.sync_alt_outlined,
+        ),
+        if (canViewFreelancers) const _FreelancersWorkModeCard(),
+      ],
+    );
+  }
+}
+
+class _FreelancersWorkModeCard extends ConsumerWidget {
+  const _FreelancersWorkModeCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final freelancersAsync = ref.watch(freelancersListProvider);
+
+    return MetricCard(
+      label: 'Freelancers',
+      value: freelancersAsync.when(
+        data: (freelancers) =>
+            '${freelancers.where((f) => f.isActive).length}',
+        loading: () => '…',
+        error: (_, _) => '—',
+      ),
+      color: AppColors.textSecondary,
+      icon: Icons.badge_outlined,
     );
   }
 }
@@ -556,6 +749,15 @@ class _EmployeeCard extends StatelessWidget {
                     status: employee.employmentStatus,
                     dense: true,
                   ),
+                  EmploymentTypeBadge(
+                    employmentType: employee.employmentType,
+                    dense: true,
+                  ),
+                  if (employee.probationStatus != null)
+                    ProbationBadge(
+                      status: employee.probationStatus!,
+                      dense: true,
+                    ),
                   WorkModeBadge(workMode: employee.workMode, dense: true),
                   InfoChip(
                     icon: Icons.email_outlined,
