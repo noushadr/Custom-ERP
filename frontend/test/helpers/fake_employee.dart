@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:zera_erp/features/employee/domain/entities/add_employee_input.dart';
 import 'package:zera_erp/features/employee/domain/entities/asset.dart';
 import 'package:zera_erp/features/employee/domain/entities/audit_log_entry.dart';
+import 'package:zera_erp/features/employee/domain/entities/birthday_spotlight.dart';
 import 'package:zera_erp/features/employee/domain/entities/department.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee_document.dart';
@@ -138,6 +139,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.deleteDepartmentError,
     this.upcomingBirthdays = const [],
     this.getUpcomingBirthdaysError,
+    this.birthdaySpotlight = const BirthdaySpotlight(),
+    this.getBirthdaySpotlightError,
     this.upcomingWorkAnniversaries = const [],
     this.getUpcomingWorkAnniversariesError,
     this.payrollSummary,
@@ -155,6 +158,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final int activeEmployeeDelta;
   final List<UpcomingBirthday> upcomingBirthdays;
   final Object? getUpcomingBirthdaysError;
+  final BirthdaySpotlight birthdaySpotlight;
+  final Object? getBirthdaySpotlightError;
   final List<UpcomingWorkAnniversary> upcomingWorkAnniversaries;
   final Object? getUpcomingWorkAnniversariesError;
   final PayrollSummary? payrollSummary;
@@ -242,6 +247,12 @@ class FakeEmployeeRepository implements EmployeeRepository {
   Future<List<UpcomingBirthday>> getUpcomingBirthdays() async {
     if (getUpcomingBirthdaysError != null) throw getUpcomingBirthdaysError!;
     return upcomingBirthdays;
+  }
+
+  @override
+  Future<BirthdaySpotlight> getBirthdaySpotlight() async {
+    if (getBirthdaySpotlightError != null) throw getBirthdaySpotlightError!;
+    return birthdaySpotlight;
   }
 
   @override

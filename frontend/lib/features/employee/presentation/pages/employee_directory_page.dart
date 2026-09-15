@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/metric_card.dart';
+import '../../../../shared/widgets/pie_chart_panel.dart';
+import '../../../../shared/widgets/top_breakdown_panel.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../../shared/utils/date_format.dart';
-import '../../../freelancers/application/freelancers_providers.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../../performance_reviews/domain/entities/performance_review_summary.dart';
 import '../../application/employee_providers.dart';
@@ -72,76 +73,83 @@ class _EmployeeDirectoryPageState
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1040),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (canRead) ...[
-                const _WorkModeSection(),
-                const SizedBox(height: 16),
-              ],
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (canRead)
-                    _ViewModeToggle(
-                      value: _viewMode,
-                      onChanged: (mode) => setState(() => _viewMode = mode),
-                    ),
-                  if (canRead && _viewMode == _DirectoryViewMode.list)
-                    SizedBox(
-                      width: 280,
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value.trim()),
-                        decoration: InputDecoration(
-                          hintText: 'Search employees',
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          suffixIcon: _searchQuery.isEmpty
-                              ? null
-                              : IconButton(
-                                  icon: const Icon(Icons.close, size: 18),
-                                  onPressed: () => setState(() {
-                                    _searchController.clear();
-                                    _searchQuery = '';
-                                  }),
-                                ),
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                  if (canRead && _viewMode == _DirectoryViewMode.list)
-                    _StatusFilterRow(
-                      value: _statusFilter,
-                      onChanged: (value) =>
-                          setState(() => _statusFilter = value),
-                    ),
-                  if (canManage)
-                    ElevatedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const AddEmployeePage(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.person_add_outlined, size: 18),
-                      label: const Text('Add Employee'),
-                    ),
+          // The whole page scrolls as one unit (matching every other page
+          // in this app, e.g. the Dashboard) rather than splitting into a
+          // fixed header + independently-scrolling list — the stats row
+          // grew tall enough (Avg. Profile Completion/Notice Period/On
+          // Leave/On Probation/Pending Performance Reviews plus the
+          // department pie chart) that a fixed, non-scrolling header no
+          // longer reliably fits above the fold on real screen sizes.
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (canRead) ...[
+                  const _EmployeeStatsSection(),
+                  const SizedBox(height: 16),
                 ],
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: canRead
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (canRead)
+                      _ViewModeToggle(
+                        value: _viewMode,
+                        onChanged: (mode) => setState(() => _viewMode = mode),
+                      ),
+                    if (canRead && _viewMode == _DirectoryViewMode.list)
+                      SizedBox(
+                        width: 280,
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (value) =>
+                              setState(() => _searchQuery = value.trim()),
+                          decoration: InputDecoration(
+                            hintText: 'Search employees',
+                            prefixIcon: const Icon(Icons.search, size: 20),
+                            suffixIcon: _searchQuery.isEmpty
+                                ? null
+                                : IconButton(
+                                    icon: const Icon(Icons.close, size: 18),
+                                    onPressed: () => setState(() {
+                                      _searchController.clear();
+                                      _searchQuery = '';
+                                    }),
+                                  ),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    if (canRead && _viewMode == _DirectoryViewMode.list)
+                      _StatusFilterRow(
+                        value: _statusFilter,
+                        onChanged: (value) =>
+                            setState(() => _statusFilter = value),
+                      ),
+                    if (canManage)
+                      ElevatedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AddEmployeePage(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.person_add_outlined, size: 18),
+                        label: const Text('Add Employee'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                canRead
                     ? _DirectoryBody(
                         viewMode: _viewMode,
                         searchQuery: _searchQuery,
                         statusFilter: _statusFilter,
                       )
                     : const _NoDirectoryAccess(),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -189,38 +197,17 @@ class _DirectoryBody extends ConsumerWidget {
         }
 
         if (viewMode == _DirectoryViewMode.hierarchy) {
-          final shown = employees
-              .where((employee) => employee.isCurrentEmployee)
-              .length;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _DirectorySummary(employees: employees, shown: shown),
-              const SizedBox(height: 14),
-              Expanded(child: EmployeeHierarchyView(employees: employees)),
-            ],
-          );
+          return EmployeeHierarchyView(employees: employees);
         }
 
         final filtered = _filterEmployees(employees, searchQuery, statusFilter);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _DirectorySummary(employees: employees, shown: filtered.length),
-            const SizedBox(height: 14),
-            Expanded(
-              child: filtered.isEmpty
-                  ? const Center(
-                      child: Text('No employees match your search.'),
-                    )
-                  : _EmployeeList(
-                      employees: filtered,
-                      canViewPerformance: canViewPerformance,
-                      reviewSummaries: reviewSummaries,
-                    ),
-            ),
-          ],
-        );
+        return filtered.isEmpty
+            ? const Center(child: Text('No employees match your search.'))
+            : _EmployeeList(
+                employees: filtered,
+                canViewPerformance: canViewPerformance,
+                reviewSummaries: reviewSummaries,
+              );
       },
     );
   }
@@ -365,7 +352,6 @@ class _StatusFilterRow extends StatelessWidget {
         initialValue: value,
         isExpanded: true,
         decoration: InputDecoration(
-          labelText: 'Employment status',
           isDense: true,
           suffixIcon: value == null
               ? null
@@ -382,75 +368,6 @@ class _StatusFilterRow extends StatelessWidget {
         ],
         onChanged: onChanged,
       ),
-    );
-  }
-}
-
-/// A "N employees" (or "Showing N of M") headline, followed by the same
-/// employment-status breakdown the dashboard shows — as plain, well-spaced
-/// text rather than another row of boxes, since this page already has its
-/// own card grid below. Work-mode breakdown lives in [_WorkModeSection]
-/// above instead, as boxes (moved here from the Dashboard).
-class _DirectorySummary extends StatelessWidget {
-  const _DirectorySummary({required this.employees, required this.shown});
-
-  final List<Employee> employees;
-  final int shown;
-
-  @override
-  Widget build(BuildContext context) {
-    final total = employees.length;
-    final byStatus = <String, int>{};
-    for (final employee in employees) {
-      byStatus.update(
-        employee.employmentStatus,
-        (count) => count + 1,
-        ifAbsent: () => 1,
-      );
-    }
-
-    final headline = shown == total
-        ? '$total ${total == 1 ? 'employee' : 'employees'}'
-        : 'Showing $shown of $total employees';
-    final statLabelStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          headline,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 18,
-          runSpacing: 6,
-          children: [
-            Text('Active: ${byStatus['active'] ?? 0}', style: statLabelStyle),
-            Text(
-              'On Leave: ${byStatus['on_leave'] ?? 0}',
-              style: statLabelStyle,
-            ),
-            Text(
-              'Notice Period: ${byStatus['notice_period'] ?? 0}',
-              style: statLabelStyle,
-            ),
-            Text(
-              'Resigned: ${byStatus['resigned'] ?? 0}',
-              style: statLabelStyle,
-            ),
-            Text(
-              'Terminated: ${byStatus['terminated'] ?? 0}',
-              style: statLabelStyle,
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -483,32 +400,43 @@ class _TotalEmployeesCard extends ConsumerWidget {
       secondaryValue: secondaryValue,
       color: AppColors.primary,
       icon: Icons.people_alt_outlined,
+      dense: true,
     );
   }
 }
 
-/// Work-mode breakdown for currently-active employees, plus active
-/// freelancer count alongside them — moved here from the Dashboard so
-/// "how people currently work" lives on the page about people, not the
-/// company-wide overview. The Freelancers tile is gated on `payroll.manage`
-/// (same as it was on the Dashboard) since `GET /freelancers` requires that
-/// permission server-side — a Team Lead has `employees.read` (this whole
-/// page) without it.
-class _WorkModeSection extends ConsumerWidget {
-  const _WorkModeSection();
+/// The page's whole stats row — kept deliberately compact (every tile
+/// `dense`) since it now holds several tiles instead of the two or three a
+/// full-size `MetricCard` row comfortably fits. On-site/Remote/Hybrid,
+/// previously three separate tiles, are combined into one [_WorkModeCard]
+/// here; Freelancers was dropped entirely (freelancers aren't `Employee`
+/// rows, so a headcount page isn't the right place for them — Payroll's own
+/// stats already cover them). Avg. Profile Completion and Pending
+/// Performance Reviews moved in from the Dashboard's own Overview section —
+/// Notice Period was also part of that move, but this page already had its
+/// own Notice Period tile (below), so nothing new was needed for it.
+class _EmployeeStatsSection extends ConsumerWidget {
+  const _EmployeeStatsSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final employeesAsync = ref.watch(employeeListProvider);
-    final authState = ref.watch(authControllerProvider);
-    final canViewFreelancers =
-        authState is AuthAuthenticated &&
-        authState.user.hasPermission('payroll.manage');
-
     final employees = employeesAsync.valueOrNull ?? const <Employee>[];
+    final authState = ref.watch(authControllerProvider);
+    final canViewPerformance =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('performance.manage');
+
     final activeCount = employees
         .where((employee) => employee.employmentStatus == 'active')
         .length;
+    final avgProfileCompletion = employees.isEmpty
+        ? 0
+        : (employees
+                      .map((e) => e.profileCompletionPercentage)
+                      .reduce((a, b) => a + b) /
+                  employees.length)
+              .round();
     final byWorkMode = <String, int>{};
     for (final employee in employees) {
       // Work mode only makes sense for people currently working, so resigned/
@@ -521,53 +449,199 @@ class _WorkModeSection extends ConsumerWidget {
         );
       }
     }
+    final noticePeriodCount = employees
+        .where((employee) => employee.employmentStatus == 'notice_period')
+        .length;
+    final onLeaveCount = employees
+        .where((employee) => employee.employmentStatus == 'on_leave')
+        .length;
+    final onProbationCount = employees
+        .where((employee) => employee.probationStatus == 'on_probation')
+        .length;
 
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+    // Every tile forced to the same fixed width (`_StatTile`) so the left
+    // column reads as a uniform grid regardless of each tile's own natural
+    // content width — `_WorkModeCard`'s three icon+count pairs need the
+    // most room of any tile, so this width is sized to fit that one
+    // comfortably rather than the (narrower) plain MetricCards.
+    final tiles = <Widget>[
+      _TotalEmployeesCard(count: activeCount),
+      MetricCard(
+        label: 'Avg. Profile Completion',
+        value: '$avgProfileCompletion%',
+        color: AppColors.accentTeal,
+        icon: Icons.donut_large_outlined,
+        dense: true,
+      ),
+      _WorkModeCard(byWorkMode: byWorkMode),
+      MetricCard(
+        label: 'Notice Period',
+        value: '$noticePeriodCount',
+        color: AppColors.secondary,
+        icon: Icons.event_busy_outlined,
+        dense: true,
+      ),
+      MetricCard(
+        label: 'On Leave',
+        value: '$onLeaveCount',
+        color: AppColors.warning,
+        icon: Icons.beach_access_outlined,
+        dense: true,
+      ),
+      MetricCard(
+        label: 'On Probation',
+        value: '$onProbationCount',
+        color: AppColors.accentTeal,
+        icon: Icons.hourglass_bottom_outlined,
+        dense: true,
+      ),
+      if (canViewPerformance) const _PendingReviewsCard(),
+    ];
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _TotalEmployeesCard(count: activeCount),
-        MetricCard(
-          label: 'On-site',
-          value: '${byWorkMode['on_site'] ?? 0}',
-          color: AppColors.textSecondary,
-          icon: Icons.apartment_outlined,
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final tile in tiles) _StatTile(child: tile),
+            ],
+          ),
         ),
-        MetricCard(
-          label: 'Remote',
-          value: '${byWorkMode['remote'] ?? 0}',
-          color: AppColors.textSecondary,
-          icon: Icons.home_outlined,
+        const SizedBox(width: 12),
+        SizedBox(
+          width: 260,
+          child: PieChartPanel(
+            title: 'Employees by Department',
+            icon: Icons.apartment_outlined,
+            compact: true,
+            counts: computeTopCounts(
+              employees.where((e) => e.employmentStatus == 'active').toList(),
+              (e) => e.department?.name,
+              limit: 20,
+            ),
+          ),
         ),
-        MetricCard(
-          label: 'Hybrid',
-          value: '${byWorkMode['hybrid'] ?? 0}',
-          color: AppColors.textSecondary,
-          icon: Icons.sync_alt_outlined,
-        ),
-        if (canViewFreelancers) const _FreelancersWorkModeCard(),
       ],
     );
   }
 }
 
-class _FreelancersWorkModeCard extends ConsumerWidget {
-  const _FreelancersWorkModeCard();
+/// Forces every stat tile in [_EmployeeStatsSection]'s left column to the
+/// same fixed width, whatever its own natural content width would have
+/// been — a plain `MetricCard`'s dense minimum (120) and `_WorkModeCard`'s
+/// three-pair row (its own widest content) would otherwise render at
+/// visibly different sizes side by side.
+class _StatTile extends StatelessWidget {
+  const _StatTile({required this.child});
+
+  final Widget child;
+
+  static const _width = 150.0;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(width: _width, child: child);
+}
+
+/// Company-wide count of reviews still awaiting a manager's/HR's
+/// completion — moved here from the Dashboard's own Overview section
+/// (identical computation/providers). A separate async fetch from the
+/// (already-loaded) employee list, so it renders its own loading/error
+/// value rather than blocking the rest of the stats row.
+class _PendingReviewsCard extends ConsumerWidget {
+  const _PendingReviewsCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final freelancersAsync = ref.watch(freelancersListProvider);
+    final reviewsAsync = ref.watch(allPendingPerformanceReviewsProvider);
+    final deltaAsync = ref.watch(pendingReviewsDeltaProvider);
+    final delta = deltaAsync.valueOrNull;
+    final secondaryValue = delta == null
+        ? null
+        : delta == 0
+        ? 'No change in last 7 days'
+        : '${delta > 0 ? '+' : ''}$delta in last 7 days';
 
     return MetricCard(
-      label: 'Freelancers',
-      value: freelancersAsync.when(
-        data: (freelancers) =>
-            '${freelancers.where((f) => f.isActive).length}',
+      label: 'Pending Performance Reviews',
+      value: reviewsAsync.when(
+        data: (reviews) => '${reviews.length}',
         loading: () => '…',
         error: (_, _) => '—',
       ),
-      color: AppColors.textSecondary,
-      icon: Icons.badge_outlined,
+      secondaryValue: secondaryValue,
+      color: AppColors.secondary,
+      icon: Icons.rate_review_outlined,
+      dense: true,
+    );
+  }
+}
+
+/// On-site/Remote/Hybrid, combined into one compact tile (previously three
+/// separate `MetricCard`s) — a single small icon+count per work mode inside
+/// one card, rather than a headline number.
+class _WorkModeCard extends StatelessWidget {
+  const _WorkModeCard({required this.byWorkMode});
+
+  final Map<String, int> byWorkMode;
+
+  static const _modes = <(String key, String label, IconData icon)>[
+    ('on_site', 'On-site', Icons.apartment_outlined),
+    ('remote', 'Remote', Icons.home_outlined),
+    ('hybrid', 'Hybrid', Icons.sync_alt_outlined),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('work-mode-card'),
+      constraints: const BoxConstraints(minWidth: 150),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.textSecondary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Work Mode',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (key, label, icon) in _modes) ...[
+                Tooltip(
+                  message: label,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${byWorkMode[key] ?? 0}',
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+            ]..removeLast(),
+          ),
+        ],
+      ),
     );
   }
 }

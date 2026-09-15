@@ -15,12 +15,19 @@ class MetricCard extends StatelessWidget {
     this.valueFontSize,
     this.valueSpans,
     this.onTap,
+    this.dense = false,
   });
 
   final String label;
   final String value;
   final Color color;
   final IconData? icon;
+
+  /// A smaller variant (tighter padding, smaller icon/value text) — for a
+  /// page whose stats row needs to stay compact, e.g. because it holds more
+  /// tiles than the default size comfortably fits. Cosmetic only; every
+  /// other prop behaves the same.
+  final bool dense;
 
   /// When set, the whole tile becomes tappable (e.g. the Dashboard's Notice
   /// Period tile jumping to the filtered Employees list).
@@ -49,25 +56,31 @@ class MetricCard extends StatelessWidget {
       label,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: Theme.of(
-        context,
-      ).textTheme.titleSmall?.copyWith(color: AppColors.textPrimary),
+      style:
+          (dense
+                  ? Theme.of(context).textTheme.bodySmall
+                  : Theme.of(context).textTheme.titleSmall)
+              ?.copyWith(color: AppColors.textPrimary),
     );
-    final baseValueStyle = Theme.of(context).textTheme.headlineSmall?.copyWith(
-      color: color,
-      fontWeight: FontWeight.w700,
-      fontSize: valueFontSize,
-    );
+    final baseValueStyle =
+        (dense
+                ? Theme.of(context).textTheme.titleLarge
+                : Theme.of(context).textTheme.headlineSmall)
+            ?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: valueFontSize,
+            );
     final valueText = valueSpans != null
         ? Text.rich(TextSpan(style: baseValueStyle, children: valueSpans))
         : Text(value, style: baseValueStyle);
 
     final content = Container(
-      constraints: const BoxConstraints(minWidth: 150),
-      padding: const EdgeInsets.all(14),
+      constraints: BoxConstraints(minWidth: dense ? 120 : 150),
+      padding: EdgeInsets.all(dense ? 10 : 14),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(dense ? 13 : 16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,17 +88,17 @@ class MetricCard extends StatelessWidget {
         children: [
           if (icon != null) ...[
             Container(
-              padding: const EdgeInsets.all(7),
+              padding: EdgeInsets.all(dense ? 5 : 7),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(dense ? 8 : 10),
               ),
-              child: Icon(icon, size: 16, color: color),
+              child: Icon(icon, size: dense ? 13 : 16, color: color),
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: dense ? 6 : 10),
           ],
           labelText,
-          const SizedBox(height: 4),
+          SizedBox(height: dense ? 2 : 4),
           valueText,
           if (secondaryValue != null) ...[
             const SizedBox(height: 1),
@@ -103,9 +116,9 @@ class MetricCard extends StatelessWidget {
     if (onTap == null) return content;
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(dense ? 13 : 16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(dense ? 13 : 16),
         onTap: onTap,
         child: content,
       ),
