@@ -813,6 +813,60 @@ describe('EmployeesService', () => {
     });
   });
 
+  describe('getBirthdaySpotlight', () => {
+    it('picks the closest past birthday as last and the closest future one as upcoming', async () => {
+      const longPassed = buildEmployee({
+        id: 'employee-long-passed',
+        dateOfBirth: isoDobInDays(-30),
+      });
+      const recentlyPassed = buildEmployee({
+        id: 'employee-recently-passed',
+        dateOfBirth: isoDobInDays(-2),
+      });
+      const soon = buildEmployee({
+        id: 'employee-soon',
+        dateOfBirth: isoDobInDays(5),
+      });
+      const farAway = buildEmployee({
+        id: 'employee-far-away',
+        dateOfBirth: isoDobInDays(60),
+      });
+      employeeRepository.findAll.mockResolvedValue([
+        longPassed,
+        recentlyPassed,
+        soon,
+        farAway,
+      ]);
+
+      const result = await service.getBirthdaySpotlight();
+
+      expect(result.last?.employeeId).toBe('employee-recently-passed');
+      expect(result.upcoming?.employeeId).toBe('employee-soon');
+    });
+
+    it("treats today's birthday as upcoming, not last", async () => {
+      const today = buildEmployee({
+        id: 'employee-today',
+        dateOfBirth: isoDobInDays(0),
+      });
+      employeeRepository.findAll.mockResolvedValue([today]);
+
+      const result = await service.getBirthdaySpotlight();
+
+      expect(result.upcoming?.employeeId).toBe('employee-today');
+      expect(result.last).toBeNull();
+    });
+
+    it('returns null for either side with no active employee birthdays on file', async () => {
+      employeeRepository.findAll.mockResolvedValue([]);
+
+      const result = await service.getBirthdaySpotlight();
+
+      expect(result.last).toBeNull();
+      expect(result.upcoming).toBeNull();
+    });
+  });
+
   describe('getUpcomingWorkAnniversaries', () => {
     it('returns active employees within the window, soonest first', async () => {
       const soon = buildEmployee({

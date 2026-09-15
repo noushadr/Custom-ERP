@@ -3,14 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
+import 'package:zera_erp/features/announcements/application/announcement_providers.dart';
+import 'package:zera_erp/features/announcements/domain/entities/today_announcements.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/email/application/email_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/employee/domain/entities/birthday_spotlight.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
+import 'package:zera_erp/features/employee/domain/entities/upcoming_birthday.dart';
 import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
 import 'package:zera_erp/features/goals/application/goal_providers.dart';
+import 'package:zera_erp/features/holidays/application/holiday_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leads/application/leads_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
@@ -21,17 +26,16 @@ import 'package:zera_erp/features/performance_reviews/application/performance_re
 import 'package:zera_erp/features/requests/application/request_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/features/tasks/domain/entities/task_status.dart';
-import 'package:zera_erp/shared/models/named_ref.dart';
-import 'package:zera_erp/shared/widgets/metric_card.dart';
-import 'package:zera_erp/shared/widgets/monthly_bar_chart.dart';
 
 import 'package:zera_erp/main.dart';
+import 'helpers/fake_announcements.dart';
 import 'helpers/fake_auth.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_email.dart';
 import 'helpers/fake_employee.dart';
 import 'helpers/fake_freelancers.dart';
 import 'helpers/fake_goal.dart';
+import 'helpers/fake_holiday.dart';
 import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leads.dart';
 import 'helpers/fake_leave.dart';
@@ -54,6 +58,8 @@ Widget _authenticatedApp({
   FakeGoalRepository? goalRepository,
   FakeEmailRepository? emailRepository,
   FakePayrollRepository? payrollRepository,
+  FakeAnnouncementsRepository? announcementsRepository,
+  FakeHolidayRepository? holidayRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -68,6 +74,12 @@ Widget _authenticatedApp({
             ),
       ),
       noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
+      announcementsRepositoryProvider.overrideWithValue(
+        announcementsRepository ?? FakeAnnouncementsRepository(),
+      ),
+      holidayRepositoryProvider.overrideWithValue(
+        holidayRepository ?? FakeHolidayRepository(),
+      ),
       requestRepositoryProvider.overrideWithValue(
         requestRepository ?? FakeRequestRepository(),
       ),
@@ -160,27 +172,8 @@ void main() {
     expect(find.text('Set by Muhammad Bilal Rathore'), findsOneWidget);
   });
 
-  testWidgets('renders the admin dashboard stats for a Super Admin', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      _authenticatedApp(
-        user: const AuthUser(
-          id: 'admin-1',
-          email: 'admin@zeracreative.com',
-          role: 'Super Admin',
-          permissions: [],
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Avg. Profile Completion'), findsOneWidget);
-  });
-
   testWidgets(
-    'admin dashboard shows a New Hires by month chart, counting only '
-    'hires within the last 12 months',
+    'admin dashboard shows the current Employee of the Month',
     (WidgetTester tester) async {
       const admin = AuthUser(
         id: 'admin-1',
@@ -188,48 +181,55 @@ void main() {
         role: 'Super Admin',
         permissions: [],
       );
-      final recentHireDate = DateTime.now().subtract(const Duration(days: 10));
-      final oldHireDate = DateTime.now().subtract(const Duration(days: 400));
-      String iso(DateTime date) => date.toIso8601String().substring(0, 10);
 
       await tester.pumpWidget(
         _authenticatedApp(
           user: admin,
-          employeeRepository: FakeEmployeeRepository(
-            employees: [
-              buildTestEmployee(
-                id: 'employee-1',
-                joiningDate: iso(recentHireDate),
+          announcementsRepository: FakeAnnouncementsRepository(
+            today: const TodayAnnouncements(
+              birthdays: [],
+              workAnniversaries: [],
+              holiday: null,
+              notices: [],
+              employeeOfTheMonth: TodayEmployeeOfMonth(
+                employeeId: 'employee-1',
+                fullName: 'Muhammad Asad Rathore',
               ),
-              buildTestEmployee(
-                id: 'employee-2',
-                joiningDate: iso(oldHireDate),
-              ),
-            ],
+            ),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('New Hires (Last 12 Months)'), findsOneWidget);
-      // Only the recent hire counts — the 400-day-old one falls outside the
-      // 12-month window and shouldn't be reflected in any bar's count.
-      // Scoped to the chart itself, since other pre-built IndexedStack pages
-      // (see this file's own notes on that) can coincidentally show a bare
-      // "1" elsewhere on screen.
+      expect(find.text('Employee of the Month'), findsOneWidget);
+      expect(find.text('Muhammad Asad Rathore'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "admin dashboard shows 'No Employee of the Month right now.' when none "
+    'is currently active',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+
+      await tester.pumpWidget(_authenticatedApp(user: admin));
+      await tester.pumpAndSettle();
+
       expect(
-        find.descendant(
-          of: find.byType(MonthlyBarChart),
-          matching: find.text('1'),
-        ),
+        find.text('No Employee of the Month right now.'),
         findsOneWidget,
       );
     },
   );
 
   testWidgets(
-    'admin dashboard shows an Employees by Department breakdown, counting '
-    'only active employees',
+    'admin dashboard shows the most recent past birthday and the soonest '
+    'upcoming one',
     (WidgetTester tester) async {
       const admin = AuthUser(
         id: 'admin-1',
@@ -242,143 +242,37 @@ void main() {
         _authenticatedApp(
           user: admin,
           employeeRepository: FakeEmployeeRepository(
-            employees: [
-              buildTestEmployee(
-                id: 'employee-1',
-                department: const NamedRef(id: 'dept-1', name: 'Engineering'),
-                employmentStatus: 'active',
+            employees: [buildTestEmployee()],
+            birthdaySpotlight: const BirthdaySpotlight(
+              last: UpcomingBirthday(
+                employeeId: 'employee-2',
+                fullName: 'Aamna Irfan',
+                dateOfBirth: '1997-08-13',
+                daysUntil: -2,
               ),
-              buildTestEmployee(
-                id: 'employee-2',
-                department: const NamedRef(id: 'dept-1', name: 'Engineering'),
-                employmentStatus: 'active',
+              upcoming: UpcomingBirthday(
+                employeeId: 'employee-3',
+                fullName: 'Babar Hussain',
+                dateOfBirth: '1995-09-20',
+                daysUntil: 5,
               ),
-              buildTestEmployee(
-                id: 'employee-3',
-                department: const NamedRef(id: 'dept-1', name: 'Engineering'),
-                employmentStatus: 'resigned',
-              ),
-            ],
+            ),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Employees by Department'), findsOneWidget);
-      expect(find.text('Engineering'), findsOneWidget);
-      // Only the 2 active Engineering employees count — the resigned one
-      // doesn't.
-      expect(find.text('2'), findsOneWidget);
+      expect(find.text('Last Birthday'), findsOneWidget);
+      expect(find.text('Aamna Irfan'), findsOneWidget);
+      expect(find.text('Aug 13 · 2 days ago'), findsOneWidget);
+      expect(find.text('Upcoming Birthday'), findsOneWidget);
+      expect(find.text('Babar Hussain'), findsOneWidget);
+      expect(find.text('Sep 20 · in 5 days'), findsOneWidget);
     },
   );
 
   testWidgets(
-    "tapping the Notice Period tile jumps to Employees, pre-filtered to "
-    'employees on notice period',
-    (WidgetTester tester) async {
-      const admin = AuthUser(
-        id: 'admin-1',
-        email: 'admin@zeracreative.com',
-        role: 'Super Admin',
-        permissions: ['employees.read'],
-      );
-      // The Employees page's header (Work Mode stats + status filter/search
-      // row) needs more height than the default test surface once landed
-      // there pre-filtered.
-      tester.view.physicalSize = const Size(900, 1200);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: admin,
-          employeeRepository: FakeEmployeeRepository(
-            employees: [
-              buildTestEmployee(id: 'employee-1', employmentStatus: 'active'),
-              buildTestEmployee(
-                id: 'employee-2',
-                fullName: 'Notice Person',
-                email: 'notice.person@zeracreative.com',
-                employmentStatus: 'notice_period',
-              ),
-            ],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(
-        find.byWidgetPredicate(
-          (w) => w is MetricCard && w.label == 'Notice Period',
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Landed on Employees, showing only the notice-period employee.
-      expect(find.text('Notice Person'), findsOneWidget);
-      expect(find.text('Jane Doe'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'admin dashboard shows the pending performance reviews count for a performance.manage holder',
-    (WidgetTester tester) async {
-      const admin = AuthUser(
-        id: 'admin-1',
-        email: 'admin@zeracreative.com',
-        role: 'Super Admin',
-        permissions: ['performance.manage'],
-      );
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: admin,
-          performanceReviewRepository: FakePerformanceReviewRepository(
-            allPendingReviews: [
-              buildTestPerformanceReview(id: 'review-1'),
-              buildTestPerformanceReview(id: 'review-2'),
-            ],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Pending Performance Reviews'), findsOneWidget);
-      expect(find.text('2'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    "shows the Pending Performance Reviews tile's weekly delta "
-    '(e.g. 15 -> 14 shows -1)',
-    (WidgetTester tester) async {
-      const admin = AuthUser(
-        id: 'admin-1',
-        email: 'admin@zeracreative.com',
-        role: 'Super Admin',
-        permissions: ['performance.manage'],
-      );
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: admin,
-          performanceReviewRepository: FakePerformanceReviewRepository(
-            allPendingReviews: [buildTestPerformanceReview(id: 'review-1')],
-            pendingReviewsDelta: -1,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final pendingCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate(
-          (w) => w is MetricCard && w.label == 'Pending Performance Reviews',
-        ),
-      );
-      expect(pendingCard.secondaryValue, '-1 in last 7 days');
-    },
-  );
-
-  testWidgets(
-    'hides the pending performance reviews stat from an admin dashboard viewer without performance.manage',
+    'admin dashboard shows the soonest upcoming public holiday',
     (WidgetTester tester) async {
       const admin = AuthUser(
         id: 'admin-1',
@@ -386,10 +280,41 @@ void main() {
         role: 'Super Admin',
         permissions: [],
       );
-      await tester.pumpWidget(_authenticatedApp(user: admin));
+      final soon = DateTime.now().add(const Duration(days: 10));
+      final soonIso =
+          '${soon.year.toString().padLeft(4, '0')}-'
+          '${soon.month.toString().padLeft(2, '0')}-'
+          '${soon.day.toString().padLeft(2, '0')}';
+      final past = DateTime.now().subtract(const Duration(days: 10));
+      final pastIso =
+          '${past.year.toString().padLeft(4, '0')}-'
+          '${past.month.toString().padLeft(2, '0')}-'
+          '${past.day.toString().padLeft(2, '0')}';
+
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          holidayRepository: FakeHolidayRepository(
+            holidays: [
+              buildTestHoliday(
+                id: 'holiday-past',
+                name: 'Already Happened',
+                date: pastIso,
+              ),
+              buildTestHoliday(
+                id: 'holiday-soon',
+                name: 'Independence Day',
+                date: soonIso,
+              ),
+            ],
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('Pending Performance Reviews'), findsNothing);
+      expect(find.text('Upcoming Public Holiday'), findsOneWidget);
+      expect(find.text('Independence Day'), findsOneWidget);
+      expect(find.text('Already Happened'), findsNothing);
     },
   );
 
@@ -623,7 +548,7 @@ void main() {
 
       expect(find.text('Dashboard'), findsWidgets);
       expect(find.text('User Dashboard'), findsNothing);
-      expect(find.text('Avg. Profile Completion'), findsOneWidget);
+      expect(find.text('Employee of the Month'), findsOneWidget);
     },
   );
 
@@ -635,7 +560,7 @@ void main() {
 
       expect(find.text('User Dashboard'), findsWidgets);
       expect(find.text('Dashboard'), findsNothing);
-      expect(find.text('Avg. Profile Completion'), findsNothing);
+      expect(find.text('Employee of the Month'), findsNothing);
     },
   );
 

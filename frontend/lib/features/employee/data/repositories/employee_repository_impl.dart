@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../domain/entities/add_employee_input.dart';
 import '../../domain/entities/asset.dart';
 import '../../domain/entities/audit_log_entry.dart';
+import '../../domain/entities/birthday_spotlight.dart';
 import '../../domain/entities/department.dart';
 import '../../domain/entities/education_record.dart';
 import '../../domain/entities/employee.dart';
@@ -37,6 +38,10 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   @override
   Future<List<UpcomingBirthday>> getUpcomingBirthdays() =>
       _guard(() => _remoteDataSource.getUpcomingBirthdays());
+
+  @override
+  Future<BirthdaySpotlight> getBirthdaySpotlight() =>
+      _guard(() => _remoteDataSource.getBirthdaySpotlight());
 
   @override
   Future<List<UpcomingWorkAnniversary>> getUpcomingWorkAnniversaries() =>

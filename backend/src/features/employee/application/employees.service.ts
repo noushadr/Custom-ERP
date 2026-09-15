@@ -85,6 +85,7 @@ import {
   DepartmentPayrollTotal,
   PayrollSummaryResponse,
 } from './payroll-summary-response.interface';
+import { BirthdaySpotlightResponse } from './birthday-spotlight-response.interface';
 import { UpcomingBirthdayResponse } from './upcoming-birthday-response.interface';
 import { UpcomingWorkAnniversaryResponse } from './upcoming-work-anniversary-response.interface';
 
@@ -264,6 +265,25 @@ export class EmployeesService {
         dateOfBirth: employee.dateOfBirth!,
         daysUntil,
       }));
+  }
+
+  /** The single most-recently-passed and single soonest-upcoming birthday
+   * among active employees, for the Admin Dashboard's "Last Birthday"/
+   * "Upcoming Birthday" cards — reuses `getUpcomingBirthdays`'s own date
+   * math rather than recomputing it, just called with a window wide enough
+   * (`closestAnnualOccurrence` never returns more than ~183 days out) to
+   * never truncate either side. */
+  async getBirthdaySpotlight(): Promise<BirthdaySpotlightResponse> {
+    const all = await this.getUpcomingBirthdays(366, 366);
+    const past = all.filter((b) => b.daysUntil < 0);
+    const future = all.filter((b) => b.daysUntil >= 0);
+    return {
+      // `all` is sorted ascending by daysUntil, so the last past entry is
+      // the one closest to today (most recent) and the first future entry
+      // is the soonest upcoming one.
+      last: past.length > 0 ? past[past.length - 1] : null,
+      upcoming: future.length > 0 ? future[0] : null,
+    };
   }
 
   /** Active employees marking a work anniversary (1+ full years of service)

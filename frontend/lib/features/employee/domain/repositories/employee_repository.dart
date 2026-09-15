@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import '../entities/add_employee_input.dart';
 import '../entities/asset.dart';
 import '../entities/audit_log_entry.dart';
+import '../entities/birthday_spotlight.dart';
 import '../entities/department.dart';
 import '../entities/education_record.dart';
 import '../entities/employee.dart';
@@ -25,6 +26,10 @@ abstract interface class EmployeeRepository {
   /// Employees with a birthday in the next 7 days, soonest first. Requires
   /// `employees.manage`.
   Future<List<UpcomingBirthday>> getUpcomingBirthdays();
+
+  /// The single most-recently-passed and single soonest-upcoming birthday
+  /// among active employees. Requires `employees.manage`.
+  Future<BirthdaySpotlight> getBirthdaySpotlight();
 
   /// Employees marking a work anniversary in the next 7 days, soonest first.
   /// Requires `employees.manage`.

@@ -6,6 +6,7 @@ import '../../domain/entities/update_employee_input.dart';
 import '../../domain/entities/update_my_profile_input.dart';
 import '../models/asset_model.dart';
 import '../models/audit_log_entry_model.dart';
+import '../models/birthday_spotlight_model.dart';
 import '../models/department_model.dart';
 import '../models/education_record_model.dart';
 import '../models/employee_document_model.dart';
@@ -47,6 +48,13 @@ class EmployeeRemoteDataSource {
         .cast<Map<String, dynamic>>()
         .map(UpcomingBirthdayModel.fromJson)
         .toList();
+  }
+
+  Future<BirthdaySpotlightModel> getBirthdaySpotlight() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/employees/birthdays/spotlight',
+    );
+    return BirthdaySpotlightModel.fromJson(response.data!);
   }
 
   Future<List<UpcomingWorkAnniversaryModel>> getUpcomingWorkAnniversaries() async {

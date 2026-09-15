@@ -4,6 +4,7 @@ import '../data/datasources/employee_remote_data_source.dart';
 import '../data/repositories/employee_repository_impl.dart';
 import '../domain/entities/asset.dart';
 import '../domain/entities/audit_log_entry.dart';
+import '../domain/entities/birthday_spotlight.dart';
 import '../domain/entities/department.dart';
 import '../domain/entities/education_record.dart';
 import '../domain/entities/employee.dart';
@@ -48,6 +49,13 @@ final upcomingBirthdaysProvider =
       ref.watch(authControllerProvider);
       return ref.watch(employeeRepositoryProvider).getUpcomingBirthdays();
     });
+
+final birthdaySpotlightProvider = FutureProvider.autoDispose<BirthdaySpotlight>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getBirthdaySpotlight();
+});
 
 final upcomingWorkAnniversariesProvider =
     FutureProvider.autoDispose<List<UpcomingWorkAnniversary>>((ref) {
