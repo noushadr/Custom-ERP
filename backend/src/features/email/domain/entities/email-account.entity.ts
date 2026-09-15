@@ -1,6 +1,5 @@
-import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
+import { Column, Entity } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
-import { Employee } from '../../../employee/domain/entities/employee.entity';
 
 /** One employee's real, working cPanel mailbox — created manually by
  * Admin/HR in cPanel first, then its credentials are entered here so the
@@ -10,12 +9,15 @@ import { Employee } from '../../../employee/domain/entities/employee.entity';
  * text past the request that set it. */
 @Entity('email_accounts')
 export class EmailAccount extends BaseEntity {
-  @Column({ unique: true })
+  // Explicit `type: 'uuid'` needed now that this isn't also a relation's
+  // join column — a bare `@Column({ unique: true })` infers `varchar` from
+  // the TS `string` type, which would otherwise make `synchronize: true`
+  // attempt a live column-type ALTER against real rows on next boot (it
+  // did, and failed — see CLAUDE.md's cleanup entry). `Employee.id` is a
+  // `uuid` primary key, and this column always held real UUIDs; this keeps
+  // the actual schema unchanged.
+  @Column({ type: 'uuid', unique: true })
   employeeId: string;
-
-  @OneToOne(() => Employee, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'employeeId' })
-  employee: Employee;
 
   @Column()
   emailAddress: string;

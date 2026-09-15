@@ -75,8 +75,8 @@ void main() {
   });
 
   testWidgets(
-    'shows only a plain "Package" section — never "SEO Details" or its '
-    'other fields — regardless of the project\'s actual service',
+    'shows only a plain "Package" section — never "SEO Details" — '
+    'regardless of the project\'s actual service',
     (tester) async {
       await tester.pumpWidget(
         _app(
@@ -86,13 +86,6 @@ void main() {
                 name: 'SMM Retainer',
                 services: const [ProjectServiceRef(id: 's1', name: 'SMM')],
                 packageName: 'GROWTH +',
-                // Legacy data some older projects still carry — none of
-                // this should render any more.
-                backlinksTarget: '50',
-                seoSheetName: 'Old Sheet',
-                projectFolderName: 'Old Folder',
-                workingEmailAccount: 'old@client.test',
-                ahrefsAccount: 'old-ahrefs',
               ),
             ],
           ),
@@ -103,16 +96,6 @@ void main() {
       expect(find.text('SEO Details'), findsNothing);
       expect(find.text('Package'), findsOneWidget);
       expect(find.text('GROWTH +'), findsOneWidget);
-      expect(find.text('Backlinks target'), findsNothing);
-      expect(find.text('50'), findsNothing);
-      expect(find.text('SEO sheet'), findsNothing);
-      expect(find.text('Old Sheet'), findsNothing);
-      expect(find.text('Project folder'), findsNothing);
-      expect(find.text('Old Folder'), findsNothing);
-      expect(find.text('Working email account'), findsNothing);
-      expect(find.text('old@client.test'), findsNothing);
-      expect(find.text('Ahrefs account'), findsNothing);
-      expect(find.text('old-ahrefs'), findsNothing);
       expect(
         find.textContaining('kept in the team password manager'),
         findsNothing,
@@ -143,11 +126,7 @@ void main() {
         _app(
           repository: FakeClientsRepository(
             projects: [
-              buildTestProject(
-                name: 'SMM Retainer',
-                clientName: 'Acme Co',
-                endDate: '2026-12-31',
-              ),
+              buildTestProject(name: 'SMM Retainer', clientName: 'Acme Co'),
             ],
           ),
         ),
