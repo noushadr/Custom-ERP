@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
@@ -11,6 +12,7 @@ import type { RoleRepository } from '../domain/repositories/role-repository.inte
 import type { UserRepository } from '../domain/repositories/user-repository.interface';
 import { User } from '../domain/entities/user.entity';
 import { UserStatus } from '../domain/enums/user-status.enum';
+import type { JwtPayload } from '../presentation/strategies/jwt.strategy';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RolesService } from './roles.service';
 
@@ -45,6 +47,20 @@ function buildUser(overrides: Partial<User> = {}): User {
     status: UserStatus.ACTIVE,
     ...overrides,
   } as User;
+}
+
+/** A caller unrestricted enough to pass every guard in this spec's existing
+ * (non-escalation-focused) tests — holds every permission key any of those
+ * tests happens to request. Individual escalation/Super-Admin-protection
+ * tests build their own narrower caller instead. */
+function buildCaller(overrides: Partial<JwtPayload> = {}): JwtPayload {
+  return {
+    sub: 'user-1',
+    email: 'admin@zeracreative.com',
+    role: 'Super Admin',
+    permissions: ['employees.read', 'teams.manage', 'roles.manage'],
+    ...overrides,
+  };
 }
 
 describe('RolesService', () => {
@@ -150,11 +166,14 @@ describe('RolesService', () => {
       ]);
       roleRepository.save.mockImplementation((role) => Promise.resolve(role));
 
-      const result = await service.createRole({
-        name: 'Recruiter',
-        description: 'Handles hiring',
-        permissionKeys: ['employees.read'],
-      });
+      const result = await service.createRole(
+        {
+          name: 'Recruiter',
+          description: 'Handles hiring',
+          permissionKeys: ['employees.read'],
+        },
+        buildCaller(),
+      );
 
       expect(result.name).toBe('Recruiter');
       expect(result.description).toBe('Handles hiring');
@@ -167,10 +186,13 @@ describe('RolesService', () => {
       roleRepository.findByName.mockResolvedValue(buildRole());
 
       await expect(
-        service.createRole({
-          name: 'Team Lead',
-          permissionKeys: [],
-        }),
+        service.createRole(
+          {
+            name: 'Team Lead',
+            permissionKeys: [],
+          },
+          buildCaller(),
+        ),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(roleRepository.save).not.toHaveBeenCalled();
     });
@@ -180,11 +202,29 @@ describe('RolesService', () => {
       permissionRepository.findByKeys.mockResolvedValue([]);
 
       await expect(
-        service.createRole({
-          name: 'Recruiter',
-          permissionKeys: ['not.a.real.permission'],
-        }),
+        service.createRole(
+          {
+            name: 'Recruiter',
+            permissionKeys: ['not.a.real.permission'],
+          },
+          buildCaller(),
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
+      expect(roleRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the caller tries to grant a permission they do not hold', async () => {
+      roleRepository.findByName.mockResolvedValue(null);
+      permissionRepository.findByKeys.mockResolvedValue([
+        buildPermission({ key: 'finances.manage' }),
+      ]);
+
+      await expect(
+        service.createRole(
+          { name: 'Recruiter', permissionKeys: ['finances.manage'] },
+          buildCaller({ permissions: ['employees.read'] }),
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
       expect(roleRepository.save).not.toHaveBeenCalled();
     });
   });
@@ -197,9 +237,11 @@ describe('RolesService', () => {
       roleRepository.save.mockImplementation((role) => Promise.resolve(role));
       userRepository.findAll.mockResolvedValue([]);
 
-      const result = await service.updateRole('role-1', {
-        name: 'Senior Team Lead',
-      });
+      const result = await service.updateRole(
+        'role-1',
+        { name: 'Senior Team Lead' },
+        buildCaller(),
+      );
 
       expect(result.name).toBe('Senior Team Lead');
     });
@@ -209,7 +251,7 @@ describe('RolesService', () => {
       roleRepository.findById.mockResolvedValue(existing);
 
       await expect(
-        service.updateRole('role-1', { name: 'New Name' }),
+        service.updateRole('role-1', { name: 'New Name' }, buildCaller()),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(roleRepository.save).not.toHaveBeenCalled();
     });
@@ -226,7 +268,7 @@ describe('RolesService', () => {
       );
 
       await expect(
-        service.updateRole('role-1', { name: 'Employee' }),
+        service.updateRole('role-1', { name: 'Employee' }, buildCaller()),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(roleRepository.save).not.toHaveBeenCalled();
     });
@@ -256,7 +298,7 @@ describe('RolesService', () => {
       roleRepository.save.mockImplementation((role) => Promise.resolve(role));
       userRepository.findAll.mockResolvedValue([]);
 
-      const result = await service.updateRole('role-1', dto);
+      const result = await service.updateRole('role-1', dto, buildCaller());
 
       expect(result.name).toBe('Team Lead');
       expect(result.description).toBe('Leads a team');
@@ -267,9 +309,71 @@ describe('RolesService', () => {
       roleRepository.findById.mockResolvedValue(null);
 
       await expect(
-        service.updateRole('missing-role', { name: 'New Name' }),
+        service.updateRole('missing-role', { name: 'New Name' }, buildCaller()),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(roleRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the caller tries to grant a permission they do not hold', async () => {
+      const existing = buildRole({ name: 'Team Lead', isSystem: false });
+      roleRepository.findById.mockResolvedValue(existing);
+      permissionRepository.findByKeys.mockResolvedValue([
+        buildPermission({ key: 'finances.manage' }),
+      ]);
+
+      await expect(
+        service.updateRole(
+          'role-1',
+          { permissionKeys: ['finances.manage'] },
+          buildCaller({ permissions: ['employees.read'] }),
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(roleRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when a caller missing some permission tries to edit the Super Admin role', async () => {
+      const superAdminRole = buildRole({
+        id: 'super-admin-role',
+        name: 'Super Admin',
+        isSystem: true,
+      });
+      roleRepository.findById.mockResolvedValue(superAdminRole);
+      permissionRepository.findAll.mockResolvedValue([
+        buildPermission({ key: 'employees.read' }),
+        buildPermission({ key: 'finances.manage' }),
+      ]);
+
+      await expect(
+        service.updateRole(
+          'super-admin-role',
+          { description: 'Edited by HR' },
+          buildCaller({ permissions: ['employees.read'] }), // missing finances.manage
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(roleRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('allows a caller holding every known permission to edit the Super Admin role', async () => {
+      const superAdminRole = buildRole({
+        id: 'super-admin-role',
+        name: 'Super Admin',
+        isSystem: true,
+      });
+      roleRepository.findById.mockResolvedValue(superAdminRole);
+      permissionRepository.findAll.mockResolvedValue([
+        buildPermission({ key: 'employees.read' }),
+        buildPermission({ key: 'finances.manage' }),
+      ]);
+      roleRepository.save.mockImplementation((role) => Promise.resolve(role));
+      userRepository.findAll.mockResolvedValue([]);
+
+      const result = await service.updateRole(
+        'super-admin-role',
+        { description: 'Edited by a real Super Admin' },
+        buildCaller({ permissions: ['employees.read', 'finances.manage'] }),
+      );
+
+      expect(result.description).toBe('Edited by a real Super Admin');
     });
   });
 

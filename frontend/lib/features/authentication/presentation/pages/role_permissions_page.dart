@@ -2,15 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../application/auth_providers.dart';
+import '../../application/auth_state.dart';
 import '../../application/role_providers.dart';
 import '../../domain/entities/permission.dart';
 import '../../domain/entities/role.dart';
 import '../../domain/exceptions/auth_exception.dart';
 
-/// Lets Super Admin define custom roles and toggle which permissions each
-/// role grants — the four built-in roles (Super Admin, HR/Manager, Team
-/// Lead, Employee) can have their permissions edited but not be renamed or
-/// deleted. Requires `roles.manage`.
+const _superAdminRoleName = 'Super Admin';
+
+/// Lets Super Admin — and, since 2026-09-11, HR/Manager — define custom
+/// roles and toggle which permissions each role grants. The four built-in
+/// roles (Super Admin, HR/Manager, Team Lead, Employee) can have their
+/// permissions edited but not be renamed or deleted. Requires
+/// `roles.manage`. Two restrictions apply regardless of who holds that
+/// permission (enforced server-side in `RolesService`, mirrored here for
+/// UX): only a viewer holding every known permission (i.e. a real Super
+/// Admin) can edit the Super Admin role itself, and nobody can grant a role
+/// a permission they don't personally hold.
 class RolePermissionsPage extends ConsumerWidget {
   const RolePermissionsPage({super.key});
 
@@ -98,6 +107,13 @@ class _RoleCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Only relevant for the Super Admin role — every other role stays
+    // editable regardless of this value, so skip the fetch it takes to
+    // resolve it for the common case.
+    final canEditSuperAdmin = role.name != _superAdminRoleName
+        ? true
+        : (ref.watch(viewerIsUnrestrictedProvider).valueOrNull ?? false);
+
     return FormSection(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,12 +201,16 @@ class _RoleCard extends ConsumerWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Edit',
+            tooltip: canEditSuperAdmin
+                ? 'Edit'
+                : 'Only a Super Admin can edit the Super Admin role',
             icon: const Icon(Icons.edit_outlined, size: 20),
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (_) => _RoleFormDialog(role: role),
-            ),
+            onPressed: !canEditSuperAdmin
+                ? null
+                : () => showDialog<void>(
+                    context: context,
+                    builder: (_) => _RoleFormDialog(role: role),
+                  ),
           ),
           if (!role.isSystem)
             IconButton(
@@ -222,6 +242,13 @@ class _RoleFormDialogState extends ConsumerState<_RoleFormDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
   late Set<String> _selectedKeys;
+
+  /// The role's permission keys as they were when this dialog opened —
+  /// frozen, unlike [_selectedKeys]. Toggling one of these off (or back on)
+  /// is always allowed even for a permission the viewer doesn't personally
+  /// hold, matching the backend's own "only newly-granted permissions must
+  /// be held by the caller" rule (`RolesService.updateRole`).
+  late final Set<String> _originalKeys;
   bool _saving = false;
   String? _errorMessage;
 
@@ -236,6 +263,7 @@ class _RoleFormDialogState extends ConsumerState<_RoleFormDialog> {
       text: widget.role?.description,
     );
     _selectedKeys = {...?widget.role?.permissions};
+    _originalKeys = {..._selectedKeys};
   }
 
   @override
@@ -284,6 +312,10 @@ class _RoleFormDialogState extends ConsumerState<_RoleFormDialog> {
   @override
   Widget build(BuildContext context) {
     final permissionsAsync = ref.watch(permissionsProvider);
+    final authState = ref.watch(authControllerProvider);
+    final viewerPermissions = authState is AuthAuthenticated
+        ? authState.user.permissions.toSet()
+        : const <String>{};
 
     return AlertDialog(
       title: Text(_isEditing ? 'Edit role' : 'Add role'),
@@ -341,7 +373,9 @@ class _RoleFormDialogState extends ConsumerState<_RoleFormDialog> {
                   data: (permissions) => _PermissionCheckboxList(
                     permissions: permissions,
                     selectedKeys: _selectedKeys,
+                    originalKeys: _originalKeys,
                     enabled: !_saving,
+                    viewerPermissions: viewerPermissions,
                     onChanged: (keys) => setState(() => _selectedKeys = keys),
                   ),
                 ),
@@ -374,13 +408,27 @@ class _PermissionCheckboxList extends StatelessWidget {
   const _PermissionCheckboxList({
     required this.permissions,
     required this.selectedKeys,
+    required this.originalKeys,
     required this.enabled,
+    required this.viewerPermissions,
     required this.onChanged,
   });
 
   final List<Permission> permissions;
   final Set<String> selectedKeys;
+
+  /// The role's permission keys as of when this dialog opened — toggling
+  /// one of these is always allowed (on or off), even for a permission
+  /// outside [viewerPermissions]; see [_RoleFormDialogState._originalKeys].
+  final Set<String> originalKeys;
   final bool enabled;
+
+  /// The current viewer's own permission keys — a `roles.manage` holder can
+  /// only grant a permission that isn't already on the role (i.e. wasn't in
+  /// [originalKeys]) if they personally hold it (enforced server-side too,
+  /// see `RolesService.assertCallerHoldsPermissions`), so newly checking one
+  /// outside this set is disabled rather than left to fail on save.
+  final Set<String> viewerPermissions;
   final ValueChanged<Set<String>> onChanged;
 
   @override
@@ -389,27 +437,40 @@ class _PermissionCheckboxList extends StatelessWidget {
       shrinkWrap: true,
       children: [
         for (final permission in permissions)
-          CheckboxListTile(
-            key: Key('permission-${permission.key}'),
-            value: selectedKeys.contains(permission.key),
-            onChanged: !enabled
-                ? null
-                : (checked) {
-                    final next = {...selectedKeys};
-                    if (checked ?? false) {
-                      next.add(permission.key);
-                    } else {
-                      next.remove(permission.key);
-                    }
-                    onChanged(next);
-                  },
-            controlAffinity: ListTileControlAffinity.leading,
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(permission.key),
-            subtitle: (permission.description ?? '').isEmpty
-                ? null
-                : Text(permission.description!),
+          Builder(
+            builder: (context) {
+              final isChecked = selectedKeys.contains(permission.key);
+              final canToggle =
+                  originalKeys.contains(permission.key) ||
+                  viewerPermissions.contains(permission.key);
+              return Tooltip(
+                message: canToggle
+                    ? ''
+                    : "You don't hold this permission, so you can't grant it.",
+                child: CheckboxListTile(
+                  key: Key('permission-${permission.key}'),
+                  value: isChecked,
+                  onChanged: !enabled || !canToggle
+                      ? null
+                      : (checked) {
+                          final next = {...selectedKeys};
+                          if (checked ?? false) {
+                            next.add(permission.key);
+                          } else {
+                            next.remove(permission.key);
+                          }
+                          onChanged(next);
+                        },
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(permission.key),
+                  subtitle: (permission.description ?? '').isEmpty
+                      ? null
+                      : Text(permission.description!),
+                ),
+              );
+            },
           ),
       ],
     );

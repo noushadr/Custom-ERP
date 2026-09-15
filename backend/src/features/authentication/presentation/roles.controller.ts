@@ -11,7 +11,9 @@ import {
 import { CreateRoleDto } from '../application/dto/create-role.dto';
 import { UpdateRoleDto } from '../application/dto/update-role.dto';
 import { RolesService } from '../application/roles.service';
+import { CurrentUser } from './decorators/current-user.decorator';
 import { Permissions } from './decorators/permissions.decorator';
+import type { JwtPayload } from './strategies/jwt.strategy';
 
 @Controller('roles')
 @Permissions('roles.manage')
@@ -24,13 +26,17 @@ export class RolesController {
   }
 
   @Post()
-  create(@Body() dto: CreateRoleDto) {
-    return this.rolesService.createRole(dto);
+  create(@Body() dto: CreateRoleDto, @CurrentUser() caller: JwtPayload) {
+    return this.rolesService.createRole(dto, caller);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
-    return this.rolesService.updateRole(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateRoleDto,
+    @CurrentUser() caller: JwtPayload,
+  ) {
+    return this.rolesService.updateRole(id, dto, caller);
   }
 
   @Delete(':id')

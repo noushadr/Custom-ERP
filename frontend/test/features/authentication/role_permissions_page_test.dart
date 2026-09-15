@@ -104,12 +104,19 @@ class FakeRoleRepository implements RoleRepository {
   }
 }
 
-Widget _app(FakeRoleRepository repository) {
+Widget _app(
+  FakeRoleRepository repository, {
+  List<String> viewerPermissions = const [
+    'roles.manage',
+    'employees.read',
+    'employees.manage',
+  ],
+}) {
   final user = AuthUser(
     id: 'user-1',
     email: 'jane.doe@zeracreative.com',
     role: 'Super Admin',
-    permissions: const ['roles.manage'],
+    permissions: viewerPermissions,
   );
 
   return ProviderScope(
@@ -305,6 +312,158 @@ void main() {
         ),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'disables editing the Super Admin role for a viewer missing any '
+    'permission',
+    (tester) async {
+      final repository = FakeRoleRepository(
+        roles: const [
+          Role(
+            id: 'role-super-admin',
+            name: 'Super Admin',
+            isSystem: true,
+            permissions: ['a', 'b'],
+            userCount: 1,
+          ),
+        ],
+        permissions: const [Permission(key: 'a'), Permission(key: 'b')],
+      );
+
+      await tester.pumpWidget(
+        _app(repository, viewerPermissions: const ['roles.manage', 'a']),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byTooltip('Only a Super Admin can edit the Super Admin role'),
+        findsOneWidget,
+      );
+      final editButton = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.edit_outlined),
+      );
+      expect(editButton.onPressed, isNull);
+    },
+  );
+
+  testWidgets(
+    'allows editing the Super Admin role for a viewer holding every '
+    'permission',
+    (tester) async {
+      final repository = FakeRoleRepository(
+        roles: const [
+          Role(
+            id: 'role-super-admin',
+            name: 'Super Admin',
+            isSystem: true,
+            permissions: ['a', 'b'],
+            userCount: 1,
+          ),
+        ],
+        permissions: const [Permission(key: 'a'), Permission(key: 'b')],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          repository,
+          viewerPermissions: const ['roles.manage', 'a', 'b'],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Edit'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.edit_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit role'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'disables newly granting a permission the viewer does not hold, but '
+    'still allows removing one the role already had',
+    (tester) async {
+      final repository = FakeRoleRepository(
+        roles: const [
+          Role(
+            id: 'role-team-lead',
+            name: 'Team Lead',
+            isSystem: true,
+            permissions: ['a'],
+            userCount: 1,
+          ),
+        ],
+        permissions: const [Permission(key: 'a'), Permission(key: 'b')],
+      );
+
+      // Viewer holds 'a' (already on the role) but not 'b'.
+      await tester.pumpWidget(
+        _app(repository, viewerPermissions: const ['roles.manage', 'a']),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.edit_outlined));
+      await tester.pumpAndSettle();
+
+      final checkboxA = tester.widget<CheckboxListTile>(
+        find.byKey(const Key('permission-a')),
+      );
+      final checkboxB = tester.widget<CheckboxListTile>(
+        find.byKey(const Key('permission-b')),
+      );
+      // 'a' was already granted — can still be unchecked despite the
+      // viewer not holding... wait, viewer DOES hold 'a' here; the point is
+      // it stays toggleable either way.
+      expect(checkboxA.onChanged, isNotNull);
+      // 'b' isn't on the role yet and the viewer doesn't hold it — can't be
+      // newly checked.
+      expect(checkboxB.onChanged, isNull);
+      expect(
+        find.byTooltip("You don't hold this permission, so you can't grant it."),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    "allows unchecking a permission the role already had even though the "
+    'viewer does not hold it themselves',
+    (tester) async {
+      final repository = FakeRoleRepository(
+        roles: const [
+          Role(
+            id: 'role-team-lead',
+            name: 'Team Lead',
+            isSystem: true,
+            permissions: ['b'],
+            userCount: 1,
+          ),
+        ],
+        permissions: const [Permission(key: 'a'), Permission(key: 'b')],
+      );
+
+      // Viewer holds neither 'a' nor 'b' themselves, but 'b' is already on
+      // the role.
+      await tester.pumpWidget(
+        _app(repository, viewerPermissions: const ['roles.manage']),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.edit_outlined));
+      await tester.pumpAndSettle();
+
+      final checkboxB = tester.widget<CheckboxListTile>(
+        find.byKey(const Key('permission-b')),
+      );
+      expect(checkboxB.onChanged, isNotNull);
+
+      await tester.tap(find.byKey(const Key('permission-b')));
+      await tester.tap(find.text('Save changes').last);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdateInput?.permissionKeys, <String>[]);
     },
   );
 }

@@ -37,6 +37,15 @@ const DEFAULT_PERMISSIONS = [
   'email.manage',
 ];
 
+// 'roles.manage' (Roles & Permissions) was granted to HR/Manager 2026-09-11
+// per explicit instruction ("roles should be editable by HR as well") — she
+// still can't touch the Super Admin role itself (RolesService.updateRole
+// requires the caller to already hold every permission to edit that one
+// specific role, which HR/Manager doesn't since 'finances.manage'/
+// 'leads.manage'/'users.impersonate' remain Super-Admin-exclusive below),
+// nor can she grant any role a permission she doesn't herself hold (the
+// same service also rejects that on every create/update, closing the
+// privilege-escalation hole this change would otherwise open).
 // 'clients.manage' and 'payroll.manage' (Clients & Projects / Client Health /
 // Payroll — the Admin Business Management modules; the original Agency
 // Reporting and Finances modules were removed 2026-08-23) are deliberately
@@ -71,6 +80,7 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
     name: 'HR/Manager',
     permissions: [
       'users.manage',
+      'roles.manage',
       'employees.read',
       'employees.manage',
       'departments.manage',
