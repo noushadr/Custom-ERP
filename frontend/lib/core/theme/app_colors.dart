@@ -7,6 +7,13 @@ abstract final class AppColors {
   static const Color canvasBackground = Color(0xFFF5F4FB);
   static const Color fieldFill = Color(0xFFF1F0F9);
 
+  // Popups (dialogs, dropdown/overflow menus) — a neutral light grey/ash
+  // white, deliberately not lavender-tinted like the fields/canvas above.
+  // Material 3's default popup surface derives from the violet seed color
+  // in the theme's ColorScheme, which read as a faint "baby pink" — this is
+  // the explicit override for every popup surface instead.
+  static const Color popupSurface = Color(0xFFF5F5F5);
+
   // Left nav — white like the content area; separated from the canvas by a
   // hairline border rather than a flat fill, so it reads as part of the same
   // modern surface language instead of a boxed-off panel.

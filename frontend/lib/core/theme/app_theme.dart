@@ -21,6 +21,12 @@ abstract final class AppTheme {
       brightness: Brightness.light,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.canvasBackground,
+      // Also the fallback background for a `DropdownButton`/
+      // `DropdownButtonFormField`'s open menu (it paints on `canvasColor`
+      // when no `dropdownColor` is given) — set here so those popups pick
+      // up the same ash-white surface as dialogs/popup menus below, without
+      // touching every one of this app's many dropdown call sites.
+      canvasColor: AppColors.popupSurface,
       textTheme: textTheme,
       splashFactory: InkSparkle.splashFactory,
       visualDensity: VisualDensity.standard,
@@ -182,7 +188,7 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: AppColors.surface,
+        color: AppColors.popupSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 6,
         shadowColor: AppColors.navActive.withValues(alpha: 0.12),
@@ -191,6 +197,26 @@ abstract final class AppTheme {
           side: const BorderSide(color: AppColors.borderSubtle),
         ),
         textStyle: textTheme.bodyMedium,
+      ),
+      // Material 3's default dialog background derives from the violet seed
+      // color above, which read as a faint "baby pink" — every dialog in
+      // this app (via the bare `AlertDialog(...)` pattern, none of which set
+      // their own background) picks up this neutral ash-white instead.
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.popupSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 6,
+        shadowColor: AppColors.navActive.withValues(alpha: 0.12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+      // The `showDatePicker` calendar popup, used throughout (leave dates,
+      // joining/probation/leaving dates, ...) — same default-tint issue as
+      // every other popup above.
+      datePickerTheme: const DatePickerThemeData(
+        backgroundColor: AppColors.popupSurface,
+        surfaceTintColor: Colors.transparent,
       ),
     );
   }
