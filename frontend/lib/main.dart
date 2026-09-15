@@ -36,6 +36,7 @@ import 'features/tasks/application/task_providers.dart';
 import 'features/tasks/domain/entities/task_status.dart';
 import 'features/tasks/presentation/pages/task_detail_page.dart';
 import 'features/tasks/presentation/pages/tasks_page.dart';
+import 'shared/widgets/module_pin_gate.dart';
 
 void main() {
   runApp(const ProviderScope(child: ZeraApp()));
@@ -347,9 +348,17 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
       case 'Payroll':
         return const PayrollPage();
       case 'Leads':
-        return const LeadsPage();
+        return const ModulePinGate(
+          moduleKey: 'leads',
+          moduleLabel: 'Leads',
+          child: LeadsPage(),
+        );
       case 'Financial Reports':
-        return const FinancialReportsPage();
+        return const ModulePinGate(
+          moduleKey: 'financial_reports',
+          moduleLabel: 'Financial Reports',
+          child: FinancialReportsPage(),
+        );
       case 'Logs':
         return const LogsPage();
       default:

@@ -20,6 +20,7 @@ import { HolidaysModule } from './features/holidays/holidays.module';
 import { KnowledgeBaseModule } from './features/knowledge-base/knowledge-base.module';
 import { LeadsModule } from './features/leads/leads.module';
 import { LeaveModule } from './features/leave/leave.module';
+import { ModuleLockModule } from './features/module-lock/module-lock.module';
 import { NoticesModule } from './features/notices/notices.module';
 import { NotificationsModule } from './features/notifications/notifications.module';
 import { PayrollModule } from './features/payroll/payroll.module';
@@ -56,6 +57,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     FreelancersModule,
     GoalsModule,
     EmailModule,
+    ModuleLockModule,
   ],
   controllers: [AppController],
   providers: [AppService],

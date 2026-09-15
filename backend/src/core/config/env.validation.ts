@@ -61,6 +61,10 @@ class EnvironmentVariables {
 
   @IsString()
   EMAIL_CREDENTIAL_KEY: string;
+
+  @IsOptional()
+  @IsString()
+  MODULE_LOCK_PIN?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

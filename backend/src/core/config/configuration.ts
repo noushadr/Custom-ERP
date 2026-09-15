@@ -21,6 +21,9 @@ export default () => ({
   // AES-256-GCM key (32-byte hex) used to encrypt mailbox passwords at rest
   // for the Email feature.
   emailCredentialKey: process.env.EMAIL_CREDENTIAL_KEY,
+  // Shared PIN gating the Leads and Financial Reports pages (on top of
+  // their existing Super-Admin-only permission gates).
+  moduleLockPin: process.env.MODULE_LOCK_PIN ?? '2803',
   // Comma-separated list of allowed frontend origins. Falls back to the
   // local Flutter-web dev server when unset — never wide open by default.
   corsOrigin: process.env.CORS_ORIGIN,
