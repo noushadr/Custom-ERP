@@ -9,9 +9,13 @@ abstract interface class TaskRepository {
   /// "Assigned Tasks" — created by the caller.
   Future<List<Task>> getTasksAssignedByMe();
 
-  /// "Team Tasks" — company-wide for a `tasks.manage` holder, or the
+  /// "Task Board" — company-wide for a `tasks.manage` holder, or the
   /// caller's headed department(s) for a department head; empty otherwise.
   Future<List<Task>> getTeamTasks();
+
+  /// Unclaimed tasks (assigned to a team, nobody picked yet) in the
+  /// caller's own department — what they could accept.
+  Future<List<Task>> getClaimableTasks();
 
   /// Throws [TaskException] if the caller isn't allowed to view this task.
   Future<Task> getTask(String id);
@@ -26,11 +30,15 @@ abstract interface class TaskRepository {
   /// requires `clients.manage`.
   Future<List<Task>> getTasksByProject(String projectId);
 
-  /// Requires `tasks.manage` or headship of the assignee's department.
+  /// Exactly one of [assigneeEmployeeId]/[departmentId] should be set.
+  /// Assigning straight to an employee requires `tasks.manage` or headship
+  /// of their department; assigning to a team needs neither — anyone can
+  /// hand a task to a team, leaving the team to pick who does it.
   Future<Task> createTask({
     required String title,
     String? description,
-    required String assigneeEmployeeId,
+    String? assigneeEmployeeId,
+    String? departmentId,
     String? priority,
     required String dueDate,
     String? projectId,
@@ -48,7 +56,19 @@ abstract interface class TaskRepository {
     String? projectId,
   });
 
-  /// The assignee, the assigner, a department head, or a `tasks.manage`
-  /// holder may change status.
-  Future<Task> updateStatus(String id, String status);
+  /// The assignee's own self-service update — status, due date, and/or
+  /// progress remarks — notifies whoever assigned the task. The assigner,
+  /// a department head, or a `tasks.manage` holder may also call this.
+  Future<Task> updateProgress(
+    String id, {
+    String? status,
+    String? dueDate,
+    String? progressRemarks,
+  });
+
+  /// Any member of the task's own team claiming it for themselves.
+  Future<Task> claimTask(String id);
+
+  /// The task's team head picking a specific member.
+  Future<Task> assignTeamMember(String id, String employeeId);
 }

@@ -89,7 +89,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Change History'), findsOneWidget);
-      expect(find.text('Designation'), findsOneWidget);
+      expect(find.textContaining('Designation'), findsOneWidget);
       expect(find.text('Company-wide Changes'), findsNothing);
       expect(
         find.text("You don't have permission to view this page."),

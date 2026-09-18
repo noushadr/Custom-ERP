@@ -16,7 +16,12 @@ const _pageSize = 3;
 /// plain text row, so it reads as an announcement worth noticing. Only the
 /// latest 3 show by default; older ones are reachable via the pager below.
 class CompanyNoticesSection extends ConsumerStatefulWidget {
-  const CompanyNoticesSection({super.key});
+  const CompanyNoticesSection({super.key, this.trailing});
+
+  /// An optional action shown beside the "Company Notices" title — the
+  /// Admin Dashboard passes its "Post notice" button here so it lives on
+  /// this card rather than floating above the whole page.
+  final Widget? trailing;
 
   @override
   ConsumerState<CompanyNoticesSection> createState() =>
@@ -96,6 +101,7 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
 
     return FormSection(
       title: 'Company Notices',
+      trailing: widget.trailing,
       child: noticesAsync.when(
         loading: () => const Padding(
           padding: EdgeInsets.symmetric(vertical: 12),

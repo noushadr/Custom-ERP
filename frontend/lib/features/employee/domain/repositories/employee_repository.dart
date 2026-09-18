@@ -35,6 +35,12 @@ abstract interface class EmployeeRepository {
   /// Requires `employees.manage`.
   Future<List<UpcomingWorkAnniversary>> getUpcomingWorkAnniversaries();
 
+  /// Every active employee whose next work anniversary falls in the same
+  /// calendar month as the soonest one — unlike birthdays, a whole month's
+  /// worth of anniversaries can share this spotlight. Requires
+  /// `employees.manage`.
+  Future<List<UpcomingWorkAnniversary>> getWorkAnniversarySpotlight();
+
   /// Total and daily payroll of active employees, derived from each one's
   /// current salary. Requires `employees.manage`.
   Future<PayrollSummary> getPayrollSummary();

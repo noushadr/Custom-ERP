@@ -1,3 +1,4 @@
+import '../../../../shared/utils/photo_url.dart';
 import '../../domain/entities/upcoming_birthday.dart';
 
 class UpcomingBirthdayModel extends UpcomingBirthday {
@@ -13,7 +14,7 @@ class UpcomingBirthdayModel extends UpcomingBirthday {
       UpcomingBirthdayModel(
         employeeId: json['employeeId'] as String,
         fullName: json['fullName'] as String,
-        profilePhotoUrl: json['profilePhotoUrl'] as String?,
+        profilePhotoUrl: resolvePhotoUrl(json['profilePhotoUrl'] as String?),
         dateOfBirth: json['dateOfBirth'] as String,
         daysUntil: json['daysUntil'] as int,
       );

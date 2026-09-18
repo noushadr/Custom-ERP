@@ -45,6 +45,15 @@ class GoalRepositoryImpl implements GoalRepository {
   );
 
   @override
+  Future<Goal> createForSelf({required String title, String? description}) =>
+      _guard(
+        () => _remoteDataSource.createForSelf(
+          title: title,
+          description: description,
+        ),
+      );
+
+  @override
   Future<List<Goal>> bulkAssignToDepartment({
     required String departmentId,
     required String title,
@@ -86,12 +95,31 @@ class GoalRepositoryImpl implements GoalRepository {
   );
 
   @override
+  Future<Goal> updateAsSelf(
+    String goalId, {
+    String? title,
+    String? description,
+    int? achievementPercentage,
+  }) => _guard(
+    () => _remoteDataSource.updateAsSelf(
+      goalId,
+      title: title,
+      description: description,
+      achievementPercentage: achievementPercentage,
+    ),
+  );
+
+  @override
   Future<void> archive(String goalId) =>
       _guard(() => _remoteDataSource.archive(goalId));
 
   @override
   Future<void> archiveAsManager(String goalId) =>
       _guard(() => _remoteDataSource.archiveAsManager(goalId));
+
+  @override
+  Future<void> archiveAsSelf(String goalId) =>
+      _guard(() => _remoteDataSource.archiveAsSelf(goalId));
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

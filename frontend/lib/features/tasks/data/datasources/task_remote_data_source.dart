@@ -32,6 +32,14 @@ class TaskRemoteDataSource {
         .toList();
   }
 
+  Future<List<TaskModel>> getClaimableTasks() async {
+    final response = await _dio.get<List<dynamic>>('/tasks/claimable');
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(TaskModel.fromJson)
+        .toList();
+  }
+
   Future<TaskModel> getTask(String id) async {
     final response = await _dio.get<Map<String, dynamic>>('/tasks/$id');
     return TaskModel.fromJson(response.data!);
@@ -74,7 +82,8 @@ class TaskRemoteDataSource {
   Future<TaskModel> createTask({
     required String title,
     String? description,
-    required String assigneeEmployeeId,
+    String? assigneeEmployeeId,
+    String? departmentId,
     String? priority,
     required String dueDate,
     String? projectId,
@@ -84,7 +93,8 @@ class TaskRemoteDataSource {
       data: {
         'title': title,
         'description': ?description,
-        'assigneeEmployeeId': assigneeEmployeeId,
+        'assigneeEmployeeId': ?assigneeEmployeeId,
+        'departmentId': ?departmentId,
         'priority': ?priority,
         'dueDate': dueDate,
         'projectId': ?projectId,
@@ -116,10 +126,32 @@ class TaskRemoteDataSource {
     return TaskModel.fromJson(response.data!);
   }
 
-  Future<TaskModel> updateStatus(String id, String status) async {
+  Future<TaskModel> updateProgress(
+    String id, {
+    String? status,
+    String? dueDate,
+    String? progressRemarks,
+  }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
-      '/tasks/$id/status',
-      data: {'status': status},
+      '/tasks/$id/progress',
+      data: {
+        'status': ?status,
+        'dueDate': ?dueDate,
+        'progressRemarks': ?progressRemarks,
+      },
+    );
+    return TaskModel.fromJson(response.data!);
+  }
+
+  Future<TaskModel> claimTask(String id) async {
+    final response = await _dio.post<Map<String, dynamic>>('/tasks/$id/claim');
+    return TaskModel.fromJson(response.data!);
+  }
+
+  Future<TaskModel> assignTeamMember(String id, String employeeId) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/tasks/$id/assign-member',
+      data: {'employeeId': employeeId},
     );
     return TaskModel.fromJson(response.data!);
   }

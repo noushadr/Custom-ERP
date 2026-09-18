@@ -44,12 +44,14 @@ class FakeGoalRepository implements GoalRepository {
 
   String? lastCreatedEmployeeId;
   String? lastCreatedTitle;
+  bool? lastCreatedWasSelfScoped;
   String? lastBulkDepartmentId;
   String? lastBulkTitle;
   String? lastUpdatedGoalId;
   int? lastUpdatedAchievementPercentage;
   String? lastArchivedGoalId;
   bool? lastActionWasManagerScoped;
+  bool? lastActionWasSelfScoped;
 
   @override
   Future<List<Goal>> getAll() async => all;
@@ -84,6 +86,17 @@ class FakeGoalRepository implements GoalRepository {
     lastActionWasManagerScoped = true;
     if (actionError != null) throw actionError!;
     return buildTestGoal(employeeId: employeeId, title: title);
+  }
+
+  @override
+  Future<Goal> createForSelf({
+    required String title,
+    String? description,
+  }) async {
+    lastCreatedTitle = title;
+    lastCreatedWasSelfScoped = true;
+    if (actionError != null) throw actionError!;
+    return buildTestGoal(title: title);
   }
 
   @override
@@ -129,6 +142,24 @@ class FakeGoalRepository implements GoalRepository {
   }
 
   @override
+  Future<Goal> updateAsSelf(
+    String goalId, {
+    String? title,
+    String? description,
+    int? achievementPercentage,
+  }) async {
+    lastUpdatedGoalId = goalId;
+    lastUpdatedAchievementPercentage = achievementPercentage;
+    lastActionWasSelfScoped = true;
+    if (actionError != null) throw actionError!;
+    return buildTestGoal(
+      id: goalId,
+      title: title ?? 'English speaking',
+      achievementPercentage: achievementPercentage ?? 0,
+    );
+  }
+
+  @override
   Future<void> archive(String goalId) async {
     lastArchivedGoalId = goalId;
     lastActionWasManagerScoped = false;
@@ -139,6 +170,13 @@ class FakeGoalRepository implements GoalRepository {
   Future<void> archiveAsManager(String goalId) async {
     lastArchivedGoalId = goalId;
     lastActionWasManagerScoped = true;
+    if (actionError != null) throw actionError!;
+  }
+
+  @override
+  Future<void> archiveAsSelf(String goalId) async {
+    lastArchivedGoalId = goalId;
+    lastActionWasSelfScoped = true;
     if (actionError != null) throw actionError!;
   }
 }

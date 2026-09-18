@@ -143,6 +143,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.getBirthdaySpotlightError,
     this.upcomingWorkAnniversaries = const [],
     this.getUpcomingWorkAnniversariesError,
+    this.workAnniversarySpotlight = const [],
+    this.getWorkAnniversarySpotlightError,
     this.payrollSummary,
     this.getPayrollSummaryError,
     this.assets = const [],
@@ -162,6 +164,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final Object? getBirthdaySpotlightError;
   final List<UpcomingWorkAnniversary> upcomingWorkAnniversaries;
   final Object? getUpcomingWorkAnniversariesError;
+  final List<UpcomingWorkAnniversary> workAnniversarySpotlight;
+  final Object? getWorkAnniversarySpotlightError;
   final PayrollSummary? payrollSummary;
   final Object? getPayrollSummaryError;
   final List<Department> departments;
@@ -261,6 +265,14 @@ class FakeEmployeeRepository implements EmployeeRepository {
       throw getUpcomingWorkAnniversariesError!;
     }
     return upcomingWorkAnniversaries;
+  }
+
+  @override
+  Future<List<UpcomingWorkAnniversary>> getWorkAnniversarySpotlight() async {
+    if (getWorkAnniversarySpotlightError != null) {
+      throw getWorkAnniversarySpotlightError!;
+    }
+    return workAnniversarySpotlight;
   }
 
   @override

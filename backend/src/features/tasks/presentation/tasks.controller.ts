@@ -2,9 +2,10 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
+import { AssignTeamMemberDto } from '../application/dto/assign-team-member.dto';
 import { CreateTaskCommentDto } from '../application/dto/create-task-comment.dto';
 import { CreateTaskDto } from '../application/dto/create-task.dto';
-import { UpdateTaskStatusDto } from '../application/dto/update-task-status.dto';
+import { UpdateTaskProgressDto } from '../application/dto/update-task-progress.dto';
 import { UpdateTaskDto } from '../application/dto/update-task.dto';
 import { TasksService } from '../application/tasks.service';
 
@@ -33,6 +34,13 @@ export class TasksController {
   getTeamTasks(@CurrentUser() user: JwtPayload) {
     const actorHasOverride = user.permissions.includes(PERMISSION);
     return this.tasksService.getTeamTasks(user.sub, actorHasOverride);
+  }
+
+  /** Unclaimed tasks assigned to the caller's own team — what they could
+   * accept. */
+  @Get('claimable')
+  getClaimableTasks(@CurrentUser() user: JwtPayload) {
+    return this.tasksService.getClaimableTasks(user.sub);
   }
 
   /** Clients & Projects module's view of "which tasks belong to this
@@ -75,14 +83,41 @@ export class TasksController {
     return this.tasksService.addComment(id, dto, user.sub, actorHasOverride);
   }
 
-  @Patch(':id/status')
-  updateStatus(
+  @Patch(':id/progress')
+  updateProgress(
     @Param('id') id: string,
-    @Body() dto: UpdateTaskStatusDto,
+    @Body() dto: UpdateTaskProgressDto,
     @CurrentUser() user: JwtPayload,
   ) {
     const actorHasOverride = user.permissions.includes(PERMISSION);
-    return this.tasksService.updateStatus(id, dto, user.sub, actorHasOverride);
+    return this.tasksService.updateProgress(
+      id,
+      dto,
+      user.sub,
+      actorHasOverride,
+    );
+  }
+
+  /** Any member of the task's own team claiming it for themselves. */
+  @Post(':id/claim')
+  claimTask(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.tasksService.claimTask(id, user.sub);
+  }
+
+  /** The task's team head picking a specific member. */
+  @Patch(':id/assign-member')
+  assignTeamMember(
+    @Param('id') id: string,
+    @Body() dto: AssignTeamMemberDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const actorHasOverride = user.permissions.includes(PERMISSION);
+    return this.tasksService.assignTeamMember(
+      id,
+      dto,
+      user.sub,
+      actorHasOverride,
+    );
   }
 
   @Get(':id')

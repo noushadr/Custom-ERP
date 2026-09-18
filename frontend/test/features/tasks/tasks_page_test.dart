@@ -37,21 +37,22 @@ Widget _app({
 }
 
 void main() {
-  testWidgets('shows only the My Tasks tab for a plain employee', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_app());
-    await tester.pumpAndSettle();
+  testWidgets(
+    'shows My Tasks/Available to Claim/Assigned Tasks but not Task Board for a plain employee',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
 
-    expect(find.text('My Tasks'), findsOneWidget);
-    expect(find.text('Assigned Tasks'), findsNothing);
-    expect(find.text('Team Tasks'), findsNothing);
-    expect(find.text('New Task'), findsNothing);
-  });
+      expect(find.text('My Tasks'), findsOneWidget);
+      expect(find.text('Available to Claim'), findsOneWidget);
+      expect(find.text('Assigned Tasks'), findsOneWidget);
+      expect(find.text('Task Board'), findsNothing);
+      // Anyone can create a task now — at minimum, assign it to a team.
+      expect(find.text('New Task'), findsOneWidget);
+    },
+  );
 
-  testWidgets('shows all three tabs for a tasks.manage holder', (
-    tester,
-  ) async {
+  testWidgets('shows all four tabs for a tasks.manage holder', (tester) async {
     await tester.pumpWidget(
       _app(
         user: const AuthUser(
@@ -65,13 +66,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('My Tasks'), findsOneWidget);
+    expect(find.text('Available to Claim'), findsOneWidget);
     expect(find.text('Assigned Tasks'), findsOneWidget);
-    expect(find.text('Team Tasks'), findsOneWidget);
+    expect(find.text('Task Board'), findsOneWidget);
     expect(find.text('New Task'), findsOneWidget);
   });
 
   testWidgets(
-    'shows all three tabs for a department head with no tasks.manage permission',
+    'shows the Task Board tab for a department head with no tasks.manage permission',
     (tester) async {
       await tester.pumpWidget(
         _app(
@@ -87,7 +89,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Assigned Tasks'), findsOneWidget);
-      expect(find.text('Team Tasks'), findsOneWidget);
+      expect(find.text('Task Board'), findsOneWidget);
     },
   );
 
@@ -128,10 +130,7 @@ void main() {
     final later = find.text('Later task');
     expect(sooner, findsOneWidget);
     expect(later, findsOneWidget);
-    expect(
-      tester.getTopLeft(sooner).dy,
-      lessThan(tester.getTopLeft(later).dy),
-    );
+    expect(tester.getTopLeft(sooner).dy, lessThan(tester.getTopLeft(later).dy));
   });
 
   testWidgets('shows priority and status badges on each row', (tester) async {
@@ -174,10 +173,90 @@ void main() {
       await tester.tap(find.text('In Progress').last);
       await tester.pumpAndSettle();
 
-      expect(repository.lastStatusUpdatedId, 'task-1');
-      expect(repository.lastStatusUpdatedStatus, TaskStatus.inProgress);
+      expect(repository.lastProgressUpdatedId, 'task-1');
+      expect(repository.lastProgressUpdatedStatus, TaskStatus.inProgress);
       // Still on the list — no task detail AppBar ("Task") was pushed.
       expect(find.text('Task'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'changing priority from the row calls the repository directly, without '
+    "opening the task's detail page",
+    (tester) async {
+      final repository = FakeTaskRepository(
+        myTasks: [buildTestTask(priority: 'medium')],
+      );
+
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Medium'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('High').last);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedId, 'task-1');
+      expect(repository.lastUpdatedPriority, 'high');
+      expect(find.text('Task'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'changing the due date from the row calls the repository directly, '
+    "without opening the task's detail page",
+    (tester) async {
+      final repository = FakeTaskRepository(
+        myTasks: [buildTestTask(dueDate: '2026-09-18')],
+      );
+
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.calendar_today_outlined));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('30').last);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastProgressUpdatedId, 'task-1');
+      expect(repository.lastProgressUpdatedDueDate, '2026-09-30');
+      expect(find.text('Task'), findsNothing);
+
+      await tester.binding.setSurfaceSize(null);
+    },
+  );
+
+  testWidgets(
+    'an unclaimed team task shows a Claim button instead of a status menu, '
+    'and claiming it calls the repository directly',
+    (tester) async {
+      final repository = FakeTaskRepository(
+        claimableTasks: [
+          buildTestTask(
+            assigneeEmployeeId: null,
+            assigneeName: null,
+            departmentName: 'Engineering',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Available to Claim'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Unclaimed'), findsOneWidget);
+      expect(find.text('Claim'), findsOneWidget);
+
+      await tester.tap(find.text('Claim'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastClaimedId, 'task-1');
     },
   );
 }

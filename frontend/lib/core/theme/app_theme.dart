@@ -177,9 +177,22 @@ abstract final class AppTheme {
         iconColor: AppColors.textSecondary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+      // Applies to every bare `CircularProgressIndicator()` across the app
+      // (a call site that sets its own strokeWidth/size, e.g. one inside a
+      // small button, keeps that instead) — thinner and smaller than
+      // Material's chunky 4.0-stroke/36px default, with a rounded cap for a
+      // softer, more minimal spin.
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.primary,
         linearTrackColor: AppColors.borderSubtle,
+        strokeWidth: 2.5,
+        strokeCap: StrokeCap.round,
+        constraints: BoxConstraints(
+          minWidth: 28,
+          minHeight: 28,
+          maxWidth: 28,
+          maxHeight: 28,
+        ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,

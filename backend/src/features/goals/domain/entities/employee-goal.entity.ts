@@ -2,12 +2,13 @@ import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { Employee } from '../../../employee/domain/entities/employee.entity';
 
-/** One goal set for one employee — by Admin/HR (any employee) or a Team
- * Lead (only for their own direct reports, enforced in `GoalsService`, not
- * a DB constraint). Tracks how much of it is done via `achievementPercentage`
- * — settable only by Admin/HR (`GoalsService.update`), never by a Team Lead
- * (`updateAsManager` ignores it) or the employee themselves, who see it
- * read-only on their own dashboard. */
+/** One goal set for one employee — by Admin/HR (any employee), a Team Lead
+ * (only for their own direct reports), or the employee themselves (only
+ * their own), all enforced in `GoalsService`, not a DB constraint — no
+ * approval step for any of the three. Tracks how much of it is done via
+ * `achievementPercentage` — settable by Admin/HR or by the employee on
+ * their own goal, never by a Team Lead editing a direct report's goal
+ * (`updateAsManager` ignores it even if sent). */
 @Entity('employee_goals')
 export class EmployeeGoal extends BaseEntity {
   @Column()

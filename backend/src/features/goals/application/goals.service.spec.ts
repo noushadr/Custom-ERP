@@ -134,6 +134,36 @@ describe('GoalsService', () => {
     });
   });
 
+  describe('createForSelf', () => {
+    it('throws NotFoundException when the caller has no employee profile', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await expect(
+        service.createForSelf('user-1', { title: 'English speaking' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('creates a goal for the caller themselves, no approval needed', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1', firstName: 'Babar', lastName: 'Hussain' }),
+      );
+      goalRepository.findById.mockResolvedValue(buildGoal());
+
+      const result = await service.createForSelf('user-1', {
+        title: 'English speaking',
+      });
+
+      expect(goalRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          employeeId: 'employee-1',
+          title: 'English speaking',
+          createdByName: 'Babar Hussain',
+        }),
+      );
+      expect(result.title).toBe('English speaking');
+    });
+  });
+
   describe('bulkAssignToDepartment', () => {
     it('creates one goal per active employee in the department, skipping others', async () => {
       employeeRepository.findByUserId.mockResolvedValue(
@@ -180,7 +210,7 @@ describe('GoalsService', () => {
 
       await expect(
         service.update('missing', { title: 'x' }, 'admin-1', {
-          requireOwnDirectReport: false,
+          scope: 'any',
         }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -195,7 +225,7 @@ describe('GoalsService', () => {
 
       await expect(
         service.update('goal-1', { title: 'x' }, 'user-1', {
-          requireOwnDirectReport: true,
+          scope: 'ownDirectReport',
         }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
@@ -207,7 +237,7 @@ describe('GoalsService', () => {
         'goal-1',
         { title: 'Fluent English', description: 'Practice daily' },
         'admin-1',
-        { requireOwnDirectReport: false },
+        { scope: 'any' },
       );
 
       expect(result.title).toBe('Fluent English');
@@ -221,7 +251,7 @@ describe('GoalsService', () => {
         'goal-1',
         { achievementPercentage: 75 },
         'admin-1',
-        { requireOwnDirectReport: false },
+        { scope: 'any' },
       );
 
       expect(result.achievementPercentage).toBe(75);
@@ -241,10 +271,43 @@ describe('GoalsService', () => {
         'goal-1',
         { achievementPercentage: 90 },
         'user-1',
-        { requireOwnDirectReport: true },
+        { scope: 'ownDirectReport' },
       );
 
       expect(result.achievementPercentage).toBe(0);
+    });
+
+    it("throws ForbiddenException when an employee edits someone else's goal", async () => {
+      goalRepository.findById.mockResolvedValue(
+        buildGoal({ employeeId: 'someone-else' }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1' }),
+      );
+
+      await expect(
+        service.update('goal-1', { title: 'x' }, 'user-1', {
+          scope: 'self',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('lets an employee set the achievement percentage on their own goal', async () => {
+      goalRepository.findById.mockResolvedValue(
+        buildGoal({ employeeId: 'employee-1' }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1' }),
+      );
+
+      const result = await service.update(
+        'goal-1',
+        { achievementPercentage: 50 },
+        'user-1',
+        { scope: 'self' },
+      );
+
+      expect(result.achievementPercentage).toBe(50);
     });
   });
 
@@ -253,9 +316,7 @@ describe('GoalsService', () => {
       const goal = buildGoal();
       goalRepository.findById.mockResolvedValue(goal);
 
-      await service.archive('goal-1', 'admin-1', {
-        requireOwnDirectReport: false,
-      });
+      await service.archive('goal-1', 'admin-1', { scope: 'any' });
 
       expect(goalRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ archived: true }),
@@ -271,8 +332,36 @@ describe('GoalsService', () => {
       );
 
       await expect(
-        service.archive('goal-1', 'user-1', { requireOwnDirectReport: true }),
+        service.archive('goal-1', 'user-1', { scope: 'ownDirectReport' }),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("throws ForbiddenException when an employee archives someone else's goal", async () => {
+      goalRepository.findById.mockResolvedValue(
+        buildGoal({ employeeId: 'someone-else' }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1' }),
+      );
+
+      await expect(
+        service.archive('goal-1', 'user-1', { scope: 'self' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('lets an employee archive their own goal', async () => {
+      goalRepository.findById.mockResolvedValue(
+        buildGoal({ employeeId: 'employee-1' }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1' }),
+      );
+
+      await service.archive('goal-1', 'user-1', { scope: 'self' });
+
+      expect(goalRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ archived: true }),
+      );
     });
   });
 

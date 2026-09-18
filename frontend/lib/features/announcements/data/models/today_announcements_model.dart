@@ -1,3 +1,4 @@
+import '../../../../shared/utils/photo_url.dart';
 import '../../domain/entities/today_announcements.dart';
 
 class TodayAnnouncementsModel extends TodayAnnouncements {
@@ -20,7 +21,9 @@ class TodayAnnouncementsModel extends TodayAnnouncements {
             (b) => TodayBirthday(
               employeeId: b['employeeId'] as String,
               fullName: b['fullName'] as String,
-              profilePhotoUrl: b['profilePhotoUrl'] as String?,
+              profilePhotoUrl: resolvePhotoUrl(
+                b['profilePhotoUrl'] as String?,
+              ),
             ),
           )
           .toList(),
@@ -31,7 +34,9 @@ class TodayAnnouncementsModel extends TodayAnnouncements {
               employeeId: a['employeeId'] as String,
               fullName: a['fullName'] as String,
               yearsOfService: a['yearsOfService'] as int,
-              profilePhotoUrl: a['profilePhotoUrl'] as String?,
+              profilePhotoUrl: resolvePhotoUrl(
+                a['profilePhotoUrl'] as String?,
+              ),
             ),
           )
           .toList(),
@@ -56,8 +61,9 @@ class TodayAnnouncementsModel extends TodayAnnouncements {
           : TodayEmployeeOfMonth(
               employeeId: employeeOfTheMonthJson['employeeId'] as String,
               fullName: employeeOfTheMonthJson['fullName'] as String,
-              profilePhotoUrl:
-                  employeeOfTheMonthJson['profilePhotoUrl'] as String?,
+              profilePhotoUrl: resolvePhotoUrl(
+                employeeOfTheMonthJson['profilePhotoUrl'] as String?,
+              ),
             ),
     );
   }

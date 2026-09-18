@@ -22,6 +22,10 @@ class TaskRepositoryImpl implements TaskRepository {
   Future<List<Task>> getTeamTasks() => _guard(_remoteDataSource.getTeamTasks);
 
   @override
+  Future<List<Task>> getClaimableTasks() =>
+      _guard(_remoteDataSource.getClaimableTasks);
+
+  @override
   Future<Task> getTask(String id) => _guard(() => _remoteDataSource.getTask(id));
 
   @override
@@ -44,7 +48,8 @@ class TaskRepositoryImpl implements TaskRepository {
   Future<Task> createTask({
     required String title,
     String? description,
-    required String assigneeEmployeeId,
+    String? assigneeEmployeeId,
+    String? departmentId,
     String? priority,
     required String dueDate,
     String? projectId,
@@ -53,6 +58,7 @@ class TaskRepositoryImpl implements TaskRepository {
       title: title,
       description: description,
       assigneeEmployeeId: assigneeEmployeeId,
+      departmentId: departmentId,
       priority: priority,
       dueDate: dueDate,
       projectId: projectId,
@@ -81,8 +87,28 @@ class TaskRepositoryImpl implements TaskRepository {
   );
 
   @override
-  Future<Task> updateStatus(String id, String status) =>
-      _guard(() => _remoteDataSource.updateStatus(id, status));
+  Future<Task> updateProgress(
+    String id, {
+    String? status,
+    String? dueDate,
+    String? progressRemarks,
+  }) => _guard(
+    () => _remoteDataSource.updateProgress(
+      id,
+      status: status,
+      dueDate: dueDate,
+      progressRemarks: progressRemarks,
+    ),
+  );
+
+  @override
+  Future<Task> claimTask(String id) =>
+      _guard(() => _remoteDataSource.claimTask(id));
+
+  @override
+  Future<Task> assignTeamMember(String id, String employeeId) => _guard(
+    () => _remoteDataSource.assignTeamMember(id, employeeId),
+  );
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

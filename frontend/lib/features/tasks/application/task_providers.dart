@@ -36,6 +36,11 @@ final teamTasksProvider = FutureProvider.autoDispose<List<Task>>((ref) {
   return ref.watch(taskRepositoryProvider).getTeamTasks();
 });
 
+final claimableTasksProvider = FutureProvider.autoDispose<List<Task>>((ref) {
+  ref.watch(authControllerProvider);
+  return ref.watch(taskRepositoryProvider).getClaimableTasks();
+});
+
 final taskProvider = FutureProvider.autoDispose.family<Task, String>((
   ref,
   id,

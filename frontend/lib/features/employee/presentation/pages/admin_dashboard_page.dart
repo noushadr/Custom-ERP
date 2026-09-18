@@ -10,6 +10,7 @@ import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/upcoming_birthday.dart';
+import '../../domain/entities/upcoming_work_anniversary.dart';
 import '../widgets/company_notices_section.dart';
 import '../widgets/employee_avatar.dart';
 
@@ -46,9 +47,20 @@ class _DashboardStats extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
+          const Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              SizedBox(width: 240, child: _EmployeeOfMonthCard()),
+              SizedBox(width: 240, child: _LastBirthdayCard()),
+              SizedBox(width: 240, child: _UpcomingBirthdayCard()),
+              SizedBox(width: 240, child: _UpcomingWorkAnniversaryCard()),
+              SizedBox(width: 240, child: _UpcomingHolidayCard()),
+            ],
+          ),
+          const SizedBox(height: 18),
+          CompanyNoticesSection(
+            trailing: FilledButton.icon(
               onPressed: () => showDialog<void>(
                 context: context,
                 builder: (_) => const _PostNoticeDialog(),
@@ -57,19 +69,6 @@ class _DashboardStats extends StatelessWidget {
               label: const Text('Post notice'),
             ),
           ),
-          const SizedBox(height: 14),
-          const Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              SizedBox(width: 240, child: _EmployeeOfMonthCard()),
-              SizedBox(width: 240, child: _LastBirthdayCard()),
-              SizedBox(width: 240, child: _UpcomingBirthdayCard()),
-              SizedBox(width: 240, child: _UpcomingHolidayCard()),
-            ],
-          ),
-          const SizedBox(height: 18),
-          const CompanyNoticesSection(),
         ],
       ),
     );
@@ -279,6 +278,58 @@ class _UpcomingBirthdayCard extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  String _inLabel(int daysUntil) =>
+      daysUntil == 1 ? 'in 1 day' : 'in $daysUntil days';
+}
+
+/// Unlike the birthday cards (always exactly one person), a work-anniversary
+/// month can genuinely have several employees hitting theirs together — this
+/// stacks one `_SpotlightPerson` row per anniversary in that month instead of
+/// showing just the single soonest one.
+class _UpcomingWorkAnniversaryCard extends ConsumerWidget {
+  const _UpcomingWorkAnniversaryCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final spotlightAsync = ref.watch(workAnniversarySpotlightProvider);
+
+    return _SpotlightCard(
+      title: 'Upcoming Work Anniversary',
+      icon: Icons.military_tech_outlined,
+      color: AppColors.accentTeal,
+      child: spotlightAsync.when(
+        loading: () => const _SpotlightEmpty('Loading…'),
+        error: (_, _) => const _SpotlightEmpty('Could not load.'),
+        data: (anniversaries) {
+          if (anniversaries.isEmpty) {
+            return const _SpotlightEmpty('No upcoming work anniversaries.');
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < anniversaries.length; i++) ...[
+                _SpotlightPerson(
+                  fullName: anniversaries[i].fullName,
+                  photoUrl: anniversaries[i].profilePhotoUrl,
+                  caption: _caption(anniversaries[i]),
+                ),
+                if (i < anniversaries.length - 1) const SizedBox(height: 10),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _caption(UpcomingWorkAnniversary anniversary) {
+    final years = anniversary.yearsOfService;
+    final yearsLabel = years == 1 ? '1 year' : '$years years';
+    if (anniversary.daysUntil == 0) return '$yearsLabel · Today! 🎉';
+    return '$yearsLabel · ${_inLabel(anniversary.daysUntil)}';
   }
 
   String _inLabel(int daysUntil) =>

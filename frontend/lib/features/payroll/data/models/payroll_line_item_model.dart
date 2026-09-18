@@ -1,3 +1,4 @@
+import '../../../../shared/utils/photo_url.dart';
 import '../../domain/entities/payroll_line_item.dart';
 
 class PayrollLineItemModel extends PayrollLineItem {
@@ -24,7 +25,7 @@ class PayrollLineItemModel extends PayrollLineItem {
         freelancerId: json['freelancerId'] as String?,
         isFreelancer: json['isFreelancer'] as bool,
         employeeName: json['employeeName'] as String,
-        employeePhotoUrl: json['employeePhotoUrl'] as String?,
+        employeePhotoUrl: resolvePhotoUrl(json['employeePhotoUrl'] as String?),
         baseSalary: (json['baseSalary'] as num).toDouble(),
         quantity: json['quantity'] as int?,
         perUnitRate: (json['perUnitRate'] as num?)?.toDouble(),

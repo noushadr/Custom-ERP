@@ -67,6 +67,16 @@ class EmployeeRemoteDataSource {
         .toList();
   }
 
+  Future<List<UpcomingWorkAnniversaryModel>> getWorkAnniversarySpotlight() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/employees/anniversaries/spotlight',
+    );
+    return (response.data!['anniversaries'] as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(UpcomingWorkAnniversaryModel.fromJson)
+        .toList();
+  }
+
   Future<int> getActiveEmployeeDelta({int days = 7}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/employees/stats/active-delta',

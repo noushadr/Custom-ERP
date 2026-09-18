@@ -27,6 +27,19 @@ final teamGoalsProvider = FutureProvider.autoDispose<List<Goal>>((ref) {
   return ref.watch(goalRepositoryProvider).getTeam();
 });
 
+/// A Team Lead's own goals plus their direct reports' — `GoalsPage` shows
+/// this combined list instead of [teamGoalsProvider] alone, since a Team
+/// Lead is also an employee with their own goals to set. No new backend
+/// route: just the two existing calls run together.
+final myAndTeamGoalsProvider = FutureProvider.autoDispose<List<Goal>>((
+  ref,
+) async {
+  ref.watch(authControllerProvider);
+  final repository = ref.watch(goalRepositoryProvider);
+  final results = await Future.wait([repository.getMine(), repository.getTeam()]);
+  return [...results[0], ...results[1]];
+});
+
 final allGoalsProvider = FutureProvider.autoDispose<List<Goal>>((ref) {
   ref.watch(authControllerProvider);
   return ref.watch(goalRepositoryProvider).getAll();

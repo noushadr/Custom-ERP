@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/utils/date_format.dart';
 import '../../shared/widgets/announcement_banner.dart';
 import '../../shared/widgets/app_footer.dart';
 import '../../shared/widgets/zera_logo.dart';
@@ -434,15 +435,32 @@ class _TopBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      // A Stack rather than nesting the date inside the Row, so it's
+      // centered on the bar as a whole regardless of how wide the title or
+      // the actions cluster on either side happen to be.
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const Spacer(),
-          if (actions != null)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: actions!,
+          // Only the admin Dashboard gets today's date — the ask was for
+          // "the dashboard heading" specifically, not every page's header.
+          if (title == 'Dashboard')
+            Text(
+              formatDisplayDateOnly(DateTime.now()),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
+          Row(
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const Spacer(),
+              if (actions != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: actions!,
+                ),
+            ],
+          ),
         ],
       ),
     );

@@ -6,10 +6,12 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/department.dart';
+import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/presentation/widgets/employee_avatar.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/features/tasks/domain/entities/task_status.dart';
 import 'package:zera_erp/features/tasks/presentation/pages/task_detail_page.dart';
+import 'package:zera_erp/shared/models/named_ref.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
@@ -18,6 +20,8 @@ import '../../helpers/fake_task.dart';
 Widget _app({
   AuthUser user = testAuthUser,
   List<Department> departments = const [],
+  List<Employee> employees = const [],
+  Employee? me,
   required FakeTaskRepository repository,
 }) {
   return ProviderScope(
@@ -26,7 +30,11 @@ Widget _app({
         (ref) => PresetAuthController(AuthAuthenticated(user)),
       ),
       employeeRepositoryProvider.overrideWithValue(
-        FakeEmployeeRepository(departments: departments),
+        FakeEmployeeRepository(
+          departments: departments,
+          employees: employees,
+          me: me,
+        ),
       ),
       taskRepositoryProvider.overrideWithValue(repository),
     ],
@@ -57,24 +65,28 @@ void main() {
     expect(find.text('Quarterly summary'), findsOneWidget);
   });
 
-  testWidgets('changing the status dropdown updates the task status', (
-    tester,
-  ) async {
-    final repository = FakeTaskRepository(
-      taskById: buildTestTask(status: TaskStatus.todo),
-    );
+  testWidgets(
+    'shows status as a read-only badge, with no separate progress-remarks '
+    'control — a single Comments section is the only way to post an update '
+    '(status/priority/due date changes live on the tasks list row instead)',
+    (tester) async {
+      final repository = FakeTaskRepository(
+        taskById: buildTestTask(status: TaskStatus.inProgress),
+      );
 
-    await tester.pumpWidget(_app(repository: repository));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(DropdownButton<String>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('In Progress').last);
-    await tester.pumpAndSettle();
-
-    expect(repository.lastStatusUpdatedId, 'task-1');
-    expect(repository.lastStatusUpdatedStatus, TaskStatus.inProgress);
-  });
+      expect(find.text('In Progress'), findsOneWidget);
+      expect(find.byType(DropdownButton<String>), findsNothing);
+      expect(find.byIcon(Icons.calendar_today_outlined), findsNothing);
+      expect(find.byKey(const Key('progress-remarks-input')), findsNothing);
+      expect(find.text('Save remarks'), findsNothing);
+      expect(find.text('Comments'), findsOneWidget);
+      expect(find.text('Discussion'), findsNothing);
+      expect(find.text('Progress'), findsNothing);
+    },
+  );
 
   testWidgets('shows existing comments and posts a new one', (tester) async {
     final repository = FakeTaskRepository(
@@ -89,13 +101,39 @@ void main() {
 
     expect(find.text('Looks good.'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'On it.');
+    await tester.enterText(find.byKey(const Key('comment-input')), 'On it.');
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Post'));
     await tester.tap(find.widgetWithText(FilledButton, 'Post'));
     await tester.pumpAndSettle();
 
     expect(repository.lastCommentedId, 'task-1');
     expect(repository.lastCommentBody, 'On it.');
+  });
+
+  testWidgets('an unclaimed task also shows the merged Comments section, not a '
+      'separate Discussion card', (tester) async {
+    final repository = FakeTaskRepository(
+      taskById: buildTestTask(
+        assigneeEmployeeId: null,
+        assigneeName: null,
+        departmentId: 'dept-1',
+        departmentName: 'Engineering',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _app(
+        repository: repository,
+        me: buildTestEmployee(
+          id: 'someone-else-entirely',
+          department: const NamedRef(id: 'dept-2', name: 'Sales'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Comments'), findsOneWidget);
+    expect(find.text('Discussion'), findsNothing);
   });
 
   testWidgets('shows history entries', (tester) async {
@@ -221,4 +259,98 @@ void main() {
 
     expect(find.text('Edit'), findsNothing);
   });
+
+  testWidgets(
+    'a member of the task\'s own team sees an Accept button and claiming it '
+    'calls the repository',
+    (tester) async {
+      final repository = FakeTaskRepository(
+        taskById: buildTestTask(
+          assigneeEmployeeId: null,
+          assigneeName: null,
+          departmentId: 'dept-1',
+          departmentName: 'Engineering',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          me: buildTestEmployee(
+            id: 'employee-1',
+            department: const NamedRef(id: 'dept-1', name: 'Engineering'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('This task is assigned to Engineering'),
+        findsOneWidget,
+      );
+      expect(find.text('Accept this task'), findsOneWidget);
+
+      await tester.tap(find.text('Accept this task'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastClaimedId, 'task-1');
+    },
+  );
+
+  testWidgets(
+    "the team's head can pick a specific member for an unclaimed task",
+    (tester) async {
+      final repository = FakeTaskRepository(
+        taskById: buildTestTask(
+          assigneeEmployeeId: null,
+          assigneeName: null,
+          departmentId: 'dept-1',
+          departmentName: 'Engineering',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          me: buildTestEmployee(
+            id: 'head-1',
+            department: const NamedRef(id: 'dept-1', name: 'Engineering'),
+          ),
+          employees: [
+            buildTestEmployee(
+              id: 'employee-2',
+              fullName: 'Target Person',
+              department: const NamedRef(id: 'dept-1', name: 'Engineering'),
+            ),
+          ],
+          departments: const [
+            Department(
+              id: 'dept-1',
+              name: 'Engineering',
+              headEmployeeId: 'head-1',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assign a team member'), findsOneWidget);
+
+      await tester.tap(
+        find.widgetWithText(
+          DropdownButtonFormField<String>,
+          'Assign a team member',
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Target Person').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Assign'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastAssignedMemberTaskId, 'task-1');
+      expect(repository.lastAssignedMemberEmployeeId, 'employee-2');
+    },
+  );
 }

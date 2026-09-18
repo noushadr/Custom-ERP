@@ -8,25 +8,30 @@ import {
 } from './task-response.interface';
 
 /** Flattens to a DTO before returning from a controller — same convention as
- * toKnowledgeBaseArticleResponse/toPerformanceReviewResponse. `departmentId`/
- * `departmentName` are derived from the eager-loaded `assignee.department`
- * rather than stored on Task itself, so they can never drift out of sync. */
+ * toKnowledgeBaseArticleResponse/toPerformanceReviewResponse. `assignee` is
+ * null for a task still assigned to a team, not yet a person; `department`
+ * always comes from Task's own stored column now, never derived from
+ * `assignee.department` (that would have nothing to derive from once
+ * `assignee` can be null). */
 export function toTaskResponse(task: Task): TaskResponseDto {
   return {
     id: task.id,
     title: task.title,
     description: task.description,
     assigneeEmployeeId: task.assigneeEmployeeId,
-    assigneeName: `${task.assignee.firstName} ${task.assignee.lastName}`,
-    assigneePhotoUrl: task.assignee.profilePhotoUrl ?? null,
-    departmentId: task.assignee.departmentId ?? null,
-    departmentName: task.assignee.department?.name ?? null,
+    assigneeName: task.assignee
+      ? `${task.assignee.firstName} ${task.assignee.lastName}`
+      : null,
+    assigneePhotoUrl: task.assignee?.profilePhotoUrl ?? null,
+    departmentId: task.departmentId,
+    departmentName: task.department?.name ?? null,
     assignedByUserId: task.assignedByUserId,
     assignedByName: task.assignedByName,
     assignedByPhotoUrl: task.assignedByPhotoUrl,
     priority: task.priority,
     dueDate: task.dueDate,
     status: task.status,
+    progressRemarks: task.progressRemarks ?? null,
     completedAt: task.completedAt?.toISOString() ?? null,
     projectId: task.projectId ?? null,
     createdAt: task.createdAt.toISOString(),

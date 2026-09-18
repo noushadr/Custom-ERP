@@ -1,5 +1,5 @@
-import '../../../../core/config/app_config.dart';
 import '../../../../shared/models/named_ref.dart';
+import '../../../../shared/utils/photo_url.dart';
 import '../../domain/entities/employee.dart';
 
 class EmployeeModel extends Employee {
@@ -51,7 +51,7 @@ class EmployeeModel extends Employee {
     firstName: json['firstName'] as String,
     lastName: json['lastName'] as String,
     fullName: json['fullName'] as String,
-    profilePhotoUrl: _resolvePhotoUrl(json['profilePhotoUrl'] as String?),
+    profilePhotoUrl: resolvePhotoUrl(json['profilePhotoUrl'] as String?),
     designation: json['designation'] as String?,
     department: json['department'] == null
         ? null
@@ -83,21 +83,12 @@ class EmployeeModel extends Employee {
     profileCompletionPercentage: json['profileCompletionPercentage'] as int,
   );
 
-  /// The backend returns photo paths relative to itself (e.g.
-  /// `/uploads/avatars/ZC-00001.jpg`) so the API response stays portable
-  /// across environments; resolve it against our known API base here.
-  static String? _resolvePhotoUrl(String? url) {
-    if (url == null || url.isEmpty) return null;
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    return '${AppConfig.apiBaseUrl}$url';
-  }
-
   static NamedRef? _resolveReportingManager(Map<String, dynamic>? json) {
     if (json == null) return null;
     return NamedRef(
       id: json['id'] as String,
       name: json['name'] as String,
-      photoUrl: _resolvePhotoUrl(json['photoUrl'] as String?),
+      photoUrl: resolvePhotoUrl(json['photoUrl'] as String?),
     );
   }
 }

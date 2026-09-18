@@ -53,6 +53,9 @@ class EmployeeAuditLogPanel extends ConsumerWidget {
   }
 }
 
+/// One line per change: field + what changed on the left (ellipsized rather
+/// than wrapping), who/when on the right — same shape as the company-wide
+/// log's row, so a record never needs more height than a single line.
 class _AuditLogRow extends StatelessWidget {
   const _AuditLogRow({required this.entry});
 
@@ -60,18 +63,26 @@ class _AuditLogRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium;
+    final emphasisStyle = bodyStyle?.copyWith(fontWeight: FontWeight.w600);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          entry.fieldLabel,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              style: bodyStyle,
+              children: [
+                TextSpan(text: entry.fieldLabel, style: emphasisStyle),
+                TextSpan(text: ': ${entry.describeChange}'),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        const SizedBox(height: 4),
-        Text(entry.describeChange, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 4),
+        const SizedBox(width: 12),
         Text(
           '${entry.actorName} · ${formatDisplayDateTime(entry.createdAt)}',
           style: Theme.of(

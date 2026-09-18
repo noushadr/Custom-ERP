@@ -88,6 +88,7 @@ import {
 import { BirthdaySpotlightResponse } from './birthday-spotlight-response.interface';
 import { UpcomingBirthdayResponse } from './upcoming-birthday-response.interface';
 import { UpcomingWorkAnniversaryResponse } from './upcoming-work-anniversary-response.interface';
+import { WorkAnniversarySpotlightResponse } from './work-anniversary-spotlight-response.interface';
 
 const DEFAULT_EMPLOYEE_ROLE = 'Employee';
 const COMPANY_AUDIT_LOG_DEFAULT_LIMIT = 10;
@@ -323,6 +324,31 @@ export class EmployeesService {
         daysUntil,
         yearsOfService,
       }));
+  }
+
+  /** Every upcoming work anniversary that falls in the same calendar month
+   * as the soonest one, for the Admin Dashboard's "Upcoming Work
+   * Anniversary" card — unlike birthdays, more than one employee can
+   * reasonably share this spotlight (a whole month's worth of anniversaries)
+   * rather than always picking exactly one. `getUpcomingWorkAnniversaries`
+   * called with a wide, future-only window (`recentDays: 0` excludes
+   * anything already passed, matching "today counts as upcoming" everywhere
+   * else in this file) gives every anniversary within the year, sorted
+   * soonest-first; grouping by `new Date(joiningDate).getMonth()` works
+   * because that month is invariant across years by construction (see
+   * `closestAnnualOccurrence`), and since every entry here is computed
+   * against the same `today`, two different employees can never land the
+   * same month in two different calendar years. */
+  async getWorkAnniversarySpotlight(): Promise<WorkAnniversarySpotlightResponse> {
+    const upcoming = await this.getUpcomingWorkAnniversaries(366, 0);
+    if (upcoming.length === 0) return { anniversaries: [] };
+
+    const soonestMonth = new Date(upcoming[0].joiningDate).getMonth();
+    return {
+      anniversaries: upcoming.filter(
+        (a) => new Date(a.joiningDate).getMonth() === soonestMonth,
+      ),
+    };
   }
 
   /** How the company-wide active-employee count has changed over the last

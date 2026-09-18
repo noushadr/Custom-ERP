@@ -2,8 +2,8 @@ export interface TaskResponseDto {
   id: string;
   title: string;
   description: string | null;
-  assigneeEmployeeId: string;
-  assigneeName: string;
+  assigneeEmployeeId: string | null;
+  assigneeName: string | null;
   assigneePhotoUrl: string | null;
   departmentId: string | null;
   departmentName: string | null;
@@ -13,6 +13,7 @@ export interface TaskResponseDto {
   priority: string;
   dueDate: string;
   status: string;
+  progressRemarks: string | null;
   completedAt: string | null;
   projectId: string | null;
   createdAt: string;

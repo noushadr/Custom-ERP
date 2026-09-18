@@ -46,16 +46,61 @@ Widget _app({
 
 void main() {
   testWidgets(
-    'shows a fallback message for someone who neither manages goals nor has direct reports',
+    'a plain employee sees My Goals and can add a goal for themselves with no approval',
     (tester) async {
-      await tester.pumpWidget(_app());
+      final goalRepository = FakeGoalRepository(
+        mine: [buildTestGoal(employeeName: 'Jane Doe')],
+      );
+      await tester.pumpWidget(_app(goalRepository: goalRepository));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining("Goals are set by your manager or HR/Admin"),
-        findsOneWidget,
+      expect(find.text('My Goals'), findsOneWidget);
+      // No employee/department picker or search/filter row — it's always
+      // implicitly "for me".
+      expect(find.text('Search by employee name'), findsNothing);
+      expect(find.text('Individual'), findsNothing);
+
+      await tester.tap(find.text('Add Goal'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Goal'),
+        'Learn Flutter',
       );
-      expect(find.text('Add Goal'), findsNothing);
+      await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+      await tester.pumpAndSettle();
+
+      expect(goalRepository.lastCreatedWasSelfScoped, isTrue);
+      expect(goalRepository.lastCreatedTitle, 'Learn Flutter');
+    },
+  );
+
+  testWidgets(
+    "an employee can edit their own goal's achievement percentage and archive it",
+    (tester) async {
+      final goalRepository = FakeGoalRepository(
+        mine: [buildTestGoal(id: 'goal-9', achievementPercentage: 10)],
+      );
+      await tester.pumpWidget(_app(goalRepository: goalRepository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Edit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Achieved'), findsOneWidget);
+      expect(find.byType(Slider), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(goalRepository.lastActionWasSelfScoped, isTrue);
+      expect(goalRepository.lastUpdatedAchievementPercentage, 10);
+
+      await tester.tap(find.byTooltip('Archive'));
+      await tester.pumpAndSettle();
+
+      expect(goalRepository.lastArchivedGoalId, 'goal-9');
+      expect(goalRepository.lastActionWasSelfScoped, isTrue);
     },
   );
 
@@ -147,10 +192,23 @@ void main() {
   );
 
   testWidgets(
-    'a Team Lead sees only their team\'s goals, scoped to their own direct reports when adding',
+    'a Team Lead sees both their own goals and their team\'s, with no department filter',
     (tester) async {
       final goalRepository = FakeGoalRepository(
-        team: [buildTestGoal(employeeName: 'Babar Hussain')],
+        mine: [
+          buildTestGoal(
+            id: 'goal-mine',
+            employeeId: 'employee-1',
+            employeeName: 'Jane Doe',
+          ),
+        ],
+        team: [
+          buildTestGoal(
+            id: 'goal-team',
+            employeeId: 'report-1',
+            employeeName: 'Babar Hussain',
+          ),
+        ],
       );
       await tester.pumpWidget(
         _app(
@@ -165,15 +223,43 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text("My Team's Goals"), findsOneWidget);
-      // No admin-only "Individual"/"Whole department" toggle for a TL.
+      expect(find.text("My Goals & Team's Goals"), findsOneWidget);
+      expect(find.text('Jane Doe'), findsOneWidget);
+      expect(find.text('Babar Hussain'), findsOneWidget);
+      // No admin-only "Individual"/"Whole department" toggle, and no
+      // department filter — a Team Lead's list is always just this small,
+      // already-scoped set.
       expect(find.text('Whole department'), findsNothing);
+      expect(
+        find.widgetWithText(DropdownButtonFormField<String?>, 'Department'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'a Team Lead can add a goal for a direct report, or for themselves via "Myself"',
+    (tester) async {
+      final goalRepository = FakeGoalRepository();
+      await tester.pumpWidget(
+        _app(
+          role: 'Team Lead',
+          goalRepository: goalRepository,
+          employeeRepository: FakeEmployeeRepository(
+            directReports: [
+              buildTestEmployee(id: 'report-1', fullName: 'Babar Hussain'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Add Goal'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Employee'));
       await tester.pumpAndSettle();
+      expect(find.text('Myself'), findsOneWidget);
       await tester.tap(find.text('Babar Hussain').last);
       await tester.pumpAndSettle();
 
@@ -186,6 +272,24 @@ void main() {
 
       expect(goalRepository.lastCreatedEmployeeId, 'report-1');
       expect(goalRepository.lastActionWasManagerScoped, isTrue);
+
+      await tester.tap(find.text('Add Goal'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Employee'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Myself').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Goal'),
+        'Public speaking',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+      await tester.pumpAndSettle();
+
+      expect(goalRepository.lastCreatedWasSelfScoped, isTrue);
+      expect(goalRepository.lastCreatedTitle, 'Public speaking');
     },
   );
 
@@ -236,7 +340,7 @@ void main() {
       _app(
         role: 'Team Lead',
         goalRepository: FakeGoalRepository(
-          team: [buildTestGoal(id: 'goal-9')],
+          team: [buildTestGoal(id: 'goal-9', employeeId: 'report-1')],
         ),
         employeeRepository: FakeEmployeeRepository(
           directReports: [buildTestEmployee(id: 'report-1')],

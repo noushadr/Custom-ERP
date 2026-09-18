@@ -13,15 +13,6 @@ export class TypeOrmPerformanceReviewResponseRepository
     private readonly repository: Repository<PerformanceReviewResponse>,
   ) {}
 
-  findByReviewId(
-    performanceReviewId: string,
-  ): Promise<PerformanceReviewResponse[]> {
-    return this.repository.find({
-      where: { performanceReviewId },
-      order: { sortOrder: 'ASC' },
-    });
-  }
-
   save(
     item: PerformanceReviewResponse,
   ): Promise<PerformanceReviewResponse> {

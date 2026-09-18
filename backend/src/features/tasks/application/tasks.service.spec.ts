@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
 import { Department } from '../../departments/domain/entities/department.entity';
 import type { DepartmentRepository } from '../../departments/domain/repositories/department-repository.interface';
@@ -39,6 +43,9 @@ function buildTask(overrides: Partial<Task> = {}): Task {
     description: null,
     assigneeEmployeeId: 'employee-1',
     assignee: buildEmployee(),
+    departmentId: 'dept-1',
+    department: buildDepartment(),
+    progressRemarks: null,
     assignedByUserId: 'manager-user-1',
     assignedByName: 'Manager Person',
     assignedByPhotoUrl: null,
@@ -162,10 +169,12 @@ describe('TasksService', () => {
       taskRepository.findAll.mockResolvedValue([
         buildTask({
           id: 'task-1',
+          departmentId: 'dept-1',
           assignee: buildEmployee({ departmentId: 'dept-1' }),
         }),
         buildTask({
           id: 'task-2',
+          departmentId: 'dept-2',
           assignee: buildEmployee({
             id: 'employee-2',
             departmentId: 'dept-2',
@@ -268,6 +277,27 @@ describe('TasksService', () => {
       await expect(
         service.getTaskForActor('task-1', 'stranger-user-1', false),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('is visible to any member of the team while the task is unclaimed', async () => {
+      taskRepository.findById.mockResolvedValue(
+        buildTask({
+          assigneeEmployeeId: null,
+          assignee: null,
+          departmentId: 'dept-1',
+        }),
+      );
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-2', departmentId: 'dept-1' }),
+      );
+
+      const result = await service.getTaskForActor(
+        'task-1',
+        'employee-user-2',
+        false,
+      );
+
+      expect(result.id).toBe('task-1');
     });
   });
 
@@ -402,9 +432,207 @@ describe('TasksService', () => {
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it('lets any employee assign a new task straight to a team, no override needed', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'plain-1' }),
+      );
+      departmentRepository.findById.mockResolvedValue(
+        buildDepartment({ id: 'dept-1', name: 'Engineering' }),
+      );
+      taskRepository.findById.mockImplementation((id) =>
+        Promise.resolve(
+          buildTask({ id, assigneeEmployeeId: null, assignee: null }),
+        ),
+      );
+
+      const result = await service.createTask(
+        { title: 'New task', departmentId: 'dept-1', dueDate: '2026-12-01' },
+        'plain-user-1',
+        false,
+      );
+
+      expect(result).toBeDefined();
+      const savedTask = taskRepository.save.mock.calls[0][0];
+      expect(savedTask.assigneeEmployeeId).toBeNull();
+      expect(savedTask.departmentId).toBe('dept-1');
+      const savedLog = auditLogRepository.save.mock.calls[0][0];
+      expect(savedLog.newValue).toBe('Assigned to team: Engineering');
+    });
+
+    it('400s when neither an employee nor a department is given', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'plain-1' }),
+      );
+
+      await expect(
+        service.createTask(
+          { title: 'New task', dueDate: '2026-12-01' },
+          'plain-user-1',
+          false,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 
-  describe('updateStatus', () => {
+  describe('claimTask', () => {
+    it('lets a member of the task\'s own team claim it', async () => {
+      const task = buildTask({
+        assigneeEmployeeId: null,
+        assignee: null,
+        departmentId: 'dept-1',
+      });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({
+          id: 'employee-2',
+          firstName: 'Aamna',
+          lastName: 'Irfan',
+          departmentId: 'dept-1',
+        }),
+      );
+
+      await service.claimTask('task-1', 'user-2');
+
+      const savedTask = taskRepository.save.mock.calls[0][0];
+      expect(savedTask.assigneeEmployeeId).toBe('employee-2');
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: task.assignedByUserId }),
+      );
+    });
+
+    it('rejects someone outside the task\'s team', async () => {
+      const task = buildTask({
+        assigneeEmployeeId: null,
+        assignee: null,
+        departmentId: 'dept-1',
+      });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'stranger-1', departmentId: 'dept-2' }),
+      );
+
+      await expect(
+        service.claimTask('task-1', 'stranger-user-1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects claiming an already-claimed task', async () => {
+      taskRepository.findById.mockResolvedValue(buildTask());
+
+      await expect(
+        service.claimTask('task-1', 'user-2'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('assignTeamMember', () => {
+    it("lets the team's head assign a member to an unclaimed task", async () => {
+      const task = buildTask({
+        assigneeEmployeeId: null,
+        assignee: null,
+        departmentId: 'dept-1',
+      });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'head-1' }),
+      );
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({
+          id: 'employee-2',
+          firstName: 'Aamna',
+          lastName: 'Irfan',
+          departmentId: 'dept-1',
+        }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+      ]);
+
+      await service.assignTeamMember(
+        'task-1',
+        { employeeId: 'employee-2' },
+        'head-user-1',
+        false,
+      );
+
+      const savedTask = taskRepository.save.mock.calls[0][0];
+      expect(savedTask.assigneeEmployeeId).toBe('employee-2');
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: task.assignedByUserId }),
+      );
+    });
+
+    it("rejects a member from a different department than the task's team", async () => {
+      const task = buildTask({
+        assigneeEmployeeId: null,
+        assignee: null,
+        departmentId: 'dept-1',
+      });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'head-1' }),
+      );
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ id: 'employee-2', departmentId: 'dept-2' }),
+      );
+      departmentRepository.findAll.mockResolvedValue([
+        buildDepartment({ id: 'dept-1', headEmployeeId: 'head-1' }),
+        buildDepartment({ id: 'dept-2', headEmployeeId: 'head-1' }),
+      ]);
+
+      await expect(
+        service.assignTeamMember(
+          'task-1',
+          { employeeId: 'employee-2' },
+          'head-user-1',
+          false,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects assigning a member to an already-claimed task', async () => {
+      taskRepository.findById.mockResolvedValue(buildTask());
+
+      await expect(
+        service.assignTeamMember(
+          'task-1',
+          { employeeId: 'employee-2' },
+          'head-user-1',
+          true,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('getClaimableTasks', () => {
+    it("returns unclaimed tasks in the caller's own department", async () => {
+      taskRepository.findAll.mockResolvedValue([
+        buildTask({
+          id: 'task-1',
+          assigneeEmployeeId: null,
+          assignee: null,
+          departmentId: 'dept-1',
+        }),
+        buildTask({ id: 'task-2', departmentId: 'dept-1' }),
+        buildTask({
+          id: 'task-3',
+          assigneeEmployeeId: null,
+          assignee: null,
+          departmentId: 'dept-2',
+        }),
+      ]);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ departmentId: 'dept-1' }),
+      );
+
+      const result = await service.getClaimableTasks('user-1');
+
+      expect(result.map((t) => t.id)).toEqual(['task-1']);
+    });
+  });
+
+  describe('updateProgress', () => {
     it('lets the assignee change their own task status', async () => {
       const task = buildTask({ status: TaskStatus.TODO });
       taskRepository.findById.mockResolvedValue(task);
@@ -412,7 +640,7 @@ describe('TasksService', () => {
         buildEmployee({ id: 'employee-1' }),
       );
 
-      const result = await service.updateStatus(
+      const result = await service.updateProgress(
         'task-1',
         { status: TaskStatus.IN_PROGRESS },
         'user-1',
@@ -429,7 +657,7 @@ describe('TasksService', () => {
         buildEmployee({ id: 'employee-1' }),
       );
 
-      await service.updateStatus(
+      await service.updateProgress(
         'task-1',
         { status: TaskStatus.COMPLETED },
         'user-1',
@@ -438,7 +666,7 @@ describe('TasksService', () => {
 
       expect(task.completedAt).not.toBeNull();
 
-      await service.updateStatus(
+      await service.updateProgress(
         'task-1',
         { status: TaskStatus.IN_PROGRESS },
         'user-1',
@@ -453,7 +681,7 @@ describe('TasksService', () => {
       taskRepository.findById.mockResolvedValue(task);
       employeeRepository.findByUserId.mockResolvedValue(null);
 
-      const result = await service.updateStatus(
+      const result = await service.updateProgress(
         'task-1',
         { status: TaskStatus.CANCELLED },
         'manager-1',
@@ -473,13 +701,50 @@ describe('TasksService', () => {
       ]);
 
       await expect(
-        service.updateStatus(
+        service.updateProgress(
           'task-1',
           { status: TaskStatus.CANCELLED },
           'stranger-user-1',
           false,
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('lets the assignee update due date and progress remarks, and notifies the assigner', async () => {
+      const task = buildTask();
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1', firstName: 'Jane', lastName: 'Doe' }),
+      );
+
+      await service.updateProgress(
+        'task-1',
+        { dueDate: '2026-12-15', progressRemarks: 'Halfway done' },
+        'user-1',
+        false,
+      );
+
+      const savedTask = taskRepository.save.mock.calls[0][0];
+      expect(savedTask.dueDate).toBe('2026-12-15');
+      expect(savedTask.progressRemarks).toBe('Halfway done');
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: task.assignedByUserId }),
+      );
+    });
+
+    it("doesn't notify when a privileged editor (not the assignee) makes the change", async () => {
+      const task = buildTask();
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await service.updateProgress(
+        'task-1',
+        { progressRemarks: 'Manager note' },
+        'manager-1',
+        true,
+      );
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
     });
   });
 
@@ -544,7 +809,7 @@ describe('TasksService', () => {
         true,
       );
 
-      await service.updateStatus(
+      await service.updateProgress(
         'task-9',
         { status: TaskStatus.IN_PROGRESS },
         'admin-user-1',

@@ -984,6 +984,53 @@ describe('EmployeesService', () => {
     });
   });
 
+  describe('getWorkAnniversarySpotlight', () => {
+    it('includes every anniversary in the same month as the soonest one, excludes a later month', async () => {
+      const soon = buildEmployee({
+        id: 'employee-soon',
+        joiningDate: isoJoiningDateAnniversaryInDays(2, 5),
+      });
+      const sameMonth = buildEmployee({
+        id: 'employee-same-month',
+        joiningDate: isoJoiningDateAnniversaryInDays(1, 8),
+      });
+      const laterMonth = buildEmployee({
+        id: 'employee-later-month',
+        joiningDate: isoJoiningDateAnniversaryInDays(4, 60),
+      });
+      employeeRepository.findAll.mockResolvedValue([soon, sameMonth, laterMonth]);
+
+      const result = await service.getWorkAnniversarySpotlight();
+
+      expect(result.anniversaries.map((a) => a.employeeId)).toEqual([
+        'employee-soon',
+        'employee-same-month',
+      ]);
+    });
+
+    it('returns an empty list when nobody has an upcoming anniversary', async () => {
+      employeeRepository.findAll.mockResolvedValue([]);
+
+      const result = await service.getWorkAnniversarySpotlight();
+
+      expect(result.anniversaries).toEqual([]);
+    });
+
+    it("treats today's anniversary as upcoming, not excluded", async () => {
+      const today = buildEmployee({
+        id: 'employee-today',
+        joiningDate: isoJoiningDateAnniversaryInDays(1, 0),
+      });
+      employeeRepository.findAll.mockResolvedValue([today]);
+
+      const result = await service.getWorkAnniversarySpotlight();
+
+      expect(result.anniversaries.map((a) => a.employeeId)).toEqual([
+        'employee-today',
+      ]);
+    });
+  });
+
   describe('getActiveEmployeeDelta', () => {
     const DAY_MS = 24 * 60 * 60 * 1000;
     /** A timestamp [days] days before now, nudged half a day further back so

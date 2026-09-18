@@ -4,6 +4,7 @@ import { Permissions } from '../../authentication/presentation/decorators/permis
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
 import { BulkAssignGoalDto } from '../application/dto/bulk-assign-goal.dto';
 import { CreateGoalDto } from '../application/dto/create-goal.dto';
+import { CreateSelfGoalDto } from '../application/dto/create-self-goal.dto';
 import { UpdateGoalDto } from '../application/dto/update-goal.dto';
 import { GoalsService } from '../application/goals.service';
 
@@ -41,6 +42,14 @@ export class GoalsController {
     return this.goalsService.createForMyDirectReport(user.sub, dto);
   }
 
+  @Post('me')
+  createForSelf(
+    @Body() dto: CreateSelfGoalDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.goalsService.createForSelf(user.sub, dto);
+  }
+
   @Post('bulk-assign')
   @Permissions('goals.manage')
   bulkAssignToDepartment(
@@ -57,9 +66,7 @@ export class GoalsController {
     @Body() dto: UpdateGoalDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.goalsService.update(id, dto, user.sub, {
-      requireOwnDirectReport: false,
-    });
+    return this.goalsService.update(id, dto, user.sub, { scope: 'any' });
   }
 
   @Patch(':id/team')
@@ -69,22 +76,34 @@ export class GoalsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.goalsService.update(id, dto, user.sub, {
-      requireOwnDirectReport: true,
+      scope: 'ownDirectReport',
     });
+  }
+
+  @Patch(':id/me')
+  updateAsSelf(
+    @Param('id') id: string,
+    @Body() dto: UpdateGoalDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.goalsService.update(id, dto, user.sub, { scope: 'self' });
   }
 
   @Patch(':id/archive')
   @Permissions('goals.manage')
   archive(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.goalsService.archive(id, user.sub, {
-      requireOwnDirectReport: false,
-    });
+    return this.goalsService.archive(id, user.sub, { scope: 'any' });
   }
 
   @Patch(':id/team/archive')
   archiveAsManager(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.goalsService.archive(id, user.sub, {
-      requireOwnDirectReport: true,
+      scope: 'ownDirectReport',
     });
+  }
+
+  @Patch(':id/me/archive')
+  archiveAsSelf(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.goalsService.archive(id, user.sub, { scope: 'self' });
   }
 }

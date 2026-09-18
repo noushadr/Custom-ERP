@@ -185,6 +185,13 @@ export class EmployeesController {
   }
 
   // Must come before @Get(':id') for the same reason as "audit-log" above.
+  @Get('anniversaries/spotlight')
+  @Permissions('employees.manage')
+  getWorkAnniversarySpotlight() {
+    return this.employeesService.getWorkAnniversarySpotlight();
+  }
+
+  // Must come before @Get(':id') for the same reason as "audit-log" above.
   @Get('payroll/summary')
   @Permissions('employees.manage')
   getPayrollSummary() {

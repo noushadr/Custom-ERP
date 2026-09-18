@@ -1,6 +1,6 @@
-/// A single-assignee task. `departmentId`/`departmentName` reflect the
-/// assignee's current department (derived server-side, never stored) —
-/// always current, even after a reassignment.
+/// A task's [assigneeEmployeeId] is nullable — a task can be assigned to a
+/// whole team ([departmentId] set, no assignee yet) until either that
+/// team's head picks a specific member or a member claims it themself.
 class Task {
   const Task({
     required this.id,
@@ -17,6 +17,7 @@ class Task {
     required this.priority,
     required this.dueDate,
     required this.status,
+    required this.progressRemarks,
     required this.completedAt,
     required this.projectId,
     required this.createdAt,
@@ -26,8 +27,10 @@ class Task {
   final String id;
   final String title;
   final String? description;
-  final String assigneeEmployeeId;
-  final String assigneeName;
+
+  /// Null until the task is claimed by, or assigned to, a specific person.
+  final String? assigneeEmployeeId;
+  final String? assigneeName;
   final String? assigneePhotoUrl;
   final String? departmentId;
   final String? departmentName;
@@ -43,10 +46,16 @@ class Task {
 
   /// One of TaskStatus's values.
   final String status;
+
+  /// Free-text progress notes, settable by the assignee.
+  final String? progressRemarks;
   final DateTime? completedAt;
 
   /// Optional link to a Clients & Projects project.
   final String? projectId;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  /// Not yet picked up by anyone — assigned to a team, no assignee.
+  bool get isUnclaimed => assigneeEmployeeId == null;
 }

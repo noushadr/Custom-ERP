@@ -143,38 +143,93 @@ class _ProfileSummaryCard extends StatelessWidget {
             const SizedBox(height: 10),
             // A full-width row rather than nested inside the Expanded above,
             // so these chips still have room to wrap at narrow widths instead
-            // of being squeezed by the button column next to them.
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            // of being squeezed by the button column next to them. The
+            // completion ring trails the chips on the same row (rather than
+            // its own full-width bar below) so the row's right side never
+            // reads as empty dead space on a wide screen.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                InfoChip(icon: Icons.badge_outlined, label: employee.employeeCode),
-                EmploymentStatusBadge(status: employee.employmentStatus),
-                WorkModeBadge(workMode: employee.workMode),
-                if (employee.department != null)
-                  InfoChip(
-                    icon: Icons.apartment_outlined,
-                    label: 'Department: ${employee.department!.name}',
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      InfoChip(
+                        icon: Icons.badge_outlined,
+                        label: employee.employeeCode,
+                      ),
+                      EmploymentStatusBadge(status: employee.employmentStatus),
+                      WorkModeBadge(workMode: employee.workMode),
+                      if (employee.department != null)
+                        InfoChip(
+                          icon: Icons.apartment_outlined,
+                          label: 'Department: ${employee.department!.name}',
+                        ),
+                      if (employee.reportingManager != null)
+                        _ReportingManagerChip(
+                          manager: employee.reportingManager!,
+                        ),
+                    ],
                   ),
-                if (employee.reportingManager != null)
-                  _ReportingManagerChip(manager: employee.reportingManager!),
+                ),
+                const SizedBox(width: 16),
+                _ProfileCompletionRing(
+                  percentage: employee.profileCompletionPercentage,
+                ),
               ],
             ),
-            const SizedBox(height: 14),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: employee.profileCompletionPercentage / 100,
-                minHeight: 6,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact ring gauge for `profileCompletionPercentage` — replaces the old
+/// full-width linear bar + caption below the info chips, so this reads at a
+/// glance instead of needing its own row, and the color scales with
+/// completeness (amber while incomplete, green once done) rather than
+/// staying a single flat tone regardless of progress.
+class _ProfileCompletionRing extends StatelessWidget {
+  const _ProfileCompletionRing({required this.percentage});
+
+  final int percentage;
+
+  @override
+  Widget build(BuildContext context) {
+    final isComplete = percentage >= 100;
+    final ringColor = isComplete ? AppColors.success : AppColors.warning;
+
+    return Tooltip(
+      message: 'Profile $percentage% complete',
+      child: SizedBox(
+        width: 46,
+        height: 46,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: 46,
+              height: 46,
+              child: CircularProgressIndicator(
+                value: percentage / 100,
+                strokeWidth: 4,
+                strokeCap: StrokeCap.round,
                 backgroundColor: AppColors.borderSubtle,
+                valueColor: AlwaysStoppedAnimation(ringColor),
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Profile ${employee.profileCompletionPercentage}% complete',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            isComplete
+                ? Icon(Icons.check, size: 18, color: ringColor)
+                : Text(
+                    '$percentage%',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: ringColor,
+                    ),
+                  ),
           ],
         ),
       ),

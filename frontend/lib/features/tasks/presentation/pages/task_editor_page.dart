@@ -46,8 +46,15 @@ List<Employee> _authorizedAssignees({
       .toList();
 }
 
-/// Create or edit a task: title, description, assignee (restricted to the
-/// viewer's authorized pool), priority, and due date.
+enum _AssignTarget { individual, team }
+
+/// Create or edit a task: title, description, assignee, priority, and due
+/// date. Creating a new task offers a choice of assignment target — a
+/// specific person (restricted to the viewer's authorized pool, unchanged
+/// from before) or a whole team (open to anyone, no employee picker at
+/// all — the team itself picks up the task afterward). Editing an existing
+/// task only ever reassigns to a specific person, same as before; a team
+/// task's own claim/assign flow lives on the detail page instead.
 class TaskEditorPage extends ConsumerStatefulWidget {
   const TaskEditorPage({super.key, this.existingTask, this.initialProjectId});
 
@@ -67,7 +74,9 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
 
+  _AssignTarget _target = _AssignTarget.individual;
   String? _assigneeEmployeeId;
+  String? _departmentId;
   late String _priority;
   DateTime? _dueDate;
 
@@ -107,10 +116,34 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
     setState(() => _dueDate = picked);
   }
 
+  /// Whether the viewer is authorized to pick a specific person at all — a
+  /// `tasks.manage` holder, or anyone heading at least one department. Read
+  /// fresh here (not the `build`-time pool) since an authorized viewer
+  /// should still get the team-only path forced when they have nobody
+  /// actually assignable yet, not just when they lack authority.
+  bool _canPickPerson() {
+    final authState = ref.read(authControllerProvider);
+    final hasOverride =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('tasks.manage');
+    if (hasOverride) return true;
+    final myProfile = ref.read(myProfileProvider).valueOrNull;
+    final departments = ref.read(departmentsProvider).valueOrNull ?? const [];
+    return myProfile != null &&
+        departments.any((d) => d.headEmployeeId == myProfile.id);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_assigneeEmployeeId == null) {
+    final assignToTeam =
+        !_isEditing &&
+        (_target == _AssignTarget.team || !_canPickPerson());
+    if (!assignToTeam && _assigneeEmployeeId == null) {
       setState(() => _errorMessage = 'Select an assignee.');
+      return;
+    }
+    if (assignToTeam && _departmentId == null) {
+      setState(() => _errorMessage = 'Select a team.');
       return;
     }
     if (_dueDate == null) {
@@ -138,7 +171,8 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
           : await repository.createTask(
               title: _titleController.text.trim(),
               description: description.isEmpty ? null : description,
-              assigneeEmployeeId: _assigneeEmployeeId!,
+              assigneeEmployeeId: assignToTeam ? null : _assigneeEmployeeId,
+              departmentId: assignToTeam ? _departmentId : null,
               priority: _priority,
               dueDate: _isoDate(_dueDate!),
               projectId: widget.initialProjectId,
@@ -151,6 +185,7 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
       ref.invalidate(myTasksProvider);
       ref.invalidate(tasksAssignedByMeProvider);
       ref.invalidate(teamTasksProvider);
+      ref.invalidate(claimableTasksProvider);
       ref.invalidate(taskProvider(saved.id));
       if (_isEditing) ref.invalidate(taskHistoryProvider(saved.id));
       if (!mounted) return;
@@ -170,7 +205,17 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
         authState.user.hasPermission('tasks.manage');
     final myProfile = ref.watch(myProfileProvider).valueOrNull;
     final departments = ref.watch(departmentsProvider).valueOrNull ?? const [];
-    final employeesAsync = ref.watch(employeeListProvider);
+    final canPickPerson =
+        _isEditing ||
+        hasOverride ||
+        (myProfile != null &&
+            departments.any((d) => d.headEmployeeId == myProfile.id));
+    // A plain employee has no permission to list all employees at all, so
+    // only fetch that list when it's actually needed for a person picker —
+    // otherwise the 403 it'd get back would block the team-only picker too.
+    final employeesAsync = canPickPerson
+        ? ref.watch(employeeListProvider)
+        : const AsyncValue<List<Employee>>.data(<Employee>[]);
 
     return Scaffold(
       appBar: AppBar(title: Text(_isEditing ? 'Edit Task' : 'New Task')),
@@ -221,37 +266,72 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
                           myProfile: myProfile,
                           hasOverride: hasOverride,
                         );
-                        final poolIds = pool.map((e) => e.id).toSet();
-                        Employee? current;
-                        for (final employee in employees) {
-                          if (employee.id == _assigneeEmployeeId) {
-                            current = employee;
-                            break;
-                          }
-                        }
-                        final items = [
-                          ...pool,
-                          if (current != null && !poolIds.contains(current.id))
-                            current,
-                        ];
-                        return DropdownButtonFormField<String>(
-                          initialValue: _assigneeEmployeeId,
-                          decoration: const InputDecoration(
-                            labelText: 'Assignee',
-                          ),
-                          items: [
-                            for (final employee in items)
-                              DropdownMenuItem(
-                                value: employee.id,
-                                child: Text(employee.fullName),
+                        if (!_isEditing && canPickPerson) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SegmentedButton<_AssignTarget>(
+                                segments: const [
+                                  ButtonSegment(
+                                    value: _AssignTarget.individual,
+                                    label: Text('Assign to person'),
+                                  ),
+                                  ButtonSegment(
+                                    value: _AssignTarget.team,
+                                    label: Text('Assign to team'),
+                                  ),
+                                ],
+                                selected: {_target},
+                                onSelectionChanged: _submitting
+                                    ? null
+                                    : (selection) => setState(
+                                        () => _target = selection.first,
+                                      ),
                               ),
-                          ],
-                          onChanged: _submitting
-                              ? null
-                              : (value) =>
-                                    setState(() => _assigneeEmployeeId = value),
-                          validator: (value) =>
-                              value == null ? 'Required' : null,
+                              const SizedBox(height: 16),
+                              if (_target == _AssignTarget.team)
+                                _TeamPicker(
+                                  departments: departments,
+                                  selectedDepartmentId: _departmentId,
+                                  enabled: !_submitting,
+                                  onChanged: (value) =>
+                                      setState(() => _departmentId = value),
+                                )
+                              else
+                                _AssigneePicker(
+                                  pool: pool,
+                                  employees: employees,
+                                  selectedEmployeeId: _assigneeEmployeeId,
+                                  enabled: !_submitting,
+                                  onChanged: (value) => setState(
+                                    () => _assigneeEmployeeId = value,
+                                  ),
+                                ),
+                            ],
+                          );
+                        }
+
+                        if (!canPickPerson) {
+                          // A plain employee creating a task: always a team
+                          // task, no toggle, no employee picker at all.
+                          return _TeamPicker(
+                            departments: departments,
+                            selectedDepartmentId: _departmentId,
+                            enabled: !_submitting,
+                            onChanged: (value) =>
+                                setState(() => _departmentId = value),
+                          );
+                        }
+
+                        // Editing an existing task: unchanged, always a
+                        // specific-person picker.
+                        return _AssigneePicker(
+                          pool: pool,
+                          employees: employees,
+                          selectedEmployeeId: _assigneeEmployeeId,
+                          enabled: !_submitting,
+                          onChanged: (value) =>
+                              setState(() => _assigneeEmployeeId = value),
                         );
                       },
                     ),
@@ -315,6 +395,79 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AssigneePicker extends StatelessWidget {
+  const _AssigneePicker({
+    required this.pool,
+    required this.employees,
+    required this.selectedEmployeeId,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final List<Employee> pool;
+  final List<Employee> employees;
+  final String? selectedEmployeeId;
+  final bool enabled;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final poolIds = pool.map((e) => e.id).toSet();
+    Employee? current;
+    for (final employee in employees) {
+      if (employee.id == selectedEmployeeId) {
+        current = employee;
+        break;
+      }
+    }
+    final items = [
+      ...pool,
+      if (current != null && !poolIds.contains(current.id)) current,
+    ];
+    return DropdownButtonFormField<String>(
+      initialValue: selectedEmployeeId,
+      decoration: const InputDecoration(labelText: 'Assignee'),
+      items: [
+        for (final employee in items)
+          DropdownMenuItem(value: employee.id, child: Text(employee.fullName)),
+      ],
+      onChanged: enabled ? onChanged : null,
+      validator: (value) => value == null ? 'Required' : null,
+    );
+  }
+}
+
+/// A plain department picker — used both by anyone assigning a new task to
+/// a team (no authority check needed) and, implicitly, has no restricted
+/// pool the way [_AssigneePicker] does.
+class _TeamPicker extends StatelessWidget {
+  const _TeamPicker({
+    required this.departments,
+    required this.selectedDepartmentId,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final List<Department> departments;
+  final String? selectedDepartmentId;
+  final bool enabled;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: selectedDepartmentId,
+      decoration: const InputDecoration(labelText: 'Team'),
+      items: [
+        for (final department in departments)
+          DropdownMenuItem(value: department.id, child: Text(department.name)),
+      ],
+      onChanged: enabled ? onChanged : null,
+      validator: (value) => value == null ? 'Required' : null,
     );
   }
 }

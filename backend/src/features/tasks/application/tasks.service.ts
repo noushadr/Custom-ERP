@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -21,9 +22,10 @@ import {
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { NotificationsService } from '../../notifications/application/notifications.service';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
+import { AssignTeamMemberDto } from './dto/assign-team-member.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
 import { CreateTaskDto } from './dto/create-task.dto';
-import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
+import { UpdateTaskProgressDto } from './dto/update-task-progress.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task } from '../domain/entities/task.entity';
 import { TaskAuditLog } from '../domain/entities/task-audit-log.entity';
@@ -126,8 +128,24 @@ export class TasksService {
     return tasks
       .filter(
         (task) =>
-          task.assignee.departmentId != null &&
-          headedDepartmentIds.has(task.assignee.departmentId),
+          task.departmentId != null &&
+          headedDepartmentIds.has(task.departmentId),
+      )
+      .map(toTaskResponse);
+  }
+
+  /** Unclaimed tasks (assigned to a team, nobody picked yet) belonging to
+   * the caller's own department — what they'd see to decide whether to
+   * claim one. Empty for anyone with no department. */
+  async getClaimableTasks(actorUserId: string): Promise<TaskResponseDto[]> {
+    const actor = await this.employeeRepository.findByUserId(actorUserId);
+    if (!actor?.departmentId) return [];
+    const tasks = await this.taskRepository.findAll();
+    return tasks
+      .filter(
+        (task) =>
+          task.assigneeEmployeeId == null &&
+          task.departmentId === actor.departmentId,
       )
       .map(toTaskResponse);
   }
@@ -207,33 +225,24 @@ export class TasksService {
 
   // ---- Create / edit / status ----
 
-  /** Create authority mirrors reassignment authority: a `tasks.manage`
-   * holder can assign to anyone; otherwise the caller must head the
-   * chosen assignee's department. */
+  /** Two create paths in one method: assigning straight to a specific
+   * employee keeps the exact same authority as before (override, or heading
+   * that employee's department); assigning to a whole team instead needs no
+   * authority check at all — any authenticated employee can hand a task to
+   * a team, per explicit instruction, leaving the team itself to pick who
+   * actually does it (see `assignTeamMember`/`claimTask`). Exactly one of
+   * `assigneeEmployeeId`/`departmentId` must be given. */
   async createTask(
     dto: CreateTaskDto,
     actorUserId: string,
     actorHasOverride: boolean,
   ): Promise<TaskResponseDto> {
-    if (
-      !(await this.canAssignTo(
-        dto.assigneeEmployeeId,
-        actorUserId,
-        actorHasOverride,
-      ))
-    ) {
-      throw new ForbiddenException(
-        "You aren't authorized to assign tasks to this employee",
-      );
-    }
-
     const { name: actorName, photoUrl: actorPhotoUrl } =
       await this.resolveActorNameAndPhoto(actorUserId);
 
     const task = new Task();
     task.title = dto.title;
     task.description = dto.description ?? null;
-    task.assigneeEmployeeId = dto.assigneeEmployeeId;
     task.assignedByUserId = actorUserId;
     task.assignedByName = actorName;
     task.assignedByPhotoUrl = actorPhotoUrl;
@@ -241,18 +250,113 @@ export class TasksService {
     task.dueDate = dto.dueDate;
     task.status = TaskStatus.TODO;
     task.projectId = dto.projectId ?? null;
+    task.progressRemarks = null;
+
+    let auditNote: string;
+    if (dto.assigneeEmployeeId) {
+      if (
+        !(await this.canAssignTo(
+          dto.assigneeEmployeeId,
+          actorUserId,
+          actorHasOverride,
+        ))
+      ) {
+        throw new ForbiddenException(
+          "You aren't authorized to assign tasks to this employee",
+        );
+      }
+      const assignee = await this.employeeRepository.findById(
+        dto.assigneeEmployeeId,
+      );
+      task.assigneeEmployeeId = dto.assigneeEmployeeId;
+      task.departmentId = assignee?.departmentId ?? null;
+      auditNote = `Assigned to ${await this.employeeName(dto.assigneeEmployeeId)}`;
+    } else if (dto.departmentId) {
+      const department = await this.departmentRepository.findById(
+        dto.departmentId,
+      );
+      if (!department) throw new NotFoundException('Department not found');
+      task.assigneeEmployeeId = null;
+      task.departmentId = dto.departmentId;
+      auditNote = `Assigned to team: ${department.name}`;
+    } else {
+      throw new BadRequestException(
+        'Choose an employee or a team to assign this task to',
+      );
+    }
 
     const saved = await this.taskRepository.save(task);
-    const assigneeName = await this.employeeName(dto.assigneeEmployeeId);
-    await this.addAuditLog(
-      saved.id,
-      actorUserId,
-      'Created',
-      null,
-      `Assigned to ${assigneeName}`,
-    );
+    await this.addAuditLog(saved.id, actorUserId, 'Created', null, auditNote);
 
     return toTaskResponse(await this.getTaskOrThrow(saved.id));
+  }
+
+  /** A team's head (department head) picking a specific member for a
+   * currently-unclaimed team task — same authority as directly assigning to
+   * that employee anywhere else (`canAssignTo`), plus confirming the
+   * employee actually belongs to *this task's* department (an actor who
+   * heads more than one department could otherwise assign in a mismatched
+   * team). */
+  async assignTeamMember(
+    id: string,
+    dto: AssignTeamMemberDto,
+    actorUserId: string,
+    actorHasOverride: boolean,
+  ): Promise<TaskResponseDto> {
+    const task = await this.getTaskOrThrow(id);
+    if (task.assigneeEmployeeId != null) {
+      throw new ForbiddenException('This task is already assigned to someone');
+    }
+    if (
+      !(await this.canAssignTo(dto.employeeId, actorUserId, actorHasOverride))
+    ) {
+      throw new ForbiddenException(
+        "You aren't authorized to assign this task to that employee",
+      );
+    }
+    const assignee = await this.employeeRepository.findById(dto.employeeId);
+    if (!assignee || assignee.departmentId !== task.departmentId) {
+      throw new ForbiddenException(
+        "That employee isn't a member of this task's team",
+      );
+    }
+
+    task.assigneeEmployeeId = dto.employeeId;
+    await this.taskRepository.save(task);
+    const assigneeName = await this.employeeName(dto.employeeId);
+    await this.addAuditLog(task.id, actorUserId, 'Assignee', null, assigneeName);
+    await this.notifyAssigner(
+      task,
+      actorUserId,
+      `${assigneeName} was assigned to task "${task.title}"`,
+    );
+
+    return toTaskResponse(await this.getTaskOrThrow(task.id));
+  }
+
+  /** Any member of the task's own team can claim an unclaimed team task for
+   * themselves — no approval step, they become the assignee immediately. */
+  async claimTask(id: string, actorUserId: string): Promise<TaskResponseDto> {
+    const task = await this.getTaskOrThrow(id);
+    if (task.assigneeEmployeeId != null) {
+      throw new ForbiddenException('This task has already been claimed');
+    }
+    const actor = await this.employeeRepository.findByUserId(actorUserId);
+    if (!actor || actor.departmentId !== task.departmentId) {
+      throw new ForbiddenException("You aren't a member of this task's team");
+    }
+
+    task.assigneeEmployeeId = actor.id;
+    await this.taskRepository.save(task);
+    const actorName = `${actor.firstName} ${actor.lastName}`;
+    await this.addAuditLog(task.id, actorUserId, 'Assignee', null, actorName);
+    await this.notifyAssigner(
+      task,
+      actorUserId,
+      `${actorName} accepted task "${task.title}"`,
+    );
+
+    return toTaskResponse(await this.getTaskOrThrow(task.id));
   }
 
   /** Edits core fields (title/description/priority/due date/assignee) — not
@@ -293,14 +397,16 @@ export class TasksService {
           "You aren't authorized to reassign this task to that employee",
         );
       }
-      const [oldName, newName] = await Promise.all([
+      const [oldName, newName, newAssignee] = await Promise.all([
         this.employeeName(task.assigneeEmployeeId),
         this.employeeName(changes.assigneeEmployeeId),
+        this.employeeRepository.findById(changes.assigneeEmployeeId),
       ]);
       await this.addAuditLog(task.id, actorUserId, 'Assignee', oldName, newName);
       const { name: actorName, photoUrl: actorPhotoUrl } =
         await this.resolveActorNameAndPhoto(actorUserId);
       task.assigneeEmployeeId = changes.assigneeEmployeeId;
+      task.departmentId = newAssignee?.departmentId ?? task.departmentId;
       task.assignedByUserId = actorUserId;
       task.assignedByName = actorName;
       task.assignedByPhotoUrl = actorPhotoUrl;
@@ -355,12 +461,14 @@ export class TasksService {
     return toTaskResponse(await this.getTaskOrThrow(task.id));
   }
 
-  /** Status is self-service: the assignee can update it themselves, in
-   * addition to the assigner/department-head/override tiers who can edit
-   * everything else. */
-  async updateStatus(
+  /** Status/due date/progress remarks are self-service: the assignee can
+   * update any of them themselves, in addition to the assigner/department-
+   * head/override tiers who can edit everything else. Only the assignee's
+   * own edit notifies the assigner — a privileged editor changing these
+   * same fields doesn't need to notify themselves. */
+  async updateProgress(
     id: string,
-    dto: UpdateTaskStatusDto,
+    dto: UpdateTaskProgressDto,
     actorUserId: string,
     actorHasOverride: boolean,
   ): Promise<TaskResponseDto> {
@@ -372,21 +480,55 @@ export class TasksService {
       !(await this.canEdit(task, actorUserId, actorHasOverride))
     ) {
       throw new ForbiddenException(
-        "You aren't authorized to update this task's status",
+        "You aren't authorized to update this task",
       );
     }
 
-    if (dto.status !== task.status) {
+    const changeSummaries: string[] = [];
+
+    if (dto.status !== undefined && dto.status !== task.status) {
+      await this.addAuditLog(task.id, actorUserId, 'Status', task.status, dto.status);
+      changeSummaries.push(`status → ${dto.status}`);
+      task.status = dto.status;
+      task.completedAt = dto.status === TaskStatus.COMPLETED ? new Date() : null;
+    }
+
+    if (dto.dueDate !== undefined && dto.dueDate !== task.dueDate) {
       await this.addAuditLog(
         task.id,
         actorUserId,
-        'Status',
-        task.status,
-        dto.status,
+        'Due Date',
+        task.dueDate,
+        dto.dueDate,
       );
-      task.status = dto.status;
-      task.completedAt = dto.status === TaskStatus.COMPLETED ? new Date() : null;
+      changeSummaries.push(`due date → ${dto.dueDate}`);
+      task.dueDate = dto.dueDate;
+    }
+
+    if (
+      dto.progressRemarks !== undefined &&
+      dto.progressRemarks !== task.progressRemarks
+    ) {
+      await this.addAuditLog(
+        task.id,
+        actorUserId,
+        'Progress Remarks',
+        task.progressRemarks,
+        dto.progressRemarks,
+      );
+      changeSummaries.push('progress remarks updated');
+      task.progressRemarks = dto.progressRemarks;
+    }
+
+    if (changeSummaries.length > 0) {
       await this.taskRepository.save(task);
+      if (isSelf) {
+        await this.notifyAssigner(
+          task,
+          actorUserId,
+          `${actor!.firstName} ${actor!.lastName} updated task "${task.title}": ${changeSummaries.join(', ')}`,
+        );
+      }
     }
 
     return toTaskResponse(await this.getTaskOrThrow(task.id));
@@ -408,8 +550,10 @@ export class TasksService {
     );
   }
 
-  /** Visible to the assignee, the assigner, a department head whose headed
-   * department contains the assignee, or a `tasks.manage` holder. */
+  /** Visible to the assignee, the assigner, any member of the task's own
+   * team while it's still unclaimed (so they can see it's available), a
+   * department head whose headed department contains the task, or a
+   * `tasks.manage` holder. */
   private async canView(
     task: Task,
     actorUserId: string,
@@ -421,18 +565,25 @@ export class TasksService {
     const actor = await this.employeeRepository.findByUserId(actorUserId);
     if (!actor) return false;
     if (task.assigneeEmployeeId === actor.id) return true;
-    if (!task.assignee.departmentId) return false;
+    if (
+      task.assigneeEmployeeId == null &&
+      task.departmentId != null &&
+      actor.departmentId === task.departmentId
+    ) {
+      return true;
+    }
+    if (!task.departmentId) return false;
 
     const headedDepartmentIds = await this.getHeadedDepartmentIds(actor.id);
-    return headedDepartmentIds.has(task.assignee.departmentId);
+    return headedDepartmentIds.has(task.departmentId);
   }
 
   /** Narrower than `canView` — excludes the assignee themself, since editing
    * the task's core fields is a creator/manager action, not a self action
-   * (self gets its own status-only carve-out in `updateStatus`). Shared by
-   * `updateTask` and `updateStatus`'s non-self branch — both editing and
-   * overriding someone else's status are the same assigner/department-head/
-   * tasks.manage tier, admin+TL+HR by role. */
+   * (self gets its own broader carve-out in `updateProgress`). Shared by
+   * `updateTask` and `updateProgress`'s non-self branch — both editing and
+   * overriding someone else's progress are the same assigner/department-
+   * head/tasks.manage tier, admin+TL+HR by role. */
   private async canEdit(
     task: Task,
     actorUserId: string,
@@ -440,12 +591,12 @@ export class TasksService {
   ): Promise<boolean> {
     if (actorHasOverride) return true;
     if (task.assignedByUserId === actorUserId) return true;
-    if (!task.assignee.departmentId) return false;
+    if (!task.departmentId) return false;
 
     const actor = await this.employeeRepository.findByUserId(actorUserId);
     if (!actor) return false;
     const headedDepartmentIds = await this.getHeadedDepartmentIds(actor.id);
-    return headedDepartmentIds.has(task.assignee.departmentId);
+    return headedDepartmentIds.has(task.departmentId);
   }
 
   /** Whether the actor may create/reassign a task to [assigneeEmployeeId] —
@@ -484,7 +635,8 @@ export class TasksService {
     return { name, photoUrl: employee?.profilePhotoUrl ?? null };
   }
 
-  private async employeeName(employeeId: string): Promise<string> {
+  private async employeeName(employeeId: string | null): Promise<string> {
+    if (!employeeId) return 'Unassigned';
     const employee = await this.employeeRepository.findById(employeeId);
     return employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown';
   }
@@ -515,6 +667,24 @@ export class TasksService {
     const task = await this.taskRepository.findById(id);
     if (!task) throw new NotFoundException('Task not found');
     return task;
+  }
+
+  /** Notifies whoever assigned/created the task — used when the assignee
+   * claims a team task, gets picked by their team's head, or updates their
+   * own progress. Never notifies the assigner about their own action (a
+   * task the assigner also happens to be the assignee for). */
+  private async notifyAssigner(
+    task: Task,
+    actingUserId: string,
+    message: string,
+  ): Promise<void> {
+    if (task.assignedByUserId === actingUserId) return;
+    await this.notificationsService.create({
+      recipientUserId: task.assignedByUserId,
+      message,
+      linkTarget: NotificationLinkTarget.TASKS,
+      linkEntityId: task.id,
+    });
   }
 
   /** Unconditional daily check — every open task's own assignee is always
@@ -552,6 +722,7 @@ export class TasksService {
     return tasks
       .filter(
         (task) =>
+          task.assignee != null &&
           task.status !== TaskStatus.COMPLETED &&
           task.status !== TaskStatus.CANCELLED &&
           task.dueDate >= todayIso &&
@@ -561,7 +732,7 @@ export class TasksService {
       .map((task) => ({
         id: task.id,
         title: task.title,
-        assigneeUserId: task.assignee.userId,
+        assigneeUserId: task.assignee!.userId,
       }));
   }
 

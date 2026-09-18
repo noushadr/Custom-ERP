@@ -9,8 +9,8 @@ Task buildTestTask({
   String id = 'task-1',
   String title = 'Write report',
   String? description = 'Quarterly summary',
-  String assigneeEmployeeId = 'employee-1',
-  String assigneeName = 'Jane Doe',
+  String? assigneeEmployeeId = 'employee-1',
+  String? assigneeName = 'Jane Doe',
   String? assigneePhotoUrl,
   String? departmentId = 'dept-1',
   String? departmentName = 'Engineering',
@@ -20,6 +20,7 @@ Task buildTestTask({
   String priority = TaskPriority.medium,
   String dueDate = '2026-12-01',
   String status = TaskStatus.todo,
+  String? progressRemarks,
   DateTime? completedAt,
   String? projectId,
   DateTime? createdAt,
@@ -40,6 +41,7 @@ Task buildTestTask({
     priority: priority,
     dueDate: dueDate,
     status: status,
+    progressRemarks: progressRemarks,
     completedAt: completedAt,
     projectId: projectId,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
@@ -84,16 +86,21 @@ class FakeTaskRepository implements TaskRepository {
     this.myTasks = const [],
     this.tasksAssignedByMe = const [],
     this.teamTasks = const [],
+    this.claimableTasks = const [],
     this.taskById,
     this.history = const [],
     this.comments = const [],
     this.createTaskResult,
     this.updateTaskResult,
-    this.updateStatusResult,
+    this.updateProgressResult,
+    this.claimTaskResult,
+    this.assignTeamMemberResult,
     this.addCommentResult,
     this.createTaskError,
     this.updateTaskError,
-    this.updateStatusError,
+    this.updateProgressError,
+    this.claimTaskError,
+    this.assignTeamMemberError,
     this.getTaskError,
     this.tasksByProject = const [],
   });
@@ -101,30 +108,44 @@ class FakeTaskRepository implements TaskRepository {
   final List<Task> myTasks;
   final List<Task> tasksAssignedByMe;
   final List<Task> teamTasks;
+  final List<Task> claimableTasks;
   final List<Task> tasksByProject;
   final Task? taskById;
   final List<TaskAuditLogEntry> history;
   final List<TaskComment> comments;
   final Task? createTaskResult;
   final Task? updateTaskResult;
-  final Task? updateStatusResult;
+  final Task? updateProgressResult;
+  final Task? claimTaskResult;
+  final Task? assignTeamMemberResult;
   final TaskComment? addCommentResult;
   final Object? createTaskError;
   final Object? updateTaskError;
-  final Object? updateStatusError;
+  final Object? updateProgressError;
+  final Object? claimTaskError;
+  final Object? assignTeamMemberError;
   final Object? getTaskError;
 
   String? lastCreatedTitle;
   String? lastCreatedAssigneeEmployeeId;
+  String? lastCreatedDepartmentId;
   String? lastCreatedPriority;
   String? lastCreatedDueDate;
 
   String? lastUpdatedId;
   String? lastUpdatedTitle;
   String? lastUpdatedAssigneeEmployeeId;
+  String? lastUpdatedPriority;
 
-  String? lastStatusUpdatedId;
-  String? lastStatusUpdatedStatus;
+  String? lastProgressUpdatedId;
+  String? lastProgressUpdatedStatus;
+  String? lastProgressUpdatedDueDate;
+  String? lastProgressUpdatedRemarks;
+
+  String? lastClaimedId;
+
+  String? lastAssignedMemberTaskId;
+  String? lastAssignedMemberEmployeeId;
 
   String? lastCommentedId;
   String? lastCommentBody;
@@ -137,6 +158,9 @@ class FakeTaskRepository implements TaskRepository {
 
   @override
   Future<List<Task>> getTeamTasks() async => teamTasks;
+
+  @override
+  Future<List<Task>> getClaimableTasks() async => claimableTasks;
 
   @override
   Future<Task> getTask(String id) async {
@@ -165,17 +189,20 @@ class FakeTaskRepository implements TaskRepository {
   Future<Task> createTask({
     required String title,
     String? description,
-    required String assigneeEmployeeId,
+    String? assigneeEmployeeId,
+    String? departmentId,
     String? priority,
     required String dueDate,
     String? projectId,
   }) async {
     lastCreatedTitle = title;
     lastCreatedAssigneeEmployeeId = assigneeEmployeeId;
+    lastCreatedDepartmentId = departmentId;
     lastCreatedPriority = priority;
     lastCreatedDueDate = dueDate;
     if (createTaskError != null) throw createTaskError!;
-    return createTaskResult ?? buildTestTask(title: title, projectId: projectId);
+    return createTaskResult ??
+        buildTestTask(title: title, projectId: projectId);
   }
 
   @override
@@ -191,15 +218,45 @@ class FakeTaskRepository implements TaskRepository {
     lastUpdatedId = id;
     lastUpdatedTitle = title;
     lastUpdatedAssigneeEmployeeId = assigneeEmployeeId;
+    lastUpdatedPriority = priority;
     if (updateTaskError != null) throw updateTaskError!;
     return updateTaskResult ?? buildTestTask(id: id, projectId: projectId);
   }
 
   @override
-  Future<Task> updateStatus(String id, String status) async {
-    lastStatusUpdatedId = id;
-    lastStatusUpdatedStatus = status;
-    if (updateStatusError != null) throw updateStatusError!;
-    return updateStatusResult ?? buildTestTask(id: id, status: status);
+  Future<Task> updateProgress(
+    String id, {
+    String? status,
+    String? dueDate,
+    String? progressRemarks,
+  }) async {
+    lastProgressUpdatedId = id;
+    lastProgressUpdatedStatus = status;
+    lastProgressUpdatedDueDate = dueDate;
+    lastProgressUpdatedRemarks = progressRemarks;
+    if (updateProgressError != null) throw updateProgressError!;
+    return updateProgressResult ??
+        buildTestTask(
+          id: id,
+          status: status ?? TaskStatus.todo,
+          dueDate: dueDate ?? '2026-12-01',
+          progressRemarks: progressRemarks,
+        );
+  }
+
+  @override
+  Future<Task> claimTask(String id) async {
+    lastClaimedId = id;
+    if (claimTaskError != null) throw claimTaskError!;
+    return claimTaskResult ?? buildTestTask(id: id);
+  }
+
+  @override
+  Future<Task> assignTeamMember(String id, String employeeId) async {
+    lastAssignedMemberTaskId = id;
+    lastAssignedMemberEmployeeId = employeeId;
+    if (assignTeamMemberError != null) throw assignTeamMemberError!;
+    return assignTeamMemberResult ??
+        buildTestTask(id: id, assigneeEmployeeId: employeeId);
   }
 }

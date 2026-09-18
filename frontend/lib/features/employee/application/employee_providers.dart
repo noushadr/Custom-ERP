@@ -63,6 +63,12 @@ final upcomingWorkAnniversariesProvider =
       return ref.watch(employeeRepositoryProvider).getUpcomingWorkAnniversaries();
     });
 
+final workAnniversarySpotlightProvider =
+    FutureProvider.autoDispose<List<UpcomingWorkAnniversary>>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(employeeRepositoryProvider).getWorkAnniversarySpotlight();
+    });
+
 /// How the company-wide active-employee count has changed over the last 30
 /// days — see `EmployeesService.getActiveEmployeeDelta` for how "30 days ago"
 /// is reconstructed from the existing audit log rather than a new snapshot.

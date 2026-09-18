@@ -6,12 +6,12 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../employee/application/employee_providers.dart';
+import '../../../employee/domain/entities/employee.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../application/task_providers.dart';
 import '../../domain/entities/task.dart';
 import '../../domain/entities/task_audit_log_entry.dart';
 import '../../domain/entities/task_comment.dart';
-import '../../domain/entities/task_status.dart';
 import '../../domain/exceptions/task_exception.dart';
 import '../widgets/task_badges.dart';
 import 'task_editor_page.dart';
@@ -38,10 +38,12 @@ bool _canEditTask(WidgetRef ref, Task task) {
   );
 }
 
-/// Shows one task's full detail: fields, a status-change control (open to
-/// anyone who can view the task — see TasksService.updateStatus, whose
-/// authority is exactly the same set as who may view it), a comment
-/// thread, and its change history.
+/// Shows one task's full detail: fields (status/priority/due date are
+/// read-only here — see `_InlineStatusMenu`/`_InlinePriorityMenu`/
+/// `_InlineDueDateChip` on the tasks list row for those), a single comment
+/// thread for both discussion and progress updates (open to anyone who can
+/// view the task — see TasksService.canView, which addComment reuses), and
+/// its change history.
 class TaskDetailPage extends ConsumerWidget {
   const TaskDetailPage({super.key, required this.taskId});
 
@@ -113,6 +115,10 @@ class _TaskDetailBody extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
+              if (!task.isUnclaimed) ...[
+                TaskStatusBadge(status: task.status),
+                const SizedBox(width: 8),
+              ],
               TaskPriorityBadge(priority: task.priority),
             ],
           ),
@@ -122,11 +128,12 @@ class _TaskDetailBody extends StatelessWidget {
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _PersonChip(
-                name: task.assigneeName,
-                photoUrl: task.assigneePhotoUrl,
-                label: 'Assigned to ${task.assigneeName}',
-              ),
+              if (!task.isUnclaimed)
+                _PersonChip(
+                  name: task.assigneeName!,
+                  photoUrl: task.assigneePhotoUrl,
+                  label: 'Assigned to ${task.assigneeName}',
+                ),
               _PersonChip(
                 name: task.assignedByName,
                 photoUrl: task.assignedByPhotoUrl,
@@ -152,9 +159,14 @@ class _TaskDetailBody extends StatelessWidget {
             Text(task.description!),
           ],
           const SizedBox(height: 20),
-          _StatusControl(task: task),
-          const SizedBox(height: 20),
-          _CommentsSection(taskId: task.id),
+          if (task.isUnclaimed) ...[
+            _AssignmentSection(task: task),
+            const SizedBox(height: 20),
+          ],
+          FormSection(
+            title: 'Comments',
+            child: _CommentsSection(taskId: task.id),
+          ),
           const SizedBox(height: 16),
           _HistorySection(taskId: task.id),
         ],
@@ -194,76 +206,161 @@ class _PersonChip extends StatelessWidget {
   }
 }
 
-class _StatusControl extends ConsumerStatefulWidget {
-  const _StatusControl({required this.task});
+/// Shown while a task has no assignee yet —
+/// any member of its team can accept it outright, and the team's head (or
+/// a `tasks.manage` holder) can pick a specific member for it.
+class _AssignmentSection extends ConsumerStatefulWidget {
+  const _AssignmentSection({required this.task});
 
   final Task task;
 
   @override
-  ConsumerState<_StatusControl> createState() => _StatusControlState();
+  ConsumerState<_AssignmentSection> createState() => _AssignmentSectionState();
 }
 
-class _StatusControlState extends ConsumerState<_StatusControl> {
-  bool _saving = false;
+class _AssignmentSectionState extends ConsumerState<_AssignmentSection> {
+  String? _selectedEmployeeId;
+  bool _acting = false;
   String? _error;
 
-  Future<void> _changeStatus(String status) async {
-    if (status == widget.task.status) return;
+  void _refreshAfterChange() {
+    ref.invalidate(taskProvider(widget.task.id));
+    ref.invalidate(taskHistoryProvider(widget.task.id));
+    ref.invalidate(myTasksProvider);
+    ref.invalidate(claimableTasksProvider);
+    ref.invalidate(teamTasksProvider);
+  }
+
+  Future<void> _claim() async {
     setState(() {
-      _saving = true;
+      _acting = true;
       _error = null;
     });
     try {
-      await ref.read(taskRepositoryProvider).updateStatus(widget.task.id, status);
-      ref.invalidate(taskProvider(widget.task.id));
-      ref.invalidate(taskHistoryProvider(widget.task.id));
-      ref.invalidate(myTasksProvider);
-      ref.invalidate(tasksAssignedByMeProvider);
-      ref.invalidate(teamTasksProvider);
+      await ref.read(taskRepositoryProvider).claimTask(widget.task.id);
+      _refreshAfterChange();
     } on TaskException catch (error) {
       setState(() => _error = error.message);
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _acting = false);
+    }
+  }
+
+  Future<void> _assignMember() async {
+    final employeeId = _selectedEmployeeId;
+    if (employeeId == null) return;
+    setState(() {
+      _acting = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(taskRepositoryProvider)
+          .assignTeamMember(widget.task.id, employeeId);
+      _refreshAfterChange();
+    } on TaskException catch (error) {
+      setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _acting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authControllerProvider);
+    final hasOverride =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('tasks.manage');
+    final myProfile = ref.watch(myProfileProvider).valueOrNull;
+    final departments = ref.watch(departmentsProvider).valueOrNull ?? const [];
+    final isTeamMember =
+        myProfile != null &&
+        myProfile.department?.id == widget.task.departmentId;
+    final headsThisTeam =
+        hasOverride ||
+        (myProfile != null &&
+            departments.any(
+              (d) =>
+                  d.id == widget.task.departmentId &&
+                  d.headEmployeeId == myProfile.id,
+            ));
+
     return FormSection(
-      title: 'Status',
+      title: 'Unclaimed',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              DropdownButton<String>(
-                value: widget.task.status,
-                items: [
-                  for (final status in TaskStatus.values)
-                    DropdownMenuItem(
-                      value: status,
-                      child: Text(formatTaskStatusLabel(status)),
-                    ),
-                ],
-                onChanged: _saving
-                    ? null
-                    : (value) {
-                        if (value != null) _changeStatus(value);
-                      },
-              ),
-              if (_saving) ...[
-                const SizedBox(width: 12),
-                const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ],
-            ],
+          Text(
+            'This task is assigned to ${widget.task.departmentName ?? 'a team'} '
+            '— nobody has picked it up yet.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           ),
+          if (isTeamMember) ...[
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _acting ? null : _claim,
+              icon: const Icon(Icons.check, size: 16),
+              label: const Text('Accept this task'),
+            ),
+          ],
+          if (headsThisTeam) ...[
+            const SizedBox(height: 16),
+            Consumer(
+              builder: (context, ref, _) {
+                final employeesAsync = ref.watch(employeeListProvider);
+                return employeesAsync.when(
+                  loading: () => const LinearProgressIndicator(),
+                  error: (_, _) => const Text('Could not load employees.'),
+                  data: (employees) {
+                    final members = employees
+                        .where(
+                          (e) =>
+                              e.employmentStatus == 'active' &&
+                              e.department?.id == widget.task.departmentId,
+                        )
+                        .toList();
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _selectedEmployeeId,
+                            decoration: const InputDecoration(
+                              labelText: 'Assign a team member',
+                            ),
+                            items: [
+                              for (final Employee employee in members)
+                                DropdownMenuItem(
+                                  value: employee.id,
+                                  child: Text(employee.fullName),
+                                ),
+                            ],
+                            onChanged: _acting
+                                ? null
+                                : (value) => setState(
+                                    () => _selectedEmployeeId = value,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton(
+                          onPressed: _acting || _selectedEmployeeId == null
+                              ? null
+                              : _assignMember,
+                          child: const Text('Assign'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ],
           if (_error != null)
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
                 _error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
@@ -317,75 +414,73 @@ class _CommentsSectionState extends ConsumerState<_CommentsSection> {
   Widget build(BuildContext context) {
     final commentsAsync = ref.watch(taskCommentsProvider(widget.taskId));
 
-    return FormSection(
-      title: 'Comments',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          commentsAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, _) => const Text('Could not load comments.'),
-            data: (comments) => comments.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      'No comments yet.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        commentsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (_, _) => const Text('Could not load comments.'),
+          data: (comments) => comments.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'No comments yet.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
                     ),
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < comments.length; i++) ...[
-                        _CommentTile(comment: comments[i]),
-                        if (i < comments.length - 1)
-                          const Divider(
-                            height: 20,
-                            color: AppColors.borderSubtle,
-                          ),
-                      ],
-                    ],
                   ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < comments.length; i++) ...[
+                      _CommentTile(comment: comments[i]),
+                      if (i < comments.length - 1)
+                        const Divider(
+                          height: 20,
+                          color: AppColors.borderSubtle,
+                        ),
+                    ],
+                  ],
+                ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('comment-input'),
+          controller: _controller,
+          enabled: !_posting,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Add a comment',
+            border: OutlineInputBorder(),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _controller,
-            enabled: !_posting,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'Add a comment',
-              border: OutlineInputBorder(),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-              onPressed: _posting ? null : _post,
-              child: _posting
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Post'),
-            ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton(
+            onPressed: _posting ? null : _post,
+            child: _posting
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Post'),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

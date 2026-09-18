@@ -24,6 +24,9 @@ abstract interface class GoalRepository {
     String? description,
   });
 
+  /// An employee setting a goal for themselves — no approval needed.
+  Future<Goal> createForSelf({required String title, String? description});
+
   /// Creates the same goal for every active employee in [departmentId].
   /// Requires `goals.manage`.
   Future<List<Goal>> bulkAssignToDepartment({
@@ -49,10 +52,22 @@ abstract interface class GoalRepository {
     String? description,
   });
 
+  /// An employee editing one of their own goals — [achievementPercentage]
+  /// is allowed here too, since it's their own progress.
+  Future<Goal> updateAsSelf(
+    String goalId, {
+    String? title,
+    String? description,
+    int? achievementPercentage,
+  });
+
   /// Soft-hides the goal rather than deleting it. Requires `goals.manage`.
   Future<void> archive(String goalId);
 
   /// A Team Lead archiving a goal belonging to one of their own direct
   /// reports.
   Future<void> archiveAsManager(String goalId);
+
+  /// An employee archiving one of their own goals.
+  Future<void> archiveAsSelf(String goalId);
 }

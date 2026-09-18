@@ -1,3 +1,4 @@
+import '../../../../shared/utils/photo_url.dart';
 import '../../domain/entities/performance_review.dart';
 import 'performance_review_response_model.dart';
 
@@ -25,7 +26,7 @@ class PerformanceReviewModel extends PerformanceReview {
         id: json['id'] as String,
         employeeId: json['employeeId'] as String,
         employeeName: json['employeeName'] as String,
-        employeePhotoUrl: json['employeePhotoUrl'] as String?,
+        employeePhotoUrl: resolvePhotoUrl(json['employeePhotoUrl'] as String?),
         reviewYear: json['reviewYear'] as int,
         dueDate: json['dueDate'] as String,
         status: json['status'] as String,

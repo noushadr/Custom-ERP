@@ -16,6 +16,7 @@ import {
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { BulkAssignGoalDto } from './dto/bulk-assign-goal.dto';
 import { CreateGoalDto } from './dto/create-goal.dto';
+import { CreateSelfGoalDto } from './dto/create-self-goal.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
 import { EmployeeGoal } from '../domain/entities/employee-goal.entity';
 import {
@@ -105,6 +106,25 @@ export class GoalsService {
     );
   }
 
+  /** An employee creating a goal for themselves — identity-scoped, no
+   * `@Permissions` guard, no approval step, same pattern as
+   * `createForMyDirectReport`. The employeeId always comes from the
+   * caller's own profile, never the request body, so this route can't be
+   * used to write a goal for someone else. */
+  async createForSelf(
+    actorUserId: string,
+    dto: CreateSelfGoalDto,
+  ): Promise<GoalResponse> {
+    const self = await this.employeeRepository.findByUserId(actorUserId);
+    if (!self) throw new NotFoundException('Employee profile not found');
+
+    return this.create(
+      { employeeId: self.id, title: dto.title, description: dto.description },
+      actorUserId,
+      `${self.firstName} ${self.lastName}`,
+    );
+  }
+
   /** Creates the same goal for every currently-active employee in one
    * department — Admin/HR only. */
   async bulkAssignToDepartment(
@@ -148,17 +168,17 @@ export class GoalsService {
     goalId: string,
     dto: UpdateGoalDto,
     actorUserId: string,
-    options: { requireOwnDirectReport: boolean },
+    options: { scope: GoalWriteScope },
   ): Promise<GoalResponse> {
     const goal = await this.loadForWrite(goalId, actorUserId, options);
     if (dto.title !== undefined) goal.title = dto.title;
     if (dto.description !== undefined) goal.description = dto.description;
-    // Achievement % is Admin/HR only — a Team Lead's own edit route always
-    // passes requireOwnDirectReport: true, so this silently no-ops for them
-    // even if a request body includes it.
+    // Achievement % is Admin/HR or the goal's own employee — a Team Lead's
+    // own-report edit route always passes scope: 'ownDirectReport', so this
+    // silently no-ops for them even if a request body includes it.
     if (
       dto.achievementPercentage !== undefined &&
-      !options.requireOwnDirectReport
+      options.scope !== 'ownDirectReport'
     ) {
       goal.achievementPercentage = dto.achievementPercentage;
     }
@@ -168,11 +188,11 @@ export class GoalsService {
 
   /** Soft-hides the goal instead of deleting it — same authorization split
    * as `update`: Admin/HR can archive any goal, a Team Lead only their own
-   * direct reports'. */
+   * direct reports', an employee only their own. */
   async archive(
     goalId: string,
     actorUserId: string,
-    options: { requireOwnDirectReport: boolean },
+    options: { scope: GoalWriteScope },
   ): Promise<void> {
     const goal = await this.loadForWrite(goalId, actorUserId, options);
     goal.archived = true;
@@ -200,20 +220,30 @@ export class GoalsService {
   private async loadForWrite(
     goalId: string,
     actorUserId: string,
-    options: { requireOwnDirectReport: boolean },
+    options: { scope: GoalWriteScope },
   ): Promise<EmployeeGoal> {
     const goal = await this.goalRepository.findById(goalId);
     if (!goal) throw new NotFoundException('Goal not found');
 
-    if (options.requireOwnDirectReport) {
+    if (options.scope === 'ownDirectReport') {
       const manager = await this.employeeRepository.findByUserId(actorUserId);
       if (!manager || goal.employee.reportingManagerId !== manager.id) {
         throw new ForbiddenException(
           'You can only manage goals for your own direct reports',
         );
       }
+    } else if (options.scope === 'self') {
+      const self = await this.employeeRepository.findByUserId(actorUserId);
+      if (!self || goal.employeeId !== self.id) {
+        throw new ForbiddenException('You can only manage your own goals');
+      }
     }
 
     return goal;
   }
 }
+
+/** 'any' — Admin/HR, `goals.manage`, no identity check. 'ownDirectReport' —
+ * a Team Lead, checked against the goal's employee's `reportingManagerId`.
+ * 'self' — the goal's own employee, checked against the caller's identity. */
+type GoalWriteScope = 'any' | 'ownDirectReport' | 'self';

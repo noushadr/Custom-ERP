@@ -1,15 +1,19 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
+import { Department } from '../../../departments/domain/entities/department.entity';
 import { Project } from '../../../clients/domain/entities/project.entity';
 import { Employee } from '../../../employee/domain/entities/employee.entity';
 import { TaskPriority } from '../enums/task-priority.enum';
 import { TaskStatus } from '../enums/task-status.enum';
 
-/** A single-assignee task. `assignee` is eager-loaded (which itself eager-
- * loads `Employee.department`), so "which department/team does this task
- * belong to" is always `task.assignee.department` — never its own stored
- * column, so it can never drift out of sync when an assignee is changed or
- * transferred. */
+/** A task's `assigneeEmployeeId` is nullable — a task can be assigned to a
+ * whole team (`departmentId` set, `assigneeEmployeeId` null) until either
+ * that team's head picks a specific member or a member claims it themself
+ * (see `TasksService.assignTeamMember`/`claimTask`). `departmentId` is its
+ * own stored column (not derived from `assignee.department` like before)
+ * precisely so a team-only task still has a department with no assignee to
+ * derive it from; once claimed, it's left as-is rather than re-derived, so
+ * it can never silently change if the assignee is later transferred. */
 @Entity('tasks')
 export class Task extends BaseEntity {
   @Column()
@@ -18,12 +22,25 @@ export class Task extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @Column()
-  assigneeEmployeeId: string;
+  @Column({ nullable: true })
+  assigneeEmployeeId: string | null;
 
-  @ManyToOne(() => Employee, { eager: true })
+  @ManyToOne(() => Employee, { eager: true, nullable: true })
   @JoinColumn({ name: 'assigneeEmployeeId' })
-  assignee: Employee;
+  assignee: Employee | null;
+
+  @Column({ nullable: true })
+  departmentId: string | null;
+
+  @ManyToOne(() => Department, { eager: true, nullable: true })
+  @JoinColumn({ name: 'departmentId' })
+  department: Department | null;
+
+  /** Free-text progress notes — settable by the assignee alongside status/
+   * due date (see `TasksService.updateProgress`), or by anyone who can edit
+   * the task's other fields. */
+  @Column({ type: 'text', nullable: true })
+  progressRemarks: string | null;
 
   @Column()
   assignedByUserId: string;

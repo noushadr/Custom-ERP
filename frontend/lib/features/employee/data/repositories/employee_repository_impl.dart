@@ -48,6 +48,10 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(() => _remoteDataSource.getUpcomingWorkAnniversaries());
 
   @override
+  Future<List<UpcomingWorkAnniversary>> getWorkAnniversarySpotlight() =>
+      _guard(() => _remoteDataSource.getWorkAnniversarySpotlight());
+
+  @override
   Future<PayrollSummary> getPayrollSummary() =>
       _guard(() => _remoteDataSource.getPayrollSummary());
 

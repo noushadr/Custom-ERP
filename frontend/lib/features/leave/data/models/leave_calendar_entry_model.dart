@@ -1,3 +1,4 @@
+import '../../../../shared/utils/photo_url.dart';
 import '../../domain/entities/leave_calendar_entry.dart';
 
 class LeaveCalendarEntryModel extends LeaveCalendarEntry {
@@ -17,7 +18,7 @@ class LeaveCalendarEntryModel extends LeaveCalendarEntry {
       LeaveCalendarEntryModel(
         employeeId: json['employeeId'] as String,
         employeeName: json['employeeName'] as String,
-        employeePhotoUrl: json['employeePhotoUrl'] as String?,
+        employeePhotoUrl: resolvePhotoUrl(json['employeePhotoUrl'] as String?),
         leaveTypeId: json['leaveTypeId'] as String,
         leaveTypeName: json['leaveTypeName'] as String,
         colorHex: json['colorHex'] as String?,

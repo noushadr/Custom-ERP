@@ -8,11 +8,13 @@ import 'package:zera_erp/features/announcements/domain/entities/today_announceme
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/email/application/email_providers.dart';
+import 'package:zera_erp/shared/utils/date_format.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/birthday_spotlight.dart';
 import 'package:zera_erp/features/employee/domain/entities/employee.dart';
 import 'package:zera_erp/features/employee/domain/entities/payroll_summary.dart';
 import 'package:zera_erp/features/employee/domain/entities/upcoming_birthday.dart';
+import 'package:zera_erp/features/employee/domain/entities/upcoming_work_anniversary.dart';
 import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
 import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/holidays/application/holiday_providers.dart';
@@ -206,6 +208,56 @@ void main() {
     },
   );
 
+  testWidgets("admin dashboard's top bar shows today's date", (
+    WidgetTester tester,
+  ) async {
+    // The date only shows on the desktop-width top bar (`_TopBar`) — the
+    // default test surface falls in the tablet range, which uses a plain
+    // AppBar instead.
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const admin = AuthUser(
+      id: 'admin-1',
+      email: 'admin@zeracreative.com',
+      role: 'Super Admin',
+      permissions: [],
+    );
+
+    await tester.pumpWidget(_authenticatedApp(user: admin));
+    await tester.pumpAndSettle();
+
+    expect(find.text(formatDisplayDateOnly(DateTime.now())), findsOneWidget);
+  });
+
+  testWidgets(
+    "admin dashboard's Post notice button lives on the Company Notices card, "
+    'not floating above it',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+
+      await tester.pumpWidget(_authenticatedApp(user: admin));
+      await tester.pumpAndSettle();
+
+      final noticesCard = find.ancestor(
+        of: find.text('Company Notices'),
+        matching: find.byType(Card),
+      );
+      expect(noticesCard, findsOneWidget);
+      expect(
+        find.descendant(of: noticesCard, matching: find.text('Post notice')),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets(
     "admin dashboard shows 'No Employee of the Month right now.' when none "
     'is currently active',
@@ -268,6 +320,50 @@ void main() {
       expect(find.text('Upcoming Birthday'), findsOneWidget);
       expect(find.text('Babar Hussain'), findsOneWidget);
       expect(find.text('Sep 20 · in 5 days'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'admin dashboard shows every work anniversary in the spotlight month',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          employeeRepository: FakeEmployeeRepository(
+            employees: [buildTestEmployee()],
+            workAnniversarySpotlight: const [
+              UpcomingWorkAnniversary(
+                employeeId: 'employee-2',
+                fullName: 'Aamna Irfan',
+                joiningDate: '2023-09-25',
+                daysUntil: 7,
+                yearsOfService: 3,
+              ),
+              UpcomingWorkAnniversary(
+                employeeId: 'employee-3',
+                fullName: 'Babar Hussain',
+                joiningDate: '2020-09-30',
+                daysUntil: 12,
+                yearsOfService: 6,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Upcoming Work Anniversary'), findsOneWidget);
+      expect(find.text('Aamna Irfan'), findsOneWidget);
+      expect(find.text('3 years · in 7 days'), findsOneWidget);
+      expect(find.text('Babar Hussain'), findsOneWidget);
+      expect(find.text('6 years · in 12 days'), findsOneWidget);
     },
   );
 

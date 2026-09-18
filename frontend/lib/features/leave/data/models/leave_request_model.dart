@@ -1,3 +1,4 @@
+import '../../../../shared/utils/photo_url.dart';
 import '../../domain/entities/leave_request.dart';
 
 class LeaveRequestModel extends LeaveRequest {
@@ -28,7 +29,9 @@ class LeaveRequestModel extends LeaveRequest {
         id: json['id'] as String,
         employeeId: json['employeeId'] as String,
         requesterName: json['requesterName'] as String,
-        requesterPhotoUrl: json['requesterPhotoUrl'] as String?,
+        requesterPhotoUrl: resolvePhotoUrl(
+          json['requesterPhotoUrl'] as String?,
+        ),
         leaveTypeId: json['leaveTypeId'] as String,
         leaveTypeName: json['leaveTypeName'] as String,
         startDate: json['startDate'] as String,

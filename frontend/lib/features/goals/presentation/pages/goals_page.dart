@@ -13,11 +13,20 @@ import '../../application/goal_providers.dart';
 import '../../domain/entities/goal.dart';
 import '../../domain/exceptions/goal_exception.dart';
 
+/// Who's looking at this page, from most to least broad reach — decides
+/// which goals are listed, what "Add Goal" creates, and what Edit/Archive
+/// are allowed to touch. [admin] (`goals.manage`) manages any employee's
+/// goals; [teamLead] (no permission, identity-scoped) manages only their
+/// own direct reports'; [self] (neither of the above) manages only their
+/// own — set, edited, and archived with no HR/Admin approval step, same as
+/// every other mode.
+enum _GoalViewerMode { admin, teamLead, self }
+
 /// Lets Admin/HR (`goals.manage`) set and edit a goal for any employee, or
 /// bulk-assign one goal to every active employee in a department; a Team
 /// Lead without that permission gets the same tools scoped to just their
-/// own direct reports. Employees see their own goals read-only on their
-/// dashboard instead (`UserDashboardPage`'s "My Goals" section), not here.
+/// own direct reports; any other employee gets it scoped to just
+/// themselves — no approval needed, same as the other two modes.
 class GoalsPage extends ConsumerWidget {
   const GoalsPage({super.key});
 
@@ -31,21 +40,16 @@ class GoalsPage extends ConsumerWidget {
     final hasDirectReports =
         directReportsAsync.valueOrNull?.isNotEmpty ?? false;
 
-    if (!canManageGoals && !hasDirectReports) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Center(
-          child: Text(
-            "Goals are set by your manager or HR/Admin — you'll see your "
-            'own on your dashboard.',
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-          ),
-        ),
-      );
-    }
+    final mode = canManageGoals
+        ? _GoalViewerMode.admin
+        : hasDirectReports
+        ? _GoalViewerMode.teamLead
+        : _GoalViewerMode.self;
+    final title = switch (mode) {
+      _GoalViewerMode.admin => 'All Goals',
+      _GoalViewerMode.teamLead => "My Goals & Team's Goals",
+      _GoalViewerMode.self => 'My Goals',
+    };
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -60,15 +64,14 @@ class GoalsPage extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        canManageGoals ? 'All Goals' : "My Team's Goals",
+                        title,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
                     FilledButton.icon(
                       onPressed: () => showDialog<void>(
                         context: context,
-                        builder: (_) =>
-                            _AddGoalDialog(canManageGoals: canManageGoals),
+                        builder: (_) => _AddGoalDialog(mode: mode),
                       ),
                       icon: const Icon(Icons.add, size: 16),
                       label: const Text('Add Goal'),
@@ -76,7 +79,7 @@ class GoalsPage extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _GoalsList(canManageGoals: canManageGoals),
+                _GoalsList(mode: mode),
               ],
             ),
           ),
@@ -87,9 +90,9 @@ class GoalsPage extends ConsumerWidget {
 }
 
 class _GoalsList extends ConsumerStatefulWidget {
-  const _GoalsList({required this.canManageGoals});
+  const _GoalsList({required this.mode});
 
-  final bool canManageGoals;
+  final _GoalViewerMode mode;
 
   @override
   ConsumerState<_GoalsList> createState() => _GoalsListState();
@@ -119,61 +122,81 @@ class _GoalsListState extends ConsumerState<_GoalsList> {
 
   @override
   Widget build(BuildContext context) {
-    final goalsAsync = ref.watch(
-      widget.canManageGoals ? allGoalsProvider : teamGoalsProvider,
-    );
+    final goalsAsync = ref.watch(switch (widget.mode) {
+      _GoalViewerMode.admin => allGoalsProvider,
+      _GoalViewerMode.teamLead => myAndTeamGoalsProvider,
+      _GoalViewerMode.self => myGoalsProvider,
+    });
     final departmentsAsync = ref.watch(departmentsProvider);
+    // A plain employee's list is only ever their own goals — searching by
+    // employee name or filtering by department would just be clutter here.
+    final showSearch = widget.mode != _GoalViewerMode.self;
+    // A Team Lead's list is always just themselves + their own direct
+    // reports (typically all one department already) — a department filter
+    // over that small, already-scoped set adds nothing. Admin/HR's list
+    // spans the whole company, where it's actually useful.
+    final showDepartmentFilter = widget.mode == _GoalViewerMode.admin;
+    // A Team Lead needs to tell their own goals from a report's on a card —
+    // resolved once here (not per-card) from the same identity check the
+    // "Myself" option in the Add Goal picker uses.
+    final selfIdAsync = widget.mode == _GoalViewerMode.teamLead
+        ? ref.watch(myProfileProvider)
+        : null;
 
     return FormSection(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    labelText: 'Search by employee name',
-                    prefixIcon: Icon(Icons.search, size: 18),
-                    isDense: true,
-                  ),
-                  onChanged: (value) =>
-                      setState(() => _searchQuery = value.trim()),
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 220,
-                child: departmentsAsync.when(
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, _) => const SizedBox.shrink(),
-                  data: (departments) => DropdownButtonFormField<String?>(
-                    initialValue: _departmentFilter,
-                    isExpanded: true,
+          if (showSearch) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
                     decoration: const InputDecoration(
-                      labelText: 'Department',
+                      labelText: 'Search by employee name',
+                      prefixIcon: Icon(Icons.search, size: 18),
                       isDense: true,
                     ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: null,
-                        child: Text('All departments'),
-                      ),
-                      for (final department in departments)
-                        DropdownMenuItem(
-                          value: department.id,
-                          child: Text(department.name),
-                        ),
-                    ],
                     onChanged: (value) =>
-                        setState(() => _departmentFilter = value),
+                        setState(() => _searchQuery = value.trim()),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+                if (showDepartmentFilter) ...[
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 220,
+                    child: departmentsAsync.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, _) => const SizedBox.shrink(),
+                      data: (departments) => DropdownButtonFormField<String?>(
+                        initialValue: _departmentFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Department',
+                          isDense: true,
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('All departments'),
+                          ),
+                          for (final department in departments)
+                            DropdownMenuItem(
+                              value: department.id,
+                              child: Text(department.name),
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _departmentFilter = value),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
           goalsAsync.when(
             loading: () => const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
@@ -181,7 +204,9 @@ class _GoalsListState extends ConsumerState<_GoalsList> {
             ),
             error: (_, _) => const Text('Could not load goals.'),
             data: (goals) {
-              final filtered = _applyFilters(goals);
+              final filtered = showSearch
+                  ? _applyFilters(goals)
+                  : goals;
               if (filtered.isEmpty) {
                 return Text(
                   goals.isEmpty
@@ -194,7 +219,8 @@ class _GoalsListState extends ConsumerState<_GoalsList> {
               }
               return _GoalCardGrid(
                 goals: filtered,
-                canManageGoals: widget.canManageGoals,
+                mode: widget.mode,
+                selfEmployeeId: selfIdAsync?.valueOrNull?.id,
               );
             },
           ),
@@ -209,10 +235,30 @@ class _GoalsListState extends ConsumerState<_GoalsList> {
 /// IntrinsicHeight-row approach as `EmployeeDirectoryPage`'s card grid, so
 /// every card in a row matches height regardless of its content length.
 class _GoalCardGrid extends StatelessWidget {
-  const _GoalCardGrid({required this.goals, required this.canManageGoals});
+  const _GoalCardGrid({
+    required this.goals,
+    required this.mode,
+    this.selfEmployeeId,
+  });
 
   final List<Goal> goals;
-  final bool canManageGoals;
+  final _GoalViewerMode mode;
+
+  /// The viewer's own employee id — only passed for [_GoalViewerMode.teamLead],
+  /// so each card can tell "my own goal" (self-scoped actions) from "a
+  /// report's goal" (manager-scoped actions) within the same combined list.
+  final String? selfEmployeeId;
+
+  /// [mode] as-is, except in [_GoalViewerMode.teamLead] a card for the
+  /// viewer's own goal (as opposed to a direct report's) resolves to
+  /// [_GoalViewerMode.self] instead, so its edit/archive route to the
+  /// `/me` endpoints and its edit dialog shows the achievement slider.
+  _GoalViewerMode _effectiveMode(Goal goal) {
+    if (mode == _GoalViewerMode.teamLead && goal.employeeId == selfEmployeeId) {
+      return _GoalViewerMode.self;
+    }
+    return mode;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -249,7 +295,7 @@ class _GoalCardGrid extends StatelessWidget {
                         width: cardWidth,
                         child: _GoalCard(
                           goal: row[i],
-                          canManageGoals: canManageGoals,
+                          mode: _effectiveMode(row[i]),
                         ),
                       ),
                       if (i != row.length - 1) const SizedBox(width: spacing),
@@ -267,21 +313,26 @@ class _GoalCardGrid extends StatelessWidget {
 }
 
 class _GoalCard extends ConsumerWidget {
-  const _GoalCard({required this.goal, required this.canManageGoals});
+  const _GoalCard({required this.goal, required this.mode});
 
   final Goal goal;
-  final bool canManageGoals;
+  final _GoalViewerMode mode;
 
   Future<void> _archive(WidgetRef ref, BuildContext context) async {
     try {
       final repository = ref.read(goalRepositoryProvider);
-      if (canManageGoals) {
-        await repository.archive(goal.id);
-      } else {
-        await repository.archiveAsManager(goal.id);
+      switch (mode) {
+        case _GoalViewerMode.admin:
+          await repository.archive(goal.id);
+        case _GoalViewerMode.teamLead:
+          await repository.archiveAsManager(goal.id);
+        case _GoalViewerMode.self:
+          await repository.archiveAsSelf(goal.id);
       }
       ref.invalidate(allGoalsProvider);
       ref.invalidate(teamGoalsProvider);
+      ref.invalidate(myGoalsProvider);
+      ref.invalidate(myAndTeamGoalsProvider);
     } on GoalException catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
@@ -331,10 +382,7 @@ class _GoalCard extends ConsumerWidget {
                 IconButton(
                   onPressed: () => showDialog<void>(
                     context: context,
-                    builder: (_) => _EditGoalDialog(
-                      goal: goal,
-                      canManageGoals: canManageGoals,
-                    ),
+                    builder: (_) => _EditGoalDialog(goal: goal, mode: mode),
                   ),
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   tooltip: 'Edit',
@@ -402,9 +450,9 @@ class _GoalCard extends ConsumerWidget {
 }
 
 class _AddGoalDialog extends ConsumerStatefulWidget {
-  const _AddGoalDialog({required this.canManageGoals});
+  const _AddGoalDialog({required this.mode});
 
-  final bool canManageGoals;
+  final _GoalViewerMode mode;
 
   @override
   ConsumerState<_AddGoalDialog> createState() => _AddGoalDialogState();
@@ -442,7 +490,12 @@ class _AddGoalDialogState extends ConsumerState<_AddGoalDialog> {
 
     try {
       final repository = ref.read(goalRepositoryProvider);
-      if (_target == _AssignTarget.department) {
+      if (widget.mode == _GoalViewerMode.self) {
+        await repository.createForSelf(
+          title: _titleController.text,
+          description: description,
+        );
+      } else if (_target == _AssignTarget.department) {
         final departmentId = _selectedDepartmentId;
         if (departmentId == null) {
           setState(() => _errorMessage = 'Choose a department');
@@ -459,9 +512,16 @@ class _AddGoalDialogState extends ConsumerState<_AddGoalDialog> {
           setState(() => _errorMessage = 'Choose an employee');
           return;
         }
-        if (widget.canManageGoals) {
+        final selfEmployeeId = ref.read(myProfileProvider).valueOrNull?.id;
+        if (widget.mode == _GoalViewerMode.admin) {
           await repository.createForEmployee(
             employeeId: employeeId,
+            title: _titleController.text,
+            description: description,
+          );
+        } else if (employeeId == selfEmployeeId) {
+          // A Team Lead picked "Myself" in the employee picker.
+          await repository.createForSelf(
             title: _titleController.text,
             description: description,
           );
@@ -475,6 +535,8 @@ class _AddGoalDialogState extends ConsumerState<_AddGoalDialog> {
       }
       ref.invalidate(allGoalsProvider);
       ref.invalidate(teamGoalsProvider);
+      ref.invalidate(myGoalsProvider);
+      ref.invalidate(myAndTeamGoalsProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
     } on GoalException catch (error) {
@@ -486,6 +548,8 @@ class _AddGoalDialogState extends ConsumerState<_AddGoalDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isSelf = widget.mode == _GoalViewerMode.self;
+    final canManageGoals = widget.mode == _GoalViewerMode.admin;
     return AlertDialog(
       title: const Text('Add Goal'),
       content: SizedBox(
@@ -505,7 +569,7 @@ class _AddGoalDialogState extends ConsumerState<_AddGoalDialog> {
                 ),
                 const SizedBox(height: 12),
               ],
-              if (widget.canManageGoals) ...[
+              if (canManageGoals) ...[
                 SegmentedButton<_AssignTarget>(
                   segments: const [
                     ButtonSegment(
@@ -525,22 +589,26 @@ class _AddGoalDialogState extends ConsumerState<_AddGoalDialog> {
                 ),
                 const SizedBox(height: 12),
               ],
-              if (_target == _AssignTarget.individual)
-                _EmployeePicker(
-                  scopeToDirectReports: !widget.canManageGoals,
-                  selectedEmployeeId: _selectedEmployeeId,
-                  enabled: !_submitting,
-                  onChanged: (value) =>
-                      setState(() => _selectedEmployeeId = value),
-                )
-              else
-                _DepartmentPicker(
-                  selectedDepartmentId: _selectedDepartmentId,
-                  enabled: !_submitting,
-                  onChanged: (value) =>
-                      setState(() => _selectedDepartmentId = value),
-                ),
-              const SizedBox(height: 12),
+              // A self-service goal is implicitly "for me" — no employee or
+              // department picker at all.
+              if (!isSelf) ...[
+                if (_target == _AssignTarget.individual)
+                  _EmployeePicker(
+                    mode: widget.mode,
+                    selectedEmployeeId: _selectedEmployeeId,
+                    enabled: !_submitting,
+                    onChanged: (value) =>
+                        setState(() => _selectedEmployeeId = value),
+                  )
+                else
+                  _DepartmentPicker(
+                    selectedDepartmentId: _selectedDepartmentId,
+                    enabled: !_submitting,
+                    onChanged: (value) =>
+                        setState(() => _selectedDepartmentId = value),
+                  ),
+                const SizedBox(height: 12),
+              ],
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(labelText: 'Goal'),
@@ -580,10 +648,10 @@ class _AddGoalDialogState extends ConsumerState<_AddGoalDialog> {
 }
 
 class _EditGoalDialog extends ConsumerStatefulWidget {
-  const _EditGoalDialog({required this.goal, required this.canManageGoals});
+  const _EditGoalDialog({required this.goal, required this.mode});
 
   final Goal goal;
-  final bool canManageGoals;
+  final _GoalViewerMode mode;
 
   @override
   ConsumerState<_EditGoalDialog> createState() => _EditGoalDialogState();
@@ -623,22 +691,32 @@ class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
       final description = _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim();
-      if (widget.canManageGoals) {
-        await repository.update(
-          widget.goal.id,
-          title: _titleController.text,
-          description: description,
-          achievementPercentage: _achievementPercentage,
-        );
-      } else {
-        await repository.updateAsManager(
-          widget.goal.id,
-          title: _titleController.text,
-          description: description,
-        );
+      switch (widget.mode) {
+        case _GoalViewerMode.admin:
+          await repository.update(
+            widget.goal.id,
+            title: _titleController.text,
+            description: description,
+            achievementPercentage: _achievementPercentage,
+          );
+        case _GoalViewerMode.teamLead:
+          await repository.updateAsManager(
+            widget.goal.id,
+            title: _titleController.text,
+            description: description,
+          );
+        case _GoalViewerMode.self:
+          await repository.updateAsSelf(
+            widget.goal.id,
+            title: _titleController.text,
+            description: description,
+            achievementPercentage: _achievementPercentage,
+          );
       }
       ref.invalidate(allGoalsProvider);
       ref.invalidate(teamGoalsProvider);
+      ref.invalidate(myGoalsProvider);
+      ref.invalidate(myAndTeamGoalsProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
     } on GoalException catch (error) {
@@ -650,6 +728,9 @@ class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // A Team Lead editing a direct report's goal never sets their progress;
+    // Admin/HR and the employee editing their own goal both can.
+    final showAchievementSlider = widget.mode != _GoalViewerMode.teamLead;
     return AlertDialog(
       title: Text(widget.goal.employeeName),
       content: SizedBox(
@@ -679,7 +760,7 @@ class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
                 labelText: 'Description (optional)',
               ),
             ),
-            if (widget.canManageGoals) ...[
+            if (showAchievementSlider) ...[
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -733,38 +814,62 @@ class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
 
 class _EmployeePicker extends ConsumerWidget {
   const _EmployeePicker({
-    required this.scopeToDirectReports,
+    required this.mode,
     required this.selectedEmployeeId,
     required this.enabled,
     required this.onChanged,
   });
 
-  final bool scopeToDirectReports;
+  /// [_GoalViewerMode.admin] lists every employee; [_GoalViewerMode.teamLead]
+  /// lists "Myself" first, then just this viewer's own direct reports — a
+  /// Team Lead is also an employee with their own goals to set, not just
+  /// their reports'. Never called with [_GoalViewerMode.self], since that
+  /// mode skips this picker entirely (a self-service goal is implicitly
+  /// "for me").
+  final _GoalViewerMode mode;
   final String? selectedEmployeeId;
   final bool enabled;
   final ValueChanged<String?> onChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final employeesAsync = ref.watch(
-      scopeToDirectReports ? myDirectReportsProvider : employeeListProvider,
-    );
-
-    return employeesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, _) => const Text('Could not load employees.'),
-      data: (employees) => DropdownButtonFormField<String>(
-        initialValue: selectedEmployeeId,
-        decoration: const InputDecoration(labelText: 'Employee'),
-        items: [
+    if (mode == _GoalViewerMode.admin) {
+      final employeesAsync = ref.watch(employeeListProvider);
+      return employeesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, _) => const Text('Could not load employees.'),
+        data: (employees) => _dropdown([
           for (final Employee employee in employees)
-            DropdownMenuItem(
-              value: employee.id,
-              child: Text(employee.fullName),
-            ),
-        ],
-        onChanged: enabled ? onChanged : null,
-      ),
+            (employee.id, employee.fullName),
+        ]),
+      );
+    }
+
+    final selfAsync = ref.watch(myProfileProvider);
+    final reportsAsync = ref.watch(myDirectReportsProvider);
+    if (selfAsync.isLoading || reportsAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final self = selfAsync.valueOrNull;
+    if (self == null || reportsAsync.hasError) {
+      return const Text('Could not load employees.');
+    }
+    return _dropdown([
+      (self.id, 'Myself'),
+      for (final Employee report in reportsAsync.valueOrNull ?? const [])
+        (report.id, report.fullName),
+    ]);
+  }
+
+  Widget _dropdown(List<(String, String)> items) {
+    return DropdownButtonFormField<String>(
+      initialValue: selectedEmployeeId,
+      decoration: const InputDecoration(labelText: 'Employee'),
+      items: [
+        for (final (id, name) in items)
+          DropdownMenuItem(value: id, child: Text(name)),
+      ],
+      onChanged: enabled ? onChanged : null,
     );
   }
 }

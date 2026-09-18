@@ -53,6 +53,17 @@ class GoalRemoteDataSource {
     return GoalModel.fromJson(response.data!);
   }
 
+  Future<GoalModel> createForSelf({
+    required String title,
+    String? description,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/goals/me',
+      data: {'title': title, 'description': ?description},
+    );
+    return GoalModel.fromJson(response.data!);
+  }
+
   Future<List<GoalModel>> bulkAssignToDepartment({
     required String departmentId,
     required String title,
@@ -98,9 +109,29 @@ class GoalRemoteDataSource {
     return GoalModel.fromJson(response.data!);
   }
 
+  Future<GoalModel> updateAsSelf(
+    String goalId, {
+    String? title,
+    String? description,
+    int? achievementPercentage,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/goals/$goalId/me',
+      data: {
+        'title': ?title,
+        'description': ?description,
+        'achievementPercentage': ?achievementPercentage,
+      },
+    );
+    return GoalModel.fromJson(response.data!);
+  }
+
   Future<void> archive(String goalId) =>
       _dio.patch('/goals/$goalId/archive');
 
   Future<void> archiveAsManager(String goalId) =>
       _dio.patch('/goals/$goalId/team/archive');
+
+  Future<void> archiveAsSelf(String goalId) =>
+      _dio.patch('/goals/$goalId/me/archive');
 }

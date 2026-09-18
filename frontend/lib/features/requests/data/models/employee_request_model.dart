@@ -1,3 +1,4 @@
+import '../../../../shared/utils/photo_url.dart';
 import '../../domain/entities/employee_request.dart';
 
 class EmployeeRequestModel extends EmployeeRequest {
@@ -24,7 +25,9 @@ class EmployeeRequestModel extends EmployeeRequest {
         id: json['id'] as String,
         requesterId: json['requesterId'] as String,
         requesterName: json['requesterName'] as String,
-        requesterPhotoUrl: json['requesterPhotoUrl'] as String?,
+        requesterPhotoUrl: resolvePhotoUrl(
+          json['requesterPhotoUrl'] as String?,
+        ),
         subject: json['subject'] as String,
         description: json['description'] as String,
         type: json['type'] as String?,

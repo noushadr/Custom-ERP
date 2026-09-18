@@ -103,7 +103,6 @@ describe('PerformanceReviewsService', () => {
       save: jest.fn((item) => Promise.resolve(item)),
     };
     responseRepository = {
-      findByReviewId: jest.fn().mockResolvedValue([]),
       save: jest.fn((item) => Promise.resolve(item)),
       saveMany: jest.fn((items) => Promise.resolve(items)),
     };

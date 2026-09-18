@@ -588,7 +588,7 @@ List<T> _recentlyDecided<T>(
   return decided.take(_maxDecidedHistory).toList();
 }
 
-/// Merges two task lists (My Tasks + Team Tasks can overlap for a
+/// Merges two task lists (My Tasks + Task Board can overlap for a
 /// department head who is also their own assignee) keyed by id.
 List<Task> _dedupeTasksById(List<Task> tasks) {
   final seen = <String>{};

@@ -51,6 +51,75 @@ void main() {
   });
 
   testWidgets(
+    'a plain employee gets only a team picker, no toggle, no employee dropdown',
+    (tester) async {
+      final repository = FakeTaskRepository();
+
+      await tester.pumpWidget(
+        _app(
+          departments: const [Department(id: 'dept-1', name: 'Engineering')],
+          repository: repository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assign to person'), findsNothing);
+      expect(find.text('Assign to team'), findsNothing);
+      expect(find.widgetWithText(DropdownButtonFormField<String>, 'Team'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Title'),
+        'Ship the release',
+      );
+      await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Team'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Engineering').last);
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const Key('task-due-date')));
+      await tester.tap(find.byKey(const Key('task-due-date')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Create Task'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Create Task'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastCreatedAssigneeEmployeeId, isNull);
+      expect(repository.lastCreatedDepartmentId, 'dept-1');
+    },
+  );
+
+  testWidgets(
+    'a tasks.manage holder can toggle to Assign to team instead of a person',
+    (tester) async {
+      final repository = FakeTaskRepository();
+
+      await tester.pumpWidget(
+        _app(
+          user: const AuthUser(
+            id: 'admin-1',
+            email: 'admin@zeracreative.com',
+            role: 'Super Admin',
+            permissions: ['tasks.manage'],
+          ),
+          departments: const [Department(id: 'dept-1', name: 'Engineering')],
+          repository: repository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assign to person'), findsOneWidget);
+      await tester.tap(find.text('Assign to team'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(DropdownButtonFormField<String>, 'Team'), findsOneWidget);
+      expect(find.widgetWithText(DropdownButtonFormField<String>, 'Assignee'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'restricts the assignee dropdown to a department head\'s own department',
     (tester) async {
       await tester.pumpWidget(
@@ -116,11 +185,13 @@ void main() {
     await tester.tap(find.text('Target Person').last);
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('task-due-date')));
     await tester.tap(find.byKey(const Key('task-due-date')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Create Task'));
     await tester.tap(find.widgetWithText(FilledButton, 'Create Task'));
     await tester.pumpAndSettle();
 

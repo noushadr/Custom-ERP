@@ -31,16 +31,53 @@
 
   <title>zera_erp</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Same background as the app's own Scaffold (AppColors.canvasBackground),
+    so there is no flash of white before this loading screen paints and no
+    flash back to white when Flutter's first frame replaces it.
+  -->
+  <style>
+    html, body {
+      background: #F5F4FB;
+    }
+    #app-boot-loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #F5F4FB;
+      z-index: 9999;
+      opacity: 1;
+      transition: opacity 180ms ease-out;
+    }
+    #app-boot-loading.app-boot-loading--hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #app-boot-loading .app-boot-spinner {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(108, 93, 211, 0.18);
+      border-top-color: #6C5DD3;
+      animation: app-boot-spin 700ms linear infinite;
+    }
+    @keyframes app-boot-spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
   <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
+    A minimal, seamless stand-in for Flutter's own default loading state
+    (a blank page while flutter_bootstrap.js fetches and boots the engine).
+    Pure HTML/CSS so it paints instantly, before any Dart code runs; removed
+    below once the Flutter app has actually started.
   -->
+  <div id="app-boot-loading"><div class="app-boot-spinner"></div></div>
+
   <script>
     // This preview server restarts often during development; without this,
     // a stale service worker can keep serving an old build's assets
@@ -52,6 +89,21 @@
       });
     }
   </script>
+  <script>
+    // Fires once Flutter's engine has booted and runApp() has returned (see
+    // flutter_bootstrap.js) — fade the boot screen out, then drop it.
+    window._hideAppBootLoading = function () {
+      var el = document.getElementById('app-boot-loading');
+      if (!el) return;
+      el.classList.add('app-boot-loading--hidden');
+      el.addEventListener('transitionend', function () { el.remove(); }, { once: true });
+    };
+  </script>
+  <!--
+    web/flutter_bootstrap.js overrides Flutter's auto-generated one (see the
+    docs link above) so it can call window._hideAppBootLoading() once
+    runApp() resolves.
+  -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
