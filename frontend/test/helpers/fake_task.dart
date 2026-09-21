@@ -25,6 +25,7 @@ Task buildTestTask({
   String? projectId,
   DateTime? createdAt,
   DateTime? updatedAt,
+  int commentCount = 0,
 }) {
   return Task(
     id: id,
@@ -46,6 +47,7 @@ Task buildTestTask({
     projectId: projectId,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
     updatedAt: updatedAt ?? DateTime(2026, 1, 1),
+    commentCount: commentCount,
   );
 }
 
@@ -131,11 +133,13 @@ class FakeTaskRepository implements TaskRepository {
   String? lastCreatedDepartmentId;
   String? lastCreatedPriority;
   String? lastCreatedDueDate;
+  String? lastCreatedProjectId;
 
   String? lastUpdatedId;
   String? lastUpdatedTitle;
   String? lastUpdatedAssigneeEmployeeId;
   String? lastUpdatedPriority;
+  String? lastUpdatedDueDate;
 
   String? lastProgressUpdatedId;
   String? lastProgressUpdatedStatus;
@@ -200,6 +204,7 @@ class FakeTaskRepository implements TaskRepository {
     lastCreatedDepartmentId = departmentId;
     lastCreatedPriority = priority;
     lastCreatedDueDate = dueDate;
+    lastCreatedProjectId = projectId;
     if (createTaskError != null) throw createTaskError!;
     return createTaskResult ??
         buildTestTask(title: title, projectId: projectId);
@@ -219,6 +224,7 @@ class FakeTaskRepository implements TaskRepository {
     lastUpdatedTitle = title;
     lastUpdatedAssigneeEmployeeId = assigneeEmployeeId;
     lastUpdatedPriority = priority;
+    lastUpdatedDueDate = dueDate;
     if (updateTaskError != null) throw updateTaskError!;
     return updateTaskResult ?? buildTestTask(id: id, projectId: projectId);
   }

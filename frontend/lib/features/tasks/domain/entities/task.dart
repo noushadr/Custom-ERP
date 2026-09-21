@@ -22,6 +22,7 @@ class Task {
     required this.projectId,
     required this.createdAt,
     required this.updatedAt,
+    required this.commentCount,
   });
 
   final String id;
@@ -55,6 +56,10 @@ class Task {
   final String? projectId;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  /// How many comments/progress updates this task has — shown as a small
+  /// count badge on the board card, same idea as a Trello/Linear card.
+  final int commentCount;
 
   /// Not yet picked up by anyone — assigned to a team, no assignee.
   bool get isUnclaimed => assigneeEmployeeId == null;

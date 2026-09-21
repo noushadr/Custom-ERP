@@ -4,6 +4,17 @@ import '../../../employee/presentation/widgets/employee_status_badges.dart';
 import '../../domain/entities/task_priority.dart';
 import '../../domain/entities/task_status.dart';
 
+/// The color a status renders in everywhere — the badge below, and each
+/// column's accent bar/count pill on the Kanban board.
+Color taskStatusColor(String status) => switch (status) {
+  TaskStatus.todo => AppColors.textSecondary,
+  TaskStatus.inProgress => AppColors.secondary,
+  TaskStatus.pending => AppColors.warning,
+  TaskStatus.completed => AppColors.success,
+  TaskStatus.cancelled => AppColors.error,
+  _ => AppColors.textSecondary,
+};
+
 class TaskStatusBadge extends StatelessWidget {
   const TaskStatusBadge({super.key, required this.status, this.dense = false});
 
@@ -12,15 +23,11 @@ class TaskStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (status) {
-      TaskStatus.todo => ('To Do', AppColors.textSecondary),
-      TaskStatus.inProgress => ('In Progress', AppColors.secondary),
-      TaskStatus.pending => ('Pending', AppColors.warning),
-      TaskStatus.completed => ('Completed', AppColors.success),
-      TaskStatus.cancelled => ('Cancelled', AppColors.error),
-      _ => (status, AppColors.textSecondary),
-    };
-    return StatusBadge(label: label, color: color, dense: dense);
+    return StatusBadge(
+      label: formatTaskStatusLabel(status),
+      color: taskStatusColor(status),
+      dense: dense,
+    );
   }
 }
 

@@ -21,4 +21,16 @@ export class TypeOrmTaskCommentRepository implements TaskCommentRepository {
   save(comment: TaskComment): Promise<TaskComment> {
     return this.repository.save(comment);
   }
+
+  async countByTaskIds(taskIds: string[]): Promise<Map<string, number>> {
+    if (taskIds.length === 0) return new Map();
+    const rows = await this.repository
+      .createQueryBuilder('comment')
+      .select('comment.taskId', 'taskId')
+      .addSelect('COUNT(*)', 'count')
+      .where('comment.taskId IN (:...taskIds)', { taskIds })
+      .groupBy('comment.taskId')
+      .getRawMany<{ taskId: string; count: string }>();
+    return new Map(rows.map((row) => [row.taskId, Number(row.count)]));
+  }
 }

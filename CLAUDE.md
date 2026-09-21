@@ -482,6 +482,72 @@ No schema backfill needed for the nullable/new columns (both nullable at the DB 
 
 No call sites touched, no tests changed. `flutter analyze` clean, 445/445 tests passing.
 
+## Tasks page redesigned as a Kanban board
+
+**2026-09-21**, per explicit instruction/reference screenshot: `frontend/lib/features/tasks/presentation/pages/tasks_page.dart`'s flat per-tab list (`_TaskListView`/`_TaskRow`) became a Kanban board (`_TaskBoardView`/`_StatusColumn`/`_TaskCard`) — one horizontally-scrollable column per `TaskStatus` value (To Do/In Progress/Pending/Completed/Cancelled), each with a colored dot + count pill header, holding that status's cards sorted by due date. Every tab (My Tasks/Available to Claim/Assigned Tasks/Task Board) renders as a board now, not just one shared list — which tab you're on still decides *which* tasks show, the board just decides how they're laid out.
+
+Each card shows: a tappable priority tag, a department tag, the title, an optional 2-line description snippet, a tappable due-date chip, the assignee's avatar+name (or "Unclaimed" + a Claim button), and a comment-count badge — everything from the old row plus the two new things this task asked for (comment count, and status conveyed by column placement instead of a text badge). Priority and due-date stay tap-to-edit exactly as before (`_InlinePriorityMenu`/`_InlineDueDateChip`, untouched); status changes via a compact "…" icon menu on the card (`_CardStatusMenu`, renamed from `_InlineStatusMenu` — same popup-of-every-status pattern, just without the now-redundant badge as its trigger) that moves the card to a different column, a click-based stand-in for drag-and-drop.
+
+**Comment count** is new plumbing end to end: `TaskCommentRepository.countByTaskIds` (new, one grouped `COUNT(*)` query, not N) → `TasksService.toResponsesWithCommentCounts`/`taskResponseFor` attach it to every list/single-task response → `TaskResponseDto.commentCount` → `Task.commentCount` (frontend entity/model, required field). `taskStatusColor` was pulled out of `TaskStatusBadge` into its own exported function in `task_badges.dart` so the board's column accent dots reuse the exact same status→color mapping as the badge, rather than a second copy of the switch.
+
+Frontend tests updated for the new layout (status-badge-on-row assertions → column-placement assertions, "Assigned by" row text removed since cards don't show it — matching the reference design); the backend's existing 48 task tests already covered every list/single-task path through a mocked `commentRepository`, so only the mock needed the new method added, no new spec cases. `nest build` clean (445 backend tests total), 447 frontend tests (5 net new) + `flutter analyze` clean. Verified live: moving a card via the "…" menu updates its column and the header counts instantly; comment counts render correctly (💬1 on a task with one comment).
+
+## Task detail page: inline-editable, no separate Edit button/page
+
+**2026-09-21**, per explicit instruction: `task_detail_page.dart`'s "Edit" button (which pushed `TaskEditorPage(existingTask: task)`) is gone — `TaskDetailPage` no longer imports that page at all. Title and description are now `TextField`s directly on the page for whoever has edit authority (`_canEditTask` — assigner/department-head/tasks.manage, unchanged), saving on blur (`onTapOutside`) or Enter (`onSubmitted`) via `updateTask`; a plain viewer without that authority sees the same fields as read-only `Text`, same as before. Priority became a tap-to-open `_PriorityMenu` (same pattern as the tasks-list row's own priority menu, just local to this file since that one's private to `tasks_page.dart`). Status stays read-only here — it already has its own tap-to-change control on the list row, no need for a third place to edit it.
+
+**Due date is now a highlighted pill, not plain text** (`_DueDateChip`): a colored, rounded background (never bare text) so it's never missed among the surrounding metadata — red once overdue on a still-open task ("Overdue · <date>"), amber within 3 days, the app's primary tint otherwise. Tappable to open the date picker for anyone with edit authority, exactly like the list row's own due-date chip.
+
+`nest build`/backend untouched (purely a frontend change); `flutter analyze` clean, 448/448 frontend tests passing (4 old "Edit button" tests replaced with inline-edit + due-date-highlight tests). Verified live: editing the title in place saves without any page navigation, and an overdue task's due date renders in red.
+
+## Task board: 3 columns, assigner name, days-left, smaller cards
+
+**2026-09-21**, per explicit instruction: `tasks_page.dart`'s board dropped the Pending and Cancelled columns — `_boardStatuses` (new, `[todo, inProgress, completed]`) replaces `TaskStatus.values` both for which columns render and for what the card's "Move to…" menu offers. A task actually left in Pending/Cancelled some other way just doesn't show on the board; its status is still visible/editable from its own detail page.
+
+Each card now shows **who assigned it** ("by {assignedByName}", name only, no photo/avatar — that's reserved for the assignee) and **how many days are left**: the due-date chip (`_InlineDueDateChip`) went from a plain "Due <date>" to a highlighted pill reading e.g. "Sep 22 · 1d left" / "Sep 25 · 4d overdue" / "Sep 03 · 18d ago" (the last for a *closed* task past its due date — "days left"/"overdue" don't apply once it's done, so that's worded neutrally instead), colored red/amber/primary by urgency exactly like the detail page's own due-date chip added earlier.
+
+Cards and columns shrank across the board — column width 280→232, card padding 12→9, title/description/tag text all a size down (`bodyMedium`→`bodySmall`, most `labelSmall` given an explicit `fontSize: 10`) — a deliberate density pass, not just the two new fields' side effect.
+
+`flutter analyze` clean, 451/451 tests passing (6 net new/updated for the 3-column board, assigner name, and days-left). Verified live: board shows exactly 3 columns, each card reads "by …" plus a colored days-left/overdue/ago pill, and cards are visibly more compact than before.
+
+## Task board: responsive columns, swapped card layout, mouse drag-and-drop
+
+**2026-09-21**, per explicit instruction: `tasks_page.dart`'s board (all 4 tabs) now fills the screen instead of sitting in a fixed 1040px-max, 232px-fixed-column layout. `_TaskBoardView` wraps its column row in a `LayoutBuilder`: when the available width comfortably fits all 3 columns at a readable minimum (`_minColumnWidth = 220`), each column is `Expanded` (flex 1) so the three stretch to fill the row evenly; otherwise (a narrow window/phone) it falls back to the old fixed-width horizontally-scrolling layout — never so narrow a column becomes unreadable.
+
+Card layout swapped per instruction: the assignee (avatar + name) moved from the bottom row up to where the priority tag used to be (top row, alongside the department tag and the status "…" menu), and priority moved down to where the assignee used to be (bottom row, alongside the Claim button/comment count).
+
+**Drag-and-drop** (`Draggable<Task>`/`DragTarget<Task>`, Trello-style): `_StatusColumn` became a `DragTarget<Task>` — dropping a card whose status differs from the column calls the same `updateProgress(status: ...)` path the "…" move-to menu already used, with the same provider invalidation and `TaskException`-to-snackbar handling (now shared via `_StatusColumn._handleDrop`, called from both the drag drop and — unchanged — `_CardStatusMenu`). `_TaskCard` wraps its full interactive card in `Draggable<Task>` (`feedback`: a lightweight fixed-width `_DragCardPreview` showing just title+priority; `childWhenDragging`: the real card at 35% opacity) — a plain tap (no movement) still resolves to the card's own tap/menu recognizers underneath, so priority/status menus and "tap card to open detail" all still work exactly as before; only an actual drag gesture is intercepted. The target column highlights (tinted background + colored border, "Drop here" replacing "No tasks here.") while a card hovers over it. Flutter's `Draggable` recognizes any pointer device by default, so this works with mouse drag and trackpad alike, no extra platform-specific wiring needed.
+
+`flutter analyze` clean, 452/452 tests passing (2 net new: a drag-and-drop test using `tester.startGesture`/`moveTo`/`up`, plus the column-fill responsiveness already covered implicitly by the existing column-position test). Verified live: dragging a card from To Do to In Progress by mouse moved it and updated both columns' counts instantly; tap-based priority menu and tap-to-open-detail both still work on the same card.
+
+## Task editor redesign: two-column layout, search fields, priority buttons, client/project link
+
+**2026-09-21**, per explicit instruction: `task_editor_page.dart` rewritten. Layout is now a `LayoutBuilder`-driven two columns above 680px width — Title/Description on the left (fewer, bigger fields worth room to breathe), everything else (assignment, priority, due date, client/project) on the right as a compact metadata sidebar; narrower than that, the same two blocks just stack instead.
+
+**Searchable assignee/team fields**: the old `DropdownButtonFormField` pickers for both the specific-person assignee and the team became `Autocomplete`-based (`_SearchableEntityField<T>`, generic, reused for all three searchable fields on this page) — Flutter's own built-in widget, no new dependency, first use of `Autocomplete` in this codebase. Same authorization pool as before (`_authorizedAssignees`), just searchable by typing instead of scrolling a dropdown.
+
+**Priority** is now a row of `ChoiceChip` selection buttons (Low/Medium/High/Urgent) instead of a dropdown, defaulting to **Low** (was Medium) per explicit instruction — both for a new task's initial state and this page's own default when `existingTask` is null.
+
+**New "Client / Project" field** (`_ClientProjectField`): searches Clients & Projects' existing `projectsListProvider`, showing each option as "{project name} — {client name}" — selecting one sets the task's existing (already-supported, just previously not exposed in this form) `projectId`. "Can't find your client? Add new" pushes the existing `ClientEditorPage` (reused as-is, no changes) to create a bare client (name-only required), then immediately prompts a minimal inline "new project" dialog (`_showQuickAddProjectDialog` — name/type/start date, `createProject`'s only required fields) since a task can only link to a *project*, not a bare client; the resulting project is auto-selected. No backend changes — `Task.projectId` already existed and already flowed through `createTask`/`updateTask`, just wasn't reachable from this form before.
+
+`flutter analyze` clean, 456/456 tests passing (10 in `task_editor_page_test.dart`, largely rewritten for the new widgets — dropdown-tap assertions became search-then-select ones, plus new tests for the Low-default/chip-selection and the client/project add-new flow). Verified live: typed-search filtering works for both people and projects, priority chips toggle correctly, and a task created through the new form round-tripped correctly (assignee, priority, due date, and project link all visible on reload).
+
+## Dashboard: Tasks summary card
+
+**2026-09-21**, per explicit instruction: `admin_dashboard_page.dart` gained a 6th spotlight card, `_TasksSummaryCard`, next to the existing five (Employee of the Month, Last/Upcoming Birthday, Upcoming Work Anniversary, Upcoming Public Holiday). Reuses `teamTasksProvider` — already returns every company task for a `tasks.manage` holder, exactly who this admin-only page is for — so no new backend endpoint was needed. Shows three counts: **Total** (every task, any status), **Pending / In Progress** (todo + pending + in-progress statuses grouped together), and **Done** (completed). Cancelled tasks count toward the total but neither bucket, matching how the Tasks board itself already treats cancelled as its own thing.
+
+`flutter analyze` clean, 457/457 tests passing (1 new). Verified live: card shows real counts (5 Total / 4 Pending / In Progress / 1 Done) matching actual task data.
+
+## User Dashboard: My Tasks box, hide empty My Team, reorder Company Notices
+
+**2026-09-21**, per explicit instruction, three changes to `user_dashboard_page.dart`:
+
+1. **Company Notices now comes before Leave Balances** — simple reorder of `_UserDashboardBody`'s children (Profile card → Company Notices → Leave Balances → My Goals → My Tasks → My Team).
+2. **"My Team" hidden entirely when the viewer has no direct reports**, instead of showing an empty "My Team (0)" card with "No team members are assigned to you yet." — `_TeamMembersSection` now returns `SizedBox.shrink()` for both the loading state and an empty reports list; the actual card (renamed `_TeamMembersList`) only ever renders once there's at least one report.
+3. **New "My Tasks" box** (`_MyTasksSection`) — both directions at once: tasks assigned *to* the viewer (`myTasksProvider`) grouped under "Assigned to you", and tasks the viewer assigned *to others* (`tasksAssignedByMeProvider`) grouped under "Assigned by you" — the same two providers the Tasks page's own tabs already use. Each row (`_TaskSummaryRow`: title, due date, status badge) opens that task's detail page directly on tap. Shows "No tasks yet." only when both lists are empty.
+
+`flutter analyze` clean, 462/462 tests passing (5 new/updated: My-Team-hidden-when-empty, My-Team-shown-when-present, My-Tasks-empty-state, My-Tasks-both-groups, tap-opens-detail — plus `test/features/employee/user_dashboard_page_test.dart`'s own `_app` helper gained a `taskRepositoryProvider` override it was previously missing entirely, since nothing on that page touched tasks before this). Verified live via Login As on a plain employee: Company Notices sits above Leave Balances, My Team is absent (no direct reports), and My Tasks shows a real "Assigned by you" task that opens correctly on tap.
+
 ## Development Workflow
 1. Understand the requirement.
 2. Design the architecture.

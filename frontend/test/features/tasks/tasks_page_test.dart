@@ -133,19 +133,18 @@ void main() {
     expect(tester.getTopLeft(sooner).dy, lessThan(tester.getTopLeft(later).dy));
   });
 
-  testWidgets('shows priority and status badges on each row', (tester) async {
+  testWidgets('shows the priority tag on each card', (tester) async {
     final repository = FakeTaskRepository(
-      myTasks: [buildTestTask(status: TaskStatus.inProgress)],
+      myTasks: [buildTestTask(priority: 'medium')],
     );
 
     await tester.pumpWidget(_app(repository: repository));
     await tester.pumpAndSettle();
 
-    expect(find.text('In Progress'), findsOneWidget);
     expect(find.text('Medium'), findsOneWidget);
   });
 
-  testWidgets('shows who assigned each task', (tester) async {
+  testWidgets('shows who assigned each task, by name only', (tester) async {
     final repository = FakeTaskRepository(
       myTasks: [buildTestTask(assignedByName: 'Nauman Meghani')],
     );
@@ -153,30 +152,116 @@ void main() {
     await tester.pumpWidget(_app(repository: repository));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Assigned by Nauman Meghani'), findsOneWidget);
+    expect(find.text('by Nauman Meghani'), findsOneWidget);
+  });
+
+  testWidgets('shows only To Do/In Progress/Completed columns — no Pending or '
+      'Cancelled column', (tester) async {
+    final repository = FakeTaskRepository(myTasks: [buildTestTask()]);
+
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('To Do'), findsOneWidget);
+    expect(find.text('In Progress'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget);
+    expect(find.text('Pending'), findsNothing);
+    expect(find.text('Cancelled'), findsNothing);
+  });
+
+  testWidgets('shows days left until the due date on the card', (tester) async {
+    final now = DateTime.now();
+    final inThreeDays = now.add(const Duration(days: 3));
+    final dueDate =
+        '${inThreeDays.year.toString().padLeft(4, '0')}-'
+        '${inThreeDays.month.toString().padLeft(2, '0')}-'
+        '${inThreeDays.day.toString().padLeft(2, '0')}';
+    final repository = FakeTaskRepository(
+      myTasks: [buildTestTask(dueDate: dueDate)],
+    );
+
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('3d left'), findsOneWidget);
+  });
+
+  testWidgets('shows how many comments a task has', (tester) async {
+    final repository = FakeTaskRepository(
+      myTasks: [buildTestTask(commentCount: 3)],
+    );
+
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('3'), findsOneWidget);
+    expect(find.byIcon(Icons.chat_bubble_outline), findsOneWidget);
   });
 
   testWidgets(
-    'changing status from the row calls the repository directly, without '
-    "opening the task's detail page",
+    'the board groups each task into the column matching its status',
     (tester) async {
       final repository = FakeTaskRepository(
-        myTasks: [buildTestTask(status: TaskStatus.todo)],
+        myTasks: [
+          buildTestTask(
+            id: 'task-1',
+            title: 'A todo task',
+            status: TaskStatus.todo,
+          ),
+          buildTestTask(
+            id: 'task-2',
+            title: 'An in-progress task',
+            status: TaskStatus.inProgress,
+          ),
+          buildTestTask(
+            id: 'task-3',
+            title: 'A completed task',
+            status: TaskStatus.completed,
+          ),
+        ],
       );
 
       await tester.pumpWidget(_app(repository: repository));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('To Do'));
+      final todoCard = tester.getTopLeft(find.text('A todo task'));
+      final inProgressCard = tester.getTopLeft(
+        find.text('An in-progress task'),
+      );
+      final completedCard = tester.getTopLeft(find.text('A completed task'));
+
+      // Each column is a fixed ~280px width — a card in a later-status
+      // column sits well to the right of one in an earlier column. The
+      // column, not the card itself, is what tells you the status now.
+      expect(inProgressCard.dx, greaterThan(todoCard.dx + 200));
+      expect(completedCard.dx, greaterThan(inProgressCard.dx + 200));
+    },
+  );
+
+  testWidgets(
+    'dragging a card onto a different column moves it there, like Trello',
+    (tester) async {
+      final repository = FakeTaskRepository(
+        myTasks: [
+          buildTestTask(status: TaskStatus.todo, title: 'Draggable task'),
+        ],
+      );
+
+      await tester.pumpWidget(_app(repository: repository));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('In Progress').last);
+      final cardCenter = tester.getCenter(find.text('Draggable task'));
+      final inProgressColumnCenter = tester.getCenter(find.text('In Progress'));
+
+      final gesture = await tester.startGesture(cardCenter);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(inProgressColumnCenter);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.up();
       await tester.pumpAndSettle();
 
       expect(repository.lastProgressUpdatedId, 'task-1');
       expect(repository.lastProgressUpdatedStatus, TaskStatus.inProgress);
-      // Still on the list — no task detail AppBar ("Task") was pushed.
-      expect(find.text('Task'), findsNothing);
     },
   );
 

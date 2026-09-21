@@ -85,6 +85,7 @@ describe('TasksService', () => {
           createdAt: item.createdAt ?? new Date('2026-01-01T00:00:00.000Z'),
         }),
       ),
+      countByTaskIds: jest.fn().mockResolvedValue(new Map()),
     };
     auditLogRepository = {
       findByTaskId: jest.fn().mockResolvedValue([]),
@@ -476,7 +477,7 @@ describe('TasksService', () => {
   });
 
   describe('claimTask', () => {
-    it('lets a member of the task\'s own team claim it', async () => {
+    it("lets a member of the task's own team claim it", async () => {
       const task = buildTask({
         assigneeEmployeeId: null,
         assignee: null,
@@ -501,7 +502,7 @@ describe('TasksService', () => {
       );
     });
 
-    it('rejects someone outside the task\'s team', async () => {
+    it("rejects someone outside the task's team", async () => {
       const task = buildTask({
         assigneeEmployeeId: null,
         assignee: null,
@@ -710,7 +711,7 @@ describe('TasksService', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it('lets the assignee update due date and progress remarks, and notifies the assigner', async () => {
+    it('lets the assignee update progress remarks, and notifies the assigner', async () => {
       const task = buildTask();
       taskRepository.findById.mockResolvedValue(task);
       employeeRepository.findByUserId.mockResolvedValue(
@@ -719,17 +720,77 @@ describe('TasksService', () => {
 
       await service.updateProgress(
         'task-1',
-        { dueDate: '2026-12-15', progressRemarks: 'Halfway done' },
+        { progressRemarks: 'Halfway done' },
         'user-1',
         false,
       );
 
       const savedTask = taskRepository.save.mock.calls[0][0];
-      expect(savedTask.dueDate).toBe('2026-12-15');
       expect(savedTask.progressRemarks).toBe('Halfway done');
       expect(notificationsService.create).toHaveBeenCalledWith(
         expect.objectContaining({ recipientUserId: task.assignedByUserId }),
       );
+    });
+
+    it('rejects a plain assignee (no assigner/department-head/override tier) changing the due date', async () => {
+      const task = buildTask({ dueDate: '2026-12-01' });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1' }),
+      );
+
+      await expect(
+        service.updateProgress(
+          'task-1',
+          { dueDate: '2026-12-20' },
+          'user-1',
+          false,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(taskRepository.save).not.toHaveBeenCalled();
+      expect(auditLogRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('lets the assigner change the due date via updateProgress and logs it in history', async () => {
+      const task = buildTask({
+        dueDate: '2026-12-01',
+        assignedByUserId: 'manager-1',
+      });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await service.updateProgress(
+        'task-1',
+        { dueDate: '2026-12-20' },
+        'manager-1',
+        false,
+      );
+
+      const savedTask = taskRepository.save.mock.calls[0][0];
+      expect(savedTask.dueDate).toBe('2026-12-20');
+      expect(auditLogRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fieldLabel: 'Due Date',
+          oldValue: '2026-12-01',
+          newValue: '2026-12-20',
+        }),
+      );
+    });
+
+    it('lets an admin/HR (tasks.manage override) change the due date via updateProgress', async () => {
+      const task = buildTask({ dueDate: '2026-12-01' });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await service.updateProgress(
+        'task-1',
+        { dueDate: '2026-12-25' },
+        'admin-user-1',
+        true,
+      );
+
+      const savedTask = taskRepository.save.mock.calls[0][0];
+      expect(savedTask.dueDate).toBe('2026-12-25');
     });
 
     it("doesn't notify when a privileged editor (not the assignee) makes the change", async () => {
@@ -776,12 +837,7 @@ describe('TasksService', () => {
       ]);
 
       await expect(
-        service.addComment(
-          'task-1',
-          { body: 'Hi' },
-          'stranger-user-1',
-          false,
-        ),
+        service.addComment('task-1', { body: 'Hi' }, 'stranger-user-1', false),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
@@ -832,9 +888,7 @@ describe('TasksService', () => {
 
       const result = await service.getTasksByProject('project-1');
 
-      expect(taskRepository.findByProjectId).toHaveBeenCalledWith(
-        'project-1',
-      );
+      expect(taskRepository.findByProjectId).toHaveBeenCalledWith('project-1');
       expect(result).toHaveLength(1);
       expect(result[0].projectId).toBe('project-1');
     });
@@ -976,8 +1030,16 @@ describe('TasksService', () => {
 
     it('excludes completed and cancelled tasks', async () => {
       taskRepository.findAll.mockResolvedValue([
-        buildTask({ id: 't1', status: TaskStatus.COMPLETED, dueDate: isoDaysFromNow(2) }),
-        buildTask({ id: 't2', status: TaskStatus.CANCELLED, dueDate: isoDaysFromNow(2) }),
+        buildTask({
+          id: 't1',
+          status: TaskStatus.COMPLETED,
+          dueDate: isoDaysFromNow(2),
+        }),
+        buildTask({
+          id: 't2',
+          status: TaskStatus.CANCELLED,
+          dueDate: isoDaysFromNow(2),
+        }),
       ]);
 
       const result = await service.getTasksNeedingDeadlineReminder(7);
@@ -1008,7 +1070,7 @@ describe('TasksService', () => {
   });
 
   describe('markDeadlineReminderSent', () => {
-    it('stamps lastDeadlineReminderSentFor with the task\'s current dueDate', async () => {
+    it("stamps lastDeadlineReminderSentFor with the task's current dueDate", async () => {
       taskRepository.findById.mockResolvedValue(
         buildTask({ id: 't1', dueDate: '2026-09-01' }),
       );
@@ -1028,7 +1090,7 @@ describe('TasksService', () => {
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }
 
-    it('notifies each matching task\'s assignee directly and marks it sent, with no admin toggle involved', async () => {
+    it("notifies each matching task's assignee directly and marks it sent, with no admin toggle involved", async () => {
       taskRepository.findAll.mockResolvedValue([
         buildTask({
           id: 't1',
@@ -1051,7 +1113,9 @@ describe('TasksService', () => {
         }),
       );
       expect(taskRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ lastDeadlineReminderSentFor: isoDaysFromNow(2) }),
+        expect.objectContaining({
+          lastDeadlineReminderSentFor: isoDaysFromNow(2),
+        }),
       );
     });
 

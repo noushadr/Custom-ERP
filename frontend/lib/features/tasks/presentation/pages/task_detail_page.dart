@@ -12,9 +12,17 @@ import '../../application/task_providers.dart';
 import '../../domain/entities/task.dart';
 import '../../domain/entities/task_audit_log_entry.dart';
 import '../../domain/entities/task_comment.dart';
+import '../../domain/entities/task_priority.dart';
+import '../../domain/entities/task_status.dart';
 import '../../domain/exceptions/task_exception.dart';
 import '../widgets/task_badges.dart';
-import 'task_editor_page.dart';
+
+/// Formats a [DateTime] as an ISO 'YYYY-MM-DD' string — same convention as
+/// `task_editor_page.dart`'s own local helper.
+String _isoDate(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
 
 /// Whether the viewer may edit this task's core fields (title/description/
 /// assignee/priority/due date) — a `tasks.manage` holder (Super Admin/
@@ -38,12 +46,14 @@ bool _canEditTask(WidgetRef ref, Task task) {
   );
 }
 
-/// Shows one task's full detail: fields (status/priority/due date are
-/// read-only here — see `_InlineStatusMenu`/`_InlinePriorityMenu`/
-/// `_InlineDueDateChip` on the tasks list row for those), a single comment
-/// thread for both discussion and progress updates (open to anyone who can
-/// view the task — see TasksService.canView, which addComment reuses), and
-/// its change history.
+/// Shows one task's full detail: fields directly editable in place for
+/// whoever can edit the task (title/description/priority/due date — see
+/// `_canEditTask`, which mirrors `TasksService.canEdit`) with no separate
+/// edit page to navigate to; status stays read-only here since it's already
+/// tap-to-change from the tasks list row (`_InlineStatusMenu`). A single
+/// comment thread covers both discussion and progress updates (open to
+/// anyone who can view the task — see TasksService.canView, which
+/// addComment reuses), plus the change history.
 class TaskDetailPage extends ConsumerWidget {
   const TaskDetailPage({super.key, required this.taskId});
 
@@ -54,29 +64,7 @@ class TaskDetailPage extends ConsumerWidget {
     final taskAsync = ref.watch(taskProvider(taskId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Task'),
-        actions: [
-          taskAsync.maybeWhen(
-            data: (task) => _canEditTask(ref, task)
-                ? TextButton.icon(
-                    onPressed: () async {
-                      await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => TaskEditorPage(existingTask: task),
-                        ),
-                      );
-                      ref.invalidate(taskProvider(taskId));
-                      ref.invalidate(taskHistoryProvider(taskId));
-                    },
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('Edit'),
-                  )
-                : const SizedBox.shrink(),
-            orElse: () => const SizedBox.shrink(),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Task')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
@@ -94,13 +82,107 @@ class TaskDetailPage extends ConsumerWidget {
   }
 }
 
-class _TaskDetailBody extends StatelessWidget {
+class _TaskDetailBody extends ConsumerStatefulWidget {
   const _TaskDetailBody({required this.task});
 
   final Task task;
 
   @override
+  ConsumerState<_TaskDetailBody> createState() => _TaskDetailBodyState();
+}
+
+class _TaskDetailBodyState extends ConsumerState<_TaskDetailBody> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
+  final _titleFocus = FocusNode();
+  final _descriptionFocus = FocusNode();
+  String? _fieldSaving;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.task.title);
+    _descriptionController = TextEditingController(
+      text: widget.task.description ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _titleFocus.dispose();
+    _descriptionFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save(
+    String field, {
+    String? title,
+    String? description,
+    String? priority,
+    String? dueDate,
+  }) async {
+    setState(() {
+      _fieldSaving = field;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(taskRepositoryProvider)
+          .updateTask(
+            widget.task.id,
+            title: title,
+            description: description,
+            priority: priority,
+            dueDate: dueDate,
+          );
+      ref.invalidate(taskProvider(widget.task.id));
+      ref.invalidate(taskHistoryProvider(widget.task.id));
+      ref.invalidate(myTasksProvider);
+      ref.invalidate(tasksAssignedByMeProvider);
+      ref.invalidate(teamTasksProvider);
+    } on TaskException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _fieldSaving = null);
+    }
+  }
+
+  void _saveTitleIfChanged() {
+    final value = _titleController.text.trim();
+    if (value.isEmpty || value == widget.task.title) return;
+    _save('title', title: value);
+  }
+
+  void _saveDescriptionIfChanged() {
+    final value = _descriptionController.text.trim();
+    if (value == (widget.task.description ?? '')) return;
+    _save('description', description: value);
+  }
+
+  Future<void> _changePriority(String priority) async {
+    if (priority == widget.task.priority) return;
+    await _save('priority', priority: priority);
+  }
+
+  Future<void> _changeDueDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.parse(widget.task.dueDate),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (picked == null) return;
+    await _save('dueDate', dueDate: _isoDate(picked));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final task = widget.task;
+    final canEdit = _canEditTask(ref, task);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -110,16 +192,48 @@ class _TaskDetailBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  task.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+                child: canEdit
+                    ? TextField(
+                        controller: _titleController,
+                        focusNode: _titleFocus,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          border: InputBorder.none,
+                          filled: false,
+                        ),
+                        onTapOutside: (_) {
+                          _titleFocus.unfocus();
+                          _saveTitleIfChanged();
+                        },
+                        onSubmitted: (_) => _saveTitleIfChanged(),
+                      )
+                    : Text(
+                        task.title,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
               ),
-              if (!task.isUnclaimed) ...[
-                TaskStatusBadge(status: task.status),
+              if (_fieldSaving == 'title') ...[
                 const SizedBox(width: 8),
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               ],
-              TaskPriorityBadge(priority: task.priority),
+              if (!task.isUnclaimed) ...[
+                const SizedBox(width: 8),
+                TaskStatusBadge(status: task.status),
+              ],
+              const SizedBox(width: 8),
+              canEdit
+                  ? _PriorityMenu(
+                      priority: task.priority,
+                      updating: _fieldSaving == 'priority',
+                      onChanged: _changePriority,
+                    )
+                  : TaskPriorityBadge(priority: task.priority),
             ],
           ),
           const SizedBox(height: 8),
@@ -146,18 +260,45 @@ class _TaskDetailBody extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
-              Text(
-                'Due ${formatDisplayDate(task.dueDate)}',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              _DueDateChip(
+                dueDate: task.dueDate,
+                status: task.status,
+                updating: _fieldSaving == 'dueDate',
+                onTap: canEdit ? _changeDueDate : null,
               ),
             ],
           ),
-          if (task.description != null && task.description!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(task.description!),
-          ],
+          const SizedBox(height: 16),
+          canEdit
+              ? TextField(
+                  controller: _descriptionController,
+                  focusNode: _descriptionFocus,
+                  maxLines: null,
+                  minLines: 1,
+                  decoration: const InputDecoration(
+                    hintText: 'Add a description',
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    border: InputBorder.none,
+                    filled: false,
+                  ),
+                  onTapOutside: (_) {
+                    _descriptionFocus.unfocus();
+                    _saveDescriptionIfChanged();
+                  },
+                  onSubmitted: (_) => _saveDescriptionIfChanged(),
+                )
+              : (task.description != null && task.description!.isNotEmpty
+                    ? Text(task.description!)
+                    : const SizedBox.shrink()),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
           const SizedBox(height: 20),
           if (task.isUnclaimed) ...[
             _AssignmentSection(task: task),
@@ -170,6 +311,126 @@ class _TaskDetailBody extends StatelessWidget {
           const SizedBox(height: 16),
           _HistorySection(taskId: task.id),
         ],
+      ),
+    );
+  }
+}
+
+/// Same tap-a-badge-to-change-it shortcut the tasks list row's own priority
+/// menu offers — used here so priority editing on the detail page needs no
+/// separate form either.
+class _PriorityMenu extends StatelessWidget {
+  const _PriorityMenu({
+    required this.priority,
+    required this.updating,
+    required this.onChanged,
+  });
+
+  final String priority;
+  final bool updating;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (updating) {
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    return PopupMenuButton<String>(
+      tooltip: 'Change priority',
+      padding: EdgeInsets.zero,
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        for (final value in TaskPriority.values)
+          PopupMenuItem(
+            value: value,
+            child: Row(
+              children: [
+                if (value == priority)
+                  const Icon(Icons.check, size: 16, color: AppColors.primary)
+                else
+                  const SizedBox(width: 16),
+                const SizedBox(width: 8),
+                Text(value[0].toUpperCase() + value.substring(1)),
+              ],
+            ),
+          ),
+      ],
+      child: TaskPriorityBadge(priority: priority),
+    );
+  }
+}
+
+/// A highlighted (never plain-text) due-date pill — colored by urgency so it
+/// stands out from the surrounding metadata at a glance: red once overdue
+/// (and still open), amber within 3 days, the app's own primary tint
+/// otherwise. Tappable to change it when [onTap] is given.
+class _DueDateChip extends StatelessWidget {
+  const _DueDateChip({
+    required this.dueDate,
+    required this.status,
+    required this.updating,
+    required this.onTap,
+  });
+
+  final String dueDate;
+  final String status;
+  final bool updating;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (updating) {
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+
+    final due = DateTime.parse(dueDate);
+    final today = DateTime.now();
+    final daysLeft = DateTime(
+      due.year,
+      due.month,
+      due.day,
+    ).difference(DateTime(today.year, today.month, today.day)).inDays;
+    final isOpen =
+        status != TaskStatus.completed && status != TaskStatus.cancelled;
+    final Color color = isOpen && daysLeft < 0
+        ? AppColors.error
+        : isOpen && daysLeft <= 3
+        ? AppColors.warning
+        : AppColors.primary;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today_outlined, size: 13, color: color),
+            const SizedBox(width: 5),
+            Text(
+              isOpen && daysLeft < 0
+                  ? 'Overdue · ${formatDisplayDate(dueDate)}'
+                  : 'Due ${formatDisplayDate(dueDate)}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

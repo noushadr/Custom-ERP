@@ -18,6 +18,7 @@ export interface TaskResponseDto {
   projectId: string | null;
   createdAt: string;
   updatedAt: string;
+  commentCount: number;
 }
 
 export interface TaskCommentResponseDto {

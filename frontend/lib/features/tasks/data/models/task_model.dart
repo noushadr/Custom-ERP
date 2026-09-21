@@ -22,6 +22,7 @@ class TaskModel extends Task {
     required super.projectId,
     required super.createdAt,
     required super.updatedAt,
+    required super.commentCount,
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) => TaskModel(
@@ -35,9 +36,7 @@ class TaskModel extends Task {
     departmentName: json['departmentName'] as String?,
     assignedByUserId: json['assignedByUserId'] as String,
     assignedByName: json['assignedByName'] as String,
-    assignedByPhotoUrl: resolvePhotoUrl(
-      json['assignedByPhotoUrl'] as String?,
-    ),
+    assignedByPhotoUrl: resolvePhotoUrl(json['assignedByPhotoUrl'] as String?),
     priority: json['priority'] as String,
     dueDate: json['dueDate'] as String,
     status: json['status'] as String,
@@ -48,5 +47,6 @@ class TaskModel extends Task {
     projectId: json['projectId'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String),
     updatedAt: DateTime.parse(json['updatedAt'] as String),
+    commentCount: json['commentCount'] as int? ?? 0,
   );
 }

@@ -97,17 +97,17 @@ export class TasksService {
     const actor = await this.employeeRepository.findByUserId(actorUserId);
     if (!actor) return [];
     const tasks = await this.taskRepository.findAll();
-    return tasks
-      .filter((task) => task.assigneeEmployeeId === actor.id)
-      .map(toTaskResponse);
+    return this.toResponsesWithCommentCounts(
+      tasks.filter((task) => task.assigneeEmployeeId === actor.id),
+    );
   }
 
   /** "Assigned Tasks" — created by the caller, for anyone else. */
   async getTasksAssignedByMe(actorUserId: string): Promise<TaskResponseDto[]> {
     const tasks = await this.taskRepository.findAll();
-    return tasks
-      .filter((task) => task.assignedByUserId === actorUserId)
-      .map(toTaskResponse);
+    return this.toResponsesWithCommentCounts(
+      tasks.filter((task) => task.assignedByUserId === actorUserId),
+    );
   }
 
   /** "Team Tasks" — every task company-wide for a `tasks.manage` holder,
@@ -118,20 +118,20 @@ export class TasksService {
     actorHasOverride: boolean,
   ): Promise<TaskResponseDto[]> {
     const tasks = await this.taskRepository.findAll();
-    if (actorHasOverride) return tasks.map(toTaskResponse);
+    if (actorHasOverride) return this.toResponsesWithCommentCounts(tasks);
 
     const actor = await this.employeeRepository.findByUserId(actorUserId);
     if (!actor) return [];
     const headedDepartmentIds = await this.getHeadedDepartmentIds(actor.id);
     if (headedDepartmentIds.size === 0) return [];
 
-    return tasks
-      .filter(
+    return this.toResponsesWithCommentCounts(
+      tasks.filter(
         (task) =>
           task.departmentId != null &&
           headedDepartmentIds.has(task.departmentId),
-      )
-      .map(toTaskResponse);
+      ),
+    );
   }
 
   /** Unclaimed tasks (assigned to a team, nobody picked yet) belonging to
@@ -141,13 +141,13 @@ export class TasksService {
     const actor = await this.employeeRepository.findByUserId(actorUserId);
     if (!actor?.departmentId) return [];
     const tasks = await this.taskRepository.findAll();
-    return tasks
-      .filter(
+    return this.toResponsesWithCommentCounts(
+      tasks.filter(
         (task) =>
           task.assigneeEmployeeId == null &&
           task.departmentId === actor.departmentId,
-      )
-      .map(toTaskResponse);
+      ),
+    );
   }
 
   /** Clients & Projects' view of "which tasks belong to this project" —
@@ -155,7 +155,7 @@ export class TasksService {
    * visibility for its assignee. */
   async getTasksByProject(projectId: string): Promise<TaskResponseDto[]> {
     const tasks = await this.taskRepository.findByProjectId(projectId);
-    return tasks.map(toTaskResponse);
+    return this.toResponsesWithCommentCounts(tasks);
   }
 
   // ---- Single task ----
@@ -169,7 +169,7 @@ export class TasksService {
     if (!(await this.canView(task, actorUserId, actorHasOverride))) {
       throw new ForbiddenException('You do not have access to this task');
     }
-    return toTaskResponse(task);
+    return toTaskResponse(task, await this.commentCountFor(task.id));
   }
 
   async getHistory(
@@ -288,7 +288,7 @@ export class TasksService {
     const saved = await this.taskRepository.save(task);
     await this.addAuditLog(saved.id, actorUserId, 'Created', null, auditNote);
 
-    return toTaskResponse(await this.getTaskOrThrow(saved.id));
+    return this.taskResponseFor(saved.id);
   }
 
   /** A team's head (department head) picking a specific member for a
@@ -331,7 +331,7 @@ export class TasksService {
       `${assigneeName} was assigned to task "${task.title}"`,
     );
 
-    return toTaskResponse(await this.getTaskOrThrow(task.id));
+    return this.taskResponseFor(task.id);
   }
 
   /** Any member of the task's own team can claim an unclaimed team task for
@@ -356,7 +356,7 @@ export class TasksService {
       `${actorName} accepted task "${task.title}"`,
     );
 
-    return toTaskResponse(await this.getTaskOrThrow(task.id));
+    return this.taskResponseFor(task.id);
   }
 
   /** Edits core fields (title/description/priority/due date/assignee) — not
@@ -458,14 +458,17 @@ export class TasksService {
     }
 
     await this.taskRepository.save(task);
-    return toTaskResponse(await this.getTaskOrThrow(task.id));
+    return this.taskResponseFor(task.id);
   }
 
-  /** Status/due date/progress remarks are self-service: the assignee can
-   * update any of them themselves, in addition to the assigner/department-
-   * head/override tiers who can edit everything else. Only the assignee's
-   * own edit notifies the assigner — a privileged editor changing these
-   * same fields doesn't need to notify themselves. */
+  /** Status/progress remarks are self-service: the assignee can update
+   * either themselves, in addition to the assigner/department-head/override
+   * tiers who can edit everything else. Due date is NOT self-service — only
+   * the assigner, a department head over the task, or a `tasks.manage`
+   * holder (Super Admin/HR) may move the deadline, same authority as
+   * `updateTask`'s core-field edits. Only the assignee's own edit notifies
+   * the assigner — a privileged editor changing these same fields doesn't
+   * need to notify themselves. */
   async updateProgress(
     id: string,
     dto: UpdateTaskProgressDto,
@@ -475,12 +478,18 @@ export class TasksService {
     const task = await this.getTaskOrThrow(id);
     const actor = await this.employeeRepository.findByUserId(actorUserId);
     const isSelf = actor != null && task.assigneeEmployeeId === actor.id;
-    if (
-      !isSelf &&
-      !(await this.canEdit(task, actorUserId, actorHasOverride))
-    ) {
+    const hasElevatedAccess =
+      !isSelf || dto.dueDate !== undefined
+        ? await this.canEdit(task, actorUserId, actorHasOverride)
+        : false;
+    if (!isSelf && !hasElevatedAccess) {
       throw new ForbiddenException(
         "You aren't authorized to update this task",
+      );
+    }
+    if (dto.dueDate !== undefined && isSelf && !hasElevatedAccess) {
+      throw new ForbiddenException(
+        "Only the task's assigner, a department head, or an admin/HR can change the due date",
       );
     }
 
@@ -531,7 +540,7 @@ export class TasksService {
       }
     }
 
-    return toTaskResponse(await this.getTaskOrThrow(task.id));
+    return this.taskResponseFor(task.id);
   }
 
   // ---- Authorization helpers ----
@@ -667,6 +676,32 @@ export class TasksService {
     const task = await this.taskRepository.findById(id);
     if (!task) throw new NotFoundException('Task not found');
     return task;
+  }
+
+  /** Re-fetches a single task by id and attaches its comment count — the
+   * single-task counterpart to `toResponsesWithCommentCounts`, used after a
+   * create/claim/assign/edit that already has the id in hand. */
+  private async taskResponseFor(id: string): Promise<TaskResponseDto> {
+    const task = await this.getTaskOrThrow(id);
+    return toTaskResponse(task, await this.commentCountFor(id));
+  }
+
+  private async commentCountFor(taskId: string): Promise<number> {
+    return (await this.commentRepository.countByTaskIds([taskId])).get(
+      taskId,
+    ) ?? 0;
+  }
+
+  /** Batched comment-count lookup (one query, not N) for a list of tasks —
+   * shared by every list endpoint (My Tasks, Assigned Tasks, Team Tasks,
+   * Claimable, by-project). */
+  private async toResponsesWithCommentCounts(
+    tasks: Task[],
+  ): Promise<TaskResponseDto[]> {
+    const counts = await this.commentRepository.countByTaskIds(
+      tasks.map((task) => task.id),
+    );
+    return tasks.map((task) => toTaskResponse(task, counts.get(task.id) ?? 0));
   }
 
   /** Notifies whoever assigned/created the task — used when the assignee

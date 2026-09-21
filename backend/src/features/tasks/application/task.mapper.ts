@@ -13,7 +13,10 @@ import {
  * always comes from Task's own stored column now, never derived from
  * `assignee.department` (that would have nothing to derive from once
  * `assignee` can be null). */
-export function toTaskResponse(task: Task): TaskResponseDto {
+export function toTaskResponse(
+  task: Task,
+  commentCount = 0,
+): TaskResponseDto {
   return {
     id: task.id,
     title: task.title,
@@ -36,6 +39,7 @@ export function toTaskResponse(task: Task): TaskResponseDto {
     projectId: task.projectId ?? null,
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
+    commentCount,
   };
 }
 

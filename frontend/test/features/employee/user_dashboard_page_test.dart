@@ -12,6 +12,7 @@ import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notices/domain/entities/notice.dart';
+import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/shared/models/named_ref.dart';
 
 import '../../helpers/fake_auth.dart';
@@ -19,6 +20,7 @@ import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_goal.dart';
 import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
+import '../../helpers/fake_task.dart';
 
 Future<void> _useTallSurface(WidgetTester tester) async {
   tester.view.physicalSize = const Size(900, 2200);
@@ -40,6 +42,7 @@ Widget _app({
   FakeNoticeRepository? noticeRepository,
   FakeAuthRepository? authRepository,
   FakeLeaveRepository? leaveRepository,
+  FakeTaskRepository? taskRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -59,6 +62,9 @@ Widget _app({
         leaveRepository ?? FakeLeaveRepository(),
       ),
       goalRepositoryProvider.overrideWithValue(FakeGoalRepository()),
+      taskRepositoryProvider.overrideWithValue(
+        taskRepository ?? FakeTaskRepository(),
+      ),
     ],
     child: const MaterialApp(home: Scaffold(body: UserDashboardPage())),
   );
@@ -106,184 +112,175 @@ void main() {
     expect(find.text('Closed for the holiday.'), findsOneWidget);
   });
 
-  testWidgets('shows an empty state when there are no notices', (
-    tester,
-  ) async {
+  testWidgets('shows an empty state when there are no notices', (tester) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
     expect(find.text('No company notices yet.'), findsOneWidget);
   });
 
-  testWidgets(
-    'paginates notices 3 per page, revealing older ones via page 2',
-    (tester) async {
-      await _useTallSurface(tester);
-      final notices = [
-        for (var i = 4; i >= 1; i--)
-          Notice(
-            id: 'notice-$i',
-            title: 'Notice $i',
-            body: 'Body $i',
-            authorName: 'HR Team',
-            createdAt: DateTime(2026, i),
-          ),
-      ];
-      await tester.pumpWidget(
-        _app(noticeRepository: FakeNoticeRepository(notices: notices)),
-      );
-      await tester.pumpAndSettle();
-
-      // Newest 3 shown on page 1; the oldest is on page 2.
-      expect(find.text('Notice 4'), findsOneWidget);
-      expect(find.text('Notice 3'), findsOneWidget);
-      expect(find.text('Notice 2'), findsOneWidget);
-      expect(find.text('Notice 1'), findsNothing);
-
-      await tester.tap(find.text('2'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Notice 1'), findsOneWidget);
-      expect(find.text('Notice 4'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'hides the delete button from a viewer without notices.manage',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          noticeRepository: FakeNoticeRepository(
-            notices: [
-              Notice(
-                id: 'notice-1',
-                title: 'Office closed',
-                body: 'Closed for the holiday.',
-                authorName: 'HR Team',
-                createdAt: DateTime(2026, 1, 1),
-              ),
-            ],
-          ),
+  testWidgets('paginates notices 3 per page, revealing older ones via page 2', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    final notices = [
+      for (var i = 4; i >= 1; i--)
+        Notice(
+          id: 'notice-$i',
+          title: 'Notice $i',
+          body: 'Body $i',
+          authorName: 'HR Team',
+          createdAt: DateTime(2026, i),
         ),
-      );
-      await tester.pumpAndSettle();
+    ];
+    await tester.pumpWidget(
+      _app(noticeRepository: FakeNoticeRepository(notices: notices)),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.byTooltip('Delete notice'), findsNothing);
-    },
-  );
+    // Newest 3 shown on page 1; the oldest is on page 2.
+    expect(find.text('Notice 4'), findsOneWidget);
+    expect(find.text('Notice 3'), findsOneWidget);
+    expect(find.text('Notice 2'), findsOneWidget);
+    expect(find.text('Notice 1'), findsNothing);
 
-  testWidgets(
-    'HR/Admin can delete a notice after confirming',
-    (tester) async {
-      final noticeRepository = FakeNoticeRepository(
-        notices: [
-          Notice(
-            id: 'notice-1',
-            title: 'Office closed',
-            body: 'Closed for the holiday.',
-            authorName: 'HR Team',
-            createdAt: DateTime(2026, 1, 1),
-          ),
-        ],
-      );
-      await tester.pumpWidget(
-        _app(
-          viewer: const AuthUser(
-            id: 'user-1',
-            email: 'jane.doe@zeracreative.com',
-            role: 'HR/Manager',
-            permissions: ['notices.manage'],
-          ),
-          noticeRepository: noticeRepository,
+    await tester.tap(find.text('2'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Notice 1'), findsOneWidget);
+    expect(find.text('Notice 4'), findsNothing);
+  });
+
+  testWidgets('hides the delete button from a viewer without notices.manage', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        noticeRepository: FakeNoticeRepository(
+          notices: [
+            Notice(
+              id: 'notice-1',
+              title: 'Office closed',
+              body: 'Closed for the holiday.',
+              authorName: 'HR Team',
+              createdAt: DateTime(2026, 1, 1),
+            ),
+          ],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Delete notice'));
-      await tester.pumpAndSettle();
+    expect(find.byTooltip('Delete notice'), findsNothing);
+  });
 
-      expect(find.text('Delete notice?'), findsOneWidget);
-
-      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
-      await tester.pumpAndSettle();
-
-      expect(noticeRepository.lastDeletedId, 'notice-1');
-    },
-  );
-
-  testWidgets(
-    'hides the edit button from a viewer without notices.manage',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          noticeRepository: FakeNoticeRepository(
-            notices: [
-              Notice(
-                id: 'notice-1',
-                title: 'Office closed',
-                body: 'Closed for the holiday.',
-                authorName: 'HR Team',
-                createdAt: DateTime(2026, 1, 1),
-              ),
-            ],
-          ),
+  testWidgets('HR/Admin can delete a notice after confirming', (tester) async {
+    final noticeRepository = FakeNoticeRepository(
+      notices: [
+        Notice(
+          id: 'notice-1',
+          title: 'Office closed',
+          body: 'Closed for the holiday.',
+          authorName: 'HR Team',
+          createdAt: DateTime(2026, 1, 1),
         ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byTooltip('Edit notice'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'HR/Admin can edit a notice, pre-filled with its current text',
-    (tester) async {
-      final noticeRepository = FakeNoticeRepository(
-        notices: [
-          Notice(
-            id: 'notice-1',
-            title: 'Office closed',
-            body: 'Closed for the holiday.',
-            authorName: 'HR Team',
-            createdAt: DateTime(2026, 1, 1),
-          ),
-        ],
-      );
-      await tester.pumpWidget(
-        _app(
-          viewer: const AuthUser(
-            id: 'user-1',
-            email: 'jane.doe@zeracreative.com',
-            role: 'HR/Manager',
-            permissions: ['notices.manage'],
-          ),
-          noticeRepository: noticeRepository,
+      ],
+    );
+    await tester.pumpWidget(
+      _app(
+        viewer: const AuthUser(
+          id: 'user-1',
+          email: 'jane.doe@zeracreative.com',
+          role: 'HR/Manager',
+          permissions: ['notices.manage'],
         ),
-      );
-      await tester.pumpAndSettle();
+        noticeRepository: noticeRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Edit notice'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete notice'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Edit notice'), findsOneWidget);
-      expect(find.widgetWithText(TextFormField, 'Office closed'), findsOneWidget);
-      expect(
-        find.widgetWithText(TextFormField, 'Closed for the holiday.'),
-        findsOneWidget,
-      );
+    expect(find.text('Delete notice?'), findsOneWidget);
 
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Title'),
-        'Office closed early',
-      );
-      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
 
-      expect(noticeRepository.lastUpdatedId, 'notice-1');
-      expect(noticeRepository.lastUpdatedTitle, 'Office closed early');
-      expect(find.byType(AlertDialog), findsNothing);
-    },
-  );
+    expect(noticeRepository.lastDeletedId, 'notice-1');
+  });
+
+  testWidgets('hides the edit button from a viewer without notices.manage', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        noticeRepository: FakeNoticeRepository(
+          notices: [
+            Notice(
+              id: 'notice-1',
+              title: 'Office closed',
+              body: 'Closed for the holiday.',
+              authorName: 'HR Team',
+              createdAt: DateTime(2026, 1, 1),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Edit notice'), findsNothing);
+  });
+
+  testWidgets('HR/Admin can edit a notice, pre-filled with its current text', (
+    tester,
+  ) async {
+    final noticeRepository = FakeNoticeRepository(
+      notices: [
+        Notice(
+          id: 'notice-1',
+          title: 'Office closed',
+          body: 'Closed for the holiday.',
+          authorName: 'HR Team',
+          createdAt: DateTime(2026, 1, 1),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      _app(
+        viewer: const AuthUser(
+          id: 'user-1',
+          email: 'jane.doe@zeracreative.com',
+          role: 'HR/Manager',
+          permissions: ['notices.manage'],
+        ),
+        noticeRepository: noticeRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Edit notice'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit notice'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Office closed'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextFormField, 'Closed for the holiday.'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Title'),
+      'Office closed early',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(noticeRepository.lastUpdatedId, 'notice-1');
+    expect(noticeRepository.lastUpdatedTitle, 'Office closed early');
+    expect(find.byType(AlertDialog), findsNothing);
+  });
 
   testWidgets('only highlights the newest notice; older ones are muted', (
     tester,
@@ -320,7 +317,10 @@ void main() {
           )
           .first,
     );
-    expect((newestCard.decoration as BoxDecoration).color, AppColors.primarySoft);
+    expect(
+      (newestCard.decoration as BoxDecoration).color,
+      AppColors.primarySoft,
+    );
 
     final olderCard = tester.widget<Container>(
       find
@@ -436,16 +436,65 @@ void main() {
     expect(find.text('Ravi Report'), findsOneWidget);
   });
 
-  testWidgets('shows an empty state when there are no team members', (
-    tester,
-  ) async {
+  testWidgets(
+    'hides the My Team card entirely when there are no team members',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('My Team'), findsNothing);
+    },
+  );
+
+  testWidgets('shows an empty state when there are no tasks', (tester) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('No team members are assigned to you yet.'),
-      findsOneWidget,
+    expect(find.text('My Tasks'), findsOneWidget);
+    expect(find.text('No tasks yet.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows tasks assigned to the viewer and tasks the viewer assigned to '
+    'others, in separate groups',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          taskRepository: FakeTaskRepository(
+            myTasks: [buildTestTask(id: 'task-1', title: 'Write the report')],
+            tasksAssignedByMe: [
+              buildTestTask(id: 'task-2', title: 'Review the design'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assigned to you'), findsOneWidget);
+      expect(find.text('Write the report'), findsOneWidget);
+      expect(find.text('Assigned by you'), findsOneWidget);
+      expect(find.text('Review the design'), findsOneWidget);
+    },
+  );
+
+  testWidgets('tapping a task row opens that task\'s detail page', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        taskRepository: FakeTaskRepository(
+          myTasks: [buildTestTask(id: 'task-1', title: 'Write the report')],
+          taskById: buildTestTask(id: 'task-1', title: 'Write the report'),
+        ),
+      ),
     );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Write the report'));
+    await tester.tap(find.text('Write the report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Task'), findsOneWidget);
   });
 
   testWidgets(

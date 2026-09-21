@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
+import 'package:flutter_quill/flutter_quill.dart'
+    show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/layout/app_nav_destination.dart';
 import 'core/layout/responsive_scaffold.dart';
@@ -224,11 +225,7 @@ const _superAdminOnlyLabels = {'Financial Reports', 'Leads'};
 // group — see ResponsiveScaffold.hrAdminSectionCount — so it's obvious at a
 // glance which modules are Super-Admin-exclusive vs. shared with HR/Manager
 // vs. general.
-const _hrAndAdminOnlyLabels = {
-  'Clients & Projects',
-  'Payroll',
-  'Logs',
-};
+const _hrAndAdminOnlyLabels = {'Clients & Projects', 'Payroll', 'Logs'};
 
 bool _isAdminOrHr(WidgetRef ref) {
   final authState = ref.watch(authControllerProvider);
@@ -265,13 +262,17 @@ Map<String, int> _navBadgeCounts(WidgetRef ref) {
       myOpenRequests + managerApprovals.length + hrApprovals.length;
 
   final myTasks = ref.watch(myTasksProvider).valueOrNull ?? const [];
-  final tasksBadge = myTasks
-      .where(
-        (t) =>
-            t.status != TaskStatus.completed &&
-            t.status != TaskStatus.cancelled,
-      )
-      .length;
+  final claimableTasks =
+      ref.watch(claimableTasksProvider).valueOrNull ?? const [];
+  final tasksBadge =
+      myTasks
+          .where(
+            (t) =>
+                t.status != TaskStatus.completed &&
+                t.status != TaskStatus.cancelled,
+          )
+          .length +
+      claimableTasks.length;
 
   final myProfile = ref.watch(myProfileProvider).valueOrNull;
   final profileIncomplete =
@@ -316,7 +317,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
   // and stay stable across rebuilds, so this is sized to the full fixed set
   // rather than whatever subset is visible for the current role.
   late final List<GlobalKey<NavigatorState>> _sectionNavigatorKeys = [
-    for (var i = 0; i < _allDestinations.length; i++) GlobalKey<NavigatorState>(),
+    for (var i = 0; i < _allDestinations.length; i++)
+      GlobalKey<NavigatorState>(),
   ];
 
   Widget _sectionRootFor(AppNavDestination destination) {
@@ -421,7 +423,9 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
     final navigatorState = _sectionNavigatorKeys[index].currentState;
     navigatorState?.popUntil((route) => route.isFirst);
     navigatorState?.push(
-      MaterialPageRoute(builder: (_) => ProjectDetailPage(projectId: projectId)),
+      MaterialPageRoute(
+        builder: (_) => ProjectDetailPage(projectId: projectId),
+      ),
     );
     setState(() => _selectedIndex = index);
   }
@@ -614,9 +618,9 @@ class _ComingSoon extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               "This section is on the roadmap and isn't built yet.",
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),

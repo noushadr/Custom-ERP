@@ -67,8 +67,7 @@ void main() {
 
   testWidgets(
     'shows status as a read-only badge, with no separate progress-remarks '
-    'control — a single Comments section is the only way to post an update '
-    '(status/priority/due date changes live on the tasks list row instead)',
+    'control — a single Comments section is the only way to post a comment',
     (tester) async {
       final repository = FakeTaskRepository(
         taskById: buildTestTask(status: TaskStatus.inProgress),
@@ -79,12 +78,29 @@ void main() {
 
       expect(find.text('In Progress'), findsOneWidget);
       expect(find.byType(DropdownButton<String>), findsNothing);
-      expect(find.byIcon(Icons.calendar_today_outlined), findsNothing);
       expect(find.byKey(const Key('progress-remarks-input')), findsNothing);
       expect(find.text('Save remarks'), findsNothing);
       expect(find.text('Comments'), findsOneWidget);
       expect(find.text('Discussion'), findsNothing);
       expect(find.text('Progress'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'highlights the due date, in red once overdue on a still-open task',
+    (tester) async {
+      final repository = FakeTaskRepository(
+        taskById: buildTestTask(
+          dueDate: '2020-01-01',
+          status: TaskStatus.inProgress,
+        ),
+      );
+
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Overdue'), findsOneWidget);
+      expect(find.byIcon(Icons.calendar_today_outlined), findsOneWidget);
     },
   );
 
@@ -166,22 +182,38 @@ void main() {
     );
   });
 
-  testWidgets('shows the Edit button for the assigner', (tester) async {
-    final repository = FakeTaskRepository(
-      taskById: buildTestTask(assignedByUserId: 'user-1'),
-    );
+  testWidgets(
+    'the assigner can edit the title directly on the page — no separate '
+    'Edit page, and no Edit button at all',
+    (tester) async {
+      final repository = FakeTaskRepository(
+        taskById: buildTestTask(assignedByUserId: 'user-1', title: 'Old title'),
+      );
 
-    await tester.pumpWidget(_app(repository: repository));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Edit'), findsOneWidget);
-  });
+      expect(find.text('Edit'), findsNothing);
+      final titleField = find.widgetWithText(TextField, 'Old title');
+      expect(titleField, findsOneWidget);
 
-  testWidgets('shows the Edit button for a tasks.manage holder', (
+      await tester.enterText(titleField, 'New title');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedId, 'task-1');
+      expect(repository.lastUpdatedTitle, 'New title');
+    },
+  );
+
+  testWidgets('a tasks.manage holder can edit priority directly', (
     tester,
   ) async {
     final repository = FakeTaskRepository(
-      taskById: buildTestTask(assignedByUserId: 'someone-else'),
+      taskById: buildTestTask(
+        assignedByUserId: 'someone-else',
+        priority: 'medium',
+      ),
     );
 
     await tester.pumpWidget(
@@ -197,13 +229,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Neither this task's assigner nor its assignee's department head —
-    // tasks.manage alone is what grants Edit here.
-    expect(find.text('Edit'), findsOneWidget);
+    await tester.tap(find.text('Medium'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('High').last);
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUpdatedId, 'task-1');
+    expect(repository.lastUpdatedPriority, 'high');
   });
 
   testWidgets(
-    "shows the Edit button for the assignee's department head (a Team Lead) "
+    "the assignee's department head (a Team Lead) can edit the due date "
     'without tasks.manage',
     (tester) async {
       final repository = FakeTaskRepository(
@@ -211,6 +247,7 @@ void main() {
           assigneeEmployeeId: 'employee-1',
           assignedByUserId: 'someone-else',
           departmentId: 'dept-1',
+          dueDate: '2026-09-15',
         ),
       );
 
@@ -226,39 +263,53 @@ void main() {
           ],
         ),
       );
+      await tester.binding.setSurfaceSize(const Size(1200, 900));
       await tester.pumpAndSettle();
 
-      expect(find.text('Edit'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.calendar_today_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('30').last);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedId, 'task-1');
+      expect(repository.lastUpdatedDueDate, '2026-09-30');
+
+      await tester.binding.setSurfaceSize(null);
     },
   );
 
-  testWidgets('hides the Edit button for a plain assignee viewer', (
-    tester,
-  ) async {
-    final repository = FakeTaskRepository(
-      taskById: buildTestTask(
-        assigneeEmployeeId: 'employee-1',
-        assignedByUserId: 'someone-else',
-        departmentId: 'dept-1',
-      ),
-    );
+  testWidgets(
+    'a plain assignee viewer sees read-only fields, not editable ones',
+    (tester) async {
+      final repository = FakeTaskRepository(
+        taskById: buildTestTask(
+          assigneeEmployeeId: 'employee-1',
+          assignedByUserId: 'someone-else',
+          departmentId: 'dept-1',
+          title: 'Read-only title',
+        ),
+      );
 
-    await tester.pumpWidget(
-      _app(
-        repository: repository,
-        departments: const [
-          Department(
-            id: 'dept-1',
-            name: 'Engineering',
-            headEmployeeId: 'someone-else-entirely',
-          ),
-        ],
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _app(
+          repository: repository,
+          departments: const [
+            Department(
+              id: 'dept-1',
+              name: 'Engineering',
+              headEmployeeId: 'someone-else-entirely',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Edit'), findsNothing);
-  });
+      expect(find.text('Edit'), findsNothing);
+      expect(find.widgetWithText(TextField, 'Read-only title'), findsNothing);
+      expect(find.text('Read-only title'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'a member of the task\'s own team sees an Accept button and claiming it '

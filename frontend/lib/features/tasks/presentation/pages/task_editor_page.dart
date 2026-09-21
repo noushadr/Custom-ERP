@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
+import '../../../clients/application/clients_providers.dart';
+import '../../../clients/domain/entities/client.dart';
+import '../../../clients/domain/entities/project.dart';
+import '../../../clients/domain/entities/project_type.dart';
+import '../../../clients/domain/exceptions/client_exception.dart';
 import '../../../employee/application/employee_providers.dart';
 import '../../../employee/domain/entities/department.dart';
 import '../../../employee/domain/entities/employee.dart';
@@ -41,20 +46,23 @@ List<Employee> _authorizedAssignees({
 
   return active
       .where(
-        (e) => e.department != null && headedDepartmentIds.contains(e.department!.id),
+        (e) =>
+            e.department != null &&
+            headedDepartmentIds.contains(e.department!.id),
       )
       .toList();
 }
 
 enum _AssignTarget { individual, team }
 
-/// Create or edit a task: title, description, assignee, priority, and due
-/// date. Creating a new task offers a choice of assignment target — a
-/// specific person (restricted to the viewer's authorized pool, unchanged
-/// from before) or a whole team (open to anyone, no employee picker at
-/// all — the team itself picks up the task afterward). Editing an existing
-/// task only ever reassigns to a specific person, same as before; a team
-/// task's own claim/assign flow lives on the detail page instead.
+/// Create or edit a task: title, description, assignee, priority, due date,
+/// and an optional client/project link. Creating a new task offers a choice
+/// of assignment target — a specific person (restricted to the viewer's
+/// authorized pool, unchanged from before) or a whole team (open to anyone,
+/// no employee picker at all — the team itself picks up the task
+/// afterward). Editing an existing task only ever reassigns to a specific
+/// person, same as before; a team task's own claim/assign flow lives on the
+/// detail page instead.
 class TaskEditorPage extends ConsumerStatefulWidget {
   const TaskEditorPage({super.key, this.existingTask, this.initialProjectId});
 
@@ -77,8 +85,10 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
   _AssignTarget _target = _AssignTarget.individual;
   String? _assigneeEmployeeId;
   String? _departmentId;
-  late String _priority;
+  // Low preselected, per explicit instruction — was Medium before.
+  String _priority = TaskPriority.low;
   DateTime? _dueDate;
+  String? _projectId;
 
   bool _submitting = false;
   String? _errorMessage;
@@ -94,8 +104,9 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
       text: existing?.description ?? '',
     );
     _assigneeEmployeeId = existing?.assigneeEmployeeId;
-    _priority = existing?.priority ?? TaskPriority.medium;
+    _priority = existing?.priority ?? TaskPriority.low;
     _dueDate = existing != null ? DateTime.parse(existing.dueDate) : null;
+    _projectId = existing?.projectId ?? widget.initialProjectId;
   }
 
   @override
@@ -136,8 +147,7 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final assignToTeam =
-        !_isEditing &&
-        (_target == _AssignTarget.team || !_canPickPerson());
+        !_isEditing && (_target == _AssignTarget.team || !_canPickPerson());
     if (!assignToTeam && _assigneeEmployeeId == null) {
       setState(() => _errorMessage = 'Select an assignee.');
       return;
@@ -167,6 +177,7 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
               assigneeEmployeeId: _assigneeEmployeeId,
               priority: _priority,
               dueDate: _isoDate(_dueDate!),
+              projectId: _projectId,
             )
           : await repository.createTask(
               title: _titleController.text.trim(),
@@ -175,11 +186,14 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
               departmentId: assignToTeam ? _departmentId : null,
               priority: _priority,
               dueDate: _isoDate(_dueDate!),
-              projectId: widget.initialProjectId,
+              projectId: _projectId,
             );
 
       if (widget.initialProjectId != null) {
         ref.invalidate(tasksByProjectProvider(widget.initialProjectId!));
+      }
+      if (_projectId != null && _projectId != widget.initialProjectId) {
+        ref.invalidate(tasksByProjectProvider(_projectId!));
       }
 
       ref.invalidate(myTasksProvider);
@@ -238,136 +252,54 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    TextFormField(
-                      controller: _titleController,
-                      decoration: const InputDecoration(labelText: 'Title'),
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty)
-                          ? 'Required'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: 'Description',
-                      ),
-                      maxLines: 4,
-                    ),
-                    const SizedBox(height: 16),
-                    employeesAsync.when(
-                      loading: () => const LinearProgressIndicator(),
-                      error: (_, _) =>
-                          const Text('Could not load employees.'),
-                      data: (employees) {
-                        final pool = _authorizedAssignees(
-                          employees: employees,
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final left = _LeftColumn(
+                          titleController: _titleController,
+                          descriptionController: _descriptionController,
+                        );
+                        final right = _RightColumn(
+                          isEditing: _isEditing,
+                          submitting: _submitting,
+                          target: _target,
+                          onTargetChanged: (value) =>
+                              setState(() => _target = value),
+                          canPickPerson: canPickPerson,
+                          employeesAsync: employeesAsync,
                           departments: departments,
                           myProfile: myProfile,
                           hasOverride: hasOverride,
+                          assigneeEmployeeId: _assigneeEmployeeId,
+                          onAssigneeChanged: (value) =>
+                              setState(() => _assigneeEmployeeId = value),
+                          departmentId: _departmentId,
+                          onDepartmentChanged: (value) =>
+                              setState(() => _departmentId = value),
+                          priority: _priority,
+                          onPriorityChanged: (value) =>
+                              setState(() => _priority = value),
+                          dueDate: _dueDate,
+                          onPickDueDate: _pickDueDate,
+                          projectId: _projectId,
+                          onProjectChanged: (project) =>
+                              setState(() => _projectId = project?.id),
                         );
-                        if (!_isEditing && canPickPerson) {
-                          return Column(
+
+                        if (constraints.maxWidth >= 680) {
+                          return Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              SegmentedButton<_AssignTarget>(
-                                segments: const [
-                                  ButtonSegment(
-                                    value: _AssignTarget.individual,
-                                    label: Text('Assign to person'),
-                                  ),
-                                  ButtonSegment(
-                                    value: _AssignTarget.team,
-                                    label: Text('Assign to team'),
-                                  ),
-                                ],
-                                selected: {_target},
-                                onSelectionChanged: _submitting
-                                    ? null
-                                    : (selection) => setState(
-                                        () => _target = selection.first,
-                                      ),
-                              ),
-                              const SizedBox(height: 16),
-                              if (_target == _AssignTarget.team)
-                                _TeamPicker(
-                                  departments: departments,
-                                  selectedDepartmentId: _departmentId,
-                                  enabled: !_submitting,
-                                  onChanged: (value) =>
-                                      setState(() => _departmentId = value),
-                                )
-                              else
-                                _AssigneePicker(
-                                  pool: pool,
-                                  employees: employees,
-                                  selectedEmployeeId: _assigneeEmployeeId,
-                                  enabled: !_submitting,
-                                  onChanged: (value) => setState(
-                                    () => _assigneeEmployeeId = value,
-                                  ),
-                                ),
+                              Expanded(flex: 3, child: left),
+                              const SizedBox(width: 28),
+                              SizedBox(width: 320, child: right),
                             ],
                           );
                         }
-
-                        if (!canPickPerson) {
-                          // A plain employee creating a task: always a team
-                          // task, no toggle, no employee picker at all.
-                          return _TeamPicker(
-                            departments: departments,
-                            selectedDepartmentId: _departmentId,
-                            enabled: !_submitting,
-                            onChanged: (value) =>
-                                setState(() => _departmentId = value),
-                          );
-                        }
-
-                        // Editing an existing task: unchanged, always a
-                        // specific-person picker.
-                        return _AssigneePicker(
-                          pool: pool,
-                          employees: employees,
-                          selectedEmployeeId: _assigneeEmployeeId,
-                          enabled: !_submitting,
-                          onChanged: (value) =>
-                              setState(() => _assigneeEmployeeId = value),
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [left, const SizedBox(height: 24), right],
                         );
                       },
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: _priority,
-                      decoration: const InputDecoration(labelText: 'Priority'),
-                      items: [
-                        for (final priority in TaskPriority.values)
-                          DropdownMenuItem(
-                            value: priority,
-                            child: Text(
-                              priority[0].toUpperCase() + priority.substring(1),
-                            ),
-                          ),
-                      ],
-                      onChanged: _submitting
-                          ? null
-                          : (value) {
-                              if (value != null) {
-                                setState(() => _priority = value);
-                              }
-                            },
-                    ),
-                    const SizedBox(height: 16),
-                    InkWell(
-                      key: const Key('task-due-date'),
-                      onTap: _submitting ? null : _pickDueDate,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Due date',
-                        ),
-                        child: Text(
-                          _dueDate == null ? '—' : _isoDate(_dueDate!),
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -399,75 +331,637 @@ class _TaskEditorPageState extends ConsumerState<TaskEditorPage> {
   }
 }
 
-class _AssigneePicker extends StatelessWidget {
-  const _AssigneePicker({
-    required this.pool,
-    required this.employees,
-    required this.selectedEmployeeId,
-    required this.enabled,
-    required this.onChanged,
+/// Title + description — the two fields worth full-width room to breathe,
+/// kept on the left in the wide layout so they read like the "document"
+/// while the right column reads like the task's metadata sidebar.
+class _LeftColumn extends StatelessWidget {
+  const _LeftColumn({
+    required this.titleController,
+    required this.descriptionController,
   });
 
-  final List<Employee> pool;
-  final List<Employee> employees;
-  final String? selectedEmployeeId;
-  final bool enabled;
-  final ValueChanged<String?> onChanged;
+  final TextEditingController titleController;
+  final TextEditingController descriptionController;
 
   @override
   Widget build(BuildContext context) {
-    final poolIds = pool.map((e) => e.id).toSet();
-    Employee? current;
-    for (final employee in employees) {
-      if (employee.id == selectedEmployeeId) {
-        current = employee;
-        break;
-      }
-    }
-    final items = [
-      ...pool,
-      if (current != null && !poolIds.contains(current.id)) current,
-    ];
-    return DropdownButtonFormField<String>(
-      initialValue: selectedEmployeeId,
-      decoration: const InputDecoration(labelText: 'Assignee'),
-      items: [
-        for (final employee in items)
-          DropdownMenuItem(value: employee.id, child: Text(employee.fullName)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: titleController,
+          decoration: const InputDecoration(
+            labelText: 'Title',
+            hintText: 'What needs to get done?',
+          ),
+          style: Theme.of(context).textTheme.titleMedium,
+          validator: (value) =>
+              (value == null || value.trim().isEmpty) ? 'Required' : null,
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: descriptionController,
+          decoration: const InputDecoration(
+            labelText: 'Description',
+            hintText: 'Add any extra detail, context, or links…',
+            alignLabelWithHint: true,
+          ),
+          maxLines: 10,
+          minLines: 8,
+        ),
       ],
-      onChanged: enabled ? onChanged : null,
-      validator: (value) => value == null ? 'Required' : null,
     );
   }
 }
 
-/// A plain department picker — used both by anyone assigning a new task to
-/// a team (no authority check needed) and, implicitly, has no restricted
-/// pool the way [_AssigneePicker] does.
-class _TeamPicker extends StatelessWidget {
-  const _TeamPicker({
+/// Everything else: assignment, priority, due date, and the optional
+/// client/project link — the task's metadata, grouped together on the
+/// right in the wide layout.
+class _RightColumn extends ConsumerWidget {
+  const _RightColumn({
+    required this.isEditing,
+    required this.submitting,
+    required this.target,
+    required this.onTargetChanged,
+    required this.canPickPerson,
+    required this.employeesAsync,
     required this.departments,
-    required this.selectedDepartmentId,
+    required this.myProfile,
+    required this.hasOverride,
+    required this.assigneeEmployeeId,
+    required this.onAssigneeChanged,
+    required this.departmentId,
+    required this.onDepartmentChanged,
+    required this.priority,
+    required this.onPriorityChanged,
+    required this.dueDate,
+    required this.onPickDueDate,
+    required this.projectId,
+    required this.onProjectChanged,
+  });
+
+  final bool isEditing;
+  final bool submitting;
+  final _AssignTarget target;
+  final ValueChanged<_AssignTarget> onTargetChanged;
+  final bool canPickPerson;
+  final AsyncValue<List<Employee>> employeesAsync;
+  final List<Department> departments;
+  final Employee? myProfile;
+  final bool hasOverride;
+  final String? assigneeEmployeeId;
+  final ValueChanged<String?> onAssigneeChanged;
+  final String? departmentId;
+  final ValueChanged<String?> onDepartmentChanged;
+  final String priority;
+  final ValueChanged<String> onPriorityChanged;
+  final DateTime? dueDate;
+  final VoidCallback onPickDueDate;
+  final String? projectId;
+  final ValueChanged<Project?> onProjectChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Assignment', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        employeesAsync.when(
+          loading: () => const LinearProgressIndicator(),
+          error: (_, _) => const Text('Could not load employees.'),
+          data: (employees) {
+            final pool = _authorizedAssignees(
+              employees: employees,
+              departments: departments,
+              myProfile: myProfile,
+              hasOverride: hasOverride,
+            );
+            if (!isEditing && canPickPerson) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SegmentedButton<_AssignTarget>(
+                    segments: const [
+                      ButtonSegment(
+                        value: _AssignTarget.individual,
+                        label: Text('Person'),
+                      ),
+                      ButtonSegment(
+                        value: _AssignTarget.team,
+                        label: Text('Team'),
+                      ),
+                    ],
+                    selected: {target},
+                    onSelectionChanged: submitting
+                        ? null
+                        : (selection) => onTargetChanged(selection.first),
+                  ),
+                  const SizedBox(height: 12),
+                  if (target == _AssignTarget.team)
+                    _SearchableEntityField<Department>(
+                      label: 'Team',
+                      hintText: 'Search teams…',
+                      options: departments,
+                      displayStringForOption: (d) => d.name,
+                      initialText: departments
+                          .where((d) => d.id == departmentId)
+                          .map((d) => d.name)
+                          .firstOrElse(''),
+                      enabled: !submitting,
+                      onSelected: (d) => onDepartmentChanged(d.id),
+                    )
+                  else
+                    _SearchableEntityField<Employee>(
+                      label: 'Assignee',
+                      hintText: 'Search people…',
+                      options: pool,
+                      displayStringForOption: (e) => e.fullName,
+                      initialText: employees
+                          .where((e) => e.id == assigneeEmployeeId)
+                          .map((e) => e.fullName)
+                          .firstOrElse(''),
+                      enabled: !submitting,
+                      onSelected: (e) => onAssigneeChanged(e.id),
+                    ),
+                ],
+              );
+            }
+
+            if (!canPickPerson) {
+              // A plain employee creating a task: always a team task, no
+              // toggle, no employee picker at all.
+              return _SearchableEntityField<Department>(
+                label: 'Team',
+                hintText: 'Search teams…',
+                options: departments,
+                displayStringForOption: (d) => d.name,
+                initialText: departments
+                    .where((d) => d.id == departmentId)
+                    .map((d) => d.name)
+                    .firstOrElse(''),
+                enabled: !submitting,
+                onSelected: (d) => onDepartmentChanged(d.id),
+              );
+            }
+
+            // Editing an existing task: unchanged, always a specific-person
+            // picker.
+            return _SearchableEntityField<Employee>(
+              label: 'Assignee',
+              hintText: 'Search people…',
+              options: pool,
+              displayStringForOption: (e) => e.fullName,
+              initialText: employees
+                  .where((e) => e.id == assigneeEmployeeId)
+                  .map((e) => e.fullName)
+                  .firstOrElse(''),
+              enabled: !submitting,
+              onSelected: (e) => onAssigneeChanged(e.id),
+            );
+          },
+        ),
+        const SizedBox(height: 20),
+        Text('Priority', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final value in TaskPriority.values)
+              ChoiceChip(
+                label: Text(value[0].toUpperCase() + value.substring(1)),
+                selected: priority == value,
+                onSelected: submitting
+                    ? null
+                    : (selected) {
+                        if (selected) onPriorityChanged(value);
+                      },
+              ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Text('Due date', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        InkWell(
+          key: const Key('task-due-date'),
+          onTap: submitting ? null : onPickDueDate,
+          child: InputDecorator(
+            decoration: const InputDecoration(),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 16),
+                const SizedBox(width: 8),
+                Text(dueDate == null ? 'Select a date' : _isoDate(dueDate!)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text('Client / Project', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        _ClientProjectField(
+          selectedProjectId: projectId,
+          enabled: !submitting,
+          onChanged: onProjectChanged,
+        ),
+      ],
+    );
+  }
+}
+
+extension _FirstOrElse<T> on Iterable<T> {
+  /// Like `firstWhere` with an eager fallback — used here purely to resolve
+  /// "the display text for whatever's currently selected, or blank if
+  /// nothing/not-found-yet" without pulling in package:collection just for
+  /// `firstOrNull`.
+  T firstOrElse(T fallback) => isEmpty ? fallback : first;
+}
+
+/// A generic type-ahead field — Flutter's own `Autocomplete`, no new
+/// dependency — used for every searchable picker on this page (assignee,
+/// team, client/project). Selecting an option is the only way to set a
+/// value; free text alone does nothing, matching the previous dropdowns'
+/// all-or-nothing behavior.
+class _SearchableEntityField<T extends Object> extends StatelessWidget {
+  const _SearchableEntityField({
+    required this.label,
+    required this.hintText,
+    required this.options,
+    required this.displayStringForOption,
+    required this.onSelected,
+    this.initialText = '',
+    this.enabled = true,
+  });
+
+  final String label;
+  final String hintText;
+  final List<T> options;
+  final String Function(T) displayStringForOption;
+  final ValueChanged<T> onSelected;
+  final String initialText;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Autocomplete<T>(
+      initialValue: TextEditingValue(text: initialText),
+      displayStringForOption: displayStringForOption,
+      optionsBuilder: (textEditingValue) {
+        if (!enabled) return const Iterable.empty();
+        final query = textEditingValue.text.trim().toLowerCase();
+        if (query.isEmpty) return options;
+        return options.where(
+          (option) =>
+              displayStringForOption(option).toLowerCase().contains(query),
+        );
+      },
+      onSelected: onSelected,
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        return TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          enabled: enabled,
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: hintText,
+            prefixIcon: const Icon(Icons.search, size: 18),
+          ),
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 260, minWidth: 260),
+              child: options.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('No matches.'),
+                    )
+                  : ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (context, index) {
+                        final option = options.elementAt(index);
+                        return ListTile(
+                          dense: true,
+                          title: Text(displayStringForOption(option)),
+                          onTap: () => onSelected(option),
+                        );
+                      },
+                    ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Search-and-select a Client & Projects project (shown as "{project} —
+/// {client}", so picking effectively picks a client too), with a fallback
+/// to add a brand-new client (and a minimal new project for them, since a
+/// task can only link to a project, not a bare client) right from here —
+/// no need to leave this page and go create one in Clients & Projects
+/// first.
+class _ClientProjectField extends ConsumerStatefulWidget {
+  const _ClientProjectField({
+    required this.selectedProjectId,
     required this.enabled,
     required this.onChanged,
   });
 
-  final List<Department> departments;
-  final String? selectedDepartmentId;
+  final String? selectedProjectId;
   final bool enabled;
-  final ValueChanged<String?> onChanged;
+  final ValueChanged<Project?> onChanged;
+
+  @override
+  ConsumerState<_ClientProjectField> createState() =>
+      _ClientProjectFieldState();
+}
+
+class _ClientProjectFieldState extends ConsumerState<_ClientProjectField> {
+  Project? _selected;
+
+  Future<void> _addNewClient() async {
+    final client = await _showQuickAddClientDialog(context, ref);
+    if (client == null || !mounted) return;
+    ref.invalidate(clientsListProvider(false));
+
+    final project = await _showQuickAddProjectDialog(context, ref, client);
+    if (project == null || !mounted) return;
+    ref.invalidate(projectsListProvider((status: null, clientId: null)));
+    setState(() => _selected = project);
+    widget.onChanged(project);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      initialValue: selectedDepartmentId,
-      decoration: const InputDecoration(labelText: 'Team'),
-      items: [
-        for (final department in departments)
-          DropdownMenuItem(value: department.id, child: Text(department.name)),
-      ],
-      onChanged: enabled ? onChanged : null,
-      validator: (value) => value == null ? 'Required' : null,
+    final projectsAsync = ref.watch(
+      projectsListProvider((status: null, clientId: null)),
+    );
+    return projectsAsync.when(
+      loading: () => const LinearProgressIndicator(),
+      error: (_, _) => const Text('Could not load clients/projects.'),
+      data: (projects) {
+        Project? matchingExisting;
+        for (final project in projects) {
+          if (project.id == widget.selectedProjectId) {
+            matchingExisting = project;
+            break;
+          }
+        }
+        final current = _selected ?? matchingExisting;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SearchableEntityField<Project>(
+              label: 'Client / Project (optional)',
+              hintText: 'Search clients or projects…',
+              options: projects,
+              displayStringForOption: (p) => '${p.name} — ${p.clientName}',
+              initialText: current == null
+                  ? ''
+                  : '${current.name} — ${current.clientName}',
+              enabled: widget.enabled,
+              onSelected: (p) {
+                setState(() => _selected = p);
+                widget.onChanged(p);
+              },
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: widget.enabled ? _addNewClient : null,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text("Can't find your client? Add new"),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
+}
+
+/// A minimal "new client" dialog — just the company/client name, which is
+/// the only field `createClient` actually requires; the full client form in
+/// Clients & Projects still covers everything else (industry, website,
+/// primary contact, ...) for later.
+Future<Client?> _showQuickAddClientDialog(BuildContext context, WidgetRef ref) {
+  final nameController = TextEditingController();
+  var submitting = false;
+  String? error;
+
+  return showDialog<Client>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setState) => AlertDialog(
+        title: const Text('New client'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (error != null) ...[
+                Text(
+                  error!,
+                  style: TextStyle(
+                    color: Theme.of(dialogContext).colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Client / Company name',
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: submitting
+                ? null
+                : () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: submitting
+                ? null
+                : () async {
+                    final name = nameController.text.trim();
+                    if (name.length < 2) {
+                      setState(() => error = 'Enter a client name.');
+                      return;
+                    }
+                    setState(() {
+                      submitting = true;
+                      error = null;
+                    });
+                    try {
+                      final client = await ref
+                          .read(clientsRepositoryProvider)
+                          .createClient(companyName: name);
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop(client);
+                      }
+                    } on ClientException catch (e) {
+                      setState(() {
+                        submitting = false;
+                        error = e.message;
+                      });
+                    }
+                  },
+            child: submitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Create'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// A minimal "new project" dialog — just enough to link a brand-new client
+/// to a task (name/type/start date, matching `createProject`'s required
+/// fields); the full project form in Clients & Projects still covers
+/// everything else (package, services, renewal date, ...) for later.
+Future<Project?> _showQuickAddProjectDialog(
+  BuildContext context,
+  WidgetRef ref,
+  Client client,
+) {
+  final nameController = TextEditingController();
+  var type = ProjectType.oneTime;
+  var startDate = DateTime.now();
+  var submitting = false;
+  String? error;
+
+  return showDialog<Project>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setState) => AlertDialog(
+        title: Text('New project for ${client.companyName}'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (error != null) ...[
+                Text(
+                  error!,
+                  style: TextStyle(
+                    color: Theme.of(dialogContext).colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Project name'),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: ProjectType.oneTime,
+                    label: Text('One-time'),
+                  ),
+                  ButtonSegment(
+                    value: ProjectType.retainer,
+                    label: Text('Retainer'),
+                  ),
+                ],
+                selected: {type},
+                onSelectionChanged: (selection) =>
+                    setState(() => type = selection.first),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: dialogContext,
+                    initialDate: startDate,
+                    firstDate: DateTime.now().subtract(
+                      const Duration(days: 365),
+                    ),
+                    lastDate: DateTime.now().add(const Duration(days: 3650)),
+                  );
+                  if (picked != null) setState(() => startDate = picked);
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(labelText: 'Start date'),
+                  child: Text(_isoDate(startDate)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: submitting
+                ? null
+                : () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: submitting
+                ? null
+                : () async {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) {
+                      setState(() => error = 'Enter a project name.');
+                      return;
+                    }
+                    setState(() {
+                      submitting = true;
+                      error = null;
+                    });
+                    try {
+                      final project = await ref
+                          .read(clientsRepositoryProvider)
+                          .createProject(
+                            clientId: client.id,
+                            name: name,
+                            type: type,
+                            startDate: _isoDate(startDate),
+                          );
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop(project);
+                      }
+                    } on ClientException catch (e) {
+                      setState(() {
+                        submitting = false;
+                        error = e.message;
+                      });
+                    }
+                  },
+            child: submitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Create'),
+          ),
+        ],
+      ),
+    ),
+  );
 }

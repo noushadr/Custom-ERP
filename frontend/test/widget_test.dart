@@ -145,10 +145,55 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Company Notices'), findsOneWidget);
-    // No direct reports in the fake by default — the count still shows.
-    expect(find.text('My Team (0)'), findsOneWidget);
+    // No direct reports in the fake by default — the whole My Team card is
+    // hidden rather than showing an empty "(0)" one.
+    expect(find.text('My Team'), findsNothing);
+    expect(find.textContaining('My Team ('), findsNothing);
     expect(find.text('My Goals'), findsOneWidget);
     expect(find.text('No goals have been set for you yet.'), findsOneWidget);
+    expect(find.text('My Tasks'), findsOneWidget);
+    expect(find.text('No tasks yet.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows My Team when the employee has direct reports, hides it when '
+    'they have none',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          employeeRepository: FakeEmployeeRepository(
+            employees: [buildTestEmployee()],
+            directReports: [
+              buildTestEmployee(id: 'report-1', fullName: 'Report One'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('My Team (1)'), findsOneWidget);
+      expect(find.text('Report One'), findsOneWidget);
+    },
+  );
+
+  testWidgets('shows tasks assigned to the employee and tasks they assigned to '
+      'others, in separate groups', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        taskRepository: FakeTaskRepository(
+          myTasks: [buildTestTask(id: 'task-1', title: 'Write the report')],
+          tasksAssignedByMe: [
+            buildTestTask(id: 'task-2', title: 'Review the design'),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Assigned to you'), findsOneWidget);
+    expect(find.text('Write the report'), findsOneWidget);
+    expect(find.text('Assigned by you'), findsOneWidget);
+    expect(find.text('Review the design'), findsOneWidget);
   });
 
   testWidgets('shows a goal set for the employee on their dashboard', (
@@ -174,39 +219,38 @@ void main() {
     expect(find.text('Set by Muhammad Bilal Rathore'), findsOneWidget);
   });
 
-  testWidgets(
-    'admin dashboard shows the current Employee of the Month',
-    (WidgetTester tester) async {
-      const admin = AuthUser(
-        id: 'admin-1',
-        email: 'admin@zeracreative.com',
-        role: 'Super Admin',
-        permissions: [],
-      );
+  testWidgets('admin dashboard shows the current Employee of the Month', (
+    WidgetTester tester,
+  ) async {
+    const admin = AuthUser(
+      id: 'admin-1',
+      email: 'admin@zeracreative.com',
+      role: 'Super Admin',
+      permissions: [],
+    );
 
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: admin,
-          announcementsRepository: FakeAnnouncementsRepository(
-            today: const TodayAnnouncements(
-              birthdays: [],
-              workAnniversaries: [],
-              holiday: null,
-              notices: [],
-              employeeOfTheMonth: TodayEmployeeOfMonth(
-                employeeId: 'employee-1',
-                fullName: 'Muhammad Asad Rathore',
-              ),
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: admin,
+        announcementsRepository: FakeAnnouncementsRepository(
+          today: const TodayAnnouncements(
+            birthdays: [],
+            workAnniversaries: [],
+            holiday: null,
+            notices: [],
+            employeeOfTheMonth: TodayEmployeeOfMonth(
+              employeeId: 'employee-1',
+              fullName: 'Muhammad Asad Rathore',
             ),
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Employee of the Month'), findsOneWidget);
-      expect(find.text('Muhammad Asad Rathore'), findsOneWidget);
-    },
-  );
+    expect(find.text('Employee of the Month'), findsOneWidget);
+    expect(find.text('Muhammad Asad Rathore'), findsOneWidget);
+  });
 
   testWidgets("admin dashboard's top bar shows today's date", (
     WidgetTester tester,
@@ -272,10 +316,7 @@ void main() {
       await tester.pumpWidget(_authenticatedApp(user: admin));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('No Employee of the Month right now.'),
-        findsOneWidget,
-      );
+      expect(find.text('No Employee of the Month right now.'), findsOneWidget);
     },
   );
 
@@ -367,8 +408,55 @@ void main() {
     },
   );
 
+  testWidgets('admin dashboard shows the soonest upcoming public holiday', (
+    WidgetTester tester,
+  ) async {
+    const admin = AuthUser(
+      id: 'admin-1',
+      email: 'admin@zeracreative.com',
+      role: 'Super Admin',
+      permissions: [],
+    );
+    final soon = DateTime.now().add(const Duration(days: 10));
+    final soonIso =
+        '${soon.year.toString().padLeft(4, '0')}-'
+        '${soon.month.toString().padLeft(2, '0')}-'
+        '${soon.day.toString().padLeft(2, '0')}';
+    final past = DateTime.now().subtract(const Duration(days: 10));
+    final pastIso =
+        '${past.year.toString().padLeft(4, '0')}-'
+        '${past.month.toString().padLeft(2, '0')}-'
+        '${past.day.toString().padLeft(2, '0')}';
+
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: admin,
+        holidayRepository: FakeHolidayRepository(
+          holidays: [
+            buildTestHoliday(
+              id: 'holiday-past',
+              name: 'Already Happened',
+              date: pastIso,
+            ),
+            buildTestHoliday(
+              id: 'holiday-soon',
+              name: 'Independence Day',
+              date: soonIso,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Upcoming Public Holiday'), findsOneWidget);
+    expect(find.text('Independence Day'), findsOneWidget);
+    expect(find.text('Already Happened'), findsNothing);
+  });
+
   testWidgets(
-    'admin dashboard shows the soonest upcoming public holiday',
+    'admin dashboard shows a company-wide Tasks summary: total, pending/in '
+    'progress, and done',
     (WidgetTester tester) async {
       const admin = AuthUser(
         id: 'admin-1',
@@ -376,41 +464,32 @@ void main() {
         role: 'Super Admin',
         permissions: [],
       );
-      final soon = DateTime.now().add(const Duration(days: 10));
-      final soonIso =
-          '${soon.year.toString().padLeft(4, '0')}-'
-          '${soon.month.toString().padLeft(2, '0')}-'
-          '${soon.day.toString().padLeft(2, '0')}';
-      final past = DateTime.now().subtract(const Duration(days: 10));
-      final pastIso =
-          '${past.year.toString().padLeft(4, '0')}-'
-          '${past.month.toString().padLeft(2, '0')}-'
-          '${past.day.toString().padLeft(2, '0')}';
 
       await tester.pumpWidget(
         _authenticatedApp(
           user: admin,
-          holidayRepository: FakeHolidayRepository(
-            holidays: [
-              buildTestHoliday(
-                id: 'holiday-past',
-                name: 'Already Happened',
-                date: pastIso,
-              ),
-              buildTestHoliday(
-                id: 'holiday-soon',
-                name: 'Independence Day',
-                date: soonIso,
-              ),
+          taskRepository: FakeTaskRepository(
+            teamTasks: [
+              buildTestTask(id: 'task-1', status: TaskStatus.todo),
+              buildTestTask(id: 'task-2', status: TaskStatus.inProgress),
+              buildTestTask(id: 'task-3', status: TaskStatus.pending),
+              buildTestTask(id: 'task-4', status: TaskStatus.completed),
+              buildTestTask(id: 'task-5', status: TaskStatus.completed),
+              buildTestTask(id: 'task-6', status: TaskStatus.cancelled),
             ],
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Upcoming Public Holiday'), findsOneWidget);
-      expect(find.text('Independence Day'), findsOneWidget);
-      expect(find.text('Already Happened'), findsNothing);
+      // "Tasks" also appears as a nav label — the summary card's own labels
+      // below are unambiguous instead.
+      expect(find.text('Total'), findsOneWidget);
+      expect(find.text('6'), findsOneWidget);
+      expect(find.text('Pending / In Progress'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
+      expect(find.text('Done'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
     },
   );
 
@@ -436,124 +515,117 @@ void main() {
     },
   );
 
-  testWidgets(
-    'shows Employees and Settings in the nav for a Super Admin',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: [],
-          ),
+  testWidgets('shows Employees and Settings in the nav for a Super Admin', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: const AuthUser(
+          id: 'admin-1',
+          email: 'admin@zeracreative.com',
+          role: 'Super Admin',
+          permissions: [],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Employees'), findsOneWidget);
-      expect(find.text('Settings'), findsOneWidget);
-    },
-  );
+    expect(find.text('Employees'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+  });
 
-  testWidgets(
-    'shows Clients & Projects in the nav for a Super Admin',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: [],
-          ),
+  testWidgets('shows Clients & Projects in the nav for a Super Admin', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: const AuthUser(
+          id: 'admin-1',
+          email: 'admin@zeracreative.com',
+          role: 'Super Admin',
+          permissions: [],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Clients & Projects'), findsOneWidget);
-    },
-  );
+    expect(find.text('Clients & Projects'), findsOneWidget);
+  });
 
-  testWidgets(
-    'shows Clients & Projects in the nav for HR/Manager too',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'hr-1',
-            email: 'hr@zeracreative.com',
-            role: 'HR/Manager',
-            permissions: [],
-          ),
+  testWidgets('shows Clients & Projects in the nav for HR/Manager too', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: const AuthUser(
+          id: 'hr-1',
+          email: 'hr@zeracreative.com',
+          role: 'HR/Manager',
+          permissions: [],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // HR/Manager shares Clients & Projects with Super Admin.
-      expect(find.text('Employees'), findsOneWidget);
-      expect(find.text('Clients & Projects'), findsOneWidget);
-    },
-  );
+    // HR/Manager shares Clients & Projects with Super Admin.
+    expect(find.text('Employees'), findsOneWidget);
+    expect(find.text('Clients & Projects'), findsOneWidget);
+  });
 
-  testWidgets(
-    'hides Clients & Projects from the nav for a plain employee',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(_authenticatedApp());
-      await tester.pumpAndSettle();
+  testWidgets('hides Clients & Projects from the nav for a plain employee', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_authenticatedApp());
+    await tester.pumpAndSettle();
 
-      expect(find.text('Clients & Projects'), findsNothing);
-    },
-  );
+    expect(find.text('Clients & Projects'), findsNothing);
+  });
 
-  testWidgets(
-    'shows Payroll in the nav for a Super Admin',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: [],
-          ),
+  testWidgets('shows Payroll in the nav for a Super Admin', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: const AuthUser(
+          id: 'admin-1',
+          email: 'admin@zeracreative.com',
+          role: 'Super Admin',
+          permissions: [],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Payroll'), findsOneWidget);
-    },
-  );
+    expect(find.text('Payroll'), findsOneWidget);
+  });
 
-  testWidgets(
-    'shows Payroll in the nav for HR/Manager too',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'hr-1',
-            email: 'hr@zeracreative.com',
-            role: 'HR/Manager',
-            permissions: [],
-          ),
+  testWidgets('shows Payroll in the nav for HR/Manager too', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: const AuthUser(
+          id: 'hr-1',
+          email: 'hr@zeracreative.com',
+          role: 'HR/Manager',
+          permissions: [],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Employees'), findsOneWidget);
-      expect(find.text('Payroll'), findsOneWidget);
-    },
-  );
+    expect(find.text('Employees'), findsOneWidget);
+    expect(find.text('Payroll'), findsOneWidget);
+  });
 
-  testWidgets(
-    'hides Payroll from the nav for a plain employee',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(_authenticatedApp());
-      await tester.pumpAndSettle();
+  testWidgets('hides Payroll from the nav for a plain employee', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_authenticatedApp());
+    await tester.pumpAndSettle();
 
-      expect(find.text('Payroll'), findsNothing);
-    },
-  );
+    expect(find.text('Payroll'), findsNothing);
+  });
 
   testWidgets('shows Logs in the nav for a Super Admin', (
     WidgetTester tester,
@@ -594,71 +666,68 @@ void main() {
     expect(find.text('Logs'), findsOneWidget);
   });
 
+  testWidgets('shows Logs in the nav for a plain employee too, unlike other '
+      'admin-only destinations', (WidgetTester tester) async {
+    await tester.pumpWidget(_authenticatedApp());
+    await tester.pumpAndSettle();
+
+    // Everyone gets a Logs destination now (their own change history for
+    // non-audit.viewAll holders — see LogsPage) — only the company-wide
+    // admin modules stay hidden from a plain employee.
+    expect(find.text('Logs'), findsOneWidget);
+    expect(find.text('Payroll'), findsNothing);
+  });
+
   testWidgets(
-    'shows Logs in the nav for a plain employee too, unlike other '
-    'admin-only destinations',
+    'shows Goals in the nav for every role, including a plain employee',
     (WidgetTester tester) async {
       await tester.pumpWidget(_authenticatedApp());
       await tester.pumpAndSettle();
 
-      // Everyone gets a Logs destination now (their own change history for
-      // non-audit.viewAll holders — see LogsPage) — only the company-wide
-      // admin modules stay hidden from a plain employee.
-      expect(find.text('Logs'), findsOneWidget);
-      expect(find.text('Payroll'), findsNothing);
+      expect(find.text('Goals'), findsOneWidget);
     },
   );
 
-  testWidgets('shows Goals in the nav for every role, including a plain employee', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(_authenticatedApp());
-    await tester.pumpAndSettle();
-
-    expect(find.text('Goals'), findsOneWidget);
-  });
-
-  testWidgets('shows Email in the nav for every role, including a plain employee', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(_authenticatedApp());
-    await tester.pumpAndSettle();
-
-    expect(find.text('Email'), findsOneWidget);
-  });
-
   testWidgets(
-    'a Super Admin sees only Dashboard, never User Dashboard',
+    'shows Email in the nav for every role, including a plain employee',
     (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: const AuthUser(
-            id: 'admin-1',
-            email: 'admin@zeracreative.com',
-            role: 'Super Admin',
-            permissions: [],
-          ),
+      await tester.pumpWidget(_authenticatedApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Email'), findsOneWidget);
+    },
+  );
+
+  testWidgets('a Super Admin sees only Dashboard, never User Dashboard', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _authenticatedApp(
+        user: const AuthUser(
+          id: 'admin-1',
+          email: 'admin@zeracreative.com',
+          role: 'Super Admin',
+          permissions: [],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Dashboard'), findsWidgets);
-      expect(find.text('User Dashboard'), findsNothing);
-      expect(find.text('Employee of the Month'), findsOneWidget);
-    },
-  );
+    expect(find.text('Dashboard'), findsWidgets);
+    expect(find.text('User Dashboard'), findsNothing);
+    expect(find.text('Employee of the Month'), findsOneWidget);
+  });
 
-  testWidgets(
-    'a plain employee sees only User Dashboard, never Dashboard',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(_authenticatedApp());
-      await tester.pumpAndSettle();
+  testWidgets('a plain employee sees only User Dashboard, never Dashboard', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_authenticatedApp());
+    await tester.pumpAndSettle();
 
-      expect(find.text('User Dashboard'), findsWidgets);
-      expect(find.text('Dashboard'), findsNothing);
-      expect(find.text('Employee of the Month'), findsNothing);
-    },
-  );
+    expect(find.text('User Dashboard'), findsWidgets);
+    expect(find.text('Dashboard'), findsNothing);
+    expect(find.text('Employee of the Month'), findsNothing);
+  });
 
   group('nav badges', () {
     testWidgets(
@@ -741,20 +810,19 @@ void main() {
       },
     );
 
-    testWidgets(
-      'shows no dashboard badge once the profile is 100% complete',
-      (WidgetTester tester) async {
-        await tester.pumpWidget(
-          _authenticatedApp(
-            employeeRepository: FakeEmployeeRepository(
-              me: buildTestEmployee(profileCompletionPercentage: 100),
-            ),
+    testWidgets('shows no dashboard badge once the profile is 100% complete', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        _authenticatedApp(
+          employeeRepository: FakeEmployeeRepository(
+            me: buildTestEmployee(profileCompletionPercentage: 100),
           ),
-        );
-        await tester.pumpAndSettle();
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        expect(_badgeCountFor(tester, 'User Dashboard'), isNull);
-      },
-    );
+      expect(_badgeCountFor(tester, 'User Dashboard'), isNull);
+    });
   });
 }

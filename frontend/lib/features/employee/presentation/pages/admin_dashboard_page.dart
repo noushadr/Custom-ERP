@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../../../shared/widgets/responsive_card_row.dart';
 import '../../../announcements/application/announcement_providers.dart';
 import '../../../holidays/application/holiday_providers.dart';
 import '../../../holidays/domain/entities/holiday.dart';
 import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
+import '../../../tasks/application/task_providers.dart';
+import '../../../tasks/domain/entities/task_status.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/upcoming_birthday.dart';
 import '../../domain/entities/upcoming_work_anniversary.dart';
@@ -19,14 +22,9 @@ class AdminDashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1040),
-          child: const _DashboardStats(),
-        ),
-      ),
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, 20),
+      child: _DashboardStats(),
     );
   }
 }
@@ -47,15 +45,16 @@ class _DashboardStats extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Wrap(
+          const ResponsiveCardRow(
+            minItemWidth: 240,
             spacing: 12,
-            runSpacing: 12,
             children: [
-              SizedBox(width: 240, child: _EmployeeOfMonthCard()),
-              SizedBox(width: 240, child: _LastBirthdayCard()),
-              SizedBox(width: 240, child: _UpcomingBirthdayCard()),
-              SizedBox(width: 240, child: _UpcomingWorkAnniversaryCard()),
-              SizedBox(width: 240, child: _UpcomingHolidayCard()),
+              _EmployeeOfMonthCard(),
+              _LastBirthdayCard(),
+              _UpcomingBirthdayCard(),
+              _UpcomingWorkAnniversaryCard(),
+              _UpcomingHolidayCard(),
+              _TasksSummaryCard(),
             ],
           ),
           const SizedBox(height: 18),
@@ -232,7 +231,9 @@ class _LastBirthdayCard extends ConsumerWidget {
         error: (_, _) => const _SpotlightEmpty('Could not load.'),
         data: (spotlight) {
           final last = spotlight.last;
-          if (last == null) return const _SpotlightEmpty('No recent birthdays.');
+          if (last == null) {
+            return const _SpotlightEmpty('No recent birthdays.');
+          }
           return _SpotlightPerson(
             fullName: last.fullName,
             photoUrl: last.profilePhotoUrl,
@@ -369,9 +370,9 @@ class _UpcomingHolidayCard extends ConsumerWidget {
               ),
               Text(
                 '${formatDisplayDate(next.date)} · ${_inLabel(next.date)}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
             ],
           );
@@ -388,8 +389,9 @@ class _UpcomingHolidayCard extends ConsumerWidget {
         '${today.year.toString().padLeft(4, '0')}-'
         '${today.month.toString().padLeft(2, '0')}-'
         '${today.day.toString().padLeft(2, '0')}';
-    final upcoming = holidays.where((h) => h.date.compareTo(todayIso) >= 0).toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final upcoming =
+        holidays.where((h) => h.date.compareTo(todayIso) >= 0).toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
     return upcoming.isEmpty ? null : upcoming.first;
   }
 
@@ -400,6 +402,108 @@ class _UpcomingHolidayCard extends ConsumerWidget {
     final daysUntil = date.difference(todayAtMidnight).inDays;
     if (daysUntil == 0) return 'Today';
     return daysUntil == 1 ? 'in 1 day' : 'in $daysUntil days';
+  }
+}
+
+/// Company-wide task counts — `teamTasksProvider` returns every task in the
+/// company for a `tasks.manage` holder (Super Admin/HR-Manager, exactly who
+/// sees this page), so no separate summary endpoint is needed. "Pending /
+/// In Progress" groups every still-open status together (todo, pending, and
+/// in-progress) since from a dashboard glance they're all "not done yet";
+/// cancelled tasks count toward the total but not either bucket, same as
+/// they're excluded from the Tasks page's own board columns.
+class _TasksSummaryCard extends ConsumerWidget {
+  const _TasksSummaryCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tasksAsync = ref.watch(teamTasksProvider);
+
+    return _SpotlightCard(
+      title: 'Tasks',
+      icon: Icons.checklist_outlined,
+      color: AppColors.primary,
+      child: tasksAsync.when(
+        loading: () => const _SpotlightEmpty('Loading…'),
+        error: (_, _) => const _SpotlightEmpty('Could not load.'),
+        data: (tasks) {
+          if (tasks.isEmpty) return const _SpotlightEmpty('No tasks yet.');
+          final pendingOrInProgress = tasks
+              .where(
+                (t) =>
+                    t.status == TaskStatus.todo ||
+                    t.status == TaskStatus.pending ||
+                    t.status == TaskStatus.inProgress,
+              )
+              .length;
+          final done = tasks
+              .where((t) => t.status == TaskStatus.completed)
+              .length;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _TaskStatRow(
+                label: 'Total',
+                value: tasks.length,
+                color: AppColors.textPrimary,
+              ),
+              const SizedBox(height: 8),
+              _TaskStatRow(
+                label: 'Pending / In Progress',
+                value: pendingOrInProgress,
+                color: AppColors.warning,
+              ),
+              const SizedBox(height: 8),
+              _TaskStatRow(
+                label: 'Done',
+                value: done,
+                color: AppColors.success,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TaskStatRow extends StatelessWidget {
+  const _TaskStatRow({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          '$value',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -461,9 +565,7 @@ class _PostNoticeDialogState extends ConsumerState<_PostNoticeDialog> {
               if (_errorMessage != null) ...[
                 Text(
                   _errorMessage!,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
                 const SizedBox(height: 12),
               ],

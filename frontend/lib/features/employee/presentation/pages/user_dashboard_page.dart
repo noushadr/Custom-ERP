@@ -4,12 +4,17 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/models/named_ref.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../../../shared/widgets/responsive_card_row.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../goals/application/goal_providers.dart';
 import '../../../leave/presentation/widgets/leave_balances_section.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../../performance_reviews/domain/entities/performance_review_summary.dart';
+import '../../../tasks/application/task_providers.dart';
+import '../../../tasks/domain/entities/task.dart';
+import '../../../tasks/presentation/pages/task_detail_page.dart';
+import '../../../tasks/presentation/widgets/task_badges.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/exceptions/employee_exception.dart';
@@ -27,24 +32,19 @@ class UserDashboardPage extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1040),
-          child: employeeAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Center(
-              child: Text(
-                error is EmployeeException && error.message == 'Not found.'
-                    ? "This login isn't linked to an employee profile, so "
-                          "there's nothing personal to show here."
-                    : 'Could not load your dashboard. Please try again.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
-            data: (employee) => _UserDashboardBody(employee: employee),
+      child: employeeAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
+          child: Text(
+            error is EmployeeException && error.message == 'Not found.'
+                ? "This login isn't linked to an employee profile, so "
+                      "there's nothing personal to show here."
+                : 'Could not load your dashboard. Please try again.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ),
+        data: (employee) => _UserDashboardBody(employee: employee),
       ),
     );
   }
@@ -63,6 +63,8 @@ class _UserDashboardBody extends StatelessWidget {
         children: [
           _ProfileSummaryCard(employee: employee),
           const SizedBox(height: 16),
+          const CompanyNoticesSection(),
+          const SizedBox(height: 16),
           const FormSection(
             title: 'Leave Balances',
             child: LeaveBalancesSection(),
@@ -70,7 +72,7 @@ class _UserDashboardBody extends StatelessWidget {
           const SizedBox(height: 16),
           const _MyGoalsSection(),
           const SizedBox(height: 16),
-          const CompanyNoticesSection(),
+          const _MyTasksSection(),
           const SizedBox(height: 16),
           const _TeamMembersSection(),
         ],
@@ -247,7 +249,11 @@ class _ReportingManagerChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        EmployeeAvatar(fullName: manager.name, photoUrl: manager.photoUrl, radius: 12),
+        EmployeeAvatar(
+          fullName: manager.name,
+          photoUrl: manager.photoUrl,
+          radius: 12,
+        ),
         const SizedBox(width: 6),
         Text(
           'Reporting Manager: ${manager.name}',
@@ -261,7 +267,10 @@ class _ReportingManagerChip extends StatelessWidget {
 }
 
 void _showChangePasswordDialog(BuildContext context) {
-  showDialog<void>(context: context, builder: (_) => const _ChangePasswordDialog());
+  showDialog<void>(
+    context: context,
+    builder: (_) => const _ChangePasswordDialog(),
+  );
 }
 
 class _ChangePasswordDialog extends ConsumerStatefulWidget {
@@ -272,8 +281,7 @@ class _ChangePasswordDialog extends ConsumerStatefulWidget {
       _ChangePasswordDialogState();
 }
 
-class _ChangePasswordDialogState
-    extends ConsumerState<_ChangePasswordDialog> {
+class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
   final _formKey = GlobalKey<FormState>();
   final _currentController = TextEditingController();
   final _newController = TextEditingController();
@@ -303,9 +311,9 @@ class _ChangePasswordDialogState
           .changePassword(_currentController.text, _newController.text);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password changed.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Password changed.')));
     } on AuthException catch (error) {
       setState(() => _errorMessage = error.message);
     } finally {
@@ -466,12 +474,167 @@ class _MyGoalsSection extends ConsumerWidget {
   }
 }
 
+/// Both directions at a glance: tasks assigned to the viewer, and tasks the
+/// viewer assigned to someone else — the same two providers the Tasks
+/// page's own "My Tasks"/"Assigned Tasks" tabs use, just summarized here
+/// rather than as a full board. Tapping a row opens that task's detail
+/// page directly.
+class _MyTasksSection extends ConsumerWidget {
+  const _MyTasksSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final myTasksAsync = ref.watch(myTasksProvider);
+    final assignedByMeAsync = ref.watch(tasksAssignedByMeProvider);
+
+    return FormSection(
+      title: 'My Tasks',
+      child: myTasksAsync.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: LinearProgressIndicator(),
+        ),
+        error: (_, _) => const Text('Could not load your tasks.'),
+        data: (myTasks) => assignedByMeAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: LinearProgressIndicator(),
+          ),
+          error: (_, _) => const Text('Could not load your tasks.'),
+          data: (assignedByMe) {
+            if (myTasks.isEmpty && assignedByMe.isEmpty) {
+              return Text(
+                'No tasks yet.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (myTasks.isNotEmpty) ...[
+                  Text(
+                    'Assigned to you',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  for (var i = 0; i < myTasks.length; i++) ...[
+                    _TaskSummaryRow(task: myTasks[i]),
+                    if (i < myTasks.length - 1)
+                      const Divider(height: 16, color: AppColors.borderSubtle),
+                  ],
+                ],
+                if (myTasks.isNotEmpty && assignedByMe.isNotEmpty)
+                  const SizedBox(height: 16),
+                if (assignedByMe.isNotEmpty) ...[
+                  Text(
+                    'Assigned by you',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  for (var i = 0; i < assignedByMe.length; i++) ...[
+                    _TaskSummaryRow(task: assignedByMe[i]),
+                    if (i < assignedByMe.length - 1)
+                      const Divider(height: 16, color: AppColors.borderSubtle),
+                  ],
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskSummaryRow extends StatelessWidget {
+  const _TaskSummaryRow({required this.task});
+
+  final Task task;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => TaskDetailPage(taskId: task.id)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    task.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Due ${formatDisplayDate(task.dueDate)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            TaskStatusBadge(status: task.status, dense: true),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Hidden entirely once it's known the viewer has no direct reports — a
+/// "My Team" card with nothing in it (and the old "No team members are
+/// assigned to you yet." filler text) was dead weight for the majority of
+/// employees who don't lead anyone. Still renders normally (with its own
+/// loading/error states) for anyone who does.
 class _TeamMembersSection extends ConsumerWidget {
   const _TeamMembersSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reportsAsync = ref.watch(myDirectReportsProvider);
+
+    return reportsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const FormSection(
+        title: 'My Team',
+        child: Text('Could not load your team members.'),
+      ),
+      data: (reports) {
+        if (reports.isEmpty) return const SizedBox.shrink();
+        return _TeamMembersList(reports: reports);
+      },
+    );
+  }
+}
+
+class _TeamMembersList extends ConsumerWidget {
+  const _TeamMembersList({required this.reports});
+
+  final List<Employee> reports;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final reviewSummariesAsync = ref.watch(
       latestPerformanceReviewsForMyTeamProvider,
     );
@@ -479,37 +642,19 @@ class _TeamMembersSection extends ConsumerWidget {
         reviewSummariesAsync.valueOrNull ??
         const <String, PerformanceReviewSummary>{};
 
-    final reportCount = reportsAsync.valueOrNull?.length;
-
     return FormSection(
-      title: reportCount == null ? 'My Team' : 'My Team ($reportCount)',
-      child: reportsAsync.when(
-        loading: () => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
-          child: LinearProgressIndicator(),
-        ),
-        error: (_, _) => const Text('Could not load your team members.'),
-        data: (reports) {
-          if (reports.isEmpty) {
-            return Text(
-              'No team members are assigned to you yet.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            );
-          }
-          return Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              for (final report in reports)
-                _TeamMemberTile(
-                  employee: report,
-                  reviewSummary: reviewSummaries[report.id],
-                ),
-            ],
-          );
-        },
+      title: 'My Team (${reports.length})',
+      child: ResponsiveCardRow(
+        minItemWidth: _teamTileWidth,
+        spacing: 16,
+        runSpacing: 16,
+        children: [
+          for (final report in reports)
+            _TeamMemberTile(
+              employee: report,
+              reviewSummary: reviewSummaries[report.id],
+            ),
+        ],
       ),
     );
   }
@@ -525,99 +670,104 @@ class _TeamMemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The Wrap's chips need an explicit max width to know when to
-    // ellipsize; derive it from the box width instead of an inner
-    // LayoutBuilder, matching the Employee Directory card's own approach.
-    const contentWidth = _teamTileWidth - 32;
-
     return Container(
-      width: _teamTileWidth,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.borderSubtle),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              EmployeeAvatar(
-                fullName: employee.fullName,
-                photoUrl: employee.profilePhotoUrl,
-                radius: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      employee.fullName,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    Text(
-                      employee.designation ?? employee.role,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              WorkModeBadge(workMode: employee.workMode, dense: true),
-              StatusBadge(
-                label: formatEmploymentType(employee.employmentType),
-                color: AppColors.textSecondary,
-                icon: Icons.work_outline,
-                dense: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              InfoChip(
-                icon: Icons.email_outlined,
-                label: employee.email,
-                maxWidth: contentWidth,
-              ),
-              InfoChip(
-                icon: Icons.timelapse_outlined,
-                label: formatTenure(employee.joiningDate),
-                maxWidth: contentWidth,
-              ),
-              InfoChip(
-                icon: Icons.cake_outlined,
-                label: employee.dateOfBirth == null
-                    ? '—'
-                    : formatMonthDay(employee.dateOfBirth!),
-                maxWidth: contentWidth,
-              ),
-              InfoChip(
-                icon: Icons.fact_check_outlined,
-                label: _reviewLabel(reviewSummary),
-                maxWidth: contentWidth,
-              ),
-            ],
-          ),
-        ],
+      // The chips need an explicit max width to know when to ellipsize —
+      // read from the tile's own rendered width (no longer fixed, now that
+      // ResponsiveCardRow stretches it to fill its row) rather than a
+      // hardcoded constant.
+      child: LayoutBuilder(
+        builder: (context, constraints) =>
+            _buildContent(context, contentWidth: constraints.maxWidth - 32),
       ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, {required double contentWidth}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            EmployeeAvatar(
+              fullName: employee.fullName,
+              photoUrl: employee.profilePhotoUrl,
+              radius: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    employee.fullName,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  Text(
+                    employee.designation ?? employee.role,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: [
+            WorkModeBadge(workMode: employee.workMode, dense: true),
+            StatusBadge(
+              label: formatEmploymentType(employee.employmentType),
+              color: AppColors.textSecondary,
+              icon: Icons.work_outline,
+              dense: true,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: [
+            InfoChip(
+              icon: Icons.email_outlined,
+              label: employee.email,
+              maxWidth: contentWidth,
+            ),
+            InfoChip(
+              icon: Icons.timelapse_outlined,
+              label: formatTenure(employee.joiningDate),
+              maxWidth: contentWidth,
+            ),
+            InfoChip(
+              icon: Icons.cake_outlined,
+              label: employee.dateOfBirth == null
+                  ? '—'
+                  : formatMonthDay(employee.dateOfBirth!),
+              maxWidth: contentWidth,
+            ),
+            InfoChip(
+              icon: Icons.fact_check_outlined,
+              label: _reviewLabel(reviewSummary),
+              maxWidth: contentWidth,
+            ),
+          ],
+        ),
+      ],
     );
   }
 
