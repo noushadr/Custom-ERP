@@ -9,7 +9,9 @@ import { ClientsService } from '../application/clients.service';
 
 /** Admin Business Management tier: `clients.manage` is granted to Super
  * Admin and HR/Manager at seed time (see seed.ts) — no self-service tier
- * for plain employees, unlike Tasks/Performance Reviews. */
+ * for plain employees, unlike Tasks/Performance Reviews. The one exception
+ * is `createClient` below, opened to any authenticated user for the Tasks
+ * feature's own "Can't find your client? Add new" quick-add flow. */
 @Controller('clients')
 @Permissions('clients.manage')
 export class ClientsController {
@@ -21,6 +23,7 @@ export class ClientsController {
   }
 
   @Post()
+  @Permissions()
   createClient(@Body() dto: CreateClientDto) {
     return this.clientsService.createClient(dto);
   }

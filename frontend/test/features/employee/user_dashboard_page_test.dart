@@ -5,6 +5,7 @@ import 'package:zera_erp/core/theme/app_colors.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
+import 'package:zera_erp/features/checklists/application/checklist_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/exceptions/employee_exception.dart';
 import 'package:zera_erp/features/employee/presentation/pages/user_dashboard_page.dart';
@@ -12,14 +13,17 @@ import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notices/domain/entities/notice.dart';
+import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/shared/models/named_ref.dart';
 
 import '../../helpers/fake_auth.dart';
+import '../../helpers/fake_checklist.dart';
 import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_goal.dart';
 import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
+import '../../helpers/fake_performance_review.dart';
 import '../../helpers/fake_task.dart';
 
 Future<void> _useTallSurface(WidgetTester tester) async {
@@ -64,6 +68,13 @@ Widget _app({
       goalRepositoryProvider.overrideWithValue(FakeGoalRepository()),
       taskRepositoryProvider.overrideWithValue(
         taskRepository ?? FakeTaskRepository(),
+      ),
+      // Only exercised once a test navigates into EmployeeProfilePage (see
+      // the "tapping..." tests below) — overridden here too so that push
+      // doesn't fall through to a real, never-completing Dio call.
+      checklistRepositoryProvider.overrideWithValue(FakeChecklistRepository()),
+      performanceReviewRepositoryProvider.overrideWithValue(
+        FakePerformanceReviewRepository(),
       ),
     ],
     child: const MaterialApp(home: Scaffold(body: UserDashboardPage())),
@@ -523,4 +534,42 @@ void main() {
       expect(find.text('Reporting Manager: Jane Manager'), findsOneWidget);
     },
   );
+
+  testWidgets("tapping the reporting manager chip opens that manager's own "
+      'profile', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        employeeRepository: FakeEmployeeRepository(
+          me: buildTestEmployee(
+            reportingManager: const NamedRef(id: 'mgr-1', name: 'Jane Manager'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Reporting Manager: Jane Manager'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Employee Profile'), findsOneWidget);
+  });
+
+  testWidgets('tapping a team member tile opens that employee\'s own profile', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        employeeRepository: FakeEmployeeRepository(
+          directReports: [buildTestEmployee(fullName: 'Ravi Report')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Ravi Report'));
+    await tester.tap(find.text('Ravi Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Employee Profile'), findsOneWidget);
+  });
 }

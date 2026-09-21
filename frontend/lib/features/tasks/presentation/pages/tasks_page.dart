@@ -34,7 +34,7 @@ const _boardStatuses = [
 ];
 
 /// Whether the current viewer heads at least one department — true Team
-/// Lead authority, gating the company/department-wide "Task Board" tab.
+/// Lead authority, gating the company/department-wide "Team Task Board" tab.
 /// Everyone can create tasks now (to a team, at least) and therefore sees
 /// "Assigned Tasks" too — this narrower check is only for the tab that
 /// shows *every* task in a headed department.
@@ -82,26 +82,28 @@ class TasksPage extends ConsumerWidget {
 
     final tabs = [
       const Tab(text: 'My Tasks'),
+      const Tab(text: 'Assigned Tasks'),
+      if (canSeeTeamTab) const Tab(text: 'Team Task Board'),
       Tab(
-        child: claimableCount > 0
-            ? Badge(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Available to Claim'),
+            if (claimableCount > 0) ...[
+              const SizedBox(width: 6),
+              Badge(
                 label: Text('$claimableCount'),
                 backgroundColor: AppColors.error,
-                child: const Text('Available to Claim'),
-              )
-            : const Text('Available to Claim'),
+              ),
+            ],
+          ],
+        ),
       ),
-      const Tab(text: 'Assigned Tasks'),
-      if (canSeeTeamTab) const Tab(text: 'Task Board'),
     ];
     final views = [
       _TaskBoardView(
         asyncTasks: ref.watch(myTasksProvider),
         emptyMessage: 'No tasks assigned to you yet.',
-      ),
-      _TaskBoardView(
-        asyncTasks: ref.watch(claimableTasksProvider),
-        emptyMessage: 'No unclaimed tasks for your team right now.',
       ),
       _TaskBoardView(
         asyncTasks: ref.watch(tasksAssignedByMeProvider),
@@ -112,6 +114,10 @@ class TasksPage extends ConsumerWidget {
           asyncTasks: ref.watch(teamTasksProvider),
           emptyMessage: 'No team tasks yet.',
         ),
+      _TaskBoardView(
+        asyncTasks: ref.watch(claimableTasksProvider),
+        emptyMessage: 'No unclaimed tasks for your team right now.',
+      ),
     ];
 
     return DefaultTabController(
@@ -282,7 +288,8 @@ class _StatusColumn extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final color = taskStatusColor(status);
     return DragTarget<Task>(
-      onWillAcceptWithDetails: (details) => details.data.status != status,
+      onWillAcceptWithDetails: (details) =>
+          details.data.status != status && !details.data.isUnclaimed,
       onAcceptWithDetails: (details) => _handleDrop(ref, context, details.data),
       builder: (context, candidateData, rejectedData) {
         final isDropTarget = candidateData.isNotEmpty;
@@ -543,7 +550,7 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
                 dueDate: task.dueDate,
                 status: task.status,
                 updating: _saving == _CardField.dueDate,
-                onTap: _changeDueDate,
+                onTap: task.isUnclaimed ? null : _changeDueDate,
               ),
               const SizedBox(height: 8),
               Row(
@@ -551,6 +558,7 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
                   _InlinePriorityMenu(
                     priority: task.priority,
                     updating: _saving == _CardField.priority,
+                    enabled: !task.isUnclaimed,
                     onChanged: _changePriority,
                   ),
                   const Spacer(),
@@ -603,9 +611,13 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
     // tap-target inside it (priority menu, due-date chip, the card itself)
     // work normally — a plain tap never accumulates enough movement to start
     // a drag, so the gesture arena resolves it to the tap recognizer
-    // underneath instead.
+    // underneath instead. An unclaimed task can't be dragged at all — it has
+    // no assignee to actually be "in progress" on, so it stays put until
+    // someone claims it (see _ClaimControl); maxSimultaneousDrags: 0 turns
+    // the gesture recognizer off without needing a second widget tree.
     return Draggable<Task>(
       data: widget.task,
+      maxSimultaneousDrags: widget.task.isUnclaimed ? 0 : 1,
       feedback: _DragCardPreview(task: widget.task),
       childWhenDragging: Opacity(opacity: 0.35, child: card),
       child: card,
@@ -754,11 +766,13 @@ class _InlinePriorityMenu extends StatelessWidget {
     required this.priority,
     required this.updating,
     required this.onChanged,
+    this.enabled = true,
   });
 
   final String priority;
   final bool updating;
   final ValueChanged<String> onChanged;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -772,6 +786,7 @@ class _InlinePriorityMenu extends StatelessWidget {
     return PopupMenuButton<String>(
       tooltip: 'Change priority',
       padding: EdgeInsets.zero,
+      enabled: enabled,
       onSelected: onChanged,
       itemBuilder: (context) => [
         for (final value in TaskPriority.values)
@@ -814,7 +829,7 @@ class _InlineDueDateChip extends StatelessWidget {
   final String dueDate;
   final String status;
   final bool updating;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

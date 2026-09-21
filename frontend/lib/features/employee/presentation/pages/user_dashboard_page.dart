@@ -246,22 +246,30 @@ class _ReportingManagerChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        EmployeeAvatar(
-          fullName: manager.name,
-          photoUrl: manager.photoUrl,
-          radius: 12,
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EmployeeProfilePage(employeeId: manager.id),
         ),
-        const SizedBox(width: 6),
-        Text(
-          'Reporting Manager: ${manager.name}',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-        ),
-      ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          EmployeeAvatar(
+            fullName: manager.name,
+            photoUrl: manager.photoUrl,
+            radius: 12,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'Reporting Manager: ${manager.name}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -670,20 +678,31 @@ class _TeamMemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      // The chips need an explicit max width to know when to ellipsize —
-      // read from the tile's own rendered width (no longer fixed, now that
-      // ResponsiveCardRow stretches it to fill its row) rather than a
-      // hardcoded constant.
-      child: LayoutBuilder(
-        builder: (context, constraints) =>
-            _buildContent(context, contentWidth: constraints.maxWidth - 32),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EmployeeProfilePage(employeeId: employee.id),
+          ),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          // The chips need an explicit max width to know when to ellipsize —
+          // read from the tile's own rendered width (no longer fixed, now
+          // that ResponsiveCardRow stretches it to fill its row) rather than
+          // a hardcoded constant.
+          child: LayoutBuilder(
+            builder: (context, constraints) =>
+                _buildContent(context, contentWidth: constraints.maxWidth - 32),
+          ),
+        ),
       ),
     );
   }

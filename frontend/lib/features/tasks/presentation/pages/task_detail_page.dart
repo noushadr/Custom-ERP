@@ -227,7 +227,7 @@ class _TaskDetailBodyState extends ConsumerState<_TaskDetailBody> {
                 TaskStatusBadge(status: task.status),
               ],
               const SizedBox(width: 8),
-              canEdit
+              canEdit && !task.isUnclaimed
                   ? _PriorityMenu(
                       priority: task.priority,
                       updating: _fieldSaving == 'priority',
@@ -264,7 +264,7 @@ class _TaskDetailBodyState extends ConsumerState<_TaskDetailBody> {
                 dueDate: task.dueDate,
                 status: task.status,
                 updating: _fieldSaving == 'dueDate',
-                onTap: canEdit ? _changeDueDate : null,
+                onTap: canEdit && !task.isUnclaimed ? _changeDueDate : null,
               ),
             ],
           ),

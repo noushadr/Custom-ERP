@@ -38,7 +38,8 @@ Widget _app({
 
 void main() {
   testWidgets(
-    'shows My Tasks/Available to Claim/Assigned Tasks but not Task Board for a plain employee',
+    'shows My Tasks/Available to Claim/Assigned Tasks but not Team Task '
+    'Board for a plain employee',
     (tester) async {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
@@ -46,11 +47,46 @@ void main() {
       expect(find.text('My Tasks'), findsOneWidget);
       expect(find.text('Available to Claim'), findsOneWidget);
       expect(find.text('Assigned Tasks'), findsOneWidget);
-      expect(find.text('Task Board'), findsNothing);
+      expect(find.text('Team Task Board'), findsNothing);
       // Anyone can create a task now — at minimum, assign it to a team.
       expect(find.text('New Task'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'badges the Available to Claim tab with the unclaimed count, as its own '
+    "widget after the label — not overlapping the word 'Claim'",
+    (tester) async {
+      final repository = FakeTaskRepository(
+        claimableTasks: [
+          buildTestTask(assigneeEmployeeId: null, assigneeName: null),
+        ],
+      );
+
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      // The label renders whole and intact...
+      final labelFinder = find.text('Available to Claim');
+      expect(labelFinder, findsOneWidget);
+      // ...with the badge a separate widget positioned to its right.
+      final badgeFinder = find.text('1');
+      expect(badgeFinder, findsOneWidget);
+      expect(
+        tester.getTopLeft(badgeFinder).dx,
+        greaterThan(tester.getTopRight(labelFinder).dx),
+      );
+    },
+  );
+
+  testWidgets('shows no badge on the Available to Claim tab when nothing is '
+      'unclaimed', (tester) async {
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Available to Claim'), findsOneWidget);
+    expect(find.text('0'), findsNothing);
+  });
 
   testWidgets('shows all four tabs for a tasks.manage holder', (tester) async {
     await tester.pumpWidget(
@@ -68,12 +104,12 @@ void main() {
     expect(find.text('My Tasks'), findsOneWidget);
     expect(find.text('Available to Claim'), findsOneWidget);
     expect(find.text('Assigned Tasks'), findsOneWidget);
-    expect(find.text('Task Board'), findsOneWidget);
+    expect(find.text('Team Task Board'), findsOneWidget);
     expect(find.text('New Task'), findsOneWidget);
   });
 
   testWidgets(
-    'shows the Task Board tab for a department head with no tasks.manage permission',
+    'shows the Team Task Board tab for a department head with no tasks.manage permission',
     (tester) async {
       await tester.pumpWidget(
         _app(
@@ -89,7 +125,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Assigned Tasks'), findsOneWidget);
-      expect(find.text('Task Board'), findsOneWidget);
+      expect(find.text('Team Task Board'), findsOneWidget);
     },
   );
 
@@ -344,4 +380,68 @@ void main() {
       expect(repository.lastClaimedId, 'task-1');
     },
   );
+
+  testWidgets(
+    "an unclaimed task's priority and due date chips aren't editable",
+    (tester) async {
+      final repository = FakeTaskRepository(
+        claimableTasks: [
+          buildTestTask(
+            assigneeEmployeeId: null,
+            assigneeName: null,
+            priority: 'medium',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Available to Claim'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Medium'));
+      await tester.pumpAndSettle();
+      expect(find.text('High'), findsNothing);
+      expect(repository.lastUpdatedPriority, isNull);
+
+      await tester.tap(find.byIcon(Icons.calendar_today_outlined));
+      await tester.pumpAndSettle();
+      expect(find.text('OK'), findsNothing);
+      expect(repository.lastProgressUpdatedDueDate, isNull);
+    },
+  );
+
+  testWidgets("an unclaimed task can't be dragged to a different column", (
+    tester,
+  ) async {
+    final repository = FakeTaskRepository(
+      claimableTasks: [
+        buildTestTask(
+          assigneeEmployeeId: null,
+          assigneeName: null,
+          status: TaskStatus.todo,
+          title: 'Unclaimed task',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Available to Claim'));
+    await tester.pumpAndSettle();
+
+    final cardCenter = tester.getCenter(find.text('Unclaimed task'));
+    final inProgressColumnCenter = tester.getCenter(find.text('In Progress'));
+
+    final gesture = await tester.startGesture(cardCenter);
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.moveTo(inProgressColumnCenter);
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(repository.lastProgressUpdatedId, isNull);
+  });
 }

@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/announcements/application/announcement_providers.dart';
 import 'package:zera_erp/features/announcements/domain/entities/today_announcements.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
+import 'package:zera_erp/features/checklists/application/checklist_providers.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/email/application/email_providers.dart';
 import 'package:zera_erp/shared/utils/date_format.dart';
@@ -32,6 +33,7 @@ import 'package:zera_erp/features/tasks/domain/entities/task_status.dart';
 import 'package:zera_erp/main.dart';
 import 'helpers/fake_announcements.dart';
 import 'helpers/fake_auth.dart';
+import 'helpers/fake_checklist.dart';
 import 'helpers/fake_clients.dart';
 import 'helpers/fake_email.dart';
 import 'helpers/fake_employee.dart';
@@ -96,6 +98,7 @@ Widget _authenticatedApp({
         taskRepository ?? FakeTaskRepository(),
       ),
       clientsRepositoryProvider.overrideWithValue(FakeClientsRepository()),
+      checklistRepositoryProvider.overrideWithValue(FakeChecklistRepository()),
       notificationsRepositoryProvider.overrideWithValue(
         FakeNotificationsRepository(),
       ),
@@ -251,6 +254,43 @@ void main() {
     expect(find.text('Employee of the Month'), findsOneWidget);
     expect(find.text('Muhammad Asad Rathore'), findsOneWidget);
   });
+
+  testWidgets(
+    "tapping the Employee of the Month spotlight opens that employee's own "
+    'profile',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          announcementsRepository: FakeAnnouncementsRepository(
+            today: const TodayAnnouncements(
+              birthdays: [],
+              workAnniversaries: [],
+              holiday: null,
+              notices: [],
+              employeeOfTheMonth: TodayEmployeeOfMonth(
+                employeeId: 'employee-1',
+                fullName: 'Muhammad Asad Rathore',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Muhammad Asad Rathore'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Employee Profile'), findsOneWidget);
+    },
+  );
 
   testWidgets("admin dashboard's top bar shows today's date", (
     WidgetTester tester,

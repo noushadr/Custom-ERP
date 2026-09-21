@@ -366,7 +366,10 @@ export class TasksService {
    * holding `tasks.manage` (Super Admin/HR-Manager) — i.e. exactly the same
    * three-tier authority `updateStatus`'s non-self branch uses; reassigning
    * additionally requires that same authority over the *new* assignee's
-   * department. */
+   * department. Priority and due date specifically also require the task to
+   * already be claimed (have an assignee) — an unclaimed task has nobody
+   * actively working it yet, so there's nothing for those fields to track
+   * until then; title/description/reassignment aren't affected. */
   async updateTask(
     id: string,
     dto: UpdateTaskDto,
@@ -432,6 +435,11 @@ export class TasksService {
     }
 
     if (changes.priority !== undefined && changes.priority !== task.priority) {
+      if (task.assigneeEmployeeId == null) {
+        throw new ForbiddenException(
+          'This task must be claimed before its priority can change',
+        );
+      }
       await this.addAuditLog(
         task.id,
         actorUserId,
@@ -443,6 +451,11 @@ export class TasksService {
     }
 
     if (changes.dueDate !== undefined && changes.dueDate !== task.dueDate) {
+      if (task.assigneeEmployeeId == null) {
+        throw new ForbiddenException(
+          'This task must be claimed before its due date can change',
+        );
+      }
       await this.addAuditLog(
         task.id,
         actorUserId,
@@ -468,7 +481,9 @@ export class TasksService {
    * holder (Super Admin/HR) may move the deadline, same authority as
    * `updateTask`'s core-field edits. Only the assignee's own edit notifies
    * the assigner — a privileged editor changing these same fields doesn't
-   * need to notify themselves. */
+   * need to notify themselves. An unclaimed task (no assignee) can't have
+   * its status or due date changed at all, by anyone, until it's claimed —
+   * see `claimTask`/`assignTeamMember`. */
   async updateProgress(
     id: string,
     dto: UpdateTaskProgressDto,
@@ -490,6 +505,14 @@ export class TasksService {
     if (dto.dueDate !== undefined && isSelf && !hasElevatedAccess) {
       throw new ForbiddenException(
         "Only the task's assigner, a department head, or an admin/HR can change the due date",
+      );
+    }
+    if (
+      task.assigneeEmployeeId == null &&
+      (dto.status !== undefined || dto.dueDate !== undefined)
+    ) {
+      throw new ForbiddenException(
+        'This task must be claimed before its status or due date can change',
       );
     }
 

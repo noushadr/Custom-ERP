@@ -10,7 +10,13 @@ import { ProjectStatus } from '../domain/enums/project-status.enum';
 export class ProjectsController {
   constructor(private readonly clientsService: ClientsService) {}
 
+  // Open to any authenticated user (handler-level @Permissions() overrides
+  // the class-level 'clients.manage') — the Tasks feature's own "Client /
+  // Project" field lets any employee search and link an existing project,
+  // or create a brand-new one, right from the task editor. Everything else
+  // on this controller (update, the summary dashboard) stays admin-only.
   @Get()
+  @Permissions()
   getProjects(
     @Query('status') status?: ProjectStatus,
     @Query('clientId') clientId?: string,
@@ -19,6 +25,7 @@ export class ProjectsController {
   }
 
   @Post()
+  @Permissions()
   createProject(@Body() dto: CreateProjectDto) {
     return this.clientsService.createProject(dto);
   }

@@ -807,6 +807,42 @@ describe('TasksService', () => {
 
       expect(notificationsService.create).not.toHaveBeenCalled();
     });
+
+    it('rejects a status change on an unclaimed task, even for an admin/HR override', async () => {
+      const task = buildTask({ assigneeEmployeeId: null, assignee: undefined });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await expect(
+        service.updateProgress(
+          'task-1',
+          { status: TaskStatus.IN_PROGRESS },
+          'admin-user-1',
+          true,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(taskRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a due date change on an unclaimed task, even for the assigner', async () => {
+      const task = buildTask({
+        assigneeEmployeeId: null,
+        assignee: undefined,
+        assignedByUserId: 'manager-1',
+      });
+      taskRepository.findById.mockResolvedValue(task);
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      await expect(
+        service.updateProgress(
+          'task-1',
+          { dueDate: '2026-12-25' },
+          'manager-1',
+          false,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(taskRepository.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('comments', () => {
@@ -964,6 +1000,62 @@ describe('TasksService', () => {
           false,
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects a priority change on an unclaimed task, even for a tasks.manage holder', async () => {
+      const task = buildTask({
+        priority: TaskPriority.MEDIUM,
+        assigneeEmployeeId: null,
+        assignee: undefined,
+      });
+      taskRepository.findById.mockResolvedValue(task);
+
+      await expect(
+        service.updateTask(
+          'task-1',
+          { priority: TaskPriority.HIGH },
+          'admin-user-1',
+          true,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(taskRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a due date change on an unclaimed task, even for a tasks.manage holder', async () => {
+      const task = buildTask({
+        dueDate: '2026-12-01',
+        assigneeEmployeeId: null,
+        assignee: undefined,
+      });
+      taskRepository.findById.mockResolvedValue(task);
+
+      await expect(
+        service.updateTask(
+          'task-1',
+          { dueDate: '2026-12-20' },
+          'admin-user-1',
+          true,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(taskRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('still lets title/description/reassignment change on an unclaimed task', async () => {
+      const task = buildTask({
+        title: 'Old title',
+        assigneeEmployeeId: null,
+        assignee: undefined,
+      });
+      taskRepository.findById.mockResolvedValue(task);
+
+      const result = await service.updateTask(
+        'task-1',
+        { title: 'New title' },
+        'admin-user-1',
+        true,
+      );
+
+      expect(result.title).toBe('New title');
     });
   });
 

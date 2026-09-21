@@ -16,6 +16,7 @@ import '../../domain/entities/upcoming_birthday.dart';
 import '../../domain/entities/upcoming_work_anniversary.dart';
 import '../widgets/company_notices_section.dart';
 import '../widgets/employee_avatar.dart';
+import 'employee_profile_page.dart';
 
 class AdminDashboardPage extends ConsumerWidget {
   const AdminDashboardPage({super.key});
@@ -122,49 +123,60 @@ class _SpotlightCard extends StatelessWidget {
 
 /// A person's avatar + name + one caption line — the shared body for every
 /// spotlight card about a specific employee (Employee of the Month, Last/
-/// Upcoming Birthday).
+/// Upcoming Birthday). Tapping opens that employee's own profile — every
+/// spotlight card links to a real person, not just a label.
 class _SpotlightPerson extends StatelessWidget {
   const _SpotlightPerson({
+    required this.employeeId,
     required this.fullName,
     required this.caption,
     this.photoUrl,
   });
 
+  final String employeeId;
   final String fullName;
   final String caption;
   final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        EmployeeAvatar(fullName: fullName, photoUrl: photoUrl, radius: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                fullName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              Text(
-                caption,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-              ),
-            ],
-          ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EmployeeProfilePage(employeeId: employeeId),
         ),
-      ],
+      ),
+      child: Row(
+        children: [
+          EmployeeAvatar(fullName: fullName, photoUrl: photoUrl, radius: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  fullName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -205,6 +217,7 @@ class _EmployeeOfMonthCard extends ConsumerWidget {
             return const _SpotlightEmpty('No Employee of the Month right now.');
           }
           return _SpotlightPerson(
+            employeeId: employeeOfTheMonth.employeeId,
             fullName: employeeOfTheMonth.fullName,
             photoUrl: employeeOfTheMonth.profilePhotoUrl,
             caption: 'Congrats! 🏆',
@@ -235,6 +248,7 @@ class _LastBirthdayCard extends ConsumerWidget {
             return const _SpotlightEmpty('No recent birthdays.');
           }
           return _SpotlightPerson(
+            employeeId: last.employeeId,
             fullName: last.fullName,
             photoUrl: last.profilePhotoUrl,
             caption: '${formatMonthDay(last.dateOfBirth)} · ${_agoLabel(last)}',
@@ -270,6 +284,7 @@ class _UpcomingBirthdayCard extends ConsumerWidget {
             return const _SpotlightEmpty('No upcoming birthdays.');
           }
           return _SpotlightPerson(
+            employeeId: upcoming.employeeId,
             fullName: upcoming.fullName,
             photoUrl: upcoming.profilePhotoUrl,
             caption: upcoming.daysUntil == 0
@@ -313,6 +328,7 @@ class _UpcomingWorkAnniversaryCard extends ConsumerWidget {
             children: [
               for (var i = 0; i < anniversaries.length; i++) ...[
                 _SpotlightPerson(
+                  employeeId: anniversaries[i].employeeId,
                   fullName: anniversaries[i].fullName,
                   photoUrl: anniversaries[i].profilePhotoUrl,
                   caption: _caption(anniversaries[i]),
