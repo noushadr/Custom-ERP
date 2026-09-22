@@ -12,11 +12,17 @@ import { WorkMode } from '../../domain/enums/work-mode.enum';
 
 export class AddEmployeeDto {
   @IsEmail()
-  @Matches(/^[a-z]+\.[a-z]+@zeracreative\.com$/, {
-    message:
-      'Company email must match the firstname.lastname@zeracreative.com format',
+  @Matches(/@zeracreative\.com$/i, {
+    message: 'Company email must be a @zeracreative.com address',
   })
   companyEmail: string;
+
+  /** Set directly by the HR/Admin adding this employee — there is no
+   * self-signup, so nobody else ever picks this account's initial
+   * password. */
+  @IsString()
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  password: string;
 
   @IsString()
   @MinLength(1)

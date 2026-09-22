@@ -67,7 +67,6 @@ import { toDocumentResponse } from './document.mapper';
 import { EmployeeResponse } from './employee-response.interface';
 import { toEmployeeResponse } from './employee.mapper';
 import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util';
-import { generateTemporaryPassword } from '../../../core/utils/generate-temporary-password.util';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import { AddEducationRecordDto } from './dto/add-education-record.dto';
 import { AddEmployeeDto } from './dto/add-employee.dto';
@@ -159,12 +158,10 @@ export class EmployeesService {
   ) {}
 
   /** HR/Admin add an employee directly from the admin panel — there is no
-   * self-signup and no email invite; the account is created immediately
-   * with a generated temporary password, returned once so it can be shared
-   * with the new employee directly. */
-  async addEmployee(
-    dto: AddEmployeeDto,
-  ): Promise<{ employee: EmployeeResponse; temporaryPassword: string }> {
+   * self-signup and no email invite; the admin sets the account's initial
+   * password directly on this form, rather than the system generating one
+   * to hand over separately. */
+  async addEmployee(dto: AddEmployeeDto): Promise<EmployeeResponse> {
     const existingUser = await this.userRepository.findByEmail(
       dto.companyEmail,
     );
@@ -180,8 +177,7 @@ export class EmployeesService {
       );
     }
 
-    const temporaryPassword = generateTemporaryPassword();
-    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+    const passwordHash = await bcrypt.hash(dto.password, 10);
 
     const user = new User();
     user.email = dto.companyEmail;
@@ -216,10 +212,7 @@ export class EmployeesService {
       reloaded!.workMode,
     );
 
-    return {
-      employee: toEmployeeResponse(reloaded!),
-      temporaryPassword,
-    };
+    return toEmployeeResponse(reloaded!);
   }
 
   /** `employees.read` (e.g. Team Lead) only grants a directory-style view —

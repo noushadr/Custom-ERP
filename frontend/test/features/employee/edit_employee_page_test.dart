@@ -39,10 +39,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Edit Other Person'), findsOneWidget);
-    expect(
-      find.widgetWithText(TextFormField, 'First name'),
-      findsOneWidget,
-    );
+    expect(find.widgetWithText(TextFormField, 'First name'), findsOneWidget);
 
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Designation'),
@@ -92,9 +89,7 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            employeeRepositoryProvider.overrideWithValue(repository),
-          ],
+          overrides: [employeeRepositoryProvider.overrideWithValue(repository)],
           child: MaterialApp(home: EditEmployeePage(employee: employee)),
         ),
       );
@@ -106,41 +101,39 @@ void main() {
       await tester.tap(find.text('Save changes'));
       await tester.pumpAndSettle();
 
-      expect(repository.lastUpdateEmployeeInput?.probationEndDate, '2026-04-01');
+      expect(
+        repository.lastUpdateEmployeeInput?.probationEndDate,
+        '2026-04-01',
+      );
     },
   );
 
-  testWidgets(
-    'clearing the probation end date sends null on save',
-    (tester) async {
-      await _useTallSurface(tester);
-      final employee = buildTestEmployee(
-        id: 'employee-2',
-        probationEndDate: '2026-04-01',
-        probationStatus: 'on_probation',
-      );
-      final repository = FakeEmployeeRepository(employees: [employee]);
+  testWidgets('clearing the probation end date sends null on save', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    final employee = buildTestEmployee(
+      id: 'employee-2',
+      probationEndDate: '2026-04-01',
+      probationStatus: 'on_probation',
+    );
+    final repository = FakeEmployeeRepository(employees: [employee]);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            employeeRepositoryProvider.overrideWithValue(repository),
-          ],
-          child: MaterialApp(home: EditEmployeePage(employee: employee)),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [employeeRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(home: EditEmployeePage(employee: employee)),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.widgetWithIcon(IconButton, Icons.close).last,
-      );
-      await tester.ensureVisible(find.text('Save changes'));
-      await tester.tap(find.text('Save changes'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.close).last);
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
 
-      expect(repository.lastUpdateEmployeeInput?.probationEndDate, isNull);
-    },
-  );
+    expect(repository.lastUpdateEmployeeInput?.probationEndDate, isNull);
+  });
 
   testWidgets('rejects an empty first name', (tester) async {
     await _useTallSurface(tester);
@@ -165,4 +158,78 @@ void main() {
 
     expect(find.text('First name is required'), findsOneWidget);
   });
+
+  testWidgets('selecting Resigned immediately prompts for a resignation date', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    final employee = buildTestEmployee(id: 'employee-2');
+    final repository = FakeEmployeeRepository(employees: [employee]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [employeeRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(home: EditEmployeePage(employee: employee)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Active'));
+    await tester.tap(find.text('Active'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Resigned').last);
+    await tester.pumpAndSettle();
+
+    // The date picker opened automatically (its helpText and the now-
+    // relabeled "Date of leaving" field behind it both read "Resignation
+    // date").
+    expect(find.text('Resignation date'), findsWidgets);
+
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUpdateEmployeeInput?.employmentStatus, 'resigned');
+    expect(repository.lastUpdateEmployeeInput?.dateOfLeaving, isNotNull);
+  });
+
+  testWidgets(
+    "refuses to save a Resigned employee with no date on file, if the "
+    'admin cancels the prompt',
+    (tester) async {
+      await _useTallSurface(tester);
+      final employee = buildTestEmployee(id: 'employee-2');
+      final repository = FakeEmployeeRepository(employees: [employee]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [employeeRepositoryProvider.overrideWithValue(repository)],
+          child: MaterialApp(home: EditEmployeePage(employee: employee)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Active'));
+      await tester.tap(find.text('Active'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Resigned').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Save changes'));
+      await tester.tap(find.text('Save changes'));
+      await tester.pump();
+
+      expect(
+        find.text('Set a resignation date before saving a Resigned employee.'),
+        findsOneWidget,
+      );
+      expect(repository.lastUpdateEmployeeInput, isNull);
+    },
+  );
 }

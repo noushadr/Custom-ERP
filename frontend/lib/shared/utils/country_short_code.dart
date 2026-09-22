@@ -11,6 +11,8 @@ const kCountryShortCodes = {
   'pakisan': 'PK',
   'karachi': 'PK',
   'rawalpindi': 'PK',
+  'pk': 'PK',
+  'pak': 'PK',
   'uae': 'UAE',
   'dubai': 'UAE',
   'united arab emirates': 'UAE',
@@ -24,6 +26,7 @@ const kCountryShortCodes = {
   'sa': 'KSA',
   'riyadh': 'KSA',
   'australia': 'AU',
+  'aus': 'AU',
   'india': 'IN',
   'germany': 'DE',
   'italy': 'IT',
@@ -73,6 +76,8 @@ const _kCountryIsoCodes = {
   'pakisan': 'PK',
   'karachi': 'PK',
   'rawalpindi': 'PK',
+  'pk': 'PK',
+  'pak': 'PK',
   'uae': 'AE',
   'dubai': 'AE',
   'united arab emirates': 'AE',
@@ -86,6 +91,7 @@ const _kCountryIsoCodes = {
   'sa': 'SA',
   'riyadh': 'SA',
   'australia': 'AU',
+  'aus': 'AU',
   'india': 'IN',
   'germany': 'DE',
   'italy': 'IT',
@@ -141,9 +147,7 @@ String? formatCountryShort(String? country) {
 /// standard way flag emoji are composed, no image assets needed.
 String _flagEmoji(String isoCode) {
   final codeUnits = isoCode.toUpperCase().codeUnits;
-  return String.fromCharCodes(
-    codeUnits.map((unit) => 0x1F1E6 + (unit - 0x41)),
-  );
+  return String.fromCharCodes(codeUnits.map((unit) => 0x1F1E6 + (unit - 0x41)));
 }
 
 /// Flag emoji + short code for a country value (e.g. "🇵🇰 PK") — used

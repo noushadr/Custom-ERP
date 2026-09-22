@@ -14,10 +14,23 @@ Widget _app(FakeEmployeeRepository repository) {
   );
 }
 
+/// The new Password field pushed the "Add" button below the default
+/// 800x600 test surface.
+Future<void> _useTallSurface(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(800, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 Future<void> _fillRequiredFields(WidgetTester tester) async {
   await tester.enterText(
     find.widgetWithText(TextFormField, 'Company email'),
     'new.hire@zeracreative.com',
+  );
+  await tester.enterText(
+    find.widgetWithText(TextFormField, 'Password'),
+    'Sup3rSecret',
   );
   await tester.enterText(
     find.widgetWithText(TextFormField, 'First name'),
@@ -33,6 +46,7 @@ void main() {
   testWidgets('shows validation errors for empty required fields', (
     tester,
   ) async {
+    await _useTallSurface(tester);
     await tester.pumpWidget(_app(FakeEmployeeRepository()));
     await tester.pumpAndSettle();
 
@@ -40,35 +54,95 @@ void main() {
     await tester.pump();
 
     expect(find.text('Company email is required'), findsOneWidget);
+    expect(find.text('Password is required'), findsOneWidget);
     expect(find.text('First name is required'), findsOneWidget);
     expect(find.text('Last name is required'), findsOneWidget);
   });
 
-  testWidgets('rejects an email that does not match the company format', (
+  testWidgets('rejects a password shorter than 8 characters', (tester) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(_app(FakeEmployeeRepository()));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Password'),
+      'short',
+    );
+    await tester.tap(find.text('Add'));
+    await tester.pump();
+
+    expect(find.text('Must be at least 8 characters'), findsOneWidget);
+  });
+
+  testWidgets(
+    'accepts any local part, not just firstname.lastname, as long as the '
+    'domain is @zeracreative.com',
+    (tester) async {
+      await _useTallSurface(tester);
+      final repository = FakeEmployeeRepository(
+        addEmployeeResult: buildTestEmployee(fullName: 'New Hire'),
+      );
+
+      await tester.pumpWidget(_app(repository));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Company email'),
+        'newhire123@zeracreative.com',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'),
+        'Sup3rSecret',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'First name'),
+        'New',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Last name'),
+        'Hire',
+      );
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('New Hire has been added.'), findsOneWidget);
+    },
+  );
+
+  testWidgets('rejects an email whose domain is not @zeracreative.com', (
     tester,
   ) async {
+    await _useTallSurface(tester);
     await tester.pumpWidget(_app(FakeEmployeeRepository()));
     await tester.pumpAndSettle();
 
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Company email'),
-      'not-the-right-format@zeracreative.com',
+      'someone@example.com',
     );
     await tester.tap(find.text('Add'));
     await tester.pump();
 
-    expect(
-      find.text('Must match firstname.lastname@zeracreative.com'),
-      findsOneWidget,
-    );
+    expect(find.text('Must be a @zeracreative.com address'), findsOneWidget);
   });
 
-  testWidgets('shows the temporary password on success', (tester) async {
+  testWidgets(
+    'pre-fills the company email field with the @zeracreative.com domain',
+    (tester) async {
+      await tester.pumpWidget(_app(FakeEmployeeRepository()));
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextFormField>(
+        find.widgetWithText(TextFormField, 'Company email'),
+      );
+      expect(field.controller?.text, '@zeracreative.com');
+    },
+  );
+
+  testWidgets('shows a success message with the employee name', (tester) async {
+    await _useTallSurface(tester);
     final repository = FakeEmployeeRepository(
-      addEmployeeResult: (
-        employee: buildTestEmployee(fullName: 'New Hire'),
-        temporaryPassword: 'Sup3rSecret',
-      ),
+      addEmployeeResult: buildTestEmployee(fullName: 'New Hire'),
     );
 
     await tester.pumpWidget(_app(repository));
@@ -79,7 +153,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('New Hire has been added.'), findsOneWidget);
-    expect(find.text('Sup3rSecret'), findsOneWidget);
   });
 
   testWidgets('defaults the work mode dropdown to On-site', (tester) async {
@@ -98,6 +171,7 @@ void main() {
   testWidgets('shows an error message when adding the employee fails', (
     tester,
   ) async {
+    await _useTallSurface(tester);
     final repository = FakeEmployeeRepository(
       addEmployeeError: const EmployeeException(
         'A user with this email already exists.',
@@ -111,9 +185,6 @@ void main() {
     await tester.tap(find.text('Add'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('A user with this email already exists.'),
-      findsOneWidget,
-    );
+    expect(find.text('A user with this email already exists.'), findsOneWidget);
   });
 }

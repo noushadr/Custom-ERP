@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/archived_toggle.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/pie_chart_panel.dart';
 import '../../../../shared/widgets/top_breakdown_panel.dart';
@@ -28,6 +29,13 @@ enum _DirectoryViewMode { list, hierarchy }
 /// keeps this filter and that field in lockstep by construction.
 const _probationFilterValue = 'on_probation';
 
+/// Resigned/terminated employees are hidden from the main directory by
+/// default (matching `Client.archivedAt`'s precedent elsewhere in the app)
+/// and only shown via the "Archived" toggle.
+bool _isArchived(Employee employee) =>
+    employee.employmentStatus == 'resigned' ||
+    employee.employmentStatus == 'terminated';
+
 class EmployeeDirectoryPage extends ConsumerStatefulWidget {
   const EmployeeDirectoryPage({super.key});
 
@@ -36,12 +44,12 @@ class EmployeeDirectoryPage extends ConsumerStatefulWidget {
       _EmployeeDirectoryPageState();
 }
 
-class _EmployeeDirectoryPageState
-    extends ConsumerState<EmployeeDirectoryPage> {
+class _EmployeeDirectoryPageState extends ConsumerState<EmployeeDirectoryPage> {
   _DirectoryViewMode _viewMode = _DirectoryViewMode.list;
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String? _statusFilter;
+  bool _showArchived = false;
 
   @override
   void dispose() {
@@ -122,11 +130,21 @@ class _EmployeeDirectoryPageState
                           ),
                         ),
                       ),
-                    if (canRead && _viewMode == _DirectoryViewMode.list)
+                    if (canRead &&
+                        _viewMode == _DirectoryViewMode.list &&
+                        !_showArchived)
                       _StatusFilterRow(
                         value: _statusFilter,
                         onChanged: (value) =>
                             setState(() => _statusFilter = value),
+                      ),
+                    if (canRead)
+                      ArchivedToggle(
+                        showArchived: _showArchived,
+                        onChanged: (value) => setState(() {
+                          _showArchived = value;
+                          _statusFilter = null;
+                        }),
                       ),
                     if (canManage)
                       ElevatedButton.icon(
@@ -146,6 +164,7 @@ class _EmployeeDirectoryPageState
                         viewMode: _viewMode,
                         searchQuery: _searchQuery,
                         statusFilter: _statusFilter,
+                        showArchived: _showArchived,
                       )
                     : const _NoDirectoryAccess(),
               ],
@@ -162,11 +181,13 @@ class _DirectoryBody extends ConsumerWidget {
     required this.viewMode,
     required this.searchQuery,
     required this.statusFilter,
+    required this.showArchived,
   });
 
   final _DirectoryViewMode viewMode;
   final String searchQuery;
   final String? statusFilter;
+  final bool showArchived;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -196,11 +217,22 @@ class _DirectoryBody extends ConsumerWidget {
           return const Center(child: Text('No employees yet.'));
         }
 
-        if (viewMode == _DirectoryViewMode.hierarchy) {
-          return EmployeeHierarchyView(employees: employees);
+        final scoped = employees
+            .where((e) => _isArchived(e) == showArchived)
+            .toList();
+        if (scoped.isEmpty) {
+          return Center(
+            child: Text(
+              showArchived ? 'No archived employees.' : 'No employees yet.',
+            ),
+          );
         }
 
-        final filtered = _filterEmployees(employees, searchQuery, statusFilter);
+        if (viewMode == _DirectoryViewMode.hierarchy) {
+          return EmployeeHierarchyView(employees: scoped);
+        }
+
+        final filtered = _filterEmployees(scoped, searchQuery, statusFilter);
         return filtered.isEmpty
             ? const Center(child: Text('No employees match your search.'))
             : _EmployeeList(
@@ -335,13 +367,14 @@ class _StatusFilterRow extends StatelessWidget {
   final String? value;
   final ValueChanged<String?> onChanged;
 
+  // Resigned/terminated employees never appear in the non-archived list this
+  // filter operates on (see `_isArchived`/the Archived toggle), so they're
+  // deliberately left out of this dropdown.
   static const _statuses = <String, String>{
     'active': 'Active',
     _probationFilterValue: 'On Probation',
     'on_leave': 'On Leave',
     'notice_period': 'Notice Period',
-    'resigned': 'Resigned',
-    'terminated': 'Terminated',
   };
 
   @override
@@ -372,6 +405,9 @@ class _StatusFilterRow extends StatelessWidget {
   }
 }
 
+/// Toggles between the normal directory and resigned/terminated employees
+/// (see `_isArchived`) — mirrors `Client.archivedAt`'s precedent elsewhere
+/// in the app.
 /// Currently-active employee count (not the full headcount — resigned/
 /// terminated employees don't count as "total" here), with a 30-day trend
 /// line — moved here from the Dashboard. [count] comes from the
@@ -505,9 +541,7 @@ class _EmployeeStatsSection extends ConsumerWidget {
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              for (final tile in tiles) _StatTile(child: tile),
-            ],
+            children: [for (final tile in tiles) _StatTile(child: tile)],
           ),
         ),
         const SizedBox(width: 12),
@@ -627,11 +661,10 @@ class _WorkModeCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         '${byWorkMode[key] ?? 0}',
-                        style: Theme.of(context).textTheme.titleSmall
-                            ?.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ],
                   ),
@@ -700,8 +733,7 @@ class _EmployeeList extends StatelessWidget {
                             reviewSummary: reviewSummaries[row[i].id],
                           ),
                         ),
-                        if (i != row.length - 1)
-                          const SizedBox(width: spacing),
+                        if (i != row.length - 1) const SizedBox(width: spacing),
                       ],
                     ],
                   ),
@@ -845,8 +877,7 @@ class _EmployeeCard extends StatelessWidget {
                   ),
                   InfoChip(
                     icon: Icons.event_outlined,
-                    label:
-                        'Joined ${formatDisplayDate(employee.joiningDate)}',
+                    label: 'Joined ${formatDisplayDate(employee.joiningDate)}',
                     maxWidth: contentWidth,
                   ),
                   InfoChip(

@@ -82,31 +82,30 @@ String _joinedAgo(int years, {int months = 0}) {
 }
 
 void main() {
-  testWidgets('shows the employee list and add-employee button with full access', (
-    tester,
-  ) async {
-    final repository = FakeEmployeeRepository(
-      employees: [buildTestEmployee()],
-    );
+  testWidgets(
+    'shows the employee list and add-employee button with full access',
+    (tester) async {
+      final repository = FakeEmployeeRepository(
+        employees: [buildTestEmployee()],
+      );
 
-    await tester.pumpWidget(
-      _app(
-        permissions: ['employees.read', 'employees.manage'],
-        repository: repository,
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _app(
+          permissions: ['employees.read', 'employees.manage'],
+          repository: repository,
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Jane Doe'), findsOneWidget);
-    expect(find.text('Add Employee'), findsOneWidget);
-  });
+      expect(find.text('Jane Doe'), findsOneWidget);
+      expect(find.text('Add Employee'), findsOneWidget);
+    },
+  );
 
   testWidgets('hides the add-employee button without employees.manage', (
     tester,
   ) async {
-    final repository = FakeEmployeeRepository(
-      employees: [buildTestEmployee()],
-    );
+    final repository = FakeEmployeeRepository(employees: [buildTestEmployee()]);
 
     await tester.pumpWidget(
       _app(permissions: ['employees.read'], repository: repository),
@@ -273,9 +272,7 @@ void main() {
   testWidgets('shows a restricted message without employees.read', (
     tester,
   ) async {
-    final repository = FakeEmployeeRepository(
-      employees: [buildTestEmployee()],
-    );
+    final repository = FakeEmployeeRepository(employees: [buildTestEmployee()]);
 
     await tester.pumpWidget(_app(permissions: [], repository: repository));
     await tester.pumpAndSettle();
@@ -362,51 +359,50 @@ void main() {
     },
   );
 
-  testWidgets(
-    'only counts active employees in the combined work-mode tile',
-    (tester) async {
-      final repository = FakeEmployeeRepository(
-        employees: [
-          buildTestEmployee(
-            id: 'employee-1',
-            employmentStatus: 'active',
-            workMode: 'remote',
-          ),
-          buildTestEmployee(
-            id: 'employee-2',
-            employmentStatus: 'resigned',
-            workMode: 'remote',
-          ),
-          buildTestEmployee(
-            id: 'employee-3',
-            employmentStatus: 'terminated',
-            workMode: 'hybrid',
-          ),
-        ],
-      );
+  testWidgets('only counts active employees in the combined work-mode tile', (
+    tester,
+  ) async {
+    final repository = FakeEmployeeRepository(
+      employees: [
+        buildTestEmployee(
+          id: 'employee-1',
+          employmentStatus: 'active',
+          workMode: 'remote',
+        ),
+        buildTestEmployee(
+          id: 'employee-2',
+          employmentStatus: 'resigned',
+          workMode: 'remote',
+        ),
+        buildTestEmployee(
+          id: 'employee-3',
+          employmentStatus: 'terminated',
+          workMode: 'hybrid',
+        ),
+      ],
+    );
 
-      await tester.pumpWidget(
-        _app(permissions: ['employees.read'], repository: repository),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(permissions: ['employees.read'], repository: repository),
+    );
+    await tester.pumpAndSettle();
 
-      // Only employee-1 is active, so the combined On-site/Remote/Hybrid
-      // tile should read 0/1/0 — On-site and Hybrid's only members are gone
-      // (resigned/terminated), and Remote counts just the one active member.
-      // Scoped to the tile itself since other stat tiles on this page (e.g.
-      // Notice Period, On Leave) also happen to read '0' for this dataset.
-      final workModeCard = find.byKey(const Key('work-mode-card'));
-      expect(workModeCard, findsOneWidget);
-      expect(
-        find.descendant(of: workModeCard, matching: find.text('0')),
-        findsNWidgets(2),
-      );
-      expect(
-        find.descendant(of: workModeCard, matching: find.text('1')),
-        findsOneWidget,
-      );
-    },
-  );
+    // Only employee-1 is active, so the combined On-site/Remote/Hybrid
+    // tile should read 0/1/0 — On-site and Hybrid's only members are gone
+    // (resigned/terminated), and Remote counts just the one active member.
+    // Scoped to the tile itself since other stat tiles on this page (e.g.
+    // Notice Period, On Leave) also happen to read '0' for this dataset.
+    final workModeCard = find.byKey(const Key('work-mode-card'));
+    expect(workModeCard, findsOneWidget);
+    expect(
+      find.descendant(of: workModeCard, matching: find.text('0')),
+      findsNWidgets(2),
+    );
+    expect(
+      find.descendant(of: workModeCard, matching: find.text('1')),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('shows Notice Period, On Leave, and On Probation stat counts', (
     tester,
@@ -513,20 +509,19 @@ void main() {
     },
   );
 
-  testWidgets(
-    'hides Pending Performance Reviews without performance.manage',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          permissions: ['employees.read'],
-          repository: FakeEmployeeRepository(employees: [buildTestEmployee()]),
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('hides Pending Performance Reviews without performance.manage', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        permissions: ['employees.read'],
+        repository: FakeEmployeeRepository(employees: [buildTestEmployee()]),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Pending Performance Reviews'), findsNothing);
-    },
-  );
+    expect(find.text('Pending Performance Reviews'), findsNothing);
+  });
 
   testWidgets(
     'shows an Employees by Department breakdown, counting only active '
@@ -607,9 +602,7 @@ void main() {
 
   testWidgets('shows each employee\'s tenure since joining', (tester) async {
     final repository = FakeEmployeeRepository(
-      employees: [
-        buildTestEmployee(joiningDate: _joinedAgo(2)),
-      ],
+      employees: [buildTestEmployee(joiningDate: _joinedAgo(2))],
     );
 
     await tester.pumpWidget(
@@ -620,22 +613,19 @@ void main() {
     expect(find.text('2 yrs'), findsOneWidget);
   });
 
-  testWidgets(
-    'hides the last-review chip without performance.manage',
-    (tester) async {
-      final repository = FakeEmployeeRepository(
-        employees: [buildTestEmployee()],
-      );
+  testWidgets('hides the last-review chip without performance.manage', (
+    tester,
+  ) async {
+    final repository = FakeEmployeeRepository(employees: [buildTestEmployee()]);
 
-      await tester.pumpWidget(
-        _app(permissions: ['employees.read'], repository: repository),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(permissions: ['employees.read'], repository: repository),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.textContaining('Last Review'), findsNothing);
-      expect(find.textContaining('No review yet'), findsNothing);
-    },
-  );
+    expect(find.textContaining('Last Review'), findsNothing);
+    expect(find.textContaining('No review yet'), findsNothing);
+  });
 
   testWidgets(
     'shows a pending last-review status for a performance.manage holder',
@@ -665,90 +655,85 @@ void main() {
     },
   );
 
-  testWidgets(
-    'shows the finalized date for a completed last review',
-    (tester) async {
-      final repository = FakeEmployeeRepository(
-        employees: [buildTestEmployee(id: 'employee-1')],
-      );
-      final finalizedAt = DateTime.utc(2026, 2, 1, 12);
-      final reviewRepository = FakePerformanceReviewRepository(
-        latestReviewSummaries: [
-          buildTestPerformanceReviewSummary(
-            employeeId: 'employee-1',
-            status: 'finalized',
-            finalizedAt: finalizedAt,
-          ),
-        ],
-      );
-
-      await tester.pumpWidget(
-        _app(
-          permissions: ['employees.read', 'performance.manage'],
-          repository: repository,
-          performanceReviewRepository: reviewRepository,
+  testWidgets('shows the finalized date for a completed last review', (
+    tester,
+  ) async {
+    final repository = FakeEmployeeRepository(
+      employees: [buildTestEmployee(id: 'employee-1')],
+    );
+    final finalizedAt = DateTime.utc(2026, 2, 1, 12);
+    final reviewRepository = FakePerformanceReviewRepository(
+      latestReviewSummaries: [
+        buildTestPerformanceReviewSummary(
+          employeeId: 'employee-1',
+          status: 'finalized',
+          finalizedAt: finalizedAt,
         ),
-      );
-      await tester.pumpAndSettle();
+      ],
+    );
 
-      expect(
-        find.text('Last Review: ${formatDisplayDateOnly(finalizedAt)}'),
-        findsOneWidget,
-      );
-    },
-  );
+    await tester.pumpWidget(
+      _app(
+        permissions: ['employees.read', 'performance.manage'],
+        repository: repository,
+        performanceReviewRepository: reviewRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-  testWidgets(
-    'shows "No review yet" for an employee with no reviews at all',
-    (tester) async {
-      final repository = FakeEmployeeRepository(
-        employees: [buildTestEmployee(id: 'employee-1')],
-      );
-      final reviewRepository = FakePerformanceReviewRepository(
-        latestReviewSummaries: const [],
-      );
+    expect(
+      find.text('Last Review: ${formatDisplayDateOnly(finalizedAt)}'),
+      findsOneWidget,
+    );
+  });
 
-      await tester.pumpWidget(
-        _app(
-          permissions: ['employees.read', 'performance.manage'],
-          repository: repository,
-          performanceReviewRepository: reviewRepository,
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('shows "No review yet" for an employee with no reviews at all', (
+    tester,
+  ) async {
+    final repository = FakeEmployeeRepository(
+      employees: [buildTestEmployee(id: 'employee-1')],
+    );
+    final reviewRepository = FakePerformanceReviewRepository(
+      latestReviewSummaries: const [],
+    );
 
-      expect(find.text('No review yet'), findsOneWidget);
-    },
-  );
+    await tester.pumpWidget(
+      _app(
+        permissions: ['employees.read', 'performance.manage'],
+        repository: repository,
+        performanceReviewRepository: reviewRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-  testWidgets(
-    "shows the Total Employees tile's active count and 30-day delta "
-    '(moved here from the Dashboard)',
-    (tester) async {
-      final repository = FakeEmployeeRepository(
-        employees: [
-          buildTestEmployee(id: 'employee-1', employmentStatus: 'active'),
-          buildTestEmployee(id: 'employee-2', employmentStatus: 'resigned'),
-        ],
-        activeEmployeeDelta: 1,
-      );
+    expect(find.text('No review yet'), findsOneWidget);
+  });
 
-      await tester.pumpWidget(
-        _app(permissions: ['employees.read'], repository: repository),
-      );
-      await tester.pumpAndSettle();
+  testWidgets("shows the Total Employees tile's active count and 30-day delta "
+      '(moved here from the Dashboard)', (tester) async {
+    final repository = FakeEmployeeRepository(
+      employees: [
+        buildTestEmployee(id: 'employee-1', employmentStatus: 'active'),
+        buildTestEmployee(id: 'employee-2', employmentStatus: 'resigned'),
+      ],
+      activeEmployeeDelta: 1,
+    );
 
-      final totalCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate(
-          (w) => w is MetricCard && w.label == 'Total Employees',
-        ),
-      );
-      // Only employee-1 is active, so the tile reads 1 (not the full
-      // headcount of 2).
-      expect(totalCard.value, '1');
-      expect(totalCard.secondaryValue, '+1 in last 30 days');
-    },
-  );
+    await tester.pumpWidget(
+      _app(permissions: ['employees.read'], repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    final totalCard = tester.widget<MetricCard>(
+      find.byWidgetPredicate(
+        (w) => w is MetricCard && w.label == 'Total Employees',
+      ),
+    );
+    // Only employee-1 is active, so the tile reads 1 (not the full
+    // headcount of 2).
+    expect(totalCard.value, '1');
+    expect(totalCard.secondaryValue, '+1 in last 30 days');
+  });
 
   testWidgets(
     "shows a negative Total Employees tile delta as e.g. '-1 in last 30 "
@@ -806,9 +791,7 @@ void main() {
         email: 'notice.person@zeracreative.com',
         employmentStatus: 'notice_period',
       );
-      final repository = FakeEmployeeRepository(
-        employees: [active, onNotice],
-      );
+      final repository = FakeEmployeeRepository(employees: [active, onNotice]);
 
       await tester.pumpWidget(
         _app(permissions: ['employees.read'], repository: repository),
@@ -819,10 +802,7 @@ void main() {
       expect(find.text('Notice Person'), findsOneWidget);
 
       await tester.tap(
-        find.widgetWithText(
-          DropdownButtonFormField<String?>,
-          'All statuses',
-        ),
+        find.widgetWithText(DropdownButtonFormField<String?>, 'All statuses'),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Notice Period').last);
@@ -833,45 +813,41 @@ void main() {
     },
   );
 
-  testWidgets(
-    "the status filter's 'On Probation' option filters by "
-    "probationStatus, not employmentStatus — a probationary employee's "
-    "employmentStatus stays 'active' so they still show up in payroll etc.",
-    (tester) async {
-      final onProbation = buildTestEmployee(
-        id: 'employee-1',
-        fullName: 'Probation Person',
-        probationEndDate: '2026-12-01',
-        probationStatus: 'on_probation',
-      );
-      final activeNotOnProbation = buildTestEmployee(
-        id: 'employee-2',
-        fullName: 'Confirmed Person',
-        email: 'confirmed.person@zeracreative.com',
-      );
-      final repository = FakeEmployeeRepository(
-        employees: [onProbation, activeNotOnProbation],
-      );
+  testWidgets("the status filter's 'On Probation' option filters by "
+      "probationStatus, not employmentStatus — a probationary employee's "
+      "employmentStatus stays 'active' so they still show up in payroll etc.", (
+    tester,
+  ) async {
+    final onProbation = buildTestEmployee(
+      id: 'employee-1',
+      fullName: 'Probation Person',
+      probationEndDate: '2026-12-01',
+      probationStatus: 'on_probation',
+    );
+    final activeNotOnProbation = buildTestEmployee(
+      id: 'employee-2',
+      fullName: 'Confirmed Person',
+      email: 'confirmed.person@zeracreative.com',
+    );
+    final repository = FakeEmployeeRepository(
+      employees: [onProbation, activeNotOnProbation],
+    );
 
-      await tester.pumpWidget(
-        _app(permissions: ['employees.read'], repository: repository),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(permissions: ['employees.read'], repository: repository),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.widgetWithText(
-          DropdownButtonFormField<String?>,
-          'All statuses',
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('On Probation').last);
-      await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(DropdownButtonFormField<String?>, 'All statuses'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('On Probation').last);
+    await tester.pumpAndSettle();
 
-      expect(find.text('Probation Person'), findsOneWidget);
-      expect(find.text('Confirmed Person'), findsNothing);
-    },
-  );
+    expect(find.text('Probation Person'), findsOneWidget);
+    expect(find.text('Confirmed Person'), findsNothing);
+  });
 
   testWidgets(
     'picks up a Notice Period pre-filter set on employeeStatusFilterProvider '
@@ -889,9 +865,7 @@ void main() {
         email: 'notice.person@zeracreative.com',
         employmentStatus: 'notice_period',
       );
-      final repository = FakeEmployeeRepository(
-        employees: [active, onNotice],
-      );
+      final repository = FakeEmployeeRepository(employees: [active, onNotice]);
       final container = ProviderContainer(
         overrides: _overridesFor(
           permissions: ['employees.read'],
@@ -921,6 +895,56 @@ void main() {
 
       expect(find.text('Active Person'), findsNothing);
       expect(find.text('Notice Person'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "hides resigned/terminated employees from the List view by default, "
+    'and reveals only them via the Archived toggle',
+    (tester) async {
+      final active = buildTestEmployee(
+        id: 'employee-1',
+        fullName: 'Active Person',
+      );
+      final onLeave = buildTestEmployee(
+        id: 'employee-2',
+        fullName: 'On Leave Person',
+        email: 'on.leave.person@zeracreative.com',
+        employmentStatus: 'on_leave',
+      );
+      final resigned = buildTestEmployee(
+        id: 'employee-3',
+        fullName: 'Resigned Person',
+        email: 'resigned.person@zeracreative.com',
+        employmentStatus: 'resigned',
+      );
+      final terminated = buildTestEmployee(
+        id: 'employee-4',
+        fullName: 'Terminated Person',
+        email: 'terminated.person@zeracreative.com',
+        employmentStatus: 'terminated',
+      );
+      final repository = FakeEmployeeRepository(
+        employees: [active, onLeave, resigned, terminated],
+      );
+
+      await tester.pumpWidget(
+        _app(permissions: ['employees.read'], repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active Person'), findsOneWidget);
+      expect(find.text('On Leave Person'), findsOneWidget);
+      expect(find.text('Resigned Person'), findsNothing);
+      expect(find.text('Terminated Person'), findsNothing);
+
+      await tester.tap(find.text('Archived'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active Person'), findsNothing);
+      expect(find.text('On Leave Person'), findsNothing);
+      expect(find.text('Resigned Person'), findsOneWidget);
+      expect(find.text('Terminated Person'), findsOneWidget);
     },
   );
 }

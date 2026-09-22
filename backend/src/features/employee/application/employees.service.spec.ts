@@ -210,6 +210,7 @@ describe('EmployeesService', () => {
   describe('addEmployee', () => {
     const dto = {
       companyEmail: 'new.hire@zeracreative.com',
+      password: 'Sup3rSecret1',
       firstName: 'New',
       lastName: 'Hire',
     };
@@ -231,7 +232,7 @@ describe('EmployeesService', () => {
       );
     });
 
-    it('creates a pending user and employee, returning a temporary password', async () => {
+    it('creates a pending user and employee, hashing the given password', async () => {
       userRepository.findByEmail.mockResolvedValue(null);
       roleRepository.findByName.mockResolvedValue(buildRole());
       userRepository.save.mockImplementation(
@@ -257,8 +258,8 @@ describe('EmployeesService', () => {
       expect(employeeRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'new-user-id' }),
       );
-      expect(result.temporaryPassword).toHaveLength(12);
-      expect(result.employee.employeeCode).toBe('ZC-00005');
+      expect(bcrypt.hash).toHaveBeenCalledWith(dto.password, 10);
+      expect(result.employeeCode).toBe('ZC-00005');
     });
 
     it('creates an onboarding checklist instance for the new employee', async () => {

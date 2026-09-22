@@ -6,14 +6,21 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/checklists/application/checklist_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/employee/domain/entities/audit_log_entry.dart';
 import 'package:zera_erp/features/employee/presentation/pages/employee_profile_page.dart';
+import 'package:zera_erp/features/goals/application/goal_providers.dart';
+import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
+import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/shared/widgets/tag_input.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_checklist.dart';
 import '../../helpers/fake_employee.dart';
+import '../../helpers/fake_goal.dart';
+import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_performance_review.dart';
+import '../../helpers/fake_task.dart';
 
 Future<void> _useTallSurface(WidgetTester tester) async {
   tester.view.physicalSize = const Size(900, 2600);
@@ -29,6 +36,9 @@ Widget _app({
   FakeAuthRepository? authRepository,
   FakeChecklistRepository? checklistRepository,
   FakePerformanceReviewRepository? performanceReviewRepository,
+  FakeLeaveRepository? leaveRepository,
+  FakeGoalRepository? goalRepository,
+  FakeTaskRepository? taskRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -45,35 +55,48 @@ Widget _app({
       performanceReviewRepositoryProvider.overrideWithValue(
         performanceReviewRepository ?? FakePerformanceReviewRepository(),
       ),
+      leaveRepositoryProvider.overrideWithValue(
+        leaveRepository ?? FakeLeaveRepository(),
+      ),
+      goalRepositoryProvider.overrideWithValue(
+        goalRepository ?? FakeGoalRepository(),
+      ),
+      taskRepositoryProvider.overrideWithValue(
+        taskRepository ?? FakeTaskRepository(),
+      ),
     ],
     child: MaterialApp(home: EmployeeProfilePage(employeeId: employeeId)),
   );
 }
 
 void main() {
-  testWidgets('shows Edit for your own profile and opens the self-service form', (
-    tester,
-  ) async {
-    final me = buildTestEmployee(email: 'jane.doe@zeracreative.com');
-    final viewer = AuthUser(
-      id: 'user-1',
-      email: 'jane.doe@zeracreative.com',
-      role: 'Employee',
-      permissions: const [],
-    );
+  testWidgets(
+    'shows Edit for your own profile and opens the self-service form',
+    (tester) async {
+      final me = buildTestEmployee(email: 'jane.doe@zeracreative.com');
+      final viewer = AuthUser(
+        id: 'user-1',
+        email: 'jane.doe@zeracreative.com',
+        role: 'Employee',
+        permissions: const [],
+      );
 
-    await tester.pumpWidget(
-      _app(viewer: viewer, repository: FakeEmployeeRepository(me: me)),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(me: me),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Edit'), findsOneWidget);
 
-    await tester.tap(find.text('Edit'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Edit My Profile'), findsOneWidget);
-  });
+      expect(find.text('Edit My Profile'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'shows a human-readable employment type instead of the raw enum value',
@@ -87,7 +110,10 @@ void main() {
       );
 
       await tester.pumpWidget(
-        _app(viewer: viewer, repository: FakeEmployeeRepository(me: me)),
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(me: me),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -229,34 +255,33 @@ void main() {
     },
   );
 
-  testWidgets(
-    'hides "Login as" without the users.impersonate permission',
-    (tester) async {
-      final other = buildTestEmployee(
-        id: 'employee-2',
-        userId: 'user-2',
-        email: 'other.person@zeracreative.com',
-        fullName: 'Other Person',
-      );
-      final viewer = AuthUser(
-        id: 'hr-1',
-        email: 'hr.manager@zeracreative.com',
-        role: 'HR/Manager',
-        permissions: const ['employees.read', 'employees.manage'],
-      );
+  testWidgets('hides "Login as" without the users.impersonate permission', (
+    tester,
+  ) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      userId: 'user-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'hr-1',
+      email: 'hr.manager@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: const ['employees.read', 'employees.manage'],
+    );
 
-      await tester.pumpWidget(
-        _app(
-          viewer: viewer,
-          employeeId: 'employee-2',
-          repository: FakeEmployeeRepository(employees: [other]),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        employeeId: 'employee-2',
+        repository: FakeEmployeeRepository(employees: [other]),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Login as'), findsNothing);
-    },
-  );
+    expect(find.text('Login as'), findsNothing);
+  });
 
   testWidgets('hides "Login as" on your own profile', (tester) async {
     final me = buildTestEmployee(
@@ -271,7 +296,10 @@ void main() {
     );
 
     await tester.pumpWidget(
-      _app(viewer: viewer, repository: FakeEmployeeRepository(me: me)),
+      _app(
+        viewer: viewer,
+        repository: FakeEmployeeRepository(me: me),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -318,144 +346,136 @@ void main() {
     expect(authRepository.lastImpersonatedUserId, 'user-2');
   });
 
-  testWidgets(
-    'shows "Reset password" for a viewer with users.manage',
-    (tester) async {
-      final other = buildTestEmployee(
-        id: 'employee-2',
-        email: 'other.person@zeracreative.com',
-        fullName: 'Other Person',
-      );
-      final viewer = AuthUser(
-        id: 'hr-1',
-        email: 'hr.manager@zeracreative.com',
-        role: 'HR/Manager',
-        permissions: const ['employees.read', 'users.manage'],
-      );
+  testWidgets('shows "Reset password" for a viewer with users.manage', (
+    tester,
+  ) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'hr-1',
+      email: 'hr.manager@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: const ['employees.read', 'users.manage'],
+    );
 
-      await tester.pumpWidget(
-        _app(
-          viewer: viewer,
-          employeeId: 'employee-2',
-          repository: FakeEmployeeRepository(employees: [other]),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        employeeId: 'employee-2',
+        repository: FakeEmployeeRepository(employees: [other]),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Reset password'), findsOneWidget);
-    },
-  );
+    expect(find.text('Reset password'), findsOneWidget);
+  });
 
-  testWidgets(
-    'hides "Reset password" without users.manage',
-    (tester) async {
-      final other = buildTestEmployee(
-        id: 'employee-2',
-        email: 'other.person@zeracreative.com',
-        fullName: 'Other Person',
-      );
-      final viewer = AuthUser(
-        id: 'user-3',
-        email: 'coworker@zeracreative.com',
-        role: 'Employee',
-        permissions: const ['employees.read'],
-      );
+  testWidgets('hides "Reset password" without users.manage', (tester) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'user-3',
+      email: 'coworker@zeracreative.com',
+      role: 'Employee',
+      permissions: const ['employees.read'],
+    );
 
-      await tester.pumpWidget(
-        _app(
-          viewer: viewer,
-          employeeId: 'employee-2',
-          repository: FakeEmployeeRepository(employees: [other]),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        employeeId: 'employee-2',
+        repository: FakeEmployeeRepository(employees: [other]),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Reset password'), findsNothing);
-    },
-  );
+    expect(find.text('Reset password'), findsNothing);
+  });
 
-  testWidgets(
-    'confirming "Reset password" shows the new temporary password',
-    (tester) async {
-      final other = buildTestEmployee(
-        id: 'employee-2',
-        userId: 'user-2',
-        email: 'other.person@zeracreative.com',
-        fullName: 'Other Person',
-      );
-      final viewer = AuthUser(
-        id: 'hr-1',
-        email: 'hr.manager@zeracreative.com',
-        role: 'HR/Manager',
-        permissions: const ['employees.read', 'users.manage'],
-      );
-      final authRepository = FakeAuthRepository(
-        resetPasswordResult: 'Nx7kP2qRstuv',
-      );
+  testWidgets('confirming "Reset password" shows the new temporary password', (
+    tester,
+  ) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      userId: 'user-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'hr-1',
+      email: 'hr.manager@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: const ['employees.read', 'users.manage'],
+    );
+    final authRepository = FakeAuthRepository(
+      resetPasswordResult: 'Nx7kP2qRstuv',
+    );
 
-      await tester.pumpWidget(
-        _app(
-          viewer: viewer,
-          employeeId: 'employee-2',
-          repository: FakeEmployeeRepository(employees: [other]),
-          authRepository: authRepository,
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        employeeId: 'employee-2',
+        repository: FakeEmployeeRepository(employees: [other]),
+        authRepository: authRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Reset password'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Reset password'));
+    await tester.pumpAndSettle();
 
-      // Confirmation dialog first — the request hasn't gone out yet.
-      expect(find.text('Reset password?'), findsOneWidget);
-      expect(authRepository.lastResetPasswordUserId, isNull);
+    // Confirmation dialog first — the request hasn't gone out yet.
+    expect(find.text('Reset password?'), findsOneWidget);
+    expect(authRepository.lastResetPasswordUserId, isNull);
 
-      await tester.tap(
-        find.widgetWithText(FilledButton, 'Reset password'),
-      );
-      await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Reset password'));
+    await tester.pumpAndSettle();
 
-      expect(authRepository.lastResetPasswordUserId, 'user-2');
-      expect(find.text('Nx7kP2qRstuv'), findsOneWidget);
-    },
-  );
+    expect(authRepository.lastResetPasswordUserId, 'user-2');
+    expect(find.text('Nx7kP2qRstuv'), findsOneWidget);
+  });
 
-  testWidgets(
-    'canceling the confirmation does not reset the password',
-    (tester) async {
-      final other = buildTestEmployee(
-        id: 'employee-2',
-        userId: 'user-2',
-        email: 'other.person@zeracreative.com',
-        fullName: 'Other Person',
-      );
-      final viewer = AuthUser(
-        id: 'hr-1',
-        email: 'hr.manager@zeracreative.com',
-        role: 'HR/Manager',
-        permissions: const ['employees.read', 'users.manage'],
-      );
-      final authRepository = FakeAuthRepository();
+  testWidgets('canceling the confirmation does not reset the password', (
+    tester,
+  ) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      userId: 'user-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'hr-1',
+      email: 'hr.manager@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: const ['employees.read', 'users.manage'],
+    );
+    final authRepository = FakeAuthRepository();
 
-      await tester.pumpWidget(
-        _app(
-          viewer: viewer,
-          employeeId: 'employee-2',
-          repository: FakeEmployeeRepository(employees: [other]),
-          authRepository: authRepository,
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        employeeId: 'employee-2',
+        repository: FakeEmployeeRepository(employees: [other]),
+        authRepository: authRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Reset password'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Reset password'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
 
-      expect(authRepository.lastResetPasswordUserId, isNull);
-    },
-  );
+    expect(authRepository.lastResetPasswordUserId, isNull);
+  });
 
   testWidgets(
     'shows Skills and Certifications as inline editors on your own profile',
@@ -469,7 +489,10 @@ void main() {
       );
 
       await tester.pumpWidget(
-        _app(viewer: viewer, repository: FakeEmployeeRepository(me: me)),
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(me: me),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -521,9 +544,7 @@ void main() {
     );
     final repository = FakeEmployeeRepository(me: me);
 
-    await tester.pumpWidget(
-      _app(viewer: viewer, repository: repository),
-    );
+    await tester.pumpWidget(_app(viewer: viewer, repository: repository));
     await tester.pumpAndSettle();
 
     final skillsInput = find.descendant(
@@ -550,9 +571,7 @@ void main() {
       );
       final repository = FakeEmployeeRepository(me: me);
 
-      await tester.pumpWidget(
-        _app(viewer: viewer, repository: repository),
-      );
+      await tester.pumpWidget(_app(viewer: viewer, repository: repository));
       await tester.pumpAndSettle();
 
       final dartChipDelete = find.descendant(
@@ -567,73 +586,65 @@ void main() {
     },
   );
 
-  testWidgets(
-    "adding a certification on someone else's profile only touches "
-    'certifications',
-    (tester) async {
-      final other = buildTestEmployee(
-        id: 'employee-2',
-        email: 'other.person@zeracreative.com',
-        fullName: 'Other Person',
-      );
-      final viewer = AuthUser(
-        id: 'hr-1',
-        email: 'hr.manager@zeracreative.com',
-        role: 'HR/Manager',
-        permissions: const ['employees.read', 'employees.manage'],
-      );
-      final repository = FakeEmployeeRepository(employees: [other]);
+  testWidgets("adding a certification on someone else's profile only touches "
+      'certifications', (tester) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'hr-1',
+      email: 'hr.manager@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: const ['employees.read', 'employees.manage'],
+    );
+    final repository = FakeEmployeeRepository(employees: [other]);
 
-      await tester.pumpWidget(
-        _app(
-          viewer: viewer,
-          employeeId: 'employee-2',
-          repository: repository,
+    await tester.pumpWidget(
+      _app(viewer: viewer, employeeId: 'employee-2', repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    final certificationsInput = find.descendant(
+      of: find.byType(TagInput).at(1),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(certificationsInput, 'PMP');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUpdateTagsId, 'employee-2');
+    expect(repository.lastUpdateTagsCertifications, ['PMP']);
+    expect(repository.lastUpdateTagsSkills, isNull);
+  });
+
+  testWidgets('shows your own assigned assets without edit controls', (
+    tester,
+  ) async {
+    final me = buildTestEmployee();
+    final viewer = AuthUser(
+      id: 'user-1',
+      email: 'jane.doe@zeracreative.com',
+      role: 'Employee',
+      permissions: const [],
+    );
+
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        repository: FakeEmployeeRepository(
+          me: me,
+          assets: [buildTestAsset(name: 'Dell Laptop')],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      final certificationsInput = find.descendant(
-        of: find.byType(TagInput).at(1),
-        matching: find.byType(TextField),
-      );
-      await tester.enterText(certificationsInput, 'PMP');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
-
-      expect(repository.lastUpdateTagsId, 'employee-2');
-      expect(repository.lastUpdateTagsCertifications, ['PMP']);
-      expect(repository.lastUpdateTagsSkills, isNull);
-    },
-  );
-
-  testWidgets(
-    'shows your own assigned assets without edit controls',
-    (tester) async {
-      final me = buildTestEmployee();
-      final viewer = AuthUser(
-        id: 'user-1',
-        email: 'jane.doe@zeracreative.com',
-        role: 'Employee',
-        permissions: const [],
-      );
-
-      await tester.pumpWidget(
-        _app(
-          viewer: viewer,
-          repository: FakeEmployeeRepository(
-            me: me,
-            assets: [buildTestAsset(name: 'Dell Laptop')],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Dell Laptop'), findsOneWidget);
-      expect(find.text('Add asset'), findsNothing);
-      expect(find.byTooltip('Delete'), findsNothing);
-    },
-  );
+    expect(find.text('Dell Laptop'), findsOneWidget);
+    expect(find.text('Add asset'), findsNothing);
+    expect(find.byTooltip('Delete'), findsNothing);
+  });
 
   testWidgets(
     "hides Assets for someone else's profile when the viewer cannot manage "
@@ -668,78 +679,74 @@ void main() {
     },
   );
 
-  testWidgets(
-    'HR/Admin sees Add asset and Delete on someone else\'s profile',
-    (tester) async {
-      final other = buildTestEmployee(
-        id: 'employee-2',
-        email: 'other.person@zeracreative.com',
-        fullName: 'Other Person',
-      );
-      final viewer = AuthUser(
-        id: 'hr-1',
-        email: 'hr.manager@zeracreative.com',
-        role: 'HR/Manager',
-        permissions: const ['employees.read', 'employees.manage'],
-      );
+  testWidgets('HR/Admin sees Add asset and Delete on someone else\'s profile', (
+    tester,
+  ) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'hr-1',
+      email: 'hr.manager@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: const ['employees.read', 'employees.manage'],
+    );
 
-      await tester.pumpWidget(
-        _app(
-          viewer: viewer,
-          employeeId: 'employee-2',
-          repository: FakeEmployeeRepository(
-            employees: [other],
-            assets: [buildTestAsset(name: 'Dell Laptop')],
-          ),
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        employeeId: 'employee-2',
+        repository: FakeEmployeeRepository(
+          employees: [other],
+          assets: [buildTestAsset(name: 'Dell Laptop')],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Dell Laptop'), findsOneWidget);
-      expect(find.text('Add asset'), findsOneWidget);
-      expect(find.byTooltip('Delete'), findsOneWidget);
-    },
-  );
+    expect(find.text('Dell Laptop'), findsOneWidget);
+    expect(find.text('Add asset'), findsOneWidget);
+    expect(find.byTooltip('Delete'), findsOneWidget);
+  });
 
-  testWidgets(
-    'adding a new asset calls createAndAssignAsset',
-    (tester) async {
-      final other = buildTestEmployee(
-        id: 'employee-2',
-        email: 'other.person@zeracreative.com',
-        fullName: 'Other Person',
-      );
-      final viewer = AuthUser(
-        id: 'hr-1',
-        email: 'hr.manager@zeracreative.com',
-        role: 'HR/Manager',
-        permissions: const ['employees.read', 'employees.manage'],
-      );
-      final repository = FakeEmployeeRepository(employees: [other]);
+  testWidgets('adding a new asset calls createAndAssignAsset', (tester) async {
+    final other = buildTestEmployee(
+      id: 'employee-2',
+      email: 'other.person@zeracreative.com',
+      fullName: 'Other Person',
+    );
+    final viewer = AuthUser(
+      id: 'hr-1',
+      email: 'hr.manager@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: const ['employees.read', 'employees.manage'],
+    );
+    final repository = FakeEmployeeRepository(employees: [other]);
 
-      await _useTallSurface(tester);
-      await tester.pumpWidget(
-        _app(viewer: viewer, employeeId: 'employee-2', repository: repository),
-      );
-      await tester.pumpAndSettle();
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(viewer: viewer, employeeId: 'employee-2', repository: repository),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Add asset'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Add asset'));
+    await tester.pumpAndSettle();
 
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Name'),
-        'MacBook Pro',
-      );
-      await tester.tap(find.widgetWithText(FilledButton, 'Add'));
-      await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Name'),
+      'MacBook Pro',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+    await tester.pumpAndSettle();
 
-      expect(
-        repository.lastCreateAndAssignAssetInput,
-        (employeeId: 'employee-2', name: 'MacBook Pro'),
-      );
-      expect(find.byType(AlertDialog), findsNothing);
-    },
-  );
+    expect(repository.lastCreateAndAssignAssetInput, (
+      employeeId: 'employee-2',
+      name: 'MacBook Pro',
+    ));
+    expect(find.byType(AlertDialog), findsNothing);
+  });
 
   testWidgets(
     'deleting an asset asks for confirmation, then calls deleteAsset',
@@ -856,7 +863,10 @@ void main() {
 
       expect(find.text('Onboarding Checklist (1/2)'), findsOneWidget);
       expect(find.text('Acceptance of offer letter via email'), findsOneWidget);
-      expect(find.text('Bring CNIC copy at the time of joining'), findsOneWidget);
+      expect(
+        find.text('Bring CNIC copy at the time of joining'),
+        findsOneWidget,
+      );
     },
   );
 
@@ -896,15 +906,12 @@ void main() {
     await tester.tap(find.byType(Checkbox));
     await tester.pumpAndSettle();
 
-    expect(
-      checklistRepository.lastSetChecklistItemCompletedInput,
-      (
-        employeeId: 'employee-2',
-        itemId: 'item-1',
-        isCompleted: true,
-        note: null,
-      ),
-    );
+    expect(checklistRepository.lastSetChecklistItemCompletedInput, (
+      employeeId: 'employee-2',
+      itemId: 'item-1',
+      isCompleted: true,
+      note: null,
+    ));
   });
 
   testWidgets(
@@ -940,32 +947,31 @@ void main() {
     },
   );
 
-  testWidgets(
-    'hides the Offboarding block for a still-active employee',
-    (tester) async {
-      final me = buildTestEmployee();
-      final viewer = AuthUser(
-        id: 'user-1',
-        email: 'jane.doe@zeracreative.com',
-        role: 'Employee',
-        permissions: const [],
-      );
+  testWidgets('hides the Offboarding block for a still-active employee', (
+    tester,
+  ) async {
+    final me = buildTestEmployee();
+    final viewer = AuthUser(
+      id: 'user-1',
+      email: 'jane.doe@zeracreative.com',
+      role: 'Employee',
+      permissions: const [],
+    );
 
-      await _useTallSurface(tester);
-      await tester.pumpWidget(
-        _app(
-          viewer: viewer,
-          repository: FakeEmployeeRepository(me: me),
-          checklistRepository: FakeChecklistRepository(
-            myChecklist: [buildTestEmployeeChecklistItem()],
-          ),
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        repository: FakeEmployeeRepository(me: me),
+        checklistRepository: FakeChecklistRepository(
+          myChecklist: [buildTestEmployeeChecklistItem()],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.textContaining('Offboarding'), findsNothing);
-    },
-  );
+    expect(find.textContaining('Offboarding'), findsNothing);
+  });
 
   testWidgets(
     'shows the performance review history for a performance.manage holder',
@@ -1061,4 +1067,122 @@ void main() {
       expect(find.text('Year 2 Review'), findsOneWidget);
     },
   );
+
+  testWidgets('shows Leave Balances, Tasks, and Goals on your own profile', (
+    tester,
+  ) async {
+    final me = buildTestEmployee();
+    final viewer = AuthUser(
+      id: 'user-1',
+      email: 'jane.doe@zeracreative.com',
+      role: 'Employee',
+      permissions: const [],
+    );
+
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        repository: FakeEmployeeRepository(me: me),
+        leaveRepository: FakeLeaveRepository(
+          myBalances: [buildTestLeaveBalance()],
+        ),
+        taskRepository: FakeTaskRepository(
+          myTasks: [buildTestTask(id: 'task-1')],
+          tasksAssignedByMe: [buildTestTask(id: 'task-2')],
+        ),
+        goalRepository: FakeGoalRepository(
+          mine: [buildTestGoal(title: 'Improve public speaking')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Leave Balances'), findsOneWidget);
+    expect(find.text('Tasks'), findsOneWidget);
+    expect(find.text('Goals'), findsOneWidget);
+    expect(find.text('Improve public speaking'), findsOneWidget);
+  });
+
+  testWidgets(
+    "shows another employee's Leave/Tasks/Goals only to a viewer holding "
+    "each section's own permission",
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.read', 'leave.manage', 'goals.manage'],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+          leaveRepository: FakeLeaveRepository(
+            myBalances: [buildTestLeaveBalance()],
+          ),
+          goalRepository: FakeGoalRepository(
+            all: [
+              buildTestGoal(employeeId: 'employee-2', title: 'Ship the API'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Leave Balances'), findsOneWidget);
+      expect(find.text('Goals'), findsOneWidget);
+      expect(find.text('Ship the API'), findsOneWidget);
+      // No tasks.manage held, so the Tasks section shouldn't render at all.
+      expect(find.text('Tasks'), findsNothing);
+    },
+  );
+
+  testWidgets('paginates Change History at 10 rows per page', (tester) async {
+    final me = buildTestEmployee();
+    final viewer = AuthUser(
+      id: 'user-1',
+      email: 'jane.doe@zeracreative.com',
+      role: 'Employee',
+      permissions: const [],
+    );
+    final entries = [
+      for (var i = 1; i <= 11; i++)
+        AuditLogEntry(
+          id: 'entry-$i',
+          fieldLabel: 'Designation',
+          oldValue: 'Old $i',
+          newValue: 'New $i',
+          actorName: 'HR Manager',
+          createdAt: DateTime(2026, 1, i),
+        ),
+    ];
+
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        repository: FakeEmployeeRepository(me: me, auditLog: entries),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Old 1 → New 1'), findsOneWidget);
+    expect(find.textContaining('Old 11 → New 11'), findsNothing);
+
+    await tester.ensureVisible(find.text('2'));
+    await tester.tap(find.text('2'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Old 1 → New 1'), findsNothing);
+    expect(find.textContaining('Old 11 → New 11'), findsOneWidget);
+  });
 }

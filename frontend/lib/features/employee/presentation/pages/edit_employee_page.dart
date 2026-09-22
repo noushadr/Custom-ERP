@@ -182,8 +182,40 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     if (picked != null) onPicked(picked);
   }
 
+  /// Switching to Resigned immediately prompts for the resignation date —
+  /// the same "Date of leaving" field every other status already has, just
+  /// asked for right away instead of leaving it for the admin/HR to
+  /// remember to fill in separately. Cancelling the picker still applies
+  /// the status change; `_submit` refuses to save a Resigned employee with
+  /// no date on file at all, so it can't silently go unset.
+  Future<void> _onEmploymentStatusChanged(String value) async {
+    setState(() => _employmentStatus = value);
+    if (value != 'resigned') return;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateOfLeaving ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2100),
+      helpText: 'Resignation date',
+    );
+    if (picked != null && mounted) {
+      setState(() => _dateOfLeaving = picked);
+    }
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    if (_employmentStatus == 'resigned' && _dateOfLeaving == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Set a resignation date before saving a Resigned employee.',
+          ),
+        ),
+      );
+      return;
+    }
 
     ref
         .read(editEmployeeControllerProvider.notifier)
@@ -214,14 +246,11 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
             phoneNumber: _phoneController.text.trim().isEmpty
                 ? null
                 : _phoneController.text.trim(),
-            dateOfBirth: _dateOfBirth == null
-                ? null
-                : _isoDate(_dateOfBirth!),
+            dateOfBirth: _dateOfBirth == null ? null : _isoDate(_dateOfBirth!),
             emergencyContactName: _emergencyNameController.text.trim().isEmpty
                 ? null
                 : _emergencyNameController.text.trim(),
-            emergencyContactPhone:
-                _emergencyPhoneController.text.trim().isEmpty
+            emergencyContactPhone: _emergencyPhoneController.text.trim().isEmpty
                 ? null
                 : _emergencyPhoneController.text.trim(),
             emergencyContactRelation:
@@ -381,23 +410,24 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                           loading: () => const LinearProgressIndicator(),
                           error: (_, _) =>
                               const Text('Could not load departments.'),
-                          data: (departments) => DropdownButtonFormField<String>(
-                            initialValue: _departmentId,
-                            decoration: const InputDecoration(
-                              labelText: 'Department',
-                            ),
-                            items: [
-                              for (final d in departments)
-                                DropdownMenuItem(
-                                  value: d.id,
-                                  child: Text(d.name),
+                          data: (departments) =>
+                              DropdownButtonFormField<String>(
+                                initialValue: _departmentId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Department',
                                 ),
-                            ],
-                            onChanged: isSubmitting
-                                ? null
-                                : (value) =>
-                                    setState(() => _departmentId = value),
-                          ),
+                                items: [
+                                  for (final d in departments)
+                                    DropdownMenuItem(
+                                      value: d.id,
+                                      child: Text(d.name),
+                                    ),
+                                ],
+                                onChanged: isSubmitting
+                                    ? null
+                                    : (value) =>
+                                          setState(() => _departmentId = value),
+                              ),
                         ),
                         const SizedBox(height: 16),
                         employeesAsync.when(
@@ -409,7 +439,9 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                                 .where((e) => e.id != widget.employee.id)
                                 .toList();
                             final validValue =
-                                candidates.any((e) => e.id == _reportingManagerId)
+                                candidates.any(
+                                  (e) => e.id == _reportingManagerId,
+                                )
                                 ? _reportingManagerId
                                 : null;
                             return DropdownButtonFormField<String?>(
@@ -452,7 +484,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                           onChanged: isSubmitting
                               ? null
                               : (value) =>
-                                  setState(() => _employmentType = value!),
+                                    setState(() => _employmentType = value!),
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
@@ -469,8 +501,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                           ],
                           onChanged: isSubmitting
                               ? null
-                              : (value) =>
-                                  setState(() => _employmentStatus = value!),
+                              : (value) => _onEmploymentStatusChanged(value!),
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
@@ -516,13 +547,14 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                                     ? null
                                     : () => _pickDate(
                                         initial: _dateOfLeaving,
-                                        onPicked: (d) => setState(
-                                          () => _dateOfLeaving = d,
-                                        ),
+                                        onPicked: (d) =>
+                                            setState(() => _dateOfLeaving = d),
                                       ),
                                 child: InputDecorator(
-                                  decoration: const InputDecoration(
-                                    labelText: 'Date of leaving',
+                                  decoration: InputDecoration(
+                                    labelText: _employmentStatus == 'resigned'
+                                        ? 'Resignation date'
+                                        : 'Date of leaving',
                                   ),
                                   child: Text(
                                     _dateOfLeaving == null
@@ -541,7 +573,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                                 onPressed: isSubmitting
                                     ? null
                                     : () =>
-                                        setState(() => _dateOfLeaving = null),
+                                          setState(() => _dateOfLeaving = null),
                               ),
                           ],
                         ),
@@ -698,9 +730,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                         TextFormField(
                           controller: _ibanController,
                           enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'IBAN',
-                          ),
+                          decoration: const InputDecoration(labelText: 'IBAN'),
                         ),
                       ],
                     ),
@@ -714,17 +744,13 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
                         TextFormField(
                           controller: _emergencyNameController,
                           enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Name',
-                          ),
+                          decoration: const InputDecoration(labelText: 'Name'),
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _emergencyPhoneController,
                           enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone',
-                          ),
+                          decoration: const InputDecoration(labelText: 'Phone'),
                           keyboardType: TextInputType.phone,
                         ),
                         const SizedBox(height: 16),

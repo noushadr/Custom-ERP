@@ -1,6 +1,7 @@
 class AddEmployeeInput {
   const AddEmployeeInput({
     required this.companyEmail,
+    required this.password,
     required this.firstName,
     required this.lastName,
     this.designation,
@@ -11,6 +12,10 @@ class AddEmployeeInput {
   });
 
   final String companyEmail;
+
+  /// Set directly by the HR/Admin adding this employee — there is no
+  /// self-signup, so nobody else ever picks this account's initial password.
+  final String password;
   final String firstName;
   final String lastName;
   final String? designation;
@@ -24,6 +29,7 @@ class AddEmployeeInput {
 
   Map<String, dynamic> toJson() => {
     'companyEmail': companyEmail,
+    'password': password,
     'firstName': firstName,
     'lastName': lastName,
     if (designation != null) 'designation': designation,

@@ -7,6 +7,7 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/clients/presentation/pages/project_editor_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/employee/domain/entities/department.dart';
 import 'package:zera_erp/shared/models/named_ref.dart';
 
 import '../../helpers/fake_auth.dart';
@@ -32,6 +33,10 @@ Widget _app({FakeClientsRepository? repository}) {
             buildTestEmployee(
               department: const NamedRef(id: 'dept-1', name: 'Engineering'),
             ),
+          ],
+          departments: const [
+            Department(id: 'dept-1', name: 'Engineering'),
+            Department(id: 'dept-2', name: 'Marketing'),
           ],
         ),
       ),
@@ -71,8 +76,6 @@ void main() {
 
     expect(employeeChip, findsOneWidget);
     expect(serviceChip, findsOneWidget);
-    // No department chip to pick — it's derived from assigned employees.
-    expect(find.widgetWithText(FilterChip, 'Engineering'), findsNothing);
 
     FilterChip chipWidget(Finder finder) => tester.widget<FilterChip>(finder);
     expect(chipWidget(employeeChip).selected, isFalse);
@@ -81,40 +84,42 @@ void main() {
     await tester.tap(employeeChip);
     await tester.pumpAndSettle();
 
-    expect(chipWidget(find.widgetWithText(FilterChip, 'Jane Doe')).selected, isTrue);
+    expect(
+      chipWidget(find.widgetWithText(FilterChip, 'Jane Doe')).selected,
+      isTrue,
+    );
   });
 
   testWidgets(
-    'shows "Departments" as read-only, derived from whichever employees '
-    'are assigned',
+    'lets the admin pick departments directly, showing a Hybrid badge once '
+    'more than one is selected',
     (tester) async {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Follows whichever employees are assigned above.'),
-        findsOneWidget,
-      );
-      expect(find.text('Engineering'), findsNothing);
+      expect(find.text('Hybrid'), findsNothing);
 
-      final employeeChip = find.widgetWithText(FilterChip, 'Jane Doe');
-      await tester.ensureVisible(employeeChip);
-      await tester.tap(employeeChip);
+      final engineeringChip = find.widgetWithText(FilterChip, 'Engineering');
+      final marketingChip = find.widgetWithText(FilterChip, 'Marketing');
+      expect(engineeringChip, findsOneWidget);
+      expect(marketingChip, findsOneWidget);
+
+      await tester.ensureVisible(engineeringChip);
+      await tester.tap(engineeringChip);
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Follows whichever employees are assigned above.'),
-        findsNothing,
-      );
-      expect(find.text('Engineering'), findsOneWidget);
+      expect(find.text('Hybrid'), findsNothing);
 
-      await tester.tap(employeeChip);
+      await tester.ensureVisible(marketingChip);
+      await tester.tap(marketingChip);
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Follows whichever employees are assigned above.'),
-        findsOneWidget,
-      );
+      expect(find.text('Hybrid'), findsOneWidget);
+
+      await tester.tap(marketingChip);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hybrid'), findsNothing);
     },
   );
 
@@ -136,9 +141,7 @@ void main() {
             FakeClientsRepository(clients: [buildTestClient()]),
           ),
         ],
-        child: MaterialApp(
-          home: ProjectEditorPage(existingProject: existing),
-        ),
+        child: MaterialApp(home: ProjectEditorPage(existingProject: existing)),
       ),
     );
     await tester.pumpAndSettle();

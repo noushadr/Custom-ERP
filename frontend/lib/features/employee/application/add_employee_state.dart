@@ -13,10 +13,9 @@ class AddEmployeeSubmitting extends AddEmployeeState {
 }
 
 class AddEmployeeSuccess extends AddEmployeeState {
-  const AddEmployeeSuccess(this.employee, this.temporaryPassword);
+  const AddEmployeeSuccess(this.employee);
 
   final Employee employee;
-  final String temporaryPassword;
 }
 
 class AddEmployeeError extends AddEmployeeState {

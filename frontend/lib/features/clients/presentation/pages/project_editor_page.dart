@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/hybrid_badge.dart';
 import '../../../employee/application/employee_providers.dart';
+import '../../../employee/domain/entities/department.dart';
 import '../../../employee/domain/entities/employee.dart';
-import '../../../../shared/models/named_ref.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/client.dart';
 import '../../domain/entities/project.dart';
@@ -17,27 +19,12 @@ String _isoDate(DateTime date) =>
     '${date.month.toString().padLeft(2, '0')}-'
     '${date.day.toString().padLeft(2, '0')}';
 
-/// The distinct departments the given employees belong to — a project's
-/// departments ("Teams") are derived from whoever is assigned rather than
-/// picked separately, since an employee is already assigned to a
-/// department and picking both was redundant.
-Set<NamedRef> _departmentsFor(
-  List<Employee> employees,
-  Set<String> employeeIds,
-) {
-  final byId = <String, NamedRef>{};
-  for (final employee in employees) {
-    final department = employee.department;
-    if (employeeIds.contains(employee.id) && department != null) {
-      byId[department.id] = department;
-    }
-  }
-  return byId.values.toSet();
-}
-
 /// Create or edit a project: client, type/status, start/renewal dates,
-/// package, and employee/service assignment (departments follow
-/// automatically from whichever employees are assigned).
+/// package, and employee/department/service assignment. Departments are
+/// picked directly rather than derived from the assigned employees — a
+/// project regularly involves people from a department who aren't
+/// individually assigned to it yet, or spans several teams working
+/// together (a "Hybrid" project, shown once more than one is picked).
 class ProjectEditorPage extends ConsumerStatefulWidget {
   const ProjectEditorPage({super.key, this.existingProject});
 
@@ -60,6 +47,7 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   DateTime? _startDate;
   DateTime? _renewalDate;
   late Set<String> _selectedEmployeeIds;
+  late Set<String> _selectedDepartmentIds;
   late Set<String> _selectedServiceIds;
 
   bool _submitting = false;
@@ -85,6 +73,9 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
         : null;
     _selectedEmployeeIds = {
       ...(existing?.assignedEmployees.map((e) => e.id) ?? const []),
+    };
+    _selectedDepartmentIds = {
+      ...(existing?.targetDepartments.map((d) => d.id) ?? const []),
     };
     _selectedServiceIds = {
       ...(existing?.services.map((s) => s.id) ?? const []),
@@ -129,11 +120,7 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
       _errorMessage = null;
     });
 
-    final employees = ref.read(employeeListProvider).value ?? const [];
-    final departmentIds = _departmentsFor(
-      employees,
-      _selectedEmployeeIds,
-    ).map((d) => d.id).toList();
+    final departmentIds = _selectedDepartmentIds.toList();
 
     final repository = ref.read(clientsRepositoryProvider);
     try {
@@ -145,7 +132,9 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               type: _type,
               status: _status,
               startDate: _isoDate(_startDate!),
-              renewalDate: _renewalDate != null ? _isoDate(_renewalDate!) : null,
+              renewalDate: _renewalDate != null
+                  ? _isoDate(_renewalDate!)
+                  : null,
               notes: _notesController.text.trim(),
               packageName: _packageNameController.text.trim(),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
@@ -158,7 +147,9 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               type: _type,
               status: _status,
               startDate: _isoDate(_startDate!),
-              renewalDate: _renewalDate != null ? _isoDate(_renewalDate!) : null,
+              renewalDate: _renewalDate != null
+                  ? _isoDate(_renewalDate!)
+                  : null,
               notes: _notesController.text.trim().isEmpty
                   ? null
                   : _notesController.text.trim(),
@@ -190,6 +181,7 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   Widget build(BuildContext context) {
     final clientsAsync = ref.watch(clientsListProvider(false));
     final employeesAsync = ref.watch(employeeListProvider);
+    final departmentsAsync = ref.watch(departmentsProvider);
     final servicesAsync = ref.watch(servicesListProvider(false));
 
     return Scaffold(
@@ -229,8 +221,7 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                         onChanged: _submitting
                             ? null
                             : (value) => setState(() => _clientId = value),
-                        validator: (value) =>
-                            value == null ? 'Required' : null,
+                        validator: (value) => value == null ? 'Required' : null,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -348,33 +339,44 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Text(
+                          'Departments',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        if (_selectedDepartmentIds.length > 1) ...[
+                          const SizedBox(width: 8),
+                          const HybridBadge(),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Text(
-                      'Departments',
-                      style: Theme.of(context).textTheme.titleSmall,
+                      'Pick more than one when several teams are working on '
+                      'this project together.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    employeesAsync.when(
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, _) => const SizedBox.shrink(),
-                      data: (employees) {
-                        final departments = _departmentsFor(
-                          employees,
-                          _selectedEmployeeIds,
-                        );
-                        final names = departments.map((d) => d.name).toList()
-                          ..sort();
-                        return Text(
-                          names.isEmpty
-                              ? 'Follows whichever employees are assigned above.'
-                              : names.join(', '),
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: names.isEmpty
-                                    ? Theme.of(context).disabledColor
-                                    : null,
-                              ),
-                        );
-                      },
+                    departmentsAsync.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, _) =>
+                          const Text('Could not load departments.'),
+                      data: (departments) => _ChipMultiSelect<Department>(
+                        items: departments,
+                        idOf: (d) => d.id,
+                        labelOf: (d) => d.name,
+                        selectedIds: _selectedDepartmentIds,
+                        onToggled: (id, selected) => setState(() {
+                          if (selected) {
+                            _selectedDepartmentIds.add(id);
+                          } else {
+                            _selectedDepartmentIds.remove(id);
+                          }
+                        }),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Text(

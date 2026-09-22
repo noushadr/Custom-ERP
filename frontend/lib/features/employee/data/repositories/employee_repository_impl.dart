@@ -25,8 +25,7 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   final EmployeeRemoteDataSource _remoteDataSource;
 
   @override
-  Future<List<Employee>> getAll() =>
-      _guard(() => _remoteDataSource.getAll());
+  Future<List<Employee>> getAll() => _guard(() => _remoteDataSource.getAll());
 
   @override
   Future<Employee> getById(String id) =>
@@ -93,9 +92,8 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(() => _remoteDataSource.uploadPhoto(id, bytes, fileName));
 
   @override
-  Future<({Employee employee, String temporaryPassword})> addEmployee(
-    AddEmployeeInput input,
-  ) => _guard(() => _remoteDataSource.addEmployee(input));
+  Future<Employee> addEmployee(AddEmployeeInput input) =>
+      _guard(() => _remoteDataSource.addEmployee(input));
 
   @override
   Future<List<Department>> getDepartments({bool includeArchived = false}) =>

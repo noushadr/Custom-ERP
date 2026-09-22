@@ -8,6 +8,7 @@ import '../../../authentication/application/auth_state.dart';
 import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/entities/notice.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
+import '../../../../shared/widgets/simple_pager.dart';
 
 const _pageSize = 3;
 
@@ -112,9 +113,9 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
           if (notices.isEmpty) {
             return Text(
               'No company notices yet.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
 
@@ -138,7 +139,9 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
                 _NoticeCard(
                   notice: pageNotices[i],
                   isLatest: start + i == 0,
-                  onEdit: canDelete ? () => _openEditDialog(pageNotices[i]) : null,
+                  onEdit: canDelete
+                      ? () => _openEditDialog(pageNotices[i])
+                      : null,
                   onDelete: canDelete
                       ? () => _confirmDelete(pageNotices[i])
                       : null,
@@ -148,7 +151,7 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
               ],
               if (totalPages > 1) ...[
                 const SizedBox(height: 12),
-                _NoticesPager(
+                SimplePager(
                   page: page,
                   totalPages: totalPages,
                   onSelect: (selected) => setState(() => _page = selected),
@@ -157,83 +160,6 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _NoticesPager extends StatelessWidget {
-  const _NoticesPager({
-    required this.page,
-    required this.totalPages,
-    required this.onSelect,
-  });
-
-  /// Zero-based current page.
-  final int page;
-  final int totalPages;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left, size: 20),
-          tooltip: 'Previous page',
-          onPressed: page > 0 ? () => onSelect(page - 1) : null,
-        ),
-        for (var p = 0; p < totalPages; p++)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: _PageNumberButton(
-              pageNumber: p + 1,
-              isSelected: p == page,
-              onTap: () => onSelect(p),
-            ),
-          ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right, size: 20),
-          tooltip: 'Next page',
-          onPressed: page < totalPages - 1 ? () => onSelect(page + 1) : null,
-        ),
-      ],
-    );
-  }
-}
-
-class _PageNumberButton extends StatelessWidget {
-  const _PageNumberButton({
-    required this.pageNumber,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final int pageNumber;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: isSelected ? null : onTap,
-      child: Container(
-        width: 28,
-        height: 28,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          '$pageNumber',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: isSelected ? Colors.white : AppColors.textSecondary,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
       ),
     );
   }
@@ -286,12 +212,15 @@ class _NoticeCard extends StatelessWidget {
               children: [
                 Text(
                   notice.title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
-                Text(notice.body, style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  notice.body,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'Posted by ${notice.authorName} · ${formatDisplayDateTime(notice.createdAt)}',
@@ -344,7 +273,9 @@ class _EditNoticeDialog extends ConsumerStatefulWidget {
 
 class _EditNoticeDialogState extends ConsumerState<_EditNoticeDialog> {
   final _formKey = GlobalKey<FormState>();
-  late final _titleController = TextEditingController(text: widget.notice.title);
+  late final _titleController = TextEditingController(
+    text: widget.notice.title,
+  );
   late final _bodyController = TextEditingController(text: widget.notice.body);
   bool _submitting = false;
   String? _errorMessage;

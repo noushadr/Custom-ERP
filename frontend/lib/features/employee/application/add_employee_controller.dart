@@ -13,8 +13,8 @@ class AddEmployeeController extends StateNotifier<AddEmployeeState> {
   Future<void> submit(AddEmployeeInput input) async {
     state = const AddEmployeeSubmitting();
     try {
-      final result = await _repository.addEmployee(input);
-      state = AddEmployeeSuccess(result.employee, result.temporaryPassword);
+      final employee = await _repository.addEmployee(input);
+      state = AddEmployeeSuccess(employee);
     } on EmployeeException catch (error) {
       state = AddEmployeeError(error.message);
     }

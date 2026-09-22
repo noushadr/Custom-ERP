@@ -57,7 +57,8 @@ class EmployeeRemoteDataSource {
     return BirthdaySpotlightModel.fromJson(response.data!);
   }
 
-  Future<List<UpcomingWorkAnniversaryModel>> getUpcomingWorkAnniversaries() async {
+  Future<List<UpcomingWorkAnniversaryModel>>
+  getUpcomingWorkAnniversaries() async {
     final response = await _dio.get<List<dynamic>>(
       '/employees/anniversaries/upcoming',
     );
@@ -67,7 +68,8 @@ class EmployeeRemoteDataSource {
         .toList();
   }
 
-  Future<List<UpcomingWorkAnniversaryModel>> getWorkAnniversarySpotlight() async {
+  Future<List<UpcomingWorkAnniversaryModel>>
+  getWorkAnniversarySpotlight() async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/employees/anniversaries/spotlight',
     );
@@ -159,18 +161,12 @@ class EmployeeRemoteDataSource {
     return EmployeeModel.fromJson(response.data!);
   }
 
-  Future<({EmployeeModel employee, String temporaryPassword})> addEmployee(
-    AddEmployeeInput input,
-  ) async {
+  Future<EmployeeModel> addEmployee(AddEmployeeInput input) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/employees',
       data: input.toJson(),
     );
-    final data = response.data!;
-    return (
-      employee: EmployeeModel.fromJson(data['employee'] as Map<String, dynamic>),
-      temporaryPassword: data['temporaryPassword'] as String,
-    );
+    return EmployeeModel.fromJson(response.data!);
   }
 
   Future<List<DepartmentModel>> getDepartments({
@@ -316,11 +312,7 @@ class EmployeeRemoteDataSource {
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/employees/audit-log',
-      queryParameters: {
-        'page': page,
-        'limit': limit,
-        'search': ?search,
-      },
+      queryParameters: {'page': page, 'limit': limit, 'search': ?search},
     );
     return PaginatedAuditLogModel.fromJson(response.data!);
   }
@@ -425,10 +417,7 @@ class EmployeeRemoteDataSource {
     await _dio.delete('/employees/me/education-history/$recordId');
   }
 
-  Future<void> deleteEducationRecord(
-    String employeeId,
-    String recordId,
-  ) async {
+  Future<void> deleteEducationRecord(String employeeId, String recordId) async {
     await _dio.delete('/employees/$employeeId/education-history/$recordId');
   }
 

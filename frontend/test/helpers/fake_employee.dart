@@ -169,7 +169,7 @@ class FakeEmployeeRepository implements EmployeeRepository {
   final PayrollSummary? payrollSummary;
   final Object? getPayrollSummaryError;
   final List<Department> departments;
-  final ({Employee employee, String temporaryPassword})? addEmployeeResult;
+  final Employee? addEmployeeResult;
   final Object? addEmployeeError;
   final Employee? updateMeResult;
   final Object? updateMeError;
@@ -339,9 +339,7 @@ class FakeEmployeeRepository implements EmployeeRepository {
   }
 
   @override
-  Future<({Employee employee, String temporaryPassword})> addEmployee(
-    AddEmployeeInput input,
-  ) async {
+  Future<Employee> addEmployee(AddEmployeeInput input) async {
     if (addEmployeeError != null) throw addEmployeeError!;
     return addEmployeeResult!;
   }
@@ -448,8 +446,7 @@ class FakeEmployeeRepository implements EmployeeRepository {
   Future<List<AuditLogEntry>> getMyAuditLog() async => auditLog;
 
   @override
-  Future<List<AuditLogEntry>> getAuditLog(String employeeId) async =>
-      auditLog;
+  Future<List<AuditLogEntry>> getAuditLog(String employeeId) async => auditLog;
 
   @override
   Future<PaginatedAuditLog> getCompanyAuditLog({
@@ -460,7 +457,8 @@ class FakeEmployeeRepository implements EmployeeRepository {
     var filtered = auditLog;
     if (search != null && search.isNotEmpty) {
       final lower = search.toLowerCase();
-      bool matches(String? value) => value?.toLowerCase().contains(lower) ?? false;
+      bool matches(String? value) =>
+          value?.toLowerCase().contains(lower) ?? false;
       filtered = filtered
           .where(
             (e) =>
@@ -573,7 +571,11 @@ class FakeEmployeeRepository implements EmployeeRepository {
   }) async {
     lastCreateAndAssignAssetInput = (employeeId: employeeId, name: name);
     if (createAndAssignAssetError != null) throw createAndAssignAssetError!;
-    return buildTestAsset(name: name, value: value, assignedEmployeeId: employeeId);
+    return buildTestAsset(
+      name: name,
+      value: value,
+      assignedEmployeeId: employeeId,
+    );
   }
 
   @override

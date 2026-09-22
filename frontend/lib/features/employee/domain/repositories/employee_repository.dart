@@ -73,10 +73,9 @@ abstract interface class EmployeeRepository {
   Future<Employee> uploadPhoto(String id, Uint8List bytes, String fileName);
 
   /// Adds an employee directly from the admin panel — no self-signup, no
-  /// email invite. Requires `employees.manage`.
-  Future<({Employee employee, String temporaryPassword})> addEmployee(
-    AddEmployeeInput input,
-  );
+  /// email invite; the admin sets the account's initial password directly
+  /// on the form. Requires `employees.manage`.
+  Future<Employee> addEmployee(AddEmployeeInput input);
 
   Future<List<Department>> getDepartments({bool includeArchived = false});
 
@@ -96,7 +95,10 @@ abstract interface class EmployeeRepository {
   });
 
   /// Requires `departments.manage`.
-  Future<Department> setDepartmentArchived(String id, {required bool isArchived});
+  Future<Department> setDepartmentArchived(
+    String id, {
+    required bool isArchived,
+  });
 
   /// Requires `departments.manage`. Fails if any employees are still
   /// assigned to this department — archive it instead.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/country_short_code.dart';
+import '../../../../shared/widgets/archived_toggle.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/permission_gate.dart';
 import '../../../../shared/widgets/top_breakdown_panel.dart';
@@ -241,17 +242,17 @@ class _NewButtons extends StatelessWidget {
     return Row(
       children: [
         OutlinedButton.icon(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ClientEditorPage()),
-          ),
+          onPressed: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ClientEditorPage())),
           icon: const Icon(Icons.add, size: 18),
           label: const Text('New Client'),
         ),
         const SizedBox(width: 8),
         ElevatedButton.icon(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ProjectEditorPage()),
-          ),
+          onPressed: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ProjectEditorPage())),
           icon: const Icon(Icons.add, size: 18),
           label: const Text('New Project'),
         ),
@@ -287,11 +288,18 @@ const _kClientColumns = [
   ('Lead Source', 1),
 ];
 
-class _ProjectsTab extends ConsumerWidget {
+class _ProjectsTab extends ConsumerStatefulWidget {
   const _ProjectsTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProjectsTab> createState() => _ProjectsTabState();
+}
+
+class _ProjectsTabState extends ConsumerState<_ProjectsTab> {
+  bool _showArchived = false;
+
+  @override
+  Widget build(BuildContext context) {
     final projectsAsync = ref.watch(
       projectsListProvider((status: null, clientId: null)),
     );
@@ -308,13 +316,46 @@ class _ProjectsTab extends ConsumerWidget {
         if (projects.isEmpty) {
           return const Center(child: Text('No projects yet.'));
         }
-        final sorted = [...projects]
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        return _DataTableShell(
-          header: const _TableHeader(columns: _kProjectColumns),
-          itemCount: sorted.length,
-          itemBuilder: (context, index) =>
-              _ProjectTableRow(project: sorted[index], isEven: index.isEven),
+
+        // Only Active projects show by default — On Hold/Completed/
+        // Cancelled all live behind the Archived toggle instead, same
+        // "hide inactive by default" convention as the Employees directory's
+        // own Archived toggle.
+        final scoped =
+            projects
+                .where(
+                  (p) => (p.status == ProjectStatus.active) != _showArchived,
+                )
+                .toList()
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ArchivedToggle(
+              showArchived: _showArchived,
+              onChanged: (value) => setState(() => _showArchived = value),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: scoped.isEmpty
+                  ? Center(
+                      child: Text(
+                        _showArchived
+                            ? 'No archived projects.'
+                            : 'No active projects.',
+                      ),
+                    )
+                  : _DataTableShell(
+                      header: const _TableHeader(columns: _kProjectColumns),
+                      itemCount: scoped.length,
+                      itemBuilder: (context, index) => _ProjectTableRow(
+                        project: scoped[index],
+                        isEven: index.isEven,
+                      ),
+                    ),
+            ),
+          ],
         );
       },
     );
@@ -368,11 +409,70 @@ class _ProjectTableRow extends StatelessWidget {
   }
 }
 
-class _ClientsTab extends ConsumerWidget {
+class _ClientsTab extends ConsumerStatefulWidget {
   const _ClientsTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ClientsTab> createState() => _ClientsTabState();
+}
+
+class _ClientsTabState extends ConsumerState<_ClientsTab> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  String? _countryFilter;
+  String? _industryFilter;
+  String? _leadSourceFilter;
+  String? _healthFilter;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool get _hasActiveFilters =>
+      _searchQuery.isNotEmpty ||
+      _countryFilter != null ||
+      _industryFilter != null ||
+      _leadSourceFilter != null ||
+      _healthFilter != null;
+
+  List<Client> _applyFilters(List<Client> clients) {
+    var filtered = clients;
+    if (_countryFilter != null) {
+      filtered = filtered
+          .where((c) => formatCountryFlag(c.country) == _countryFilter)
+          .toList();
+    }
+    if (_industryFilter != null) {
+      filtered = filtered.where((c) => c.industry == _industryFilter).toList();
+    }
+    if (_leadSourceFilter != null) {
+      filtered = filtered
+          .where((c) => c.leadSource == _leadSourceFilter)
+          .toList();
+    }
+    if (_healthFilter != null) {
+      filtered = filtered
+          .where((c) => c.healthStatus == _healthFilter)
+          .toList();
+    }
+    if (_searchQuery.isNotEmpty) {
+      final needle = _searchQuery.toLowerCase();
+      filtered = filtered
+          .where(
+            (c) =>
+                c.companyName.toLowerCase().contains(needle) ||
+                (c.primaryContactName ?? '').toLowerCase().contains(needle) ||
+                (c.primaryContactEmail ?? '').toLowerCase().contains(needle),
+          )
+          .toList();
+    }
+    return filtered;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final clientsAsync = ref.watch(clientsListProvider(false));
 
     return clientsAsync.when(
@@ -387,16 +487,249 @@ class _ClientsTab extends ConsumerWidget {
         if (clients.isEmpty) {
           return const Center(child: Text('No clients yet.'));
         }
-        return _DataTableShell(
-          header: const _TableHeader(
-            columns: _kClientColumns,
-            trailingLabel: 'Health',
-          ),
-          itemCount: clients.length,
-          itemBuilder: (context, index) =>
-              _ClientTableRow(client: clients[index], isEven: index.isEven),
+
+        final filtered = _applyFilters(clients);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ClientFilterRow(
+              clients: clients,
+              searchController: _searchController,
+              countryFilter: _countryFilter,
+              industryFilter: _industryFilter,
+              leadSourceFilter: _leadSourceFilter,
+              healthFilter: _healthFilter,
+              onSearchChanged: (value) =>
+                  setState(() => _searchQuery = value.trim()),
+              onCountryChanged: (value) =>
+                  setState(() => _countryFilter = value),
+              onIndustryChanged: (value) =>
+                  setState(() => _industryFilter = value),
+              onLeadSourceChanged: (value) =>
+                  setState(() => _leadSourceFilter = value),
+              onHealthChanged: (value) => setState(() => _healthFilter = value),
+              onClearAll: _hasActiveFilters
+                  ? () => setState(() {
+                      _searchController.clear();
+                      _searchQuery = '';
+                      _countryFilter = null;
+                      _industryFilter = null;
+                      _leadSourceFilter = null;
+                      _healthFilter = null;
+                    })
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(child: Text('No clients match your filters.'))
+                  : _DataTableShell(
+                      header: const _TableHeader(
+                        columns: _kClientColumns,
+                        trailingLabel: 'Health',
+                      ),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) => _ClientTableRow(
+                        client: filtered[index],
+                        isEven: index.isEven,
+                      ),
+                    ),
+            ),
+          ],
         );
       },
+    );
+  }
+}
+
+/// Search box + Country/Industry/Lead Source/Health dropdowns for the
+/// Clients tab — each dropdown's options are derived from whatever values
+/// are actually present in the loaded client list, so a filter never offers
+/// a choice that would return zero results. Country groups by its short
+/// display code (e.g. "Dubai" and "UAE" both group under "UAE"), matching
+/// how `_ClientsBreakdownRow`'s own Top Countries panel already groups them.
+class _ClientFilterRow extends StatelessWidget {
+  const _ClientFilterRow({
+    required this.clients,
+    required this.searchController,
+    required this.countryFilter,
+    required this.industryFilter,
+    required this.leadSourceFilter,
+    required this.healthFilter,
+    required this.onSearchChanged,
+    required this.onCountryChanged,
+    required this.onIndustryChanged,
+    required this.onLeadSourceChanged,
+    required this.onHealthChanged,
+    required this.onClearAll,
+  });
+
+  final List<Client> clients;
+  final TextEditingController searchController;
+  final String? countryFilter;
+  final String? industryFilter;
+  final String? leadSourceFilter;
+  final String? healthFilter;
+  final ValueChanged<String> onSearchChanged;
+  final ValueChanged<String?> onCountryChanged;
+  final ValueChanged<String?> onIndustryChanged;
+  final ValueChanged<String?> onLeadSourceChanged;
+  final ValueChanged<String?> onHealthChanged;
+  final VoidCallback? onClearAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final countries =
+        clients
+            .map((c) => formatCountryFlag(c.country))
+            .whereType<String>()
+            .toSet()
+            .toList()
+          ..sort();
+    final industries =
+        clients
+            .map((c) => c.industry)
+            .whereType<String>()
+            .where((s) => s.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    final leadSources =
+        clients
+            .map((c) => c.leadSource)
+            .whereType<String>()
+            .where((s) => s.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SizedBox(
+          width: 220,
+          child: TextField(
+            controller: searchController,
+            onChanged: onSearchChanged,
+            decoration: InputDecoration(
+              hintText: 'Search clients',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: searchController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () {
+                        searchController.clear();
+                        onSearchChanged('');
+                      },
+                    ),
+              isDense: true,
+            ),
+          ),
+        ),
+        _FilterDropdown(
+          hint: 'Country',
+          allLabel: 'All countries',
+          value: countryFilter,
+          options: countries,
+          onChanged: onCountryChanged,
+        ),
+        _FilterDropdown(
+          hint: 'Industry',
+          allLabel: 'All industries',
+          value: industryFilter,
+          options: industries,
+          onChanged: onIndustryChanged,
+        ),
+        _FilterDropdown(
+          hint: 'Lead Source',
+          allLabel: 'All lead sources',
+          value: leadSourceFilter,
+          options: leadSources,
+          onChanged: onLeadSourceChanged,
+        ),
+        _FilterDropdown(
+          hint: 'Health',
+          allLabel: 'All health statuses',
+          value: healthFilter,
+          options: const [
+            ClientHealthStatus.healthy,
+            ClientHealthStatus.attentionRequired,
+            ClientHealthStatus.atRisk,
+          ],
+          labelFor: formatClientHealthStatusLabel,
+          onChanged: onHealthChanged,
+        ),
+        if (onClearAll != null)
+          TextButton.icon(
+            onPressed: onClearAll,
+            icon: const Icon(Icons.close, size: 16),
+            label: const Text('Clear filters'),
+          ),
+      ],
+    );
+  }
+}
+
+class _FilterDropdown extends StatelessWidget {
+  const _FilterDropdown({
+    required this.hint,
+    required this.allLabel,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    this.labelFor,
+  });
+
+  final String hint;
+
+  /// The "no filter" option's label, e.g. "All countries" — spelled out
+  /// explicitly rather than derived from [hint] since a plain `'s'` suffix
+  /// doesn't hold up grammatically for every filter name ("All Countrys",
+  /// "All Industrys").
+  final String allLabel;
+  final String? value;
+  final List<String> options;
+  final ValueChanged<String?> onChanged;
+
+  /// Renders each option's display label, e.g. a healthStatus enum value
+  /// into its human-readable badge text. Defaults to the raw value.
+  final String Function(String value)? labelFor;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 180,
+      child: DropdownButtonFormField<String?>(
+        initialValue: value,
+        isExpanded: true,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: hint,
+          suffixIcon: value == null
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Clear',
+                  onPressed: () => onChanged(null),
+                ),
+        ),
+        items: [
+          DropdownMenuItem(value: null, child: Text(allLabel)),
+          for (final option in options)
+            DropdownMenuItem(
+              value: option,
+              child: Text(
+                labelFor?.call(option) ?? option,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+        onChanged: onChanged,
+      ),
     );
   }
 }
@@ -728,9 +1061,9 @@ class _HealthTab extends ConsumerWidget {
               if (atRisk.isEmpty) {
                 return Text(
                   'No clients need attention right now.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 );
               }
               return Column(

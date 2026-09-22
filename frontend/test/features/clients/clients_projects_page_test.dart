@@ -102,8 +102,14 @@ void main() {
     // (both test clients default to the same "Retail" industry), so a bare
     // `find.text` isn't unique anymore.
     final statTiles = find.byType(Wrap).first;
-    expect(find.descendant(of: statTiles, matching: find.text('2')), findsOneWidget);
-    expect(find.descendant(of: statTiles, matching: find.text('1')), findsNWidgets(4));
+    expect(
+      find.descendant(of: statTiles, matching: find.text('2')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: statTiles, matching: find.text('1')),
+      findsNWidgets(4),
+    );
   });
 
   testWidgets(
@@ -289,47 +295,99 @@ void main() {
     },
   );
 
-  testWidgets('shows the Projects tab by default with New Project/New Client buttons', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _app(
-        repository: FakeClientsRepository(
-          projects: [buildTestProject(name: 'Website Revamp')],
+  testWidgets(
+    'shows the Projects tab by default with New Project/New Client buttons',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            projects: [buildTestProject(name: 'Website Revamp')],
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Website Revamp'), findsOneWidget);
-    expect(find.text('New Project'), findsOneWidget);
-    expect(find.text('New Client'), findsOneWidget);
-  });
+      expect(find.text('Website Revamp'), findsOneWidget);
+      expect(find.text('New Project'), findsOneWidget);
+      expect(find.text('New Client'), findsOneWidget);
+    },
+  );
 
-  testWidgets('switching to the Clients tab shows clients instead of projects', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _app(
-        repository: FakeClientsRepository(
-          projects: [
-            buildTestProject(name: 'Website Revamp', clientName: 'Acme Co'),
-          ],
-          clients: [buildTestClient(companyName: 'Beta LLC')],
+  testWidgets(
+    'the Projects tab shows only active projects by default, and reveals '
+    'only the rest via the Archived toggle',
+    (tester) async {
+      await _useWideSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            projects: [
+              buildTestProject(
+                id: 'p1',
+                name: 'Active Project',
+                status: ProjectStatus.active,
+              ),
+              buildTestProject(
+                id: 'p2',
+                name: 'On Hold Project',
+                status: ProjectStatus.onHold,
+              ),
+              buildTestProject(
+                id: 'p3',
+                name: 'Completed Project',
+                status: ProjectStatus.completed,
+              ),
+              buildTestProject(
+                id: 'p4',
+                name: 'Cancelled Project',
+                status: ProjectStatus.cancelled,
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Website Revamp'), findsOneWidget);
-    expect(find.text('Beta LLC'), findsNothing);
+      expect(find.text('Active Project'), findsOneWidget);
+      expect(find.text('On Hold Project'), findsNothing);
+      expect(find.text('Completed Project'), findsNothing);
+      expect(find.text('Cancelled Project'), findsNothing);
 
-    await tester.tap(find.text('Clients'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Archived'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Beta LLC'), findsOneWidget);
-    expect(find.text('Website Revamp'), findsNothing);
-  });
+      expect(find.text('Active Project'), findsNothing);
+      expect(find.text('On Hold Project'), findsOneWidget);
+      expect(find.text('Completed Project'), findsOneWidget);
+      expect(find.text('Cancelled Project'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'switching to the Clients tab shows clients instead of projects',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            projects: [
+              buildTestProject(name: 'Website Revamp', clientName: 'Acme Co'),
+            ],
+            clients: [buildTestClient(companyName: 'Beta LLC')],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Website Revamp'), findsOneWidget);
+      expect(find.text('Beta LLC'), findsNothing);
+
+      await tester.tap(find.text('Clients'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Beta LLC'), findsOneWidget);
+      expect(find.text('Website Revamp'), findsNothing);
+    },
+  );
 
   testWidgets('shows an empty state when there are no projects', (
     tester,
@@ -339,6 +397,78 @@ void main() {
 
     expect(find.text('No projects yet.'), findsOneWidget);
   });
+
+  testWidgets(
+    'the Clients tab country filter narrows the list to one country',
+    (tester) async {
+      await _useWideSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            clients: [
+              buildTestClient(
+                id: 'c1',
+                companyName: 'Acme Co',
+                country: 'Pakistan',
+              ),
+              buildTestClient(
+                id: 'c2',
+                companyName: 'Beta LLC',
+                country: 'UAE',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Clients'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Acme Co'), findsOneWidget);
+      expect(find.text('Beta LLC'), findsOneWidget);
+
+      await tester.tap(find.byType(DropdownButtonFormField<String?>).at(0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('🇵🇰 PK').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Acme Co'), findsOneWidget);
+      expect(find.text('Beta LLC'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    "shows 'No clients match your filters.' and clears filters via the "
+    'Clear filters button',
+    (tester) async {
+      await _useWideSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            clients: [
+              buildTestClient(companyName: 'Acme Co', country: 'Pakistan'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Clients'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'nobody matches this');
+      await tester.pumpAndSettle();
+
+      expect(find.text('No clients match your filters.'), findsOneWidget);
+      expect(find.text('Acme Co'), findsNothing);
+
+      await tester.tap(find.text('Clear filters'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Acme Co'), findsOneWidget);
+    },
+  );
 
   testWidgets('shows a health badge on each row in the Clients tab', (
     tester,
@@ -415,29 +545,30 @@ void main() {
     expect(riskyPosition, lessThan(attentionPosition));
   });
 
-  testWidgets('the Health tab shows an empty state when nothing needs attention', (
-    tester,
-  ) async {
-    await _useWideSurface(tester);
-    await tester.pumpWidget(
-      _app(
-        repository: FakeClientsRepository(
-          clients: [
-            buildTestClient(
-              companyName: 'Healthy Co',
-              healthStatus: ClientHealthStatus.healthy,
-            ),
-          ],
+  testWidgets(
+    'the Health tab shows an empty state when nothing needs attention',
+    (tester) async {
+      await _useWideSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            clients: [
+              buildTestClient(
+                companyName: 'Healthy Co',
+                healthStatus: ClientHealthStatus.healthy,
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Health'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Health'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('No clients need attention right now.'), findsOneWidget);
-  });
+      expect(find.text('No clients need attention right now.'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'shows an access-denied message instead of any client/project data for '

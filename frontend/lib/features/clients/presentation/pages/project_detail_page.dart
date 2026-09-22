@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../../../shared/widgets/hybrid_badge.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../../tasks/application/task_providers.dart';
 import '../../../tasks/domain/entities/task.dart';
@@ -152,6 +153,9 @@ class _ProjectDetailBody extends ConsumerWidget {
           const SizedBox(height: 16),
           FormSection(
             title: 'Teams (Departments)',
+            trailing: project.targetDepartments.length > 1
+                ? const HybridBadge()
+                : null,
             child: project.targetDepartments.isEmpty
                 ? Text(
                     'No departments assigned yet.',
@@ -208,7 +212,6 @@ class _ProjectDetailBody extends ConsumerWidget {
     );
   }
 }
-
 
 class _TasksSection extends ConsumerWidget {
   const _TasksSection({required this.project});
@@ -287,7 +290,10 @@ class _TaskRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(task.title, style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(
+              task.title,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
           TaskStatusBadge(status: task.status, dense: true),
           const SizedBox(width: 8),
