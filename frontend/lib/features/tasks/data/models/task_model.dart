@@ -23,6 +23,7 @@ class TaskModel extends Task {
     required super.createdAt,
     required super.updatedAt,
     required super.commentCount,
+    super.isArchived,
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) => TaskModel(
@@ -48,5 +49,6 @@ class TaskModel extends Task {
     createdAt: DateTime.parse(json['createdAt'] as String),
     updatedAt: DateTime.parse(json['updatedAt'] as String),
     commentCount: json['commentCount'] as int? ?? 0,
+    isArchived: json['isArchived'] as bool? ?? false,
   );
 }

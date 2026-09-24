@@ -444,4 +444,88 @@ void main() {
 
     expect(repository.lastProgressUpdatedId, isNull);
   });
+
+  testWidgets('hides the Archived toggle for a plain employee', (tester) async {
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Archived'), findsNothing);
+  });
+
+  testWidgets(
+    'a tasks.manage holder can toggle Archived to see only archived tasks',
+    (tester) async {
+      final admin = const AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: ['tasks.manage'],
+      );
+      final repository = FakeTaskRepository(
+        myTasks: [
+          buildTestTask(id: 'task-active', title: 'Active task'),
+          buildTestTask(
+            id: 'task-archived',
+            title: 'Archived task',
+            isArchived: true,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_app(user: admin, repository: repository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active task'), findsOneWidget);
+      expect(find.text('Archived task'), findsNothing);
+
+      await tester.tap(find.text('Archived'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Active task'), findsNothing);
+      expect(find.text('Archived task'), findsOneWidget);
+    },
+  );
+
+  testWidgets('tapping the archive icon on a card archives the task, for a '
+      'tasks.manage holder', (tester) async {
+    final admin = const AuthUser(
+      id: 'admin-1',
+      email: 'admin@zeracreative.com',
+      role: 'Super Admin',
+      permissions: ['tasks.manage'],
+    );
+    final repository = FakeTaskRepository(
+      myTasks: [buildTestTask(id: 'task-1', title: 'Some task')],
+    );
+
+    await tester.pumpWidget(_app(user: admin, repository: repository));
+    await tester.pumpAndSettle();
+
+    // Scoped to the board area — the header's Archived toggle chip also
+    // uses this same icon as its avatar, so a bare `find.byIcon` would be
+    // ambiguous.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBarView),
+        matching: find.byIcon(Icons.archive_outlined),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.lastArchivedTaskId, 'task-1');
+    expect(repository.lastArchivedIsArchived, isTrue);
+  });
+
+  testWidgets('hides the card archive icon for a plain employee', (
+    tester,
+  ) async {
+    final repository = FakeTaskRepository(
+      myTasks: [buildTestTask(id: 'task-1', title: 'Some task')],
+    );
+
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.archive_outlined), findsNothing);
+  });
 }

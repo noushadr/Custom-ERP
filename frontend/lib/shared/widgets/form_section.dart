@@ -6,6 +6,7 @@ class FormSection extends StatelessWidget {
     super.key,
     this.title,
     this.trailing,
+    this.titleSpacing = 12,
     required this.child,
   });
 
@@ -14,6 +15,11 @@ class FormSection extends StatelessWidget {
   /// An optional action shown at the end of the title row (e.g. a button)
   /// — ignored when [title] is null.
   final Widget? trailing;
+
+  /// Gap between the title row and [child] — defaults to 12, matching every
+  /// existing call site; a section whose content sits tight against its
+  /// title (e.g. a one-line empty state) can pass something smaller.
+  final double titleSpacing;
   final Widget child;
 
   @override
@@ -36,7 +42,7 @@ class FormSection extends StatelessWidget {
                   ?trailing,
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: titleSpacing),
             ],
             child,
           ],

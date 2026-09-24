@@ -19,6 +19,7 @@ export interface TaskResponseDto {
   createdAt: string;
   updatedAt: string;
   commentCount: number;
+  isArchived: boolean;
 }
 
 export interface TaskCommentResponseDto {

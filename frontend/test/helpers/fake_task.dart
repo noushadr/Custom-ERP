@@ -26,6 +26,7 @@ Task buildTestTask({
   DateTime? createdAt,
   DateTime? updatedAt,
   int commentCount = 0,
+  bool isArchived = false,
 }) {
   return Task(
     id: id,
@@ -48,6 +49,7 @@ Task buildTestTask({
     createdAt: createdAt ?? DateTime(2026, 1, 1),
     updatedAt: updatedAt ?? DateTime(2026, 1, 1),
     commentCount: commentCount,
+    isArchived: isArchived,
   );
 }
 
@@ -105,6 +107,8 @@ class FakeTaskRepository implements TaskRepository {
     this.assignTeamMemberError,
     this.getTaskError,
     this.tasksByProject = const [],
+    this.archiveTaskResult,
+    this.archiveTaskError,
   });
 
   final List<Task> myTasks;
@@ -127,6 +131,11 @@ class FakeTaskRepository implements TaskRepository {
   final Object? claimTaskError;
   final Object? assignTeamMemberError;
   final Object? getTaskError;
+  final Task? archiveTaskResult;
+  final Object? archiveTaskError;
+
+  String? lastArchivedTaskId;
+  bool? lastArchivedIsArchived;
 
   String? lastCreatedTitle;
   String? lastCreatedAssigneeEmployeeId;
@@ -264,5 +273,13 @@ class FakeTaskRepository implements TaskRepository {
     if (assignTeamMemberError != null) throw assignTeamMemberError!;
     return assignTeamMemberResult ??
         buildTestTask(id: id, assigneeEmployeeId: employeeId);
+  }
+
+  @override
+  Future<Task> archiveTask(String id, {required bool isArchived}) async {
+    lastArchivedTaskId = id;
+    lastArchivedIsArchived = isArchived;
+    if (archiveTaskError != null) throw archiveTaskError!;
+    return archiveTaskResult ?? buildTestTask(id: id, isArchived: isArchived);
   }
 }

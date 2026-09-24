@@ -404,4 +404,67 @@ void main() {
       expect(repository.lastAssignedMemberEmployeeId, 'employee-2');
     },
   );
+
+  testWidgets('hides the archive action for a viewer without tasks.manage', (
+    tester,
+  ) async {
+    final repository = FakeTaskRepository(taskById: buildTestTask());
+
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.archive_outlined), findsNothing);
+    expect(find.byIcon(Icons.unarchive_outlined), findsNothing);
+  });
+
+  testWidgets('lets a tasks.manage holder archive the task from the app bar', (
+    tester,
+  ) async {
+    final admin = const AuthUser(
+      id: 'admin-1',
+      email: 'admin@zeracreative.com',
+      role: 'Super Admin',
+      permissions: ['tasks.manage'],
+    );
+    final repository = FakeTaskRepository(taskById: buildTestTask());
+
+    await tester.pumpWidget(_app(user: admin, repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Archived'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.archive_outlined));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastArchivedTaskId, 'task-1');
+    expect(repository.lastArchivedIsArchived, isTrue);
+  });
+
+  testWidgets(
+    "shows an 'Archived' badge and an unarchive action for an already-"
+    'archived task, for a tasks.manage holder',
+    (tester) async {
+      final admin = const AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: ['tasks.manage'],
+      );
+      final repository = FakeTaskRepository(
+        taskById: buildTestTask(isArchived: true),
+      );
+
+      await tester.pumpWidget(_app(user: admin, repository: repository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Archived'), findsOneWidget);
+      expect(find.byIcon(Icons.unarchive_outlined), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.unarchive_outlined));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastArchivedTaskId, 'task-1');
+      expect(repository.lastArchivedIsArchived, isFalse);
+    },
+  );
 }

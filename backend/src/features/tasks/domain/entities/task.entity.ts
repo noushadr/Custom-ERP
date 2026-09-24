@@ -84,4 +84,14 @@ export class Task extends BaseEntity {
   @ManyToOne(() => Project, { nullable: true })
   @JoinColumn({ name: 'projectId' })
   project?: Project;
+
+  /** Set only via `TasksService.archiveTask`, gated to `tasks.manage`
+   * holders — distinct from `status`, since an archived task keeps whatever
+   * status it had (e.g. a completed task stays "Completed", just hidden
+   * from the normal board/lists). */
+  @Column({ default: false })
+  isArchived: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  archivedAt: Date | null;
 }

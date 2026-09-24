@@ -64,7 +64,15 @@ class TaskDetailPage extends ConsumerWidget {
     final taskAsync = ref.watch(taskProvider(taskId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Task')),
+      appBar: AppBar(
+        title: const Text('Task'),
+        actions: [
+          taskAsync.maybeWhen(
+            data: (task) => _ArchiveAction(task: task),
+            orElse: () => const SizedBox.shrink(),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
@@ -77,6 +85,108 @@ class TaskDetailPage extends ConsumerWidget {
             data: (task) => _TaskDetailBody(task: task),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Archive/unarchive — restricted to `tasks.manage` (HR/Admin) only, unlike
+/// every other action on this page, which any authorized editor/viewer can
+/// reach. Renders nothing for anyone else.
+class _ArchiveAction extends ConsumerStatefulWidget {
+  const _ArchiveAction({required this.task});
+
+  final Task task;
+
+  @override
+  ConsumerState<_ArchiveAction> createState() => _ArchiveActionState();
+}
+
+class _ArchiveActionState extends ConsumerState<_ArchiveAction> {
+  bool _saving = false;
+
+  Future<void> _toggle() async {
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(taskRepositoryProvider)
+          .archiveTask(widget.task.id, isArchived: !widget.task.isArchived);
+      ref.invalidate(taskProvider(widget.task.id));
+      ref.invalidate(taskHistoryProvider(widget.task.id));
+      ref.invalidate(myTasksProvider);
+      ref.invalidate(tasksAssignedByMeProvider);
+      ref.invalidate(teamTasksProvider);
+      ref.invalidate(claimableTasksProvider);
+    } on TaskException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authControllerProvider);
+    final hasPermission =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('tasks.manage');
+    if (!hasPermission) return const SizedBox.shrink();
+
+    if (_saving) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    return IconButton(
+      onPressed: _toggle,
+      icon: Icon(
+        widget.task.isArchived
+            ? Icons.unarchive_outlined
+            : Icons.archive_outlined,
+      ),
+      tooltip: widget.task.isArchived ? 'Unarchive' : 'Archive',
+    );
+  }
+}
+
+class _ArchivedBadge extends StatelessWidget {
+  const _ArchivedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.textSecondary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.archive_outlined,
+            size: 12,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Archived',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -226,6 +336,10 @@ class _TaskDetailBodyState extends ConsumerState<_TaskDetailBody> {
                 const SizedBox(width: 8),
                 TaskStatusBadge(status: task.status),
               ],
+              if (task.isArchived) ...[
+                const SizedBox(width: 8),
+                const _ArchivedBadge(),
+              ],
               const SizedBox(width: 8),
               canEdit && !task.isUnclaimed
                   ? _PriorityMenu(
@@ -306,6 +420,7 @@ class _TaskDetailBodyState extends ConsumerState<_TaskDetailBody> {
           ],
           FormSection(
             title: 'Comments',
+            titleSpacing: 4,
             child: _CommentsSection(taskId: task.id),
           ),
           const SizedBox(height: 16),

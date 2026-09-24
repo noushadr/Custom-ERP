@@ -566,6 +566,34 @@ export class TasksService {
     return this.taskResponseFor(task.id);
   }
 
+  /** Archives/unarchives a task — deliberately its own method rather than a
+   * field on `updateTask`, since it needs a strictly narrower authority
+   * (`tasks.manage` only, enforced by the controller's `@Permissions` guard)
+   * than `updateTask`'s three-tier `canEdit` (assigner/department-head/
+   * override). Archiving doesn't touch `status` — a completed task stays
+   * "Completed", just hidden from the normal board/lists. */
+  async archiveTask(
+    id: string,
+    isArchived: boolean,
+    actorUserId: string,
+  ): Promise<TaskResponseDto> {
+    const task = await this.getTaskOrThrow(id);
+    if (task.isArchived === isArchived) return this.taskResponseFor(id);
+
+    await this.addAuditLog(
+      task.id,
+      actorUserId,
+      'Archived',
+      task.isArchived ? 'Yes' : 'No',
+      isArchived ? 'Yes' : 'No',
+    );
+    task.isArchived = isArchived;
+    task.archivedAt = isArchived ? new Date() : null;
+    await this.taskRepository.save(task);
+
+    return this.taskResponseFor(task.id);
+  }
+
   // ---- Authorization helpers ----
 
   /** Department ids where this employee is the head — the department-head
@@ -781,6 +809,7 @@ export class TasksService {
       .filter(
         (task) =>
           task.assignee != null &&
+          !task.isArchived &&
           task.status !== TaskStatus.COMPLETED &&
           task.status !== TaskStatus.CANCELLED &&
           task.dueDate >= todayIso &&

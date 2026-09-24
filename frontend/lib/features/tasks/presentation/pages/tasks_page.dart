@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../../shared/widgets/archived_toggle.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../employee/application/employee_providers.dart';
@@ -71,14 +72,37 @@ bool _headsThisDepartment(WidgetRef ref, String? departmentId) {
       );
 }
 
-class TasksPage extends ConsumerWidget {
+class TasksPage extends ConsumerStatefulWidget {
   const TasksPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TasksPage> createState() => _TasksPageState();
+}
+
+class _TasksPageState extends ConsumerState<TasksPage> {
+  bool _showArchived = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authControllerProvider);
+    final canManageTasks =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('tasks.manage');
+    // Only an admin/HR viewer can ever see archived tasks at all — for
+    // everyone else this stays permanently false since they have no toggle
+    // to flip it, so a plain `isArchived == _showArchived` filter below
+    // works uniformly for both.
+    final showArchived = canManageTasks && _showArchived;
+
+    AsyncValue<List<Task>> archivedFilter(AsyncValue<List<Task>> tasks) =>
+        tasks.whenData(
+          (list) => list.where((t) => t.isArchived == showArchived).toList(),
+        );
+
     final canSeeTeamTab = _headsADepartment(ref);
     final claimableCount =
-        ref.watch(claimableTasksProvider).valueOrNull?.length ?? 0;
+        archivedFilter(ref.watch(claimableTasksProvider)).valueOrNull?.length ??
+        0;
 
     final tabs = [
       const Tab(text: 'My Tasks'),
@@ -102,21 +126,29 @@ class TasksPage extends ConsumerWidget {
     ];
     final views = [
       _TaskBoardView(
-        asyncTasks: ref.watch(myTasksProvider),
-        emptyMessage: 'No tasks assigned to you yet.',
+        asyncTasks: archivedFilter(ref.watch(myTasksProvider)),
+        emptyMessage: showArchived
+            ? 'No archived tasks.'
+            : 'No tasks assigned to you yet.',
       ),
       _TaskBoardView(
-        asyncTasks: ref.watch(tasksAssignedByMeProvider),
-        emptyMessage: "You haven't assigned any tasks yet.",
+        asyncTasks: archivedFilter(ref.watch(tasksAssignedByMeProvider)),
+        emptyMessage: showArchived
+            ? 'No archived tasks.'
+            : "You haven't assigned any tasks yet.",
       ),
       if (canSeeTeamTab)
         _TaskBoardView(
-          asyncTasks: ref.watch(teamTasksProvider),
-          emptyMessage: 'No team tasks yet.',
+          asyncTasks: archivedFilter(ref.watch(teamTasksProvider)),
+          emptyMessage: showArchived
+              ? 'No archived tasks.'
+              : 'No team tasks yet.',
         ),
       _TaskBoardView(
-        asyncTasks: ref.watch(claimableTasksProvider),
-        emptyMessage: 'No unclaimed tasks for your team right now.',
+        asyncTasks: archivedFilter(ref.watch(claimableTasksProvider)),
+        emptyMessage: showArchived
+            ? 'No archived tasks.'
+            : 'No unclaimed tasks for your team right now.',
       ),
     ];
 
@@ -139,6 +171,13 @@ class TasksPage extends ConsumerWidget {
                     indicatorColor: AppColors.primary,
                   ),
                 ),
+                if (canManageTasks) ...[
+                  const SizedBox(width: 12),
+                  ArchivedToggle(
+                    showArchived: _showArchived,
+                    onChanged: (value) => setState(() => _showArchived = value),
+                  ),
+                ],
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
                   onPressed: () => Navigator.of(context).push(
@@ -399,6 +438,7 @@ enum _CardField { priority, dueDate, claim }
 
 class _TaskCardState extends ConsumerState<_TaskCard> {
   _CardField? _saving;
+  bool _archiving = false;
 
   Future<void> _run(_CardField field, Future<void> Function() action) async {
     setState(() => _saving = field);
@@ -461,8 +501,33 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
     );
   }
 
+  Future<void> _toggleArchived() async {
+    setState(() => _archiving = true);
+    try {
+      await ref
+          .read(taskRepositoryProvider)
+          .archiveTask(widget.task.id, isArchived: !widget.task.isArchived);
+      ref.invalidate(myTasksProvider);
+      ref.invalidate(tasksAssignedByMeProvider);
+      ref.invalidate(teamTasksProvider);
+      ref.invalidate(claimableTasksProvider);
+    } on TaskException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _archiving = false);
+    }
+  }
+
   Widget _buildCard(BuildContext context) {
     final task = widget.task;
+    final authState = ref.watch(authControllerProvider);
+    final canManageTasks =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('tasks.manage');
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(14),
@@ -504,6 +569,25 @@ class _TaskCardState extends ConsumerState<_TaskCard> {
                       ),
                     ),
                   ),
+                  if (canManageTasks) ...[
+                    const Spacer(),
+                    _archiving
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : InkWell(
+                            onTap: _toggleArchived,
+                            child: Icon(
+                              task.isArchived
+                                  ? Icons.unarchive_outlined
+                                  : Icons.archive_outlined,
+                              size: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                  ],
                 ],
               ),
               const SizedBox(height: 8),

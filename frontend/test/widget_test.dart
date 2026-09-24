@@ -533,6 +533,41 @@ void main() {
     },
   );
 
+  testWidgets(
+    'tapping the Tasks spotlight card switches to the Tasks section',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: admin,
+          taskRepository: FakeTaskRepository(
+            teamTasks: [buildTestTask(id: 'task-1', status: TaskStatus.todo)],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Scoped to the spotlight card's own InkWell (identified by its icon) —
+      // 'Tasks' is also the nav item's own label, which would trivially pass
+      // this test on its own without ever exercising the card's tap handler.
+      await tester.tap(
+        find.ancestor(
+          of: find.byIcon(Icons.checklist_outlined),
+          matching: find.byType(InkWell),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('My Tasks'), findsOneWidget);
+    },
+  );
+
   testWidgets('switching destinations updates the body', (
     WidgetTester tester,
   ) async {

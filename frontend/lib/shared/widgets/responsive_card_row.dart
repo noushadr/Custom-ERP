@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// Lays [children] out in full-width rows instead of `Wrap`'s fixed-size
-/// tiles — each row's items stretch (via `Expanded`) to fill the available
-/// width evenly, so a wide screen never leaves a dead gap on the right where
-/// a fixed-width `Wrap` would have simply run out of items. Column count per
-/// row is however many [minItemWidth]-plus-[spacing] slots fit the current
-/// width, recomputed on every layout via `LayoutBuilder` — the same
-/// fits-then-wraps idea the Tasks board's own column layout uses.
+/// Lays [children] out in evenly-sized rows instead of `Wrap`'s fixed-size
+/// tiles — every item gets the same computed width (never just whichever
+/// row it lands in), so a short trailing row can't stretch its one leftover
+/// item to fill the whole row's width the way an `Expanded`-per-row layout
+/// would. Column count per row is however many [minItemWidth]-plus-[spacing]
+/// slots fit the current width, recomputed on every layout via
+/// `LayoutBuilder` — the same fits-then-wraps idea the Tasks board's own
+/// column layout uses. Each item is additionally capped at [maxWidthFraction]
+/// of the available width, so a row with few items (e.g. a trailing row of
+/// one) still can't grow a single card past a sane share of a very wide
+/// screen.
 class ResponsiveCardRow extends StatelessWidget {
   const ResponsiveCardRow({
     super.key,
@@ -14,12 +18,18 @@ class ResponsiveCardRow extends StatelessWidget {
     this.minItemWidth = 240,
     this.spacing = 12,
     this.runSpacing = 12,
+    this.maxWidthFraction = 0.3,
   });
 
   final List<Widget> children;
   final double minItemWidth;
   final double spacing;
   final double runSpacing;
+
+  /// No single item may exceed this fraction of the row's total width —
+  /// e.g. 0.3 caps every card at 30%, regardless of how few items share its
+  /// row.
+  final double maxWidthFraction;
 
   @override
   Widget build(BuildContext context) {
@@ -33,28 +43,27 @@ class ResponsiveCardRow extends StatelessWidget {
         if (columns < 1) columns = 1;
         if (columns > children.length) columns = children.length;
 
-        final rows = <Widget>[];
-        for (var i = 0; i < children.length; i += columns) {
-          final end = i + columns > children.length
-              ? children.length
-              : i + columns;
-          final rowItems = children.sublist(i, end);
-          if (rows.isNotEmpty) rows.add(SizedBox(height: runSpacing));
-          rows.add(
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var j = 0; j < rowItems.length; j++) ...[
-                  if (j > 0) SizedBox(width: spacing),
-                  Expanded(child: rowItems[j]),
-                ],
-              ],
-            ),
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: rows,
+        // The cap only ever prevents a card from growing *past* a sane
+        // share of a wide row — it must never pull an item below
+        // [minItemWidth] itself, which would defeat the whole "at least
+        // this wide" premise the column count above was already computed
+        // from (e.g. on a narrower screen where 30% of the width happens to
+        // be less than minItemWidth).
+        final cap = constraints.maxWidth * maxWidthFraction < minItemWidth
+            ? minItemWidth
+            : constraints.maxWidth * maxWidthFraction;
+        final itemWidth =
+            ((constraints.maxWidth - spacing * (columns - 1)) / columns)
+                .clamp(0, cap)
+                .toDouble();
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: runSpacing,
+          children: [
+            for (final child in children)
+              SizedBox(width: itemWidth, child: child),
+          ],
         );
       },
     );

@@ -71,4 +71,7 @@ abstract interface class TaskRepository {
 
   /// The task's team head picking a specific member.
   Future<Task> assignTeamMember(String id, String employeeId);
+
+  /// Archives/unarchives a task — requires `tasks.manage` (HR/Admin only).
+  Future<Task> archiveTask(String id, {required bool isArchived});
 }

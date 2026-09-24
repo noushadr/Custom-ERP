@@ -155,4 +155,12 @@ class TaskRemoteDataSource {
     );
     return TaskModel.fromJson(response.data!);
   }
+
+  Future<TaskModel> archiveTask(String id, {required bool isArchived}) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/tasks/$id/archive',
+      data: {'isArchived': isArchived},
+    );
+    return TaskModel.fromJson(response.data!);
+  }
 }

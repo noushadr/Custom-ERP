@@ -57,25 +57,52 @@ class TokenStorage {
     _inMemoryAccessToken = accessToken;
     _inMemoryRefreshToken = refreshToken;
 
-    if (_rememberMe) {
-      await _storage.write(key: _accessTokenKey, value: accessToken);
-      await _storage.write(key: _refreshTokenKey, value: refreshToken);
-    } else {
-      await _storage.delete(key: _accessTokenKey);
-      await _storage.delete(key: _refreshTokenKey);
+    // Persisting is a nice-to-have (survives a page refresh/app restart) —
+    // the in-memory copies above already make the session usable for the
+    // rest of this run, so a storage failure here (e.g. flutter_secure_
+    // storage's web backend needs a "secure context" — HTTPS or localhost —
+    // and throws when the app is reached over a plain-HTTP LAN address)
+    // must never block login or leave the caller waiting on a broken write.
+    try {
+      if (_rememberMe) {
+        await _storage.write(key: _accessTokenKey, value: accessToken);
+        await _storage.write(key: _refreshTokenKey, value: refreshToken);
+      } else {
+        await _storage.delete(key: _accessTokenKey);
+        await _storage.delete(key: _refreshTokenKey);
+      }
+    } catch (_) {
+      // Session still works for this run via the in-memory tokens; it just
+      // won't be restored after a refresh/restart.
     }
   }
 
   Future<String?> get accessToken async =>
-      _inMemoryAccessToken ?? await _storage.read(key: _accessTokenKey);
+      _inMemoryAccessToken ?? await _readSafely(_accessTokenKey);
 
   Future<String?> get refreshToken async =>
-      _inMemoryRefreshToken ?? await _storage.read(key: _refreshTokenKey);
+      _inMemoryRefreshToken ?? await _readSafely(_refreshTokenKey);
+
+  /// Same "storage is a nice-to-have" reasoning as [saveTokens]/[clear] — no
+  /// persisted token is indistinguishable from "storage isn't available
+  /// here" as far as the caller needs to know: both just mean start signed
+  /// out instead of leaving `restoreSession` hanging on a broken read.
+  Future<String?> _readSafely(String key) async {
+    try {
+      return await _storage.read(key: key);
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> clear() async {
     _inMemoryAccessToken = null;
     _inMemoryRefreshToken = null;
-    await _storage.delete(key: _accessTokenKey);
-    await _storage.delete(key: _refreshTokenKey);
+    try {
+      await _storage.delete(key: _accessTokenKey);
+      await _storage.delete(key: _refreshTokenKey);
+    } catch (_) {
+      // Already cleared in memory, which is what actually gates auth state.
+    }
   }
 }

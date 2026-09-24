@@ -26,7 +26,8 @@ class TaskRepositoryImpl implements TaskRepository {
       _guard(_remoteDataSource.getClaimableTasks);
 
   @override
-  Future<Task> getTask(String id) => _guard(() => _remoteDataSource.getTask(id));
+  Future<Task> getTask(String id) =>
+      _guard(() => _remoteDataSource.getTask(id));
 
   @override
   Future<List<TaskAuditLogEntry>> getHistory(String id) =>
@@ -106,9 +107,12 @@ class TaskRepositoryImpl implements TaskRepository {
       _guard(() => _remoteDataSource.claimTask(id));
 
   @override
-  Future<Task> assignTeamMember(String id, String employeeId) => _guard(
-    () => _remoteDataSource.assignTeamMember(id, employeeId),
-  );
+  Future<Task> assignTeamMember(String id, String employeeId) =>
+      _guard(() => _remoteDataSource.assignTeamMember(id, employeeId));
+
+  @override
+  Future<Task> archiveTask(String id, {required bool isArchived}) =>
+      _guard(() => _remoteDataSource.archiveTask(id, isArchived: isArchived));
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

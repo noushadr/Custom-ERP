@@ -40,6 +40,7 @@ export function toTaskResponse(
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
     commentCount,
+    isArchived: task.isArchived,
   };
 }
 

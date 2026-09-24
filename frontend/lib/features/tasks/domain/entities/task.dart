@@ -23,6 +23,7 @@ class Task {
     required this.createdAt,
     required this.updatedAt,
     required this.commentCount,
+    this.isArchived = false,
   });
 
   final String id;
@@ -60,6 +61,11 @@ class Task {
   /// How many comments/progress updates this task has — shown as a small
   /// count badge on the board card, same idea as a Trello/Linear card.
   final int commentCount;
+
+  /// Set only by a `tasks.manage` holder (HR/Admin) — hidden from the
+  /// normal board/lists by default, revealed via the Archived toggle.
+  /// Independent of [status]: an archived task keeps whatever status it had.
+  final bool isArchived;
 
   /// Not yet picked up by anyone — assigned to a team, no assignee.
   bool get isUnclaimed => assigneeEmployeeId == null;

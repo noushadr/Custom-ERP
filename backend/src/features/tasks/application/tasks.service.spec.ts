@@ -56,6 +56,8 @@ function buildTask(overrides: Partial<Task> = {}): Task {
     projectId: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    isArchived: false,
+    archivedAt: null,
     ...overrides,
   } as Task;
 }
@@ -1158,6 +1160,73 @@ describe('TasksService', () => {
 
       const result = await service.getTasksNeedingDeadlineReminder(7);
       expect(result).toHaveLength(0);
+    });
+
+    it('excludes an archived task even if otherwise due within the window', async () => {
+      taskRepository.findAll.mockResolvedValue([
+        buildTask({ isArchived: true, dueDate: isoDaysFromNow(2) }),
+      ]);
+
+      const result = await service.getTasksNeedingDeadlineReminder(7);
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('archiveTask', () => {
+    it('lets a tasks.manage holder archive a task and records an audit entry', async () => {
+      const task = buildTask({ isArchived: false });
+      taskRepository.findById.mockResolvedValue(task);
+
+      const result = await service.archiveTask('task-1', true, 'admin-user-1');
+
+      expect(result.isArchived).toBe(true);
+      expect(taskRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isArchived: true }),
+      );
+      expect(auditLogRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fieldLabel: 'Archived',
+          oldValue: 'No',
+          newValue: 'Yes',
+        }),
+      );
+    });
+
+    it('lets a tasks.manage holder unarchive a task', async () => {
+      const task = buildTask({
+        isArchived: true,
+        archivedAt: new Date('2026-01-05T00:00:00.000Z'),
+      });
+      taskRepository.findById.mockResolvedValue(task);
+
+      const result = await service.archiveTask(
+        'task-1',
+        false,
+        'admin-user-1',
+      );
+
+      expect(result.isArchived).toBe(false);
+      expect(taskRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isArchived: false, archivedAt: null }),
+      );
+    });
+
+    it('is a no-op (no save, no audit entry) when already in the requested state', async () => {
+      const task = buildTask({ isArchived: true });
+      taskRepository.findById.mockResolvedValue(task);
+
+      await service.archiveTask('task-1', true, 'admin-user-1');
+
+      expect(taskRepository.save).not.toHaveBeenCalled();
+      expect(auditLogRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a task that does not exist', async () => {
+      taskRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.archiveTask('missing', true, 'admin-user-1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

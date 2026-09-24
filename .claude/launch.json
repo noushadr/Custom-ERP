@@ -7,7 +7,7 @@
       "runtimeArgs": [
         "-NoProfile",
         "-Command",
-        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'C:\\Users\\Zera\\Desktop\\Zera ERP\\frontend'; flutter run -d web-server --web-port $env:PORT --release"
+        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'D:\\Zera ERP (Claude Code)\\Custom-ERP\\frontend'; npx --yes serve -s build/web -l tcp://0.0.0.0:$env:PORT"
       ],
       "port": 5050,
       "autoPort": true
@@ -18,7 +18,7 @@
       "runtimeArgs": [
         "-NoProfile",
         "-Command",
-        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'C:\\Users\\Zera\\Desktop\\Zera ERP\\backend'; npm.cmd run start:dev"
+        "$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); cd 'D:\\Zera ERP (Claude Code)\\Custom-ERP\\backend'; npm.cmd run start:dev"
       ],
       "port": 3000
     }

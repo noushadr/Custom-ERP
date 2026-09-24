@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
+import { ArchiveTaskDto } from '../application/dto/archive-task.dto';
 import { AssignTeamMemberDto } from '../application/dto/assign-team-member.dto';
 import { CreateTaskCommentDto } from '../application/dto/create-task-comment.dto';
 import { CreateTaskDto } from '../application/dto/create-task.dto';
@@ -118,6 +119,19 @@ export class TasksController {
       user.sub,
       actorHasOverride,
     );
+  }
+
+  /** Archive/unarchive — restricted to `tasks.manage` (HR/Admin) only,
+   * unlike every other route on this controller which is open to any
+   * authenticated user with `TasksService` enforcing per-request authority. */
+  @Patch(':id/archive')
+  @Permissions(PERMISSION)
+  archiveTask(
+    @Param('id') id: string,
+    @Body() dto: ArchiveTaskDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tasksService.archiveTask(id, dto.isArchived, user.sub);
   }
 
   @Get(':id')

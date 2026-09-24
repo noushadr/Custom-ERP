@@ -24,9 +24,7 @@ final myTasksProvider = FutureProvider.autoDispose<List<Task>>((ref) {
   return ref.watch(taskRepositoryProvider).getMyTasks();
 });
 
-final tasksAssignedByMeProvider = FutureProvider.autoDispose<List<Task>>((
-  ref,
-) {
+final tasksAssignedByMeProvider = FutureProvider.autoDispose<List<Task>>((ref) {
   ref.watch(authControllerProvider);
   return ref.watch(taskRepositoryProvider).getTasksAssignedByMe();
 });
@@ -41,10 +39,7 @@ final claimableTasksProvider = FutureProvider.autoDispose<List<Task>>((ref) {
   return ref.watch(taskRepositoryProvider).getClaimableTasks();
 });
 
-final taskProvider = FutureProvider.autoDispose.family<Task, String>((
-  ref,
-  id,
-) {
+final taskProvider = FutureProvider.autoDispose.family<Task, String>((ref, id) {
   ref.watch(authControllerProvider);
   return ref.watch(taskRepositoryProvider).getTask(id);
 });

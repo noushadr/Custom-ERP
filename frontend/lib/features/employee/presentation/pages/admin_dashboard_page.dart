@@ -50,10 +50,10 @@ class _DashboardStats extends StatelessWidget {
             minItemWidth: 240,
             spacing: 12,
             children: [
+              _UpcomingWorkAnniversaryCard(),
               _EmployeeOfMonthCard(),
               _LastBirthdayCard(),
               _UpcomingBirthdayCard(),
-              _UpcomingWorkAnniversaryCard(),
               _UpcomingHolidayCard(),
               _TasksSummaryCard(),
             ],
@@ -85,6 +85,7 @@ class _SpotlightCard extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.child,
+    this.onTap,
   });
 
   final String title;
@@ -92,31 +93,43 @@ class _SpotlightCard extends StatelessWidget {
   final Color color;
   final Widget child;
 
+  /// Makes the whole card tappable (e.g. the Tasks card jumping to the
+  /// Tasks section) — left null for cards with nothing to navigate to.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    return FormSection(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall,
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          child,
-        ],
-      ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        child,
+      ],
+    );
+
+    return FormSection(
+      child: onTap == null
+          ? content
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: content,
+            ),
     );
   }
 }
@@ -439,6 +452,8 @@ class _TasksSummaryCard extends ConsumerWidget {
       title: 'Tasks',
       icon: Icons.checklist_outlined,
       color: AppColors.primary,
+      onTap: () =>
+          ref.read(pendingSectionNavigationProvider.notifier).state = 'Tasks',
       child: tasksAsync.when(
         loading: () => const _SpotlightEmpty('Loading…'),
         error: (_, _) => const _SpotlightEmpty('Could not load.'),

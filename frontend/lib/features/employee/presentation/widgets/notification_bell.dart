@@ -196,8 +196,7 @@ class NotificationBell extends ConsumerWidget {
 
     // No permission guard on the backend for either of these — naturally
     // empty for anyone without tasks assigned to them or a team to manage.
-    final myTasks =
-        ref.watch(myTasksProvider).valueOrNull ?? const <Task>[];
+    final myTasks = ref.watch(myTasksProvider).valueOrNull ?? const <Task>[];
     final teamTasks =
         ref.watch(teamTasksProvider).valueOrNull ?? const <Task>[];
     final newlyAssignedTasks = myTasks
@@ -259,7 +258,10 @@ class NotificationBell extends ConsumerWidget {
                 .read(notificationsRepositoryProvider)
                 .markRead(notification.id)
                 .then((_) => ref.invalidate(myNotificationsProvider));
-            onOpenNotification(notification.linkTarget, notification.linkEntityId);
+            onOpenNotification(
+              notification.linkTarget,
+              notification.linkEntityId,
+            );
         }
       },
       itemBuilder: (context) {
@@ -659,19 +661,19 @@ class _NotificationTile extends StatelessWidget {
         // PopupMenuItem itself adds no vertical padding, so without this,
         // adjacent notifications' text runs directly into each other.
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 5),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(7),
+                padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, size: 16, color: iconColor),
+                child: Icon(icon, size: 13, color: iconColor),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -679,21 +681,21 @@ class _NotificationTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     if (subtitle != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         subtitle!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
                     ],
                     if (caption != null || trailing != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Row(
                         children: [
                           if (caption != null)
@@ -701,7 +703,10 @@ class _NotificationTile extends StatelessWidget {
                               child: Text(
                                 caption!,
                                 style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(color: AppColors.textSecondary),
+                                    ?.copyWith(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 10,
+                                    ),
                               ),
                             ),
                           if (trailing != null) ...[
@@ -713,6 +718,7 @@ class _NotificationTile extends StatelessWidget {
                                     color: AppColors.textSecondary.withValues(
                                       alpha: 0.7,
                                     ),
+                                    fontSize: 10,
                                   ),
                             ),
                           ],

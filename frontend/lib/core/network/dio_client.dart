@@ -6,8 +6,18 @@ import 'token_storage.dart';
 /// outgoing requests and transparently refreshes it once on a 401 response.
 class DioClient {
   DioClient(this._tokenStorage) {
-    _dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
-    _refreshDio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+    // Without an explicit timeout, Dio waits forever on a request that never
+    // gets a response (e.g. a device that can't actually reach the server on
+    // its network) — the UI is left spinning with no way to tell the user
+    // anything is wrong. 15s gives a slow LAN/Wi-Fi round trip room to
+    // complete while still surfacing a real error otherwise.
+    final timeouts = BaseOptions(
+      connectTimeout: Duration(seconds: 15),
+      sendTimeout: Duration(seconds: 15),
+      receiveTimeout: Duration(seconds: 15),
+    );
+    _dio = Dio(timeouts.copyWith(baseUrl: AppConfig.apiBaseUrl));
+    _refreshDio = Dio(timeouts.copyWith(baseUrl: AppConfig.apiBaseUrl));
 
     _dio.interceptors.add(
       InterceptorsWrapper(
