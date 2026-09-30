@@ -19,9 +19,7 @@ class AssetModel extends Asset {
     assignedAt: json['assignedAt'] == null
         ? null
         : DateTime.parse(json['assignedAt'] as String),
-    value: json['value'] == null
-        ? null
-        : double.parse(json['value'] as String),
+    value: json['value'] == null ? null : double.parse(json['value'] as String),
     createdAt: DateTime.parse(json['createdAt'] as String),
   );
 }

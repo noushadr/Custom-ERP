@@ -15,6 +15,7 @@ class Project {
     required this.assignedEmployees,
     required this.targetDepartments,
     required this.services,
+    required this.isArchived,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -41,6 +42,8 @@ class Project {
   final List<ProjectEmployeeRef> assignedEmployees;
   final List<ProjectDepartmentRef> targetDepartments;
   final List<ProjectServiceRef> services;
+
+  final bool isArchived;
 
   final DateTime createdAt;
   final DateTime updatedAt;

@@ -30,13 +30,12 @@ class PayrollSummaryModel extends PayrollSummary {
         totalMonthlyPayroll: (json['totalMonthlyPayroll'] as num).toDouble(),
         dailyPayroll: (json['dailyPayroll'] as num).toDouble(),
         activeEmployeeCount: json['activeEmployeeCount'] as int,
-        departmentTotals:
-            (json['departmentTotals'] as List<dynamic>? ?? [])
-                .map(
-                  (e) => DepartmentPayrollTotalModel.fromJson(
-                    e as Map<String, dynamic>,
-                  ),
-                )
-                .toList(),
+        departmentTotals: (json['departmentTotals'] as List<dynamic>? ?? [])
+            .map(
+              (e) => DepartmentPayrollTotalModel.fromJson(
+                e as Map<String, dynamic>,
+              ),
+            )
+            .toList(),
       );
 }

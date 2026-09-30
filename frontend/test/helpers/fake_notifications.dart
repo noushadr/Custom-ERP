@@ -29,7 +29,9 @@ class FakeNotificationsRepository implements NotificationsRepository {
 
   @override
   Future<List<AppNotification>> getMine({bool unreadOnly = false}) async =>
-      unreadOnly ? notifications.where((n) => !n.isRead).toList() : notifications;
+      unreadOnly
+      ? notifications.where((n) => !n.isRead).toList()
+      : notifications;
 
   @override
   Future<void> markRead(String id) async {

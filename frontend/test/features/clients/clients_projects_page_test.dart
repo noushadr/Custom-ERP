@@ -314,8 +314,8 @@ void main() {
   );
 
   testWidgets(
-    'the Projects tab shows only active projects by default, and reveals '
-    'only the rest via the Archived toggle',
+    'the Projects tab shows only non-archived projects by default, and '
+    'reveals archived ones via the Archived toggle — independent of status',
     (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(
@@ -334,13 +334,9 @@ void main() {
               ),
               buildTestProject(
                 id: 'p3',
-                name: 'Completed Project',
+                name: 'Archived Completed Project',
                 status: ProjectStatus.completed,
-              ),
-              buildTestProject(
-                id: 'p4',
-                name: 'Cancelled Project',
-                status: ProjectStatus.cancelled,
+                isArchived: true,
               ),
             ],
           ),
@@ -348,18 +344,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // On Hold isn't archived — it stays visible by default, unlike the
+      // old status-based "Archived" proxy this feature replaced.
       expect(find.text('Active Project'), findsOneWidget);
-      expect(find.text('On Hold Project'), findsNothing);
-      expect(find.text('Completed Project'), findsNothing);
-      expect(find.text('Cancelled Project'), findsNothing);
+      expect(find.text('On Hold Project'), findsOneWidget);
+      expect(find.text('Archived Completed Project'), findsNothing);
 
       await tester.tap(find.text('Archived'));
       await tester.pumpAndSettle();
 
       expect(find.text('Active Project'), findsNothing);
-      expect(find.text('On Hold Project'), findsOneWidget);
-      expect(find.text('Completed Project'), findsOneWidget);
-      expect(find.text('Cancelled Project'), findsOneWidget);
+      expect(find.text('On Hold Project'), findsNothing);
+      expect(find.text('Archived Completed Project'), findsOneWidget);
     },
   );
 

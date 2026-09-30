@@ -5,9 +5,7 @@ import { PayrollLineItem } from '../../domain/entities/payroll-line-item.entity'
 import { PayrollLineItemRepository } from '../../domain/repositories/payroll-line-item-repository.interface';
 
 @Injectable()
-export class TypeOrmPayrollLineItemRepository
-  implements PayrollLineItemRepository
-{
+export class TypeOrmPayrollLineItemRepository implements PayrollLineItemRepository {
   constructor(
     @InjectRepository(PayrollLineItem)
     private readonly repository: Repository<PayrollLineItem>,

@@ -73,7 +73,11 @@ class _ClientDetailBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final projectsAsync = ref.watch(
-      projectsListProvider((status: null, clientId: client.id)),
+      projectsListProvider((
+        status: null,
+        clientId: client.id,
+        includeArchived: false,
+      )),
     );
 
     return SingleChildScrollView(
@@ -137,7 +141,9 @@ class _ClientDetailBody extends ConsumerWidget {
                     runSpacing: 8,
                     children: [
                       for (final factor in client.healthFactors)
-                        Chip(label: Text(formatClientHealthFactorLabel(factor))),
+                        Chip(
+                          label: Text(formatClientHealthFactorLabel(factor)),
+                        ),
                     ],
                   ),
                 ],

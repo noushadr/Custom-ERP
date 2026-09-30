@@ -9,12 +9,11 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../goals/application/goal_providers.dart';
 import '../../../leave/presentation/widgets/leave_balances_section.dart';
+import '../../../payroll/presentation/widgets/payslip_list_section.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../../performance_reviews/domain/entities/performance_review_summary.dart';
 import '../../../tasks/application/task_providers.dart';
-import '../../../tasks/domain/entities/task.dart';
-import '../../../tasks/presentation/pages/task_detail_page.dart';
-import '../../../tasks/presentation/widgets/task_badges.dart';
+import '../../../tasks/presentation/widgets/task_summary_row.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../../domain/exceptions/employee_exception.dart';
@@ -69,6 +68,8 @@ class _UserDashboardBody extends StatelessWidget {
             title: 'Leave Balances',
             child: LeaveBalancesSection(),
           ),
+          const SizedBox(height: 16),
+          const MyPayslipsSection(),
           const SizedBox(height: 16),
           const _MyGoalsSection(),
           const SizedBox(height: 16),
@@ -398,8 +399,6 @@ class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
   }
 }
 
-/// Read-only — goals are set by Admin/HR or the viewer's own Team Lead
-/// (see `GoalsPage`), the employee just sees them here.
 class _MyGoalsSection extends ConsumerWidget {
   const _MyGoalsSection();
 
@@ -528,7 +527,7 @@ class _MyTasksSection extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   for (var i = 0; i < myTasks.length; i++) ...[
-                    _TaskSummaryRow(task: myTasks[i]),
+                    TaskSummaryRow(task: myTasks[i]),
                     if (i < myTasks.length - 1)
                       const Divider(height: 16, color: AppColors.borderSubtle),
                   ],
@@ -542,7 +541,7 @@ class _MyTasksSection extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   for (var i = 0; i < assignedByMe.length; i++) ...[
-                    _TaskSummaryRow(task: assignedByMe[i]),
+                    TaskSummaryRow(task: assignedByMe[i]),
                     if (i < assignedByMe.length - 1)
                       const Divider(height: 16, color: AppColors.borderSubtle),
                   ],
@@ -550,60 +549,6 @@ class _MyTasksSection extends ConsumerWidget {
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-class _TaskSummaryRow extends StatelessWidget {
-  const _TaskSummaryRow({required this.task});
-
-  final Task task;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => TaskDetailPage(taskId: task.id)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    task.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Due ${formatDisplayDate(task.dueDate)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            TaskStatusBadge(status: task.status, dense: true),
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.chevron_right,
-              size: 18,
-              color: AppColors.textSecondary,
-            ),
-          ],
         ),
       ),
     );

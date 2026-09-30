@@ -17,7 +17,10 @@ import { EmailController } from './presentation/email.controller';
   controllers: [EmailController],
   providers: [
     EmailService,
-    { provide: EMAIL_ACCOUNT_REPOSITORY, useClass: TypeOrmEmailAccountRepository },
+    {
+      provide: EMAIL_ACCOUNT_REPOSITORY,
+      useClass: TypeOrmEmailAccountRepository,
+    },
   ],
 })
 export class EmailModule {}

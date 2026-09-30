@@ -224,7 +224,10 @@ class FakeLeaveRepository implements LeaveRepository {
   Future<List<LeaveRequest>> getPendingHrApproval() async => pendingHrApproval;
 
   @override
-  Future<LeaveRequest> approveAsManager(String requestId, {String? comment}) async {
+  Future<LeaveRequest> approveAsManager(
+    String requestId, {
+    String? comment,
+  }) async {
     lastDecidedRequestId = requestId;
     lastDecisionApproved = true;
     lastDecisionComment = comment;
@@ -233,7 +236,10 @@ class FakeLeaveRepository implements LeaveRepository {
   }
 
   @override
-  Future<LeaveRequest> rejectAsManager(String requestId, {String? comment}) async {
+  Future<LeaveRequest> rejectAsManager(
+    String requestId, {
+    String? comment,
+  }) async {
     lastDecidedRequestId = requestId;
     lastDecisionApproved = false;
     lastDecisionComment = comment;

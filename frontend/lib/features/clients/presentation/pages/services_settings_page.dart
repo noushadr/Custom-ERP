@@ -102,7 +102,11 @@ class _ServiceCard extends ConsumerWidget {
 
   final Service service;
 
-  Future<void> _setArchived(BuildContext context, WidgetRef ref, bool value) async {
+  Future<void> _setArchived(
+    BuildContext context,
+    WidgetRef ref,
+    bool value,
+  ) async {
     try {
       await ref
           .read(clientsRepositoryProvider)
@@ -140,14 +144,15 @@ class _ServiceCard extends ConsumerWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.textSecondary.withValues(alpha: 0.12),
+                          color: AppColors.textSecondary.withValues(
+                            alpha: 0.12,
+                          ),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           'Archived',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
                         ),
                       ),
                     ],

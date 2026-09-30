@@ -83,8 +83,7 @@ class _FinancialRecordEditorPageState
 
   /// Drops a trailing ".0" so a whole-number figure doesn't show a
   /// pointless decimal when the editor opens for an existing record.
-  String _trimmed(double value) =>
-      value == value.roundToDouble()
+  String _trimmed(double value) => value == value.roundToDouble()
       ? value.toInt().toString()
       : value.toString();
 
@@ -176,7 +175,9 @@ class _FinancialRecordEditorPageState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Financial Record' : 'New Financial Record'),
+        title: Text(
+          _isEditing ? 'Edit Financial Record' : 'New Financial Record',
+        ),
       ),
       body: Form(
         key: _formKey,
@@ -207,8 +208,9 @@ class _FinancialRecordEditorPageState
                       Text(
                         "The month and year can't be changed after a record "
                         'is created.',
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: AppColors.textSecondary),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ] else ...[
@@ -231,8 +233,12 @@ class _FinancialRecordEditorPageState
                                           ? '${_kMonthNames[m - 1]} (already added)'
                                           : _kMonthNames[m - 1],
                                       style: takenMonths.contains(m)
-                                          ? Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                              color: Theme.of(context).disabledColor,
+                                          ? Theme.of(
+                                              context,
+                                            ).textTheme.bodyMedium?.copyWith(
+                                              color: Theme.of(
+                                                context,
+                                              ).disabledColor,
                                             )
                                           : null,
                                     ),
@@ -268,9 +274,10 @@ class _FinancialRecordEditorPageState
                           '${_yearController.text.trim()} already exists — '
                           'edit it from the Monthly Detail table instead of '
                           'creating another one.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                         ),
                       ],
                       const SizedBox(height: 16),
@@ -282,7 +289,8 @@ class _FinancialRecordEditorPageState
                       ),
                       decoration: const InputDecoration(
                         labelText: 'FX Rate (PKR per USD)',
-                        helperText: 'Used to compute the USD figures below '
+                        helperText:
+                            'Used to compute the USD figures below '
                             'automatically.',
                       ),
                       validator: _fxRateValidator,
@@ -294,10 +302,9 @@ class _FinancialRecordEditorPageState
                         Expanded(
                           child: TextFormField(
                             controller: _revenueRsController,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             decoration: const InputDecoration(
                               labelText: 'Revenue (Rs)',
                             ),
@@ -323,10 +330,9 @@ class _FinancialRecordEditorPageState
                         Expanded(
                           child: TextFormField(
                             controller: _expenseRsController,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             decoration: const InputDecoration(
                               labelText: 'Expense (Rs)',
                             ),

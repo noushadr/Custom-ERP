@@ -54,10 +54,18 @@ class EmailRemoteDataSource {
     data: {'to': to, 'subject': subject, 'body': body},
   );
 
-  Future<List<InboxMessageModel>> listInbox({int limit = 25}) async {
+  Future<List<InboxMessageModel>> listMessages({
+    String mailbox = 'inbox',
+    int monthsBack = 6,
+    int limit = 200,
+  }) async {
     final response = await _dio.get<List<dynamic>>(
       '/email/inbox',
-      queryParameters: {'limit': limit},
+      queryParameters: {
+        'mailbox': mailbox,
+        'months': monthsBack,
+        'limit': limit,
+      },
     );
     return response.data!
         .cast<Map<String, dynamic>>()
@@ -65,8 +73,39 @@ class EmailRemoteDataSource {
         .toList();
   }
 
-  Future<EmailMessageDetailModel> getMessage(int uid) async {
-    final response = await _dio.get<Map<String, dynamic>>('/email/inbox/$uid');
+  Future<EmailMessageDetailModel> getMessage(
+    int uid, {
+    String mailbox = 'inbox',
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/email/inbox/$uid',
+      queryParameters: {'mailbox': mailbox},
+    );
     return EmailMessageDetailModel.fromJson(response.data!);
+  }
+
+  Future<List<EmailThreadModel>> listThreads({
+    int monthsBack = 6,
+    int limit = 200,
+  }) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/email/threads',
+      queryParameters: {'months': monthsBack, 'limit': limit},
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(EmailThreadModel.fromJson)
+        .toList();
+  }
+
+  Future<EmailThreadDetailModel> getThread(
+    String threadId, {
+    int monthsBack = 6,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/email/threads/$threadId',
+      queryParameters: {'months': monthsBack},
+    );
+    return EmailThreadDetailModel.fromJson(response.data!);
   }
 }

@@ -43,8 +43,7 @@ class AnnouncementBanner extends ConsumerStatefulWidget {
   const AnnouncementBanner({super.key});
 
   @override
-  ConsumerState<AnnouncementBanner> createState() =>
-      _AnnouncementBannerState();
+  ConsumerState<AnnouncementBanner> createState() => _AnnouncementBannerState();
 }
 
 class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
@@ -57,9 +56,7 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
   @override
   void initState() {
     super.initState();
-    ref.read(_dismissalStorageProvider).isDismissedForToday().then((
-      dismissed,
-    ) {
+    ref.read(_dismissalStorageProvider).isDismissedForToday().then((dismissed) {
       if (!mounted) return;
       setState(() {
         _dismissedForToday = dismissed;
@@ -157,7 +154,8 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_checkedDismissal || _dismissedForToday) return const SizedBox.shrink();
+    if (!_checkedDismissal || _dismissedForToday)
+      return const SizedBox.shrink();
 
     final asyncData = ref.watch(todayAnnouncementsProvider);
     final data = asyncData.valueOrNull;
@@ -211,20 +209,12 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
             InkWell(
               onTap: () => _step(-1, items.length),
               borderRadius: BorderRadius.circular(12),
-              child: Icon(
-                Icons.chevron_left,
-                size: 18,
-                color: item.color,
-              ),
+              child: Icon(Icons.chevron_left, size: 18, color: item.color),
             ),
             InkWell(
               onTap: () => _step(1, items.length),
               borderRadius: BorderRadius.circular(12),
-              child: Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: item.color,
-              ),
+              child: Icon(Icons.chevron_right, size: 18, color: item.color),
             ),
           ],
           const SizedBox(width: 8),

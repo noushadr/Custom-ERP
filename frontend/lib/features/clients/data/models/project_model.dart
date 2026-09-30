@@ -17,6 +17,7 @@ class ProjectModel extends Project {
     required super.assignedEmployees,
     required super.targetDepartments,
     required super.services,
+    required super.isArchived,
     required super.createdAt,
     required super.updatedAt,
   });
@@ -45,17 +46,22 @@ class ProjectModel extends Project {
     targetDepartments: (json['targetDepartments'] as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(
-          (d) =>
-              ProjectDepartmentRef(id: d['id'] as String, name: d['name'] as String),
+          (d) => ProjectDepartmentRef(
+            id: d['id'] as String,
+            name: d['name'] as String,
+          ),
         )
         .toList(),
     services: (json['services'] as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(
-          (s) =>
-              ProjectServiceRef(id: s['id'] as String, name: s['name'] as String),
+          (s) => ProjectServiceRef(
+            id: s['id'] as String,
+            name: s['name'] as String,
+          ),
         )
         .toList(),
+    isArchived: json['isArchived'] as bool,
     createdAt: DateTime.parse(json['createdAt'] as String),
     updatedAt: DateTime.parse(json['updatedAt'] as String),
   );

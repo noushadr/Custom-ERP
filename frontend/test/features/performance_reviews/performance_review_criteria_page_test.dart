@@ -102,8 +102,16 @@ void main() {
     await _useTallSurface(tester);
     final repository = FakePerformanceReviewRepository(
       criteria: [
-        buildTestPerformanceReviewCriterion(id: 'a', name: 'First', sortOrder: 0),
-        buildTestPerformanceReviewCriterion(id: 'b', name: 'Second', sortOrder: 1),
+        buildTestPerformanceReviewCriterion(
+          id: 'a',
+          name: 'First',
+          sortOrder: 0,
+        ),
+        buildTestPerformanceReviewCriterion(
+          id: 'b',
+          name: 'Second',
+          sortOrder: 1,
+        ),
       ],
     );
     await tester.pumpWidget(_app(performanceReviewRepository: repository));

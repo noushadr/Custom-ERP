@@ -28,9 +28,7 @@ Widget _app({FakeLeadsRepository? repository, Lead? existingLead}) {
         repository ?? FakeLeadsRepository(),
       ),
     ],
-    child: MaterialApp(
-      home: LeadEditorPage(existingLead: existingLead),
-    ),
+    child: MaterialApp(home: LeadEditorPage(existingLead: existingLead)),
   );
 }
 
@@ -62,9 +60,7 @@ void main() {
     expect(repository.lastCreatedFullName, 'New Prospect');
   });
 
-  testWidgets('pre-fills fields when editing an existing lead', (
-    tester,
-  ) async {
+  testWidgets('pre-fills fields when editing an existing lead', (tester) async {
     final existing = buildTestLead(fullName: 'Existing Prospect');
     await tester.pumpWidget(_app(existingLead: existing));
     await tester.pumpAndSettle();
@@ -79,7 +75,9 @@ void main() {
   testWidgets('saves changes to an existing lead', (tester) async {
     final repository = FakeLeadsRepository();
     final existing = buildTestLead(id: 'lead-9', fullName: 'Existing Prospect');
-    await tester.pumpWidget(_app(repository: repository, existingLead: existing));
+    await tester.pumpWidget(
+      _app(repository: repository, existingLead: existing),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Save changes'));

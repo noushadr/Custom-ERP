@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
 import { Employee } from '../../employee/domain/entities/employee.entity';
 import { EmployeesService } from '../../employee/application/employees.service';
@@ -54,7 +58,9 @@ function buildFreelancer(overrides: Partial<Freelancer> = {}): Freelancer {
   } as Freelancer;
 }
 
-function buildLineItem(overrides: Partial<PayrollLineItem> = {}): PayrollLineItem {
+function buildLineItem(
+  overrides: Partial<PayrollLineItem> = {},
+): PayrollLineItem {
   return {
     id: 'item-1',
     runId: 'run-1',
@@ -156,10 +162,13 @@ describe('PayrollService', () => {
   });
 
   describe('generateRun', () => {
-    it('creates a run and one line item per active employee, with baseSalary and netPay defaulted from that month\'s salary', async () => {
+    it("creates a run and one line item per active employee, with baseSalary and netPay defaulted from that month's salary", async () => {
       employeeRepository.findAll.mockResolvedValue([
         buildEmployee({ id: 'e1', employmentStatus: EmploymentStatus.ACTIVE }),
-        buildEmployee({ id: 'e2', employmentStatus: EmploymentStatus.RESIGNED }),
+        buildEmployee({
+          id: 'e2',
+          employmentStatus: EmploymentStatus.RESIGNED,
+        }),
       ]);
       employeesService.getSalaryAsOf.mockResolvedValue(75000);
       lineItemRepository.findByRunId.mockResolvedValue([
@@ -193,10 +202,16 @@ describe('PayrollService', () => {
 
   describe('updateLineItem', () => {
     it('edits additions/deductions for an employee line item, and netPay reflects both', async () => {
-      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT }),
+      );
       lineItemRepository.findById.mockResolvedValue(buildLineItem());
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ baseSalary: '50000.00', additions: '500.00', deductions: '2000.00' }),
+        buildLineItem({
+          baseSalary: '50000.00',
+          additions: '500.00',
+          deductions: '2000.00',
+        }),
       ]);
 
       const result = await service.updateLineItem('run-1', 'item-1', {
@@ -211,7 +226,9 @@ describe('PayrollService', () => {
     });
 
     it("computes a piece-rate employee's base pay as quantity * perUnitRate, replacing the salary snapshot", async () => {
-      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT }),
+      );
       lineItemRepository.findById.mockResolvedValue(buildLineItem());
       lineItemRepository.findByRunId.mockResolvedValue([
         buildLineItem({
@@ -231,9 +248,16 @@ describe('PayrollService', () => {
     });
 
     it("allows editing a freelancer's baseSalary directly", async () => {
-      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT }),
+      );
       lineItemRepository.findById.mockResolvedValue(
-        buildLineItem({ employeeId: null, employee: null, freelancerId: 'freelancer-1', freelancer: buildFreelancer() }),
+        buildLineItem({
+          employeeId: null,
+          employee: null,
+          freelancerId: 'freelancer-1',
+          freelancer: buildFreelancer(),
+        }),
       );
       lineItemRepository.findByRunId.mockResolvedValue([
         buildLineItem({
@@ -254,7 +278,9 @@ describe('PayrollService', () => {
     });
 
     it("rejects editing an employee's baseSalary directly", async () => {
-      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT }),
+      );
       lineItemRepository.findById.mockResolvedValue(buildLineItem());
 
       await expect(
@@ -285,8 +311,10 @@ describe('PayrollService', () => {
   });
 
   describe('addFreelancerToRun', () => {
-    it("adds a freelancer line item with the entered amount as baseSalary, additions/deductions at 0, employeeId null", async () => {
-      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+    it('adds a freelancer line item with the entered amount as baseSalary, additions/deductions at 0, employeeId null', async () => {
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT }),
+      );
       freelancerRepository.findById.mockResolvedValue(buildFreelancer());
       // First call is the pre-add duplicate check (no existing items yet);
       // second is the post-save refetch used to build the response.
@@ -323,7 +351,9 @@ describe('PayrollService', () => {
     });
 
     it('throws NotFoundException for an unknown freelancerId', async () => {
-      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT }),
+      );
       freelancerRepository.findById.mockResolvedValue(null);
 
       await expect(
@@ -335,10 +365,16 @@ describe('PayrollService', () => {
     });
 
     it('throws ConflictException when the freelancer is already in this run', async () => {
-      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT }),
+      );
       freelancerRepository.findById.mockResolvedValue(buildFreelancer());
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ employeeId: null, employee: null, freelancerId: 'freelancer-1' }),
+        buildLineItem({
+          employeeId: null,
+          employee: null,
+          freelancerId: 'freelancer-1',
+        }),
       ]);
 
       await expect(
@@ -365,7 +401,9 @@ describe('PayrollService', () => {
 
   describe('finalizeRun', () => {
     it('moves a draft run to finalized and stamps the actor', async () => {
-      runRepository.findById.mockResolvedValue(buildRun({ status: PayrollRunStatus.DRAFT }));
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.DRAFT }),
+      );
       employeeRepository.findByUserId.mockResolvedValue(
         buildEmployee({ firstName: 'Jane', lastName: 'Admin' }),
       );
@@ -381,9 +419,9 @@ describe('PayrollService', () => {
         buildRun({ status: PayrollRunStatus.PAID }),
       );
 
-      await expect(service.finalizeRun('run-1', 'admin-1')).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.finalizeRun('run-1', 'admin-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
@@ -414,7 +452,10 @@ describe('PayrollService', () => {
       );
       lineItemRepository.findByRunId.mockResolvedValue([
         buildLineItem({ employee: buildEmployee({ userId: 'user-a' }) }),
-        buildLineItem({ id: 'item-2', employee: buildEmployee({ userId: 'user-b' }) }),
+        buildLineItem({
+          id: 'item-2',
+          employee: buildEmployee({ userId: 'user-b' }),
+        }),
       ]);
 
       await service.payRun('run-1', 'admin-1');
@@ -435,7 +476,12 @@ describe('PayrollService', () => {
         buildRun({ status: PayrollRunStatus.FINALIZED }),
       );
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ employeeId: null, employee: null, freelancerId: 'freelancer-1', freelancer: buildFreelancer() }),
+        buildLineItem({
+          employeeId: null,
+          employee: null,
+          freelancerId: 'freelancer-1',
+          freelancer: buildFreelancer(),
+        }),
       ]);
 
       await service.payRun('run-1', 'admin-1');
@@ -518,6 +564,232 @@ describe('PayrollService', () => {
           itemCount: 1,
         },
       ]);
+    });
+  });
+
+  describe('getPayslipPdf', () => {
+    it('rejects a run that is not Paid', async () => {
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.FINALIZED }),
+      );
+
+      await expect(service.getPayslipPdf('run-1', 'item-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('rejects a freelancer line item', async () => {
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.PAID }),
+      );
+      lineItemRepository.findById.mockResolvedValue(
+        buildLineItem({
+          employeeId: null,
+          employee: null,
+          freelancerId: 'freelancer-1',
+          freelancer: buildFreelancer(),
+        }),
+      );
+
+      await expect(service.getPayslipPdf('run-1', 'item-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("generates a PDF buffer for a Paid run's employee line item", async () => {
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.PAID }),
+      );
+      lineItemRepository.findById.mockResolvedValue(
+        buildLineItem({
+          employee: buildEmployee({
+            employeeCode: 'ZC-00007',
+            joiningDate: '2024-01-01',
+          }),
+        }),
+      );
+
+      const result = await service.getPayslipPdf('run-1', 'item-1');
+
+      expect(result.buffer).toBeInstanceOf(Buffer);
+      expect(result.buffer.length).toBeGreaterThan(0);
+      expect(result.filename).toBe('Payslip-ZC-00007-2026-08.pdf');
+    });
+  });
+
+  describe('getMyPayslips', () => {
+    it('returns an empty list when the caller has no employee profile', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(null);
+
+      const result = await service.getMyPayslips('user-x');
+
+      expect(result).toEqual([]);
+    });
+
+    it("returns only the caller's own line items from Paid runs, newest period first", async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1' }),
+      );
+      runRepository.findAll.mockResolvedValue([
+        buildRun({
+          id: 'run-jan',
+          month: 1,
+          year: 2026,
+          status: PayrollRunStatus.PAID,
+          paidAt: new Date('2026-02-01T00:00:00.000Z'),
+        }),
+        buildRun({
+          id: 'run-feb',
+          month: 2,
+          year: 2026,
+          status: PayrollRunStatus.PAID,
+          paidAt: new Date('2026-03-01T00:00:00.000Z'),
+        }),
+        buildRun({
+          id: 'run-mar-draft',
+          month: 3,
+          year: 2026,
+          status: PayrollRunStatus.DRAFT,
+        }),
+      ]);
+      lineItemRepository.findByRunId.mockImplementation((runId: string) => {
+        if (runId === 'run-jan') {
+          return Promise.resolve([
+            buildLineItem({ id: 'item-jan', runId, employeeId: 'employee-1' }),
+          ]);
+        }
+        if (runId === 'run-feb') {
+          return Promise.resolve([
+            buildLineItem({ id: 'item-feb', runId, employeeId: 'employee-1' }),
+            buildLineItem({
+              id: 'item-other',
+              runId,
+              employeeId: 'someone-else',
+            }),
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      const result = await service.getMyPayslips('user-1');
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          runId: 'run-feb',
+          lineItemId: 'item-feb',
+          month: 2,
+          year: 2026,
+        }),
+        expect.objectContaining({
+          runId: 'run-jan',
+          lineItemId: 'item-jan',
+          month: 1,
+          year: 2026,
+        }),
+      ]);
+    });
+  });
+
+  describe('getEmployeePayslips', () => {
+    it("returns a given employee's own line items from Paid runs, newest period first", async () => {
+      runRepository.findAll.mockResolvedValue([
+        buildRun({
+          id: 'run-jan',
+          month: 1,
+          year: 2026,
+          status: PayrollRunStatus.PAID,
+          paidAt: new Date('2026-02-01T00:00:00.000Z'),
+        }),
+        buildRun({
+          id: 'run-feb',
+          month: 2,
+          year: 2026,
+          status: PayrollRunStatus.PAID,
+          paidAt: new Date('2026-03-01T00:00:00.000Z'),
+        }),
+      ]);
+      lineItemRepository.findByRunId.mockImplementation((runId: string) => {
+        if (runId === 'run-jan') {
+          return Promise.resolve([
+            buildLineItem({ id: 'item-jan', runId, employeeId: 'employee-1' }),
+          ]);
+        }
+        if (runId === 'run-feb') {
+          return Promise.resolve([
+            buildLineItem({ id: 'item-feb', runId, employeeId: 'employee-1' }),
+            buildLineItem({
+              id: 'item-other',
+              runId,
+              employeeId: 'someone-else',
+            }),
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      const result = await service.getEmployeePayslips('employee-1');
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          runId: 'run-feb',
+          lineItemId: 'item-feb',
+          month: 2,
+          year: 2026,
+        }),
+        expect.objectContaining({
+          runId: 'run-jan',
+          lineItemId: 'item-jan',
+          month: 1,
+          year: 2026,
+        }),
+      ]);
+    });
+
+    it('returns an empty list for an employee with no Paid line items', async () => {
+      runRepository.findAll.mockResolvedValue([]);
+
+      const result = await service.getEmployeePayslips('employee-1');
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getMyPayslipPdf', () => {
+    it("refuses a line item that is not the caller's own", async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1' }),
+      );
+      lineItemRepository.findById.mockResolvedValue(
+        buildLineItem({ employeeId: 'someone-else' }),
+      );
+
+      await expect(service.getMyPayslipPdf('user-1', 'item-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it("generates the caller's own payslip PDF", async () => {
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'employee-1' }),
+      );
+      lineItemRepository.findById.mockResolvedValue(
+        buildLineItem({
+          employeeId: 'employee-1',
+          employee: buildEmployee({
+            id: 'employee-1',
+            employeeCode: 'ZC-00007',
+            joiningDate: '2024-01-01',
+          }),
+        }),
+      );
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.PAID }),
+      );
+
+      const result = await service.getMyPayslipPdf('user-1', 'item-1');
+
+      expect(result.buffer).toBeInstanceOf(Buffer);
+      expect(result.filename).toBe('Payslip-ZC-00007-2026-08.pdf');
     });
   });
 });

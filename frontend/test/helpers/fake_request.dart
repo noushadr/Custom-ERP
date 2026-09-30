@@ -115,8 +115,7 @@ class FakeRequestRepository implements RequestRepository {
   Future<List<EmployeeRequest>> getHistory() async => history;
 
   @override
-  Future<List<EmployeeRequest>> getHistoryForMyTeam() async =>
-      historyForMyTeam;
+  Future<List<EmployeeRequest>> getHistoryForMyTeam() async => historyForMyTeam;
 
   @override
   Future<EmployeeRequest> approveAsManager(String requestId) async {

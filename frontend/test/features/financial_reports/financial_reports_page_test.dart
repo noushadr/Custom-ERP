@@ -38,9 +38,7 @@ Finder _periodSegment(String label) => find.descendant(
 );
 
 void main() {
-  testWidgets('shows an empty state when there are no records', (
-    tester,
-  ) async {
+  testWidgets('shows an empty state when there are no records', (tester) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
@@ -49,11 +47,13 @@ void main() {
     expect(find.text('Add Record'), findsOneWidget);
   });
 
-  testWidgets('opens the editor from the "Add Record" button', (
-    tester,
-  ) async {
+  testWidgets('opens the editor from the "Add Record" button', (tester) async {
     await tester.pumpWidget(
-      _app(repository: FakeFinancialReportsRepository(records: [buildTestFinancialRecord()])),
+      _app(
+        repository: FakeFinancialReportsRepository(
+          records: [buildTestFinancialRecord()],
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -63,43 +63,53 @@ void main() {
     expect(find.text('New Financial Record'), findsOneWidget);
   });
 
-  testWidgets('opens the editor pre-filled when a monthly detail row is tapped', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _app(
-        repository: FakeFinancialReportsRepository(
-          records: [
-            buildTestFinancialRecord(id: 'r1', year: 2026, month: 3, revenueRs: 741000),
-          ],
+  testWidgets(
+    'opens the editor pre-filled when a monthly detail row is tapped',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeFinancialReportsRepository(
+            records: [
+              buildTestFinancialRecord(
+                id: 'r1',
+                year: 2026,
+                month: 3,
+                revenueRs: 741000,
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(_periodSegment('2026'));
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(_periodSegment('2026'));
+      await tester.pumpAndSettle();
 
-    final rowCell = find.descendant(
-      of: find.byType(DataTable),
-      matching: find.text('Mar 2026'),
-    );
-    await tester.ensureVisible(rowCell);
-    await tester.tap(rowCell);
-    await tester.pumpAndSettle();
+      final rowCell = find.descendant(
+        of: find.byType(DataTable),
+        matching: find.text('Mar 2026'),
+      );
+      await tester.ensureVisible(rowCell);
+      await tester.tap(rowCell);
+      await tester.pumpAndSettle();
 
-    expect(find.text('Edit Financial Record'), findsOneWidget);
-    final revenueField = tester.widget<TextFormField>(
-      find.widgetWithText(TextFormField, 'Revenue (Rs)'),
-    );
-    expect(revenueField.controller?.text, '741000');
-  });
+      expect(find.text('Edit Financial Record'), findsOneWidget);
+      final revenueField = tester.widget<TextFormField>(
+        find.widgetWithText(TextFormField, 'Revenue (Rs)'),
+      );
+      expect(revenueField.controller?.text, '741000');
+    },
+  );
 
   testWidgets(
     'does not repeat a "Financial Reports" heading — the top bar already '
     'shows it',
     (tester) async {
       await tester.pumpWidget(
-        _app(repository: FakeFinancialReportsRepository(records: [buildTestFinancialRecord()])),
+        _app(
+          repository: FakeFinancialReportsRepository(
+            records: [buildTestFinancialRecord()],
+          ),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -111,7 +121,11 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _app(repository: FakeFinancialReportsRepository(records: [buildTestFinancialRecord()])),
+      _app(
+        repository: FakeFinancialReportsRepository(
+          records: [buildTestFinancialRecord()],
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -155,10 +169,15 @@ void main() {
 
       expect(_periodSegment('All-Time'), findsOneWidget);
       expect(find.text('Totals (All-Time)'), findsOneWidget);
-      expect(find.text('Since Jul 2022 – Jan 2026 · 2 months of data'), findsOneWidget);
+      expect(
+        find.text('Since Jul 2022 – Jan 2026 · 2 months of data'),
+        findsOneWidget,
+      );
 
       final cardValues = {
-        for (final card in tester.widgetList<MetricCard>(find.byType(MetricCard)))
+        for (final card in tester.widgetList<MetricCard>(
+          find.byType(MetricCard),
+        ))
           card.label: card.value,
       };
       // The tile labels themselves stay plain ("Total Revenue", not "Total
@@ -180,65 +199,62 @@ void main() {
     },
   );
 
-  testWidgets(
-    'picking a year narrows the totals and reveals monthly detail; '
-    'switching back to All-Time hides it again',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          repository: FakeFinancialReportsRepository(
-            records: [
-              buildTestFinancialRecord(
-                id: 'r1',
-                year: 2025,
-                month: 1,
-                revenueRs: 500000,
-                revenueUsd: 1786,
-                expenseRs: 400000,
-                expenseUsd: 1429,
-              ),
-              buildTestFinancialRecord(
-                id: 'r2',
-                year: 2026,
-                month: 1,
-                revenueRs: 2000000,
-                revenueUsd: 7142,
-                expenseRs: 1200000,
-                expenseUsd: 4286,
-              ),
-            ],
-          ),
+  testWidgets('picking a year narrows the totals and reveals monthly detail; '
+      'switching back to All-Time hides it again', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakeFinancialReportsRepository(
+          records: [
+            buildTestFinancialRecord(
+              id: 'r1',
+              year: 2025,
+              month: 1,
+              revenueRs: 500000,
+              revenueUsd: 1786,
+              expenseRs: 400000,
+              expenseUsd: 1429,
+            ),
+            buildTestFinancialRecord(
+              id: 'r2',
+              year: 2026,
+              month: 1,
+              revenueRs: 2000000,
+              revenueUsd: 7142,
+              expenseRs: 1200000,
+              expenseUsd: 4286,
+            ),
+          ],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(_periodSegment('2025'));
-      await tester.pumpAndSettle();
+    await tester.tap(_periodSegment('2025'));
+    await tester.pumpAndSettle();
 
-      final cardValues = {
-        for (final card in tester.widgetList<MetricCard>(find.byType(MetricCard)))
-          card.label: card.value,
-      };
-      expect(cardValues['Total Revenue'], 'Rs500,000 (\$1,786)');
-      // The heading switches to the selected year, not "All-Time".
-      expect(find.text('Totals (2025)'), findsOneWidget);
-      expect(find.text('Totals (All-Time)'), findsNothing);
-      expect(find.byType(DataTable), findsOneWidget);
-      expect(
-        find.textContaining('Select a year above to see its monthly'),
-        findsNothing,
-      );
+    final cardValues = {
+      for (final card in tester.widgetList<MetricCard>(find.byType(MetricCard)))
+        card.label: card.value,
+    };
+    expect(cardValues['Total Revenue'], 'Rs500,000 (\$1,786)');
+    // The heading switches to the selected year, not "All-Time".
+    expect(find.text('Totals (2025)'), findsOneWidget);
+    expect(find.text('Totals (All-Time)'), findsNothing);
+    expect(find.byType(DataTable), findsOneWidget);
+    expect(
+      find.textContaining('Select a year above to see its monthly'),
+      findsNothing,
+    );
 
-      await tester.tap(_periodSegment('All-Time'));
-      await tester.pumpAndSettle();
+    await tester.tap(_periodSegment('All-Time'));
+    await tester.pumpAndSettle();
 
-      expect(find.byType(DataTable), findsNothing);
-      expect(
-        find.textContaining('Select a year above to see its monthly'),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(find.byType(DataTable), findsNothing);
+    expect(
+      find.textContaining('Select a year above to see its monthly'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets(
     'the monthly charts label each bar with a plain month — the chart '
@@ -248,9 +264,7 @@ void main() {
       await tester.pumpWidget(
         _app(
           repository: FakeFinancialReportsRepository(
-            records: [
-              buildTestFinancialRecord(id: 'r1', year: 2026, month: 3),
-            ],
+            records: [buildTestFinancialRecord(id: 'r1', year: 2026, month: 3)],
           ),
         ),
       );
@@ -265,33 +279,32 @@ void main() {
     },
   );
 
-  testWidgets(
-    'the revenue growth chart spans every record regardless of the '
-    'selected period, and stays hidden with fewer than 2 records',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          repository: FakeFinancialReportsRepository(
-            records: [
-              buildTestFinancialRecord(id: 'r1', year: 2022, month: 7),
-              buildTestFinancialRecord(id: 'r2', year: 2026, month: 1),
-            ],
-          ),
+  testWidgets('the revenue growth chart spans every record regardless of the '
+      'selected period, and stays hidden with fewer than 2 records', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakeFinancialReportsRepository(
+          records: [
+            buildTestFinancialRecord(id: 'r1', year: 2022, month: 7),
+            buildTestFinancialRecord(id: 'r2', year: 2026, month: 1),
+          ],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // Visible by default in All-Time...
-      expect(find.text('Revenue Growth — All-Time'), findsOneWidget);
+    // Visible by default in All-Time...
+    expect(find.text('Revenue Growth — All-Time'), findsOneWidget);
 
-      await tester.tap(_periodSegment('2026'));
-      await tester.pumpAndSettle();
+    await tester.tap(_periodSegment('2026'));
+    await tester.pumpAndSettle();
 
-      // ...and stays visible, still covering both records, after narrowing
-      // to a single year via the Period selector.
-      expect(find.text('Revenue Growth — All-Time'), findsOneWidget);
-    },
-  );
+    // ...and stays visible, still covering both records, after narrowing
+    // to a single year via the Period selector.
+    expect(find.text('Revenue Growth — All-Time'), findsOneWidget);
+  });
 
   testWidgets(
     'the revenue growth chart stays hidden with fewer than 2 records',
@@ -325,45 +338,49 @@ void main() {
     },
   );
 
-  testWidgets('the monthly detail table shows each record once a year is picked', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _app(
-        repository: FakeFinancialReportsRepository(
-          records: [
-            buildTestFinancialRecord(
-              id: 'r1',
-              year: 2026,
-              month: 3,
-              revenueRs: 741000,
-              revenueUsd: 2647,
-              expenseRs: 489984,
-              expenseUsd: 1750,
-            ),
-          ],
+  testWidgets(
+    'the monthly detail table shows each record once a year is picked',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeFinancialReportsRepository(
+            records: [
+              buildTestFinancialRecord(
+                id: 'r1',
+                year: 2026,
+                month: 3,
+                revenueRs: 741000,
+                revenueUsd: 2647,
+                expenseRs: 489984,
+                expenseUsd: 1750,
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(_periodSegment('2026'));
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(_periodSegment('2026'));
+      await tester.pumpAndSettle();
 
-    // "Mar 2026" also appears on the Best/Worst Month tiles above the
-    // table, since this record is the only one in the year — scope to the
-    // table specifically.
-    expect(
-      find.descendant(of: find.byType(DataTable), matching: find.text('Mar 2026')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byType(DataTable),
-        matching: find.text('Rs741,000 (\$2,647)'),
-      ),
-      findsOneWidget,
-    );
-  });
+      // "Mar 2026" also appears on the Best/Worst Month tiles above the
+      // table, since this record is the only one in the year — scope to the
+      // table specifically.
+      expect(
+        find.descendant(
+          of: find.byType(DataTable),
+          matching: find.text('Mar 2026'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(DataTable),
+          matching: find.text('Rs741,000 (\$2,647)'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'shows an access-denied message instead of any financial data for a '

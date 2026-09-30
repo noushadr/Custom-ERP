@@ -52,8 +52,7 @@ class _DashboardStats extends StatelessWidget {
             children: [
               _UpcomingWorkAnniversaryCard(),
               _EmployeeOfMonthCard(),
-              _LastBirthdayCard(),
-              _UpcomingBirthdayCard(),
+              _BirthdaysCard(),
               _UpcomingHolidayCard(),
               _TasksSummaryCard(),
             ],
@@ -241,15 +240,18 @@ class _EmployeeOfMonthCard extends ConsumerWidget {
   }
 }
 
-class _LastBirthdayCard extends ConsumerWidget {
-  const _LastBirthdayCard();
+/// Combines what used to be two separate cards (Last Birthday, Upcoming
+/// Birthday) into one, each person on their own row — same "stack multiple
+/// people in one card" shape as `_UpcomingWorkAnniversaryCard`.
+class _BirthdaysCard extends ConsumerWidget {
+  const _BirthdaysCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final spotlightAsync = ref.watch(birthdaySpotlightProvider);
 
     return _SpotlightCard(
-      title: 'Last Birthday',
+      title: 'Birthdays',
       icon: Icons.cake_outlined,
       color: AppColors.secondary,
       child: spotlightAsync.when(
@@ -257,14 +259,33 @@ class _LastBirthdayCard extends ConsumerWidget {
         error: (_, _) => const _SpotlightEmpty('Could not load.'),
         data: (spotlight) {
           final last = spotlight.last;
-          if (last == null) {
-            return const _SpotlightEmpty('No recent birthdays.');
+          final upcoming = spotlight.upcoming;
+          if (last == null && upcoming == null) {
+            return const _SpotlightEmpty('No birthdays to show.');
           }
-          return _SpotlightPerson(
-            employeeId: last.employeeId,
-            fullName: last.fullName,
-            photoUrl: last.profilePhotoUrl,
-            caption: '${formatMonthDay(last.dateOfBirth)} · ${_agoLabel(last)}',
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (last != null)
+                _SpotlightPerson(
+                  employeeId: last.employeeId,
+                  fullName: last.fullName,
+                  photoUrl: last.profilePhotoUrl,
+                  caption:
+                      '${formatMonthDay(last.dateOfBirth)} · ${_agoLabel(last)}',
+                ),
+              if (last != null && upcoming != null) const SizedBox(height: 10),
+              if (upcoming != null)
+                _SpotlightPerson(
+                  employeeId: upcoming.employeeId,
+                  fullName: upcoming.fullName,
+                  photoUrl: upcoming.profilePhotoUrl,
+                  caption: upcoming.daysUntil == 0
+                      ? 'Today! 🎉'
+                      : '${formatMonthDay(upcoming.dateOfBirth)} · ${_inLabel(upcoming.daysUntil)}',
+                ),
+            ],
           );
         },
       ),
@@ -274,39 +295,6 @@ class _LastBirthdayCard extends ConsumerWidget {
   String _agoLabel(UpcomingBirthday birthday) {
     final daysAgo = -birthday.daysUntil;
     return daysAgo == 1 ? '1 day ago' : '$daysAgo days ago';
-  }
-}
-
-class _UpcomingBirthdayCard extends ConsumerWidget {
-  const _UpcomingBirthdayCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final spotlightAsync = ref.watch(birthdaySpotlightProvider);
-
-    return _SpotlightCard(
-      title: 'Upcoming Birthday',
-      icon: Icons.cake_outlined,
-      color: AppColors.secondary,
-      child: spotlightAsync.when(
-        loading: () => const _SpotlightEmpty('Loading…'),
-        error: (_, _) => const _SpotlightEmpty('Could not load.'),
-        data: (spotlight) {
-          final upcoming = spotlight.upcoming;
-          if (upcoming == null) {
-            return const _SpotlightEmpty('No upcoming birthdays.');
-          }
-          return _SpotlightPerson(
-            employeeId: upcoming.employeeId,
-            fullName: upcoming.fullName,
-            photoUrl: upcoming.profilePhotoUrl,
-            caption: upcoming.daysUntil == 0
-                ? 'Today! 🎉'
-                : '${formatMonthDay(upcoming.dateOfBirth)} · ${_inLabel(upcoming.daysUntil)}',
-          );
-        },
-      ),
-    );
   }
 
   String _inLabel(int daysUntil) =>

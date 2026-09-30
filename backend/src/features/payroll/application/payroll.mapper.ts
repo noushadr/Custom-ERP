@@ -20,7 +20,8 @@ export function toPayrollLineItemResponse(
 
   const salarySnapshot = Number(item.baseSalary);
   const quantity = item.quantity ?? null;
-  const perUnitRate = item.perUnitRate != null ? Number(item.perUnitRate) : null;
+  const perUnitRate =
+    item.perUnitRate != null ? Number(item.perUnitRate) : null;
   const baseSalary =
     quantity != null && quantity > 0 && perUnitRate != null
       ? quantity * perUnitRate
@@ -72,7 +73,10 @@ export function toPayrollDepartmentTotals(
       existing.itemCount += 1;
     } else {
       totalsByKey.set(key, {
-        departmentId: item.freelancerId != null ? null : (item.employee?.departmentId ?? null),
+        departmentId:
+          item.freelancerId != null
+            ? null
+            : (item.employee?.departmentId ?? null),
         departmentName,
         totalNetPay: netPay,
         itemCount: 1,

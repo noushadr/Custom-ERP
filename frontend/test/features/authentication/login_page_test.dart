@@ -101,9 +101,7 @@ void main() {
     expect(find.text('Password is required'), findsOneWidget);
   });
 
-  testWidgets('shows a validation error for a malformed email', (
-    tester,
-  ) async {
+  testWidgets('shows a validation error for a malformed email', (tester) async {
     await tester.pumpWidget(_appWith(FakeAuthRepository()));
     await tester.pumpAndSettle();
 

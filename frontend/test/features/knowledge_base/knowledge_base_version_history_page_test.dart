@@ -71,9 +71,7 @@ void main() {
     expect(find.text('No version history yet.'), findsOneWidget);
   });
 
-  testWidgets('tapping a version opens its read-only content', (
-    tester,
-  ) async {
+  testWidgets('tapping a version opens its read-only content', (tester) async {
     final repository = FakeKnowledgeBaseRepository(
       versionHistory: [
         buildTestKnowledgeBaseArticleVersionSummary(id: 'v1', versionNumber: 1),

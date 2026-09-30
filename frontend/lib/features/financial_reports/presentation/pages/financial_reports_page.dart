@@ -169,7 +169,8 @@ class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
             });
           final years = {for (final r in sorted) r.year}.toList()
             ..sort((a, b) => b.compareTo(a));
-          final selectedYear = (_selectedYear != null && years.contains(_selectedYear))
+          final selectedYear =
+              (_selectedYear != null && years.contains(_selectedYear))
               ? _selectedYear
               : null;
           final isAllTime = selectedYear == null;
@@ -206,7 +207,10 @@ class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
                       ),
                       showSelectedIcon: false,
                       segments: [
-                        const ButtonSegment(value: null, label: Text('All-Time')),
+                        const ButtonSegment(
+                          value: null,
+                          label: Text('All-Time'),
+                        ),
                         for (final year in years)
                           ButtonSegment(value: year, label: Text('$year')),
                       ],
@@ -227,7 +231,10 @@ class _FinancialReportsPageState extends ConsumerState<FinancialReportsPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _SummaryStatsRow(records: scopedRecords, scopeLabel: scopeLabel),
+                _SummaryStatsRow(
+                  records: scopedRecords,
+                  scopeLabel: scopeLabel,
+                ),
                 const SizedBox(height: 16),
                 // Always the full history, independent of the Period
                 // selector above — "from day 1" means every record, not
@@ -345,7 +352,8 @@ class _SummaryStatsRow extends StatelessWidget {
     final avgProfitRs = totalProfitRs / monthCount;
     final avgProfitUsd = totalProfitUsd / monthCount;
 
-    final byProfit = [...records]..sort((a, b) => a.profitRs.compareTo(b.profitRs));
+    final byProfit = [...records]
+      ..sort((a, b) => a.profitRs.compareTo(b.profitRs));
     final worstMonth = byProfit.first;
     final bestMonth = byProfit.last;
     final profitableMonths = records.where((r) => r.profitRs >= 0).length;
@@ -399,7 +407,8 @@ class _SummaryStatsRow extends StatelessWidget {
             MetricCard(
               label: 'Profit Margin',
               value: _formatPercent(profitMargin),
-              secondaryValue: '$profitableMonths of $monthCount months profitable',
+              secondaryValue:
+                  '$profitableMonths of $monthCount months profitable',
               color: profitMargin >= 0 ? AppColors.success : AppColors.error,
               icon: Icons.percent_outlined,
               // Matches the money tiles' size for visual consistency across
@@ -451,7 +460,10 @@ class _SummaryStatsRow extends StatelessWidget {
               label: 'Worst Month (by Profit)',
               valueRs: worstMonth.profitRs,
               valueUsd: worstMonth.profitUsd,
-              secondaryValue: _formatMonthYear(worstMonth.month, worstMonth.year),
+              secondaryValue: _formatMonthYear(
+                worstMonth.month,
+                worstMonth.year,
+              ),
               color: worstMonth.profitRs >= 0
                   ? AppColors.success
                   : AppColors.error,
@@ -673,10 +685,7 @@ class _ProfitTrendChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _ChartLegend(
-            entries: [
-              ('Profit', AppColors.success),
-              ('Loss', AppColors.error),
-            ],
+            entries: [('Profit', AppColors.success), ('Loss', AppColors.error)],
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -929,8 +938,7 @@ class _RevenueGrowthChart extends StatelessWidget {
             height: _chartHeight + 26,
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final plotWidth =
-                    constraints.maxWidth - _horizontalPadding * 2;
+                final plotWidth = constraints.maxWidth - _horizontalPadding * 2;
                 final pointSpacing = plotWidth / (records.length - 1);
                 final points = [
                   for (var i = 0; i < records.length; i++)
@@ -966,7 +974,10 @@ class _RevenueGrowthChart extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: AppColors.primary,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 1.5),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                         ),
@@ -978,7 +989,9 @@ class _RevenueGrowthChart extends StatelessWidget {
                     // stay inside the chart's own bounds rather than
                     // centered, so neither ever clips past its edge.
                     for (var i = 0; i < records.length; i++)
-                      if (i == 0 || i == records.length - 1 || records[i].month == 1)
+                      if (i == 0 ||
+                          i == records.length - 1 ||
+                          records[i].month == 1)
                         Positioned(
                           left: i == 0
                               ? points[i].dx
@@ -988,11 +1001,8 @@ class _RevenueGrowthChart extends StatelessWidget {
                           top: _chartHeight + 6,
                           child: Text(
                             '${records[i].year}',
-                            style: Theme.of(
-                              context,
-                            ).textTheme.labelSmall?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(color: AppColors.textSecondary),
                           ),
                         ),
                   ],
@@ -1067,7 +1077,9 @@ class _MonthlyRecordsTable extends StatelessWidget {
                 ),
                 cells: [
                   DataCell(
-                    Text('${_kMonthAbbreviations[record.month - 1]} ${record.year}'),
+                    Text(
+                      '${_kMonthAbbreviations[record.month - 1]} ${record.year}',
+                    ),
                   ),
                   DataCell(
                     Text.rich(

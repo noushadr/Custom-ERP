@@ -48,7 +48,10 @@ void main() {
     expect(find.text('Onboarding SOP'), findsOneWidget);
     expect(find.text('By Jane Doe'), findsOneWidget);
     expect(find.text('Published Jan 05, 2026'), findsOneWidget);
-    expect(find.text('Last updated Feb 10, 2026 by Mona Manager'), findsOneWidget);
+    expect(
+      find.text('Last updated Feb 10, 2026 by Mona Manager'),
+      findsOneWidget,
+    );
     // The Quill viewer renders the delta through its own internal
     // RenderObject tree rather than plain Text/RichText widgets, so verify
     // the right content was handed to it rather than the rendered pixels.

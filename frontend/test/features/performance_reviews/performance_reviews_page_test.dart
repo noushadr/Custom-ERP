@@ -42,31 +42,30 @@ const _hrUser = AuthUser(
 );
 
 void main() {
-  testWidgets(
-    'shows finalized reviews to a performance.manage holder',
-    (tester) async {
-      await _useTallSurface(tester);
-      await tester.pumpWidget(
-        _app(
-          user: _hrUser,
-          performanceReviewRepository: FakePerformanceReviewRepository(
-            finalizedReviews: [
-              buildTestPerformanceReview(
-                id: 'review-1',
-                employeeName: 'Jane Doe',
-                reviewYear: 2,
-                status: 'finalized',
-              ),
-            ],
-          ),
+  testWidgets('shows finalized reviews to a performance.manage holder', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        user: _hrUser,
+        performanceReviewRepository: FakePerformanceReviewRepository(
+          finalizedReviews: [
+            buildTestPerformanceReview(
+              id: 'review-1',
+              employeeName: 'Jane Doe',
+              reviewYear: 2,
+              status: 'finalized',
+            ),
+          ],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Finalized Reviews'), findsOneWidget);
-      expect(find.text('Year 2 Review — Jane Doe'), findsOneWidget);
-    },
-  );
+    expect(find.text('Finalized Reviews'), findsOneWidget);
+    expect(find.text('Year 2 Review — Jane Doe'), findsOneWidget);
+  });
 
   testWidgets(
     'shows pending reviews company-wide to a performance.manage holder',
@@ -94,17 +93,16 @@ void main() {
     },
   );
 
-  testWidgets(
-    'shows an empty state when no reviews are pending',
-    (tester) async {
-      await _useTallSurface(tester);
-      await tester.pumpWidget(_app(user: _hrUser));
-      await tester.pumpAndSettle();
+  testWidgets('shows an empty state when no reviews are pending', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(_app(user: _hrUser));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Pending Reviews'), findsOneWidget);
-      expect(find.text('No reviews are pending right now.'), findsOneWidget);
-    },
-  );
+    expect(find.text('Pending Reviews'), findsOneWidget);
+    expect(find.text('No reviews are pending right now.'), findsOneWidget);
+  });
 
   testWidgets(
     'hides the company-wide pending reviews section without performance.manage',
@@ -117,20 +115,16 @@ void main() {
     },
   );
 
-  testWidgets(
-    'shows an empty state when nothing has been finalized yet',
-    (tester) async {
-      await _useTallSurface(tester);
-      await tester.pumpWidget(_app(user: _hrUser));
-      await tester.pumpAndSettle();
+  testWidgets('shows an empty state when nothing has been finalized yet', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(_app(user: _hrUser));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Finalized Reviews'), findsOneWidget);
-      expect(
-        find.text('No reviews have been finalized yet.'),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(find.text('Finalized Reviews'), findsOneWidget);
+    expect(find.text('No reviews have been finalized yet.'), findsOneWidget);
+  });
 
   testWidgets(
     'hides the finalized reviews section without performance.manage',

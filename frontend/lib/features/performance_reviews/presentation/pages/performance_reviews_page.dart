@@ -79,9 +79,9 @@ class _MyReviewsSection extends ConsumerWidget {
           if (reviews.isEmpty) {
             return Text(
               "You don't have any performance reviews yet.",
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
           final sorted = [...reviews]
@@ -123,9 +123,9 @@ class _PendingManagerActionSection extends ConsumerWidget {
           if (reviews.isEmpty) {
             return Text(
               'Nothing is waiting for your review right now.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
           return Column(
@@ -167,9 +167,9 @@ class _PendingHrFinalizationSection extends ConsumerWidget {
           if (reviews.isEmpty) {
             return Text(
               'Nothing is awaiting finalization right now.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
           return Column(
@@ -214,9 +214,9 @@ class _PendingReviewsSection extends ConsumerWidget {
           if (reviews.isEmpty) {
             return Text(
               'No reviews are pending right now.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
           return Column(
@@ -261,16 +261,17 @@ class _FinalizedReviewsSection extends ConsumerWidget {
           if (reviews.isEmpty) {
             return Text(
               'No reviews have been finalized yet.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
-          final sorted = [...reviews]..sort((a, b) {
-            final aAt = a.finalizedAt ?? a.createdAt;
-            final bAt = b.finalizedAt ?? b.createdAt;
-            return bAt.compareTo(aAt);
-          });
+          final sorted = [...reviews]
+            ..sort((a, b) {
+              final aAt = a.finalizedAt ?? a.createdAt;
+              final bAt = b.finalizedAt ?? b.createdAt;
+              return bAt.compareTo(aAt);
+            });
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

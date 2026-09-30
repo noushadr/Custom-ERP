@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
@@ -41,6 +42,23 @@ export class PayrollController {
     return this.payrollService.updateLineItem(runId, lineItemId, dto);
   }
 
+  @Get('runs/:runId/line-items/:lineItemId/payslip')
+  async downloadPayslip(
+    @Param('runId') runId: string,
+    @Param('lineItemId') lineItemId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.payrollService.getPayslipPdf(
+      runId,
+      lineItemId,
+    );
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+    res.send(buffer);
+  }
+
   @Post('runs/:runId/freelancer-line-items')
   addFreelancerToRun(
     @Param('runId') runId: string,
@@ -57,5 +75,10 @@ export class PayrollController {
   @Post('runs/:id/pay')
   payRun(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.payrollService.payRun(id, user.sub);
+  }
+
+  @Get('employees/:employeeId/payslips')
+  getEmployeePayslips(@Param('employeeId') employeeId: string) {
+    return this.payrollService.getEmployeePayslips(employeeId);
   }
 }

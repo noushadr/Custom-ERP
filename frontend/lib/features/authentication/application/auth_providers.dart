@@ -32,6 +32,5 @@ final authRepositoryProvider = Provider<AuthRepository>(
 );
 
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
-  (ref) => AuthController(ref.watch(authRepositoryProvider))
-    ..restoreSession(),
+  (ref) => AuthController(ref.watch(authRepositoryProvider))..restoreSession(),
 );

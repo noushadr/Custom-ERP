@@ -68,9 +68,7 @@ void main() {
     expect(find.text('No articles have been published yet.'), findsOneWidget);
   });
 
-  testWidgets('tapping an article row opens the article page', (
-    tester,
-  ) async {
+  testWidgets('tapping an article row opens the article page', (tester) async {
     final repository = FakeKnowledgeBaseRepository(
       articles: [
         buildTestKnowledgeBaseArticleSummary(

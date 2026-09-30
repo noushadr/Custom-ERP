@@ -169,8 +169,9 @@ export class EmployeesService {
       throw new ConflictException('A user with this email already exists');
     }
 
-    const employeeRole =
-      await this.roleRepository.findByName(DEFAULT_EMPLOYEE_ROLE);
+    const employeeRole = await this.roleRepository.findByName(
+      DEFAULT_EMPLOYEE_ROLE,
+    );
     if (!employeeRole) {
       throw new InternalServerErrorException(
         `Default "${DEFAULT_EMPLOYEE_ROLE}" role is not seeded`,
@@ -189,7 +190,8 @@ export class EmployeesService {
 
     const employee = new Employee();
     employee.userId = savedUser.id;
-    employee.employeeCode = dto.employeeCode ?? (await this.generateEmployeeCode());
+    employee.employeeCode =
+      dto.employeeCode ?? (await this.generateEmployeeCode());
     employee.firstName = dto.firstName;
     employee.lastName = dto.lastName;
     employee.designation = dto.designation;
@@ -198,7 +200,8 @@ export class EmployeesService {
     employee.joiningDate =
       dto.joiningDate ?? new Date().toISOString().slice(0, 10);
     employee.probationEndDate =
-      dto.probationEndDate ?? this.defaultProbationEndDate(employee.joiningDate);
+      dto.probationEndDate ??
+      this.defaultProbationEndDate(employee.joiningDate);
     employee.workMode = dto.workMode ?? WorkMode.ON_SITE;
     employee.skills = [];
     employee.certifications = [];
@@ -250,7 +253,9 @@ export class EmployeesService {
         daysUntil: this.closestAnnualOccurrence(employee.dateOfBirth!, today)
           .daysUntil,
       }))
-      .filter(({ daysUntil }) => daysUntil <= withinDays && daysUntil >= -recentDays)
+      .filter(
+        ({ daysUntil }) => daysUntil <= withinDays && daysUntil >= -recentDays,
+      )
       .sort((a, b) => a.daysUntil - b.daysUntil)
       .map(({ employee, daysUntil }) => ({
         employeeId: employee.id,
@@ -262,13 +267,12 @@ export class EmployeesService {
   }
 
   /** The single most-recently-passed and single soonest-upcoming birthday
-   * among active employees, for the Admin Dashboard's "Last Birthday"/
-   * "Upcoming Birthday" cards — reuses `getUpcomingBirthdays`'s own date
-   * math rather than recomputing it, just called with a window wide enough
-   * (`closestAnnualOccurrence` never returns more than ~183 days out) to
-   * never truncate either side. */
+   * among active employees, for the Admin Dashboard's Birthdays card —
+   * reuses `getUpcomingBirthdays`'s own date math rather than recomputing
+   * it. Scoped to the last/next 15 days only — a birthday further out than
+   * that shouldn't show as "last"/"upcoming" on the dashboard. */
   async getBirthdaySpotlight(): Promise<BirthdaySpotlightResponse> {
-    const all = await this.getUpcomingBirthdays(366, 366);
+    const all = await this.getUpcomingBirthdays(15, 15);
     const past = all.filter((b) => b.daysUntil < 0);
     const future = all.filter((b) => b.daysUntil >= 0);
     return {
@@ -294,7 +298,9 @@ export class EmployeesService {
     today.setHours(0, 0, 0, 0);
 
     return employees
-      .filter((employee) => employee.employmentStatus === EmploymentStatus.ACTIVE)
+      .filter(
+        (employee) => employee.employmentStatus === EmploymentStatus.ACTIVE,
+      )
       .map((employee) => {
         const { daysUntil, occurrenceYear } = this.closestAnnualOccurrence(
           employee.joiningDate,
@@ -306,7 +312,9 @@ export class EmployeesService {
       })
       .filter(
         ({ daysUntil, yearsOfService }) =>
-          yearsOfService >= 1 && daysUntil <= withinDays && daysUntil >= -recentDays,
+          yearsOfService >= 1 &&
+          daysUntil <= withinDays &&
+          daysUntil >= -recentDays,
       )
       .sort((a, b) => a.daysUntil - b.daysUntil)
       .map(({ employee, daysUntil, yearsOfService }) => ({
@@ -412,14 +420,20 @@ export class EmployeesService {
     const msPerDay = 24 * 60 * 60 * 1000;
     const candidates = [-1, 0, 1].map((yearOffset) => {
       const occurrenceYear = today.getFullYear() + yearOffset;
-      const occurrence = new Date(occurrenceYear, date.getMonth(), date.getDate());
+      const occurrence = new Date(
+        occurrenceYear,
+        date.getMonth(),
+        date.getDate(),
+      );
       const daysUntil = Math.round(
         (occurrence.getTime() - today.getTime()) / msPerDay,
       );
       return { daysUntil, occurrenceYear };
     });
     return candidates.reduce((closest, candidate) =>
-      Math.abs(candidate.daysUntil) < Math.abs(closest.daysUntil) ? candidate : closest,
+      Math.abs(candidate.daysUntil) < Math.abs(closest.daysUntil)
+        ? candidate
+        : closest,
     );
   }
 
@@ -493,9 +507,8 @@ export class EmployeesService {
     employeeId: string,
     asOfIsoDate: string,
   ): Promise<number> {
-    const records = await this.salaryRecordRepository.findByEmployeeId(
-      employeeId,
-    );
+    const records =
+      await this.salaryRecordRepository.findByEmployeeId(employeeId);
     const eligible = records.filter(
       (record) => record.effectiveDate <= asOfIsoDate,
     );
@@ -506,7 +519,11 @@ export class EmployeesService {
   async findById(id: string, viewer: JwtPayload): Promise<EmployeeResponse> {
     const employee = await this.employeeRepository.findById(id);
     if (!employee) throw new NotFoundException('Employee not found');
-    return this.applyFieldVisibility(toEmployeeResponse(employee), employee, viewer);
+    return this.applyFieldVisibility(
+      toEmployeeResponse(employee),
+      employee,
+      viewer,
+    );
   }
 
   /** Financial/personal-contact fields are only visible to `employees.manage`
@@ -677,9 +694,7 @@ export class EmployeesService {
 
     const emailChanged = !!companyEmail && companyEmail !== previousEmail;
     if (emailChanged) {
-      const existingUser = await this.userRepository.findByEmail(
-        companyEmail,
-      );
+      const existingUser = await this.userRepository.findByEmail(companyEmail);
       if (existingUser && existingUser.id !== employee.userId) {
         throw new ConflictException('A user with this email already exists');
       }
@@ -1074,7 +1089,13 @@ export class EmployeesService {
     await this.recordAuditEntries(
       employeeId,
       { userId: actorUserId, name: actorName },
-      [{ fieldLabel: 'Assets', oldValue: null, newValue: `Assigned ${saved.name}` }],
+      [
+        {
+          fieldLabel: 'Assets',
+          oldValue: null,
+          newValue: `Assigned ${saved.name}`,
+        },
+      ],
     );
 
     return toAssetResponse(saved);
@@ -1105,7 +1126,13 @@ export class EmployeesService {
     await this.recordAuditEntries(
       employeeId,
       { userId: actorUserId, name: actorName },
-      [{ fieldLabel: 'Assets', oldValue: `Assigned ${assetName}`, newValue: null }],
+      [
+        {
+          fieldLabel: 'Assets',
+          oldValue: `Assigned ${assetName}`,
+          newValue: null,
+        },
+      ],
     );
   }
 

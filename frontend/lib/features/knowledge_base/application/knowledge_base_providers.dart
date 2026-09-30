@@ -38,10 +38,7 @@ final knowledgeBaseArticleProvider = FutureProvider.autoDispose
     });
 
 final knowledgeBaseVersionHistoryProvider = FutureProvider.autoDispose
-    .family<List<KnowledgeBaseArticleVersionSummary>, String>((
-      ref,
-      articleId,
-    ) {
+    .family<List<KnowledgeBaseArticleVersionSummary>, String>((ref, articleId) {
       ref.watch(authControllerProvider);
       return ref
           .watch(knowledgeBaseRepositoryProvider)
@@ -49,11 +46,12 @@ final knowledgeBaseVersionHistoryProvider = FutureProvider.autoDispose
     });
 
 final knowledgeBaseVersionProvider = FutureProvider.autoDispose
-    .family<KnowledgeBaseArticleVersion, (String articleId, String versionId)>(
-      (ref, params) {
-        ref.watch(authControllerProvider);
-        return ref
-            .watch(knowledgeBaseRepositoryProvider)
-            .getVersion(params.$1, params.$2);
-      },
-    );
+    .family<KnowledgeBaseArticleVersion, (String articleId, String versionId)>((
+      ref,
+      params,
+    ) {
+      ref.watch(authControllerProvider);
+      return ref
+          .watch(knowledgeBaseRepositoryProvider)
+          .getVersion(params.$1, params.$2);
+    });

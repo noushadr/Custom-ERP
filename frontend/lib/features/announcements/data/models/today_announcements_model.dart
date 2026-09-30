@@ -21,9 +21,7 @@ class TodayAnnouncementsModel extends TodayAnnouncements {
             (b) => TodayBirthday(
               employeeId: b['employeeId'] as String,
               fullName: b['fullName'] as String,
-              profilePhotoUrl: resolvePhotoUrl(
-                b['profilePhotoUrl'] as String?,
-              ),
+              profilePhotoUrl: resolvePhotoUrl(b['profilePhotoUrl'] as String?),
             ),
           )
           .toList(),
@@ -34,9 +32,7 @@ class TodayAnnouncementsModel extends TodayAnnouncements {
               employeeId: a['employeeId'] as String,
               fullName: a['fullName'] as String,
               yearsOfService: a['yearsOfService'] as int,
-              profilePhotoUrl: resolvePhotoUrl(
-                a['profilePhotoUrl'] as String?,
-              ),
+              profilePhotoUrl: resolvePhotoUrl(a['profilePhotoUrl'] as String?),
             ),
           )
           .toList(),

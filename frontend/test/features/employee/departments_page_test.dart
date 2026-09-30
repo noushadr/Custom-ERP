@@ -83,9 +83,7 @@ void main() {
     tester,
   ) async {
     final repository = FakeEmployeeRepository(
-      departments: const [
-        Department(id: 'department-1', name: 'Engineering'),
-      ],
+      departments: const [Department(id: 'department-1', name: 'Engineering')],
     );
 
     await tester.pumpWidget(_app(repository));
@@ -201,9 +199,7 @@ void main() {
     tester,
   ) async {
     final repository = FakeEmployeeRepository(
-      departments: const [
-        Department(id: 'department-1', name: 'Engineering'),
-      ],
+      departments: const [Department(id: 'department-1', name: 'Engineering')],
     );
 
     await tester.pumpWidget(_app(repository));
@@ -223,11 +219,7 @@ void main() {
     (tester) async {
       final repository = FakeEmployeeRepository(
         departments: const [
-          Department(
-            id: 'department-1',
-            name: 'Engineering',
-            isArchived: true,
-          ),
+          Department(id: 'department-1', name: 'Engineering', isArchived: true),
         ],
       );
 
@@ -254,9 +246,7 @@ void main() {
   testWidgets('deleting a department asks for confirmation before calling '
       'deleteDepartment', (tester) async {
     final repository = FakeEmployeeRepository(
-      departments: const [
-        Department(id: 'department-1', name: 'Engineering'),
-      ],
+      departments: const [Department(id: 'department-1', name: 'Engineering')],
     );
 
     await tester.pumpWidget(_app(repository));
@@ -280,9 +270,7 @@ void main() {
     tester,
   ) async {
     final repository = FakeEmployeeRepository(
-      departments: const [
-        Department(id: 'department-1', name: 'Engineering'),
-      ],
+      departments: const [Department(id: 'department-1', name: 'Engineering')],
     );
 
     await tester.pumpWidget(_app(repository));

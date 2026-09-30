@@ -134,29 +134,34 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
   });
 
-  testWidgets('deleting a holiday asks for confirmation before calling delete', (
-    tester,
-  ) async {
-    final repository = FakeHolidayRepository(
-      holidays: const [
-        Holiday(id: 'holiday-1', name: 'Independence Day', date: '2026-08-14'),
-      ],
-    );
+  testWidgets(
+    'deleting a holiday asks for confirmation before calling delete',
+    (tester) async {
+      final repository = FakeHolidayRepository(
+        holidays: const [
+          Holiday(
+            id: 'holiday-1',
+            name: 'Independence Day',
+            date: '2026-08-14',
+          ),
+        ],
+      );
 
-    await tester.pumpWidget(_app(repository));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_app(repository));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.delete_outline));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Delete holiday?'), findsOneWidget);
-    expect(repository.lastDeleteId, isNull);
+      expect(find.text('Delete holiday?'), findsOneWidget);
+      expect(repository.lastDeleteId, isNull);
 
-    await tester.tap(find.text('Delete').last);
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete').last);
+      await tester.pumpAndSettle();
 
-    expect(repository.lastDeleteId, 'holiday-1');
-  });
+      expect(repository.lastDeleteId, 'holiday-1');
+    },
+  );
 
   testWidgets('shows an error message when deleting fails', (tester) async {
     final repository = FakeHolidayRepository(

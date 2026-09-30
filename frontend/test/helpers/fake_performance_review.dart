@@ -269,11 +269,15 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
     lastCompletedReviewId = id;
     lastCompletedResponses = responses;
     if (completeReviewError != null) throw completeReviewError!;
-    return reviewById ?? buildTestPerformanceReview(id: id, status: 'completed');
+    return reviewById ??
+        buildTestPerformanceReview(id: id, status: 'completed');
   }
 
   @override
-  Future<PerformanceReview> setSelfAssessment(String id, String comments) async {
+  Future<PerformanceReview> setSelfAssessment(
+    String id,
+    String comments,
+  ) async {
     lastSelfAssessmentReviewId = id;
     lastSelfAssessmentComments = comments;
     if (setSelfAssessmentError != null) throw setSelfAssessmentError!;
@@ -285,14 +289,16 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   Future<PerformanceReview> finalizeReview(String id) async {
     lastFinalizedReviewId = id;
     if (finalizeReviewError != null) throw finalizeReviewError!;
-    return reviewById ?? buildTestPerformanceReview(id: id, status: 'finalized');
+    return reviewById ??
+        buildTestPerformanceReview(id: id, status: 'finalized');
   }
 
   @override
   Future<PerformanceReview> unfinalizeReview(String id) async {
     lastUnfinalizedReviewId = id;
     if (unfinalizeReviewError != null) throw unfinalizeReviewError!;
-    return reviewById ?? buildTestPerformanceReview(id: id, status: 'completed');
+    return reviewById ??
+        buildTestPerformanceReview(id: id, status: 'completed');
   }
 
   @override

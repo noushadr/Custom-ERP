@@ -63,7 +63,9 @@ class _LeaveCalendarViewState extends ConsumerState<LeaveCalendarView> {
     };
     final isDepartmentHead =
         myEmployeeId != null &&
-        departments.any((department) => department.headEmployeeId == myEmployeeId);
+        departments.any(
+          (department) => department.headEmployeeId == myEmployeeId,
+        );
     final effectiveScope = isDepartmentHead ? _scope : 'company';
 
     final entriesAsync = ref.watch(
@@ -188,7 +190,13 @@ class _MonthGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var col = 0; col < 7; col++)
-                _dayCellFor(row: row, col: col, leadingBlanks: leadingBlanks, daysInMonth: daysInMonth, byDay: byDay),
+                _dayCellFor(
+                  row: row,
+                  col: col,
+                  leadingBlanks: leadingBlanks,
+                  daysInMonth: daysInMonth,
+                  byDay: byDay,
+                ),
             ],
           ),
       ],

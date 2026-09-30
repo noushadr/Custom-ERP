@@ -54,7 +54,9 @@ class _LeadEditorPageState extends ConsumerState<LeadEditorPage> {
     _serviceInterestedController = TextEditingController(
       text: existing?.serviceInterested ?? '',
     );
-    _leadDate = existing != null ? DateTime.parse(existing.leadDate) : DateTime.now();
+    _leadDate = existing != null
+        ? DateTime.parse(existing.leadDate)
+        : DateTime.now();
   }
 
   @override
@@ -132,7 +134,8 @@ class _LeadEditorPageState extends ConsumerState<LeadEditorPage> {
     }
   }
 
-  String? _emptyToNull(String value) => value.trim().isEmpty ? null : value.trim();
+  String? _emptyToNull(String value) =>
+      value.trim().isEmpty ? null : value.trim();
 
   @override
   Widget build(BuildContext context) {
@@ -169,9 +172,7 @@ class _LeadEditorPageState extends ConsumerState<LeadEditorPage> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _fullNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Full name',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Full name'),
                       validator: (value) =>
                           (value == null || value.trim().length < 2)
                           ? 'Required'

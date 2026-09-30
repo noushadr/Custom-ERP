@@ -80,6 +80,16 @@ export class Project extends BaseEntity {
   @Column({ nullable: true })
   ahrefsAccount?: string;
 
+  /** Independent of `status` — a Completed/Cancelled project isn't
+   * automatically archived, and an Active one could still be archived (e.g.
+   * a duplicate entered by mistake). Same two-column shape as
+   * `Client.isArchived`/`archivedAt`. */
+  @Column({ default: false })
+  isArchived: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  archivedAt: Date | null;
+
   @ManyToMany(() => Employee, { eager: true })
   @JoinTable({
     name: 'project_assigned_employees',

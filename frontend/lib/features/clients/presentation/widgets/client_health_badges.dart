@@ -5,7 +5,11 @@ import '../../domain/entities/client_health_factor.dart';
 import '../../domain/entities/client_health_status.dart';
 
 class ClientHealthBadge extends StatelessWidget {
-  const ClientHealthBadge({super.key, required this.status, this.dense = false});
+  const ClientHealthBadge({
+    super.key,
+    required this.status,
+    this.dense = false,
+  });
 
   final String status;
   final bool dense;

@@ -50,7 +50,9 @@ class RequestsPage extends ConsumerWidget {
     };
     final isDepartmentHead =
         myEmployeeId != null &&
-        departments.any((department) => department.headEmployeeId == myEmployeeId);
+        departments.any(
+          (department) => department.headEmployeeId == myEmployeeId,
+        );
     // "Requests Awaiting My Approval" is only meaningful for people actually
     // expected to approve on someone's behalf — Super Admin, HR/Manager,
     // Team Leads, or a department head — not just anyone who happens to be
@@ -198,7 +200,10 @@ class _MyRequestRow extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        Text(request.description, style: Theme.of(context).textTheme.bodyMedium),
+        Text(
+          request.description,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
         const SizedBox(height: 4),
         Text(
           formatDisplayDateTime(request.createdAt),
@@ -217,9 +222,9 @@ class _MyRequestRow extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Reason: ${request.rejectionReason}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.error,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.error),
           ),
         ],
       ],
@@ -314,9 +319,9 @@ class _RequesterHeader extends StatelessWidget {
               ),
               Text(
                 formatDisplayDateTime(request.createdAt),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -393,9 +398,7 @@ class _SubmitRequestDialogState extends ConsumerState<_SubmitRequestDialog> {
               if (_errorMessage != null) ...[
                 Text(
                   _errorMessage!,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -517,9 +520,7 @@ class _NominateEmployeeOfMonthDialogState
               if (_errorMessage != null) ...[
                 Text(
                   _errorMessage!,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -538,8 +539,7 @@ class _NominateEmployeeOfMonthDialogState
                   ],
                   onChanged: _submitting
                       ? null
-                      : (value) =>
-                            setState(() => _selectedEmployeeId = value),
+                      : (value) => setState(() => _selectedEmployeeId = value),
                 ),
               ),
               const SizedBox(height: 12),
@@ -597,9 +597,9 @@ class _PendingMyApprovalSection extends ConsumerWidget {
           if (requests.isEmpty) {
             return Text(
               'Nothing is waiting for your approval.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
           return Column(
@@ -726,9 +726,9 @@ class _PendingHrApprovalSection extends ConsumerWidget {
           if (requests.isEmpty) {
             return Text(
               'Nothing is awaiting HR approval right now.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
           return Column(
@@ -810,9 +810,9 @@ class _PendingHrRequestRowState extends ConsumerState<_PendingHrRequestRow> {
                     ? 'Manager Approval: No need'
                     : 'Approved by manager: '
                           '${request.managerDecisionByName ?? '—'}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -868,9 +868,9 @@ class _RequestHistorySection extends ConsumerWidget {
           if (requests.isEmpty) {
             return Text(
               'No requests have been decided yet.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
           return Column(
@@ -933,7 +933,8 @@ class _RequestHistoryRow extends StatelessWidget {
               const SizedBox(height: 2),
               if (decidedAt != null)
                 Text(formatDisplayDateTime(decidedAt), style: captionStyle),
-              if (request.status == 'rejected' && request.rejectionReason != null)
+              if (request.status == 'rejected' &&
+                  request.rejectionReason != null)
                 Text(
                   'Reason: ${request.rejectionReason}',
                   style: captionStyle?.copyWith(color: AppColors.error),

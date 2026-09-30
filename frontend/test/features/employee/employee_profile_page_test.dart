@@ -10,6 +10,7 @@ import 'package:zera_erp/features/employee/domain/entities/audit_log_entry.dart'
 import 'package:zera_erp/features/employee/presentation/pages/employee_profile_page.dart';
 import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
+import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
 import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/shared/widgets/tag_input.dart';
@@ -19,6 +20,7 @@ import '../../helpers/fake_checklist.dart';
 import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_goal.dart';
 import '../../helpers/fake_leave.dart';
+import '../../helpers/fake_payroll.dart';
 import '../../helpers/fake_performance_review.dart';
 import '../../helpers/fake_task.dart';
 
@@ -39,6 +41,7 @@ Widget _app({
   FakeLeaveRepository? leaveRepository,
   FakeGoalRepository? goalRepository,
   FakeTaskRepository? taskRepository,
+  FakePayrollRepository? payrollRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -63,6 +66,9 @@ Widget _app({
       ),
       taskRepositoryProvider.overrideWithValue(
         taskRepository ?? FakeTaskRepository(),
+      ),
+      payrollRepositoryProvider.overrideWithValue(
+        payrollRepository ?? FakePayrollRepository(),
       ),
     ],
     child: MaterialApp(home: EmployeeProfilePage(employeeId: employeeId)),
@@ -1102,6 +1108,164 @@ void main() {
     expect(find.text('Tasks'), findsOneWidget);
     expect(find.text('Goals'), findsOneWidget);
     expect(find.text('Improve public speaking'), findsOneWidget);
+    // The specific task titles, not just the aggregate counts.
+    expect(find.text('Write report'), findsNWidgets(2));
+  });
+
+  testWidgets('tapping a goal on your own profile opens the edit dialog', (
+    tester,
+  ) async {
+    final me = buildTestEmployee();
+    final viewer = AuthUser(
+      id: 'user-1',
+      email: 'jane.doe@zeracreative.com',
+      role: 'Employee',
+      permissions: const [],
+    );
+    final goalRepository = FakeGoalRepository(
+      mine: [
+        buildTestGoal(
+          id: 'goal-1',
+          title: 'Improve public speaking',
+          achievementPercentage: 40,
+        ),
+      ],
+    );
+
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        repository: FakeEmployeeRepository(me: me),
+        goalRepository: goalRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Improve public speaking'));
+    await tester.tap(find.text('Improve public speaking'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Goal'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Goal'),
+      'Improve public speaking confidently',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(goalRepository.lastUpdatedGoalId, 'goal-1');
+    expect(goalRepository.lastActionWasSelfScoped, isTrue);
+  });
+
+  testWidgets('archiving a goal on your own profile calls archiveAsSelf', (
+    tester,
+  ) async {
+    final me = buildTestEmployee();
+    final viewer = AuthUser(
+      id: 'user-1',
+      email: 'jane.doe@zeracreative.com',
+      role: 'Employee',
+      permissions: const [],
+    );
+    final goalRepository = FakeGoalRepository(
+      mine: [buildTestGoal(id: 'goal-1', title: 'Improve public speaking')],
+    );
+
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        repository: FakeEmployeeRepository(me: me),
+        goalRepository: goalRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Improve public speaking'));
+    await tester.tap(find.text('Improve public speaking'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Archive'));
+    await tester.pumpAndSettle();
+
+    expect(goalRepository.lastArchivedGoalId, 'goal-1');
+    expect(goalRepository.lastActionWasSelfScoped, isTrue);
+  });
+
+  testWidgets(
+    'tapping Add goal on someone else\'s profile creates a goal for that employee',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.read', 'goals.manage'],
+      );
+      final goalRepository = FakeGoalRepository();
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+          goalRepository: goalRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byTooltip('Add goal'));
+      await tester.tap(find.byTooltip('Add goal'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Goal'),
+        'Lead the Q4 campaign',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(goalRepository.lastCreatedEmployeeId, 'employee-2');
+      expect(goalRepository.lastCreatedTitle, 'Lead the Q4 campaign');
+    },
+  );
+
+  testWidgets('tapping a task in the Tasks section opens its detail page', (
+    tester,
+  ) async {
+    final me = buildTestEmployee();
+    final viewer = AuthUser(
+      id: 'user-1',
+      email: 'jane.doe@zeracreative.com',
+      role: 'Employee',
+      permissions: const [],
+    );
+
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        viewer: viewer,
+        repository: FakeEmployeeRepository(me: me),
+        taskRepository: FakeTaskRepository(
+          myTasks: [buildTestTask(id: 'task-1', title: 'Fix the login bug')],
+          taskById: buildTestTask(id: 'task-1', title: 'Fix the login bug'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Fix the login bug'));
+    await tester.tap(find.text('Fix the login bug'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Task'), findsOneWidget);
   });
 
   testWidgets(
@@ -1185,4 +1349,73 @@ void main() {
     expect(find.textContaining('Old 1 → New 1'), findsNothing);
     expect(find.textContaining('Old 11 → New 11'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows a Payslips section with a download button for a viewer with payroll.manage',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const [
+          'employees.read',
+          'employees.manage',
+          'payroll.manage',
+        ],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+          payrollRepository: FakePayrollRepository(
+            myPayslips: [
+              buildTestPayslipListItem(month: 8, year: 2026, netPay: 51500),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payslips'), findsOneWidget);
+      expect(find.text('August 2026'), findsOneWidget);
+      expect(find.byIcon(Icons.download_outlined), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'hides the Payslips section for a viewer without payroll.manage',
+    (tester) async {
+      final other = buildTestEmployee(
+        id: 'employee-2',
+        email: 'other.person@zeracreative.com',
+        fullName: 'Other Person',
+      );
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr.manager@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.read', 'employees.manage'],
+      );
+
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          employeeId: 'employee-2',
+          repository: FakeEmployeeRepository(employees: [other]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payslips'), findsNothing);
+    },
+  );
 }

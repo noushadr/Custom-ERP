@@ -28,12 +28,12 @@ final leaveTypesProvider = FutureProvider.autoDispose
           .getLeaveTypes(includeArchived: includeArchived);
     });
 
-final myLeaveBalancesProvider = FutureProvider.autoDispose<List<LeaveBalance>>(
-  (ref) {
-    ref.watch(authControllerProvider);
-    return ref.watch(leaveRepositoryProvider).getMyBalances();
-  },
-);
+final myLeaveBalancesProvider = FutureProvider.autoDispose<List<LeaveBalance>>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(leaveRepositoryProvider).getMyBalances();
+});
 
 /// Requires `leave.manage` — used by the "Apply Leave for Employee" dialog
 /// so HR/Admin can see how many days someone has left before applying leave
@@ -44,12 +44,12 @@ final employeeLeaveBalancesProvider = FutureProvider.autoDispose
       return ref.watch(leaveRepositoryProvider).getEmployeeBalances(employeeId);
     });
 
-final myLeaveRequestsProvider = FutureProvider.autoDispose<List<LeaveRequest>>(
-  (ref) {
-    ref.watch(authControllerProvider);
-    return ref.watch(leaveRepositoryProvider).getMyLeaveRequests();
-  },
-);
+final myLeaveRequestsProvider = FutureProvider.autoDispose<List<LeaveRequest>>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(leaveRepositoryProvider).getMyLeaveRequests();
+});
 
 final pendingManagerApprovalLeaveRequestsProvider =
     FutureProvider.autoDispose<List<LeaveRequest>>((ref) {

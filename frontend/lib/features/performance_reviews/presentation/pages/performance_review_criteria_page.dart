@@ -145,9 +145,9 @@ class _CriterionCard extends ConsumerWidget {
     reordered.insert(newIndex, moved);
 
     try {
-      await ref
-          .read(performanceReviewRepositoryProvider)
-          .reorderCriteria([for (final i in reordered) i.id]);
+      await ref.read(performanceReviewRepositoryProvider).reorderCriteria([
+        for (final i in reordered) i.id,
+      ]);
       ref.invalidate(performanceReviewCriteriaProvider);
     } on PerformanceReviewException catch (error) {
       if (!context.mounted) return;
@@ -224,13 +224,17 @@ class _CriterionCard extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 _Chip(
-                  label: _responseTypeLabels[item.responseType] ??
+                  label:
+                      _responseTypeLabels[item.responseType] ??
                       item.responseType,
                   color: AppColors.secondary,
                 ),
                 if (item.isArchived) ...[
                   const SizedBox(width: 8),
-                  const _Chip(label: 'Archived', color: AppColors.textSecondary),
+                  const _Chip(
+                    label: 'Archived',
+                    color: AppColors.textSecondary,
+                  ),
                 ],
               ],
             ),
@@ -380,7 +384,10 @@ class _CriterionFormDialogState extends ConsumerState<_CriterionFormDialog> {
                 initialValue: _responseType,
                 decoration: const InputDecoration(labelText: 'Response type'),
                 items: const [
-                  DropdownMenuItem(value: 'rating', child: Text('Rating (1-5)')),
+                  DropdownMenuItem(
+                    value: 'rating',
+                    child: Text('Rating (1-5)'),
+                  ),
                   DropdownMenuItem(value: 'text', child: Text('Written')),
                 ],
                 onChanged: _saving

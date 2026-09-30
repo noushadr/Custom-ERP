@@ -424,7 +424,7 @@ class _ImportPreview extends StatelessWidget {
             '$importCount ready to import'
             '${errorCount > 0 ? ', $errorCount with errors (skipped)' : ''}'
             '${duplicateCount > 0 ? ', $duplicateCount possible duplicate'
-                  '${duplicateCount == 1 ? '' : 's'} (excluded by default)' : ''}'
+                      '${duplicateCount == 1 ? '' : 's'} (excluded by default)' : ''}'
             '.',
             style: Theme.of(
               context,

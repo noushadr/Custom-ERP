@@ -97,9 +97,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
         children: [
           DecoratedBox(
             decoration: const BoxDecoration(
-              border: Border(
-                right: BorderSide(color: AppColors.borderSubtle),
-              ),
+              border: Border(right: BorderSide(color: AppColors.borderSubtle)),
             ),
             // NavigationRail doesn't scroll on its own, so on a short window
             // (or a role with many visible destinations) it would otherwise
@@ -446,19 +444,16 @@ class _TopBar extends StatelessWidget {
           if (title == 'Dashboard')
             Text(
               formatDisplayDateOnly(DateTime.now()),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
           Row(
             children: [
               Text(title, style: Theme.of(context).textTheme.titleMedium),
               const Spacer(),
               if (actions != null)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: actions!,
-                ),
+                Row(mainAxisSize: MainAxisSize.min, children: actions!),
             ],
           ),
         ],

@@ -5,6 +5,7 @@ import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/hybrid_badge.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
+import '../../../employee/presentation/widgets/employee_status_badges.dart';
 import '../../../tasks/application/task_providers.dart';
 import '../../../tasks/domain/entities/task.dart';
 import '../../../tasks/presentation/pages/task_detail_page.dart';
@@ -12,34 +13,81 @@ import '../../../tasks/presentation/pages/task_editor_page.dart';
 import '../../../tasks/presentation/widgets/task_badges.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/project.dart';
+import '../../domain/exceptions/client_exception.dart';
 import '../widgets/project_badges.dart';
 import 'project_editor_page.dart';
 
-class ProjectDetailPage extends ConsumerWidget {
+class ProjectDetailPage extends ConsumerStatefulWidget {
   const ProjectDetailPage({super.key, required this.projectId});
 
   final String projectId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final projectAsync = ref.watch(projectProvider(projectId));
+  ConsumerState<ProjectDetailPage> createState() => _ProjectDetailPageState();
+}
+
+class _ProjectDetailPageState extends ConsumerState<ProjectDetailPage> {
+  bool _togglingArchive = false;
+
+  Future<void> _setArchived(bool value) async {
+    setState(() => _togglingArchive = true);
+    try {
+      await ref
+          .read(clientsRepositoryProvider)
+          .updateProject(widget.projectId, isArchived: value);
+      ref.invalidate(projectProvider(widget.projectId));
+      for (final includeArchived in [false, true]) {
+        ref.invalidate(
+          projectsListProvider((
+            status: null,
+            clientId: null,
+            includeArchived: includeArchived,
+          )),
+        );
+      }
+      ref.invalidate(projectsSummaryProvider);
+    } on ClientException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _togglingArchive = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final projectAsync = ref.watch(projectProvider(widget.projectId));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Project'),
         actions: [
           projectAsync.maybeWhen(
-            data: (project) => TextButton.icon(
-              onPressed: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ProjectEditorPage(existingProject: project),
-                  ),
-                );
-                ref.invalidate(projectProvider(projectId));
-              },
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('Edit'),
+            data: (project) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: _togglingArchive
+                      ? null
+                      : () => _setArchived(!project.isArchived),
+                  child: Text(project.isArchived ? 'Unarchive' : 'Archive'),
+                ),
+                TextButton.icon(
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ProjectEditorPage(existingProject: project),
+                      ),
+                    );
+                    ref.invalidate(projectProvider(widget.projectId));
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit'),
+                ),
+              ],
             ),
             orElse: () => const SizedBox.shrink(),
           ),
@@ -88,6 +136,10 @@ class _ProjectDetailBody extends ConsumerWidget {
               ProjectTypeBadge(type: project.type),
               const SizedBox(width: 8),
               ProjectStatusBadge(status: project.status),
+              if (project.isArchived) ...[
+                const SizedBox(width: 8),
+                const StatusBadge(label: 'Archived', color: AppColors.error),
+              ],
             ],
           ),
           const SizedBox(height: 4),

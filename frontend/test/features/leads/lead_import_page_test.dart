@@ -98,9 +98,7 @@ void main() {
 
   group('flagDuplicates', () {
     test('flags a row whose phone matches an existing lead', () {
-      final parsed = parseImportText(
-        '2026-07-15\tJohn New\t\t+92 300 1234567',
-      );
+      final parsed = parseImportText('2026-07-15\tJohn New\t\t+92 300 1234567');
       final flagged = flagDuplicates(parsed, [
         buildTestLead(fullName: 'Jane Existing', phone: '+923001234567'),
       ]);
@@ -124,20 +122,23 @@ void main() {
       },
     );
 
-    test('flags a row whose email matches an existing lead, case-insensitively', () {
-      final parsed = parseImportText(
-        '2026-07-15\tJohn New\t\t\tJANE@ACME.TEST',
-      );
-      final flagged = flagDuplicates(parsed, [
-        buildTestLead(fullName: 'Jane Existing', email: 'jane@acme.test'),
-      ]);
+    test(
+      'flags a row whose email matches an existing lead, case-insensitively',
+      () {
+        final parsed = parseImportText(
+          '2026-07-15\tJohn New\t\t\tJANE@ACME.TEST',
+        );
+        final flagged = flagDuplicates(parsed, [
+          buildTestLead(fullName: 'Jane Existing', email: 'jane@acme.test'),
+        ]);
 
-      expect(flagged.single.isDuplicate, isTrue);
-      expect(
-        flagged.single.duplicateReason,
-        'Same email as existing lead "Jane Existing"',
-      );
-    });
+        expect(flagged.single.isDuplicate, isTrue);
+        expect(
+          flagged.single.duplicateReason,
+          'Same email as existing lead "Jane Existing"',
+        );
+      },
+    );
 
     test('flags the second of two rows in the same paste sharing a phone', () {
       final parsed = parseImportText(
@@ -182,7 +183,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('2 rows found — 1 ready to import, 1 with errors (skipped).'), findsOneWidget);
+    expect(
+      find.text('2 rows found — 1 ready to import, 1 with errors (skipped).'),
+      findsOneWidget,
+    );
     expect(find.text('Jane Prospect'), findsOneWidget);
     expect(find.text('John Prospect'), findsOneWidget);
     expect(find.text('Unrecognized date "not a date"'), findsOneWidget);
@@ -231,7 +235,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('1 row found — 0 ready to import, 1 possible duplicate (excluded by default).'),
+        find.text(
+          '1 row found — 0 ready to import, 1 possible duplicate (excluded by default).',
+        ),
         findsOneWidget,
       );
       expect(
@@ -250,7 +256,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Same phone as existing lead "Jane Existing" — will be imported'),
+        find.text(
+          'Same phone as existing lead "Jane Existing" — will be imported',
+        ),
         findsOneWidget,
       );
       expect(find.text('Import 1 Lead'), findsOneWidget);
@@ -274,10 +282,7 @@ void main() {
     final button = tester.widget<FilledButton>(find.byType(FilledButton));
     expect(button.onPressed, isNull);
 
-    await tester.enterText(
-      find.byType(TextField),
-      '2026-07-15\tJane Prospect',
-    );
+    await tester.enterText(find.byType(TextField), '2026-07-15\tJane Prospect');
     await tester.pumpAndSettle();
 
     final enabledButton = tester.widget<FilledButton>(

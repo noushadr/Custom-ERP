@@ -38,7 +38,9 @@ class _DepartmentsPageState extends ConsumerState<DepartmentsPage> {
     );
     final employeesAsync = ref.watch(employeeListProvider);
     final employees = employeesAsync.valueOrNull ?? const [];
-    final employeesById = {for (final employee in employees) employee.id: employee};
+    final employeesById = {
+      for (final employee in employees) employee.id: employee,
+    };
 
     return Scaffold(
       appBar: AppBar(
@@ -83,7 +85,9 @@ class _DepartmentsPageState extends ConsumerState<DepartmentsPage> {
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
                   error: (_, _) => const Center(
-                    child: Text('Could not load departments. Please try again.'),
+                    child: Text(
+                      'Could not load departments. Please try again.',
+                    ),
                   ),
                   data: (departments) {
                     if (departments.isEmpty) {
@@ -135,7 +139,11 @@ class _DepartmentCard extends ConsumerWidget {
   final Employee? headEmployee;
   final List<Employee> members;
 
-  Future<void> _setArchived(BuildContext context, WidgetRef ref, bool value) async {
+  Future<void> _setArchived(
+    BuildContext context,
+    WidgetRef ref,
+    bool value,
+  ) async {
     try {
       await ref
           .read(employeeRepositoryProvider)
@@ -177,7 +185,9 @@ class _DepartmentCard extends ConsumerWidget {
     if (confirmed != true) return;
 
     try {
-      await ref.read(employeeRepositoryProvider).deleteDepartment(department.id);
+      await ref
+          .read(employeeRepositoryProvider)
+          .deleteDepartment(department.id);
       _invalidateDepartments(ref);
     } on EmployeeException catch (error) {
       if (!context.mounted) return;
@@ -246,8 +256,9 @@ class _DepartmentCard extends ConsumerWidget {
                       const SizedBox(width: 8),
                       Text(
                         'Head: ${headEmployee!.fullName}',
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: AppColors.textSecondary),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   )
@@ -397,8 +408,7 @@ class _DepartmentFormDialog extends ConsumerStatefulWidget {
       _DepartmentFormDialogState();
 }
 
-class _DepartmentFormDialogState
-    extends ConsumerState<_DepartmentFormDialog> {
+class _DepartmentFormDialogState extends ConsumerState<_DepartmentFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;

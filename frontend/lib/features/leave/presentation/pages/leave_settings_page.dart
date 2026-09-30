@@ -72,8 +72,9 @@ class _LeaveSettingsPageState extends ConsumerState<LeaveSettingsPage> {
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Center(child: CircularProgressIndicator()),
                   ),
-                  error: (_, _) =>
-                      const Text('Could not load leave types. Please try again.'),
+                  error: (_, _) => const Text(
+                    'Could not load leave types. Please try again.',
+                  ),
                   data: (leaveTypes) {
                     if (leaveTypes.isEmpty) {
                       return const Text('No leave types yet.');
@@ -104,7 +105,11 @@ class _LeaveTypeCard extends ConsumerWidget {
 
   final LeaveType leaveType;
 
-  Future<void> _setArchived(BuildContext context, WidgetRef ref, bool value) async {
+  Future<void> _setArchived(
+    BuildContext context,
+    WidgetRef ref,
+    bool value,
+  ) async {
     try {
       await ref
           .read(leaveRepositoryProvider)
@@ -149,14 +154,15 @@ class _LeaveTypeCard extends ConsumerWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.textSecondary.withValues(alpha: 0.12),
+                          color: AppColors.textSecondary.withValues(
+                            alpha: 0.12,
+                          ),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           'Archived',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
                         ),
                       ),
                     ],
@@ -305,20 +311,26 @@ class _LeaveTypeFormDialogState extends ConsumerState<_LeaveTypeFormDialog> {
               TextFormField(
                 controller: _allowanceController,
                 enabled: !_saving,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: const InputDecoration(
                   labelText: 'Annual allowance (days)',
                 ),
                 validator: (value) {
                   final parsed = double.tryParse(value?.trim() ?? '');
-                  return (parsed == null || parsed < 0) ? 'Enter a valid number' : null;
+                  return (parsed == null || parsed < 0)
+                      ? 'Enter a valid number'
+                      : null;
                 },
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _carryForwardController,
                 enabled: !_saving,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: const InputDecoration(
                   labelText: 'Carry-forward limit (optional)',
                 ),
@@ -366,9 +378,9 @@ class _AdjustBalanceSection extends StatelessWidget {
           Text(
             'Grant or deduct leave days for a specific employee, leave type, '
             'and year — e.g. a one-off bonus day or a correction.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
           Align(
@@ -416,7 +428,9 @@ class _AdjustBalanceDialogState extends ConsumerState<_AdjustBalanceDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_employeeId == null || _leaveTypeId == null) {
-      setState(() => _errorMessage = 'Please choose an employee and a leave type.');
+      setState(
+        () => _errorMessage = 'Please choose an employee and a leave type.',
+      );
       return;
     }
 

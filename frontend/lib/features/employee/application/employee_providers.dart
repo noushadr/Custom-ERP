@@ -32,9 +32,7 @@ final employeeRepositoryProvider = Provider<EmployeeRepository>(
 // error) would silently keep showing after switching to another, since
 // nothing else in the dependency graph would prompt Riverpod to refetch.
 
-final employeeListProvider = FutureProvider.autoDispose<List<Employee>>((
-  ref,
-) {
+final employeeListProvider = FutureProvider.autoDispose<List<Employee>>((ref) {
   ref.watch(authControllerProvider);
   return ref.watch(employeeRepositoryProvider).getAll();
 });
@@ -50,23 +48,27 @@ final upcomingBirthdaysProvider =
       return ref.watch(employeeRepositoryProvider).getUpcomingBirthdays();
     });
 
-final birthdaySpotlightProvider = FutureProvider.autoDispose<BirthdaySpotlight>((
-  ref,
-) {
-  ref.watch(authControllerProvider);
-  return ref.watch(employeeRepositoryProvider).getBirthdaySpotlight();
-});
+final birthdaySpotlightProvider = FutureProvider.autoDispose<BirthdaySpotlight>(
+  (ref) {
+    ref.watch(authControllerProvider);
+    return ref.watch(employeeRepositoryProvider).getBirthdaySpotlight();
+  },
+);
 
 final upcomingWorkAnniversariesProvider =
     FutureProvider.autoDispose<List<UpcomingWorkAnniversary>>((ref) {
       ref.watch(authControllerProvider);
-      return ref.watch(employeeRepositoryProvider).getUpcomingWorkAnniversaries();
+      return ref
+          .watch(employeeRepositoryProvider)
+          .getUpcomingWorkAnniversaries();
     });
 
 final workAnniversarySpotlightProvider =
     FutureProvider.autoDispose<List<UpcomingWorkAnniversary>>((ref) {
       ref.watch(authControllerProvider);
-      return ref.watch(employeeRepositoryProvider).getWorkAnniversarySpotlight();
+      return ref
+          .watch(employeeRepositoryProvider)
+          .getWorkAnniversarySpotlight();
     });
 
 /// How the company-wide active-employee count has changed over the last 30
@@ -74,9 +76,7 @@ final workAnniversarySpotlightProvider =
 /// is reconstructed from the existing audit log rather than a new snapshot.
 final employeeActiveDeltaProvider = FutureProvider.autoDispose<int>((ref) {
   ref.watch(authControllerProvider);
-  return ref
-      .watch(employeeRepositoryProvider)
-      .getActiveEmployeeDelta(days: 30);
+  return ref.watch(employeeRepositoryProvider).getActiveEmployeeDelta(days: 30);
 });
 
 /// Set by a cross-section "jump to Employees, filtered" affordance (e.g. the
@@ -109,9 +109,7 @@ final employeeDetailProvider = FutureProvider.autoDispose
       return ref.watch(employeeRepositoryProvider).getById(id);
     });
 
-final departmentsProvider = FutureProvider.autoDispose<List<Department>>((
-  ref,
-) {
+final departmentsProvider = FutureProvider.autoDispose<List<Department>>((ref) {
   ref.watch(authControllerProvider);
   return ref.watch(employeeRepositoryProvider).getDepartments();
 });
@@ -128,12 +126,12 @@ final departmentsManagementProvider = FutureProvider.autoDispose
           .getDepartments(includeArchived: includeArchived);
     });
 
-final myDocumentsProvider = FutureProvider.autoDispose<List<EmployeeDocument>>(
-  (ref) {
-    ref.watch(authControllerProvider);
-    return ref.watch(employeeRepositoryProvider).getMyDocuments();
-  },
-);
+final myDocumentsProvider = FutureProvider.autoDispose<List<EmployeeDocument>>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getMyDocuments();
+});
 
 final employeeDocumentsProvider = FutureProvider.autoDispose
     .family<List<EmployeeDocument>, String>((ref, employeeId) {
@@ -188,19 +186,17 @@ final companyAuditLogProvider = FutureProvider.autoDispose
           );
     });
 
-final mySalaryHistoryProvider = FutureProvider.autoDispose<List<SalaryRecord>>(
-  (ref) {
-    ref.watch(authControllerProvider);
-    return ref.watch(employeeRepositoryProvider).getMySalaryHistory();
-  },
-);
+final mySalaryHistoryProvider = FutureProvider.autoDispose<List<SalaryRecord>>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(employeeRepositoryProvider).getMySalaryHistory();
+});
 
 final employeeSalaryHistoryProvider = FutureProvider.autoDispose
     .family<List<SalaryRecord>, String>((ref, employeeId) {
       ref.watch(authControllerProvider);
-      return ref
-          .watch(employeeRepositoryProvider)
-          .getSalaryHistory(employeeId);
+      return ref.watch(employeeRepositoryProvider).getSalaryHistory(employeeId);
     });
 
 final myAssetsProvider = FutureProvider.autoDispose<List<Asset>>((ref) {

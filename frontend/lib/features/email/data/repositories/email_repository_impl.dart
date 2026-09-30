@@ -102,12 +102,38 @@ class EmailRepositoryImpl implements EmailRepository {
   );
 
   @override
-  Future<List<InboxMessage>> listInbox({int limit = 25}) =>
-      _guard(() => _remoteDataSource.listInbox(limit: limit));
+  Future<List<InboxMessage>> listMessages({
+    String mailbox = 'inbox',
+    int monthsBack = 6,
+    int limit = 200,
+  }) => _guard(
+    () => _remoteDataSource.listMessages(
+      mailbox: mailbox,
+      monthsBack: monthsBack,
+      limit: limit,
+    ),
+  );
 
   @override
-  Future<EmailMessageDetail> getMessage(int uid) =>
-      _guard(() => _remoteDataSource.getMessage(uid));
+  Future<EmailMessageDetail> getMessage(int uid, {String mailbox = 'inbox'}) =>
+      _guard(() => _remoteDataSource.getMessage(uid, mailbox: mailbox));
+
+  @override
+  Future<List<EmailThread>> listThreads({
+    int monthsBack = 6,
+    int limit = 200,
+  }) => _guard(
+    () =>
+        _remoteDataSource.listThreads(monthsBack: monthsBack, limit: limit),
+  );
+
+  @override
+  Future<EmailThreadDetail> getThread(
+    String threadId, {
+    int monthsBack = 6,
+  }) => _guard(
+    () => _remoteDataSource.getThread(threadId, monthsBack: monthsBack),
+  );
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

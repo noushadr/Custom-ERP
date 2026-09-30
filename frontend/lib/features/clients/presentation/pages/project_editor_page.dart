@@ -159,10 +159,22 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               serviceIds: _selectedServiceIds.toList(),
             );
 
-      ref.invalidate(projectsListProvider((status: null, clientId: null)));
-      ref.invalidate(
-        projectsListProvider((status: null, clientId: saved.clientId)),
-      );
+      for (final includeArchived in [false, true]) {
+        ref.invalidate(
+          projectsListProvider((
+            status: null,
+            clientId: null,
+            includeArchived: includeArchived,
+          )),
+        );
+        ref.invalidate(
+          projectsListProvider((
+            status: null,
+            clientId: saved.clientId,
+            includeArchived: includeArchived,
+          )),
+        );
+      }
       ref.invalidate(projectProvider(saved.id));
       ref.invalidate(projectsSummaryProvider);
       if (!mounted) return;

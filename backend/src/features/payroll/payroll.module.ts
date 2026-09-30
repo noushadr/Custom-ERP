@@ -12,6 +12,7 @@ import { PayrollRun } from './domain/entities/payroll-run.entity';
 import { PAYROLL_LINE_ITEM_REPOSITORY } from './domain/repositories/payroll-line-item-repository.interface';
 import { PAYROLL_RUN_REPOSITORY } from './domain/repositories/payroll-run-repository.interface';
 import { PayrollController } from './presentation/payroll.controller';
+import { PayslipController } from './presentation/payslip.controller';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { PayrollController } from './presentation/payroll.controller';
     NotificationsModule,
     FreelancersModule,
   ],
-  controllers: [PayrollController],
+  controllers: [PayrollController, PayslipController],
   providers: [
     PayrollService,
     { provide: PAYROLL_RUN_REPOSITORY, useClass: TypeOrmPayrollRunRepository },

@@ -123,9 +123,8 @@ class _SettingsEntry extends StatelessWidget {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: builder)),
+        onTap: () =>
+            Navigator.of(context).push(MaterialPageRoute(builder: builder)),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -143,10 +142,7 @@ class _SettingsEntry extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+                    Text(title, style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,

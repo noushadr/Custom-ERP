@@ -50,14 +50,18 @@ final servicesListProvider = FutureProvider.autoDispose
     });
 
 final projectsListProvider = FutureProvider.autoDispose
-    .family<List<Project>, ({String? status, String? clientId})>((
-      ref,
-      filters,
-    ) {
+    .family<
+      List<Project>,
+      ({String? status, String? clientId, bool includeArchived})
+    >((ref, filters) {
       ref.watch(authControllerProvider);
       return ref
           .watch(clientsRepositoryProvider)
-          .getProjects(status: filters.status, clientId: filters.clientId);
+          .getProjects(
+            status: filters.status,
+            clientId: filters.clientId,
+            includeArchived: filters.includeArchived,
+          );
     });
 
 final projectProvider = FutureProvider.autoDispose.family<Project, String>((

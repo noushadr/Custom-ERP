@@ -36,12 +36,11 @@ final pendingHrApprovalRequestsProvider =
       return ref.watch(requestRepositoryProvider).getPendingHrApproval();
     });
 
-final requestHistoryProvider = FutureProvider.autoDispose<List<EmployeeRequest>>(
-  (ref) {
-    ref.watch(authControllerProvider);
-    return ref.watch(requestRepositoryProvider).getHistory();
-  },
-);
+final requestHistoryProvider =
+    FutureProvider.autoDispose<List<EmployeeRequest>>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(requestRepositoryProvider).getHistory();
+    });
 
 final requestHistoryForMyTeamProvider =
     FutureProvider.autoDispose<List<EmployeeRequest>>((ref) {

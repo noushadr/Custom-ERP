@@ -80,7 +80,10 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> changePassword(String currentPassword, String newPassword) async {
+  Future<void> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
     lastChangePasswordNewPassword = newPassword;
     if (changePasswordError != null) throw changePasswordError!;
   }

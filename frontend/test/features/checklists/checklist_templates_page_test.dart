@@ -124,9 +124,7 @@ void main() {
       await tester.pumpWidget(
         _app(
           checklistRepository: FakeChecklistRepository(
-            templateItems: [
-              buildTestChecklistTemplateItem(id: 'template-1'),
-            ],
+            templateItems: [buildTestChecklistTemplateItem(id: 'template-1')],
             deleteTemplateItemError: const ChecklistException(
               'Cannot delete a checklist item that already has employee '
               'checklists created against it. Archive it instead.',

@@ -104,9 +104,9 @@ class MetricCard extends StatelessWidget {
             const SizedBox(height: 1),
             Text(
               secondaryValue!,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ],

@@ -40,9 +40,7 @@ Widget _app(
       ),
     ],
     child: const MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(child: LeaveCalendarView()),
-      ),
+      home: Scaffold(body: SingleChildScrollView(child: LeaveCalendarView())),
     ),
   );
 }
@@ -122,9 +120,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text(
-        '${_monthName(nextMonth.month)} ${nextMonth.year}',
-      ),
+      find.text('${_monthName(nextMonth.month)} ${nextMonth.year}'),
       findsOneWidget,
     );
   });

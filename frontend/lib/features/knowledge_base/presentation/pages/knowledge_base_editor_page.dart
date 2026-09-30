@@ -62,7 +62,8 @@ class _KnowledgeBaseEditorPageState
             selection: const TextSelection.collapsed(offset: 0),
           )
         : QuillController.basic();
-    _visibilityType = existing?.visibilityType ?? KnowledgeBaseVisibility.everyone;
+    _visibilityType =
+        existing?.visibilityType ?? KnowledgeBaseVisibility.everyone;
     _selectedRoleIds = {...(existing?.targetRoleIds ?? const [])};
     _selectedDepartmentIds = {...(existing?.targetDepartmentIds ?? const [])};
   }
@@ -139,9 +140,7 @@ class _KnowledgeBaseEditorPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Article' : 'New Article'),
-      ),
+      appBar: AppBar(title: Text(_isEditing ? 'Edit Article' : 'New Article')),
       body: Form(
         key: _formKey,
         child: Column(
@@ -224,7 +223,10 @@ class _KnowledgeBaseEditorPageState
                               showListCheck: false,
                             ),
                           ),
-                          const Divider(height: 1, color: AppColors.borderSubtle),
+                          const Divider(
+                            height: 1,
+                            color: AppColors.borderSubtle,
+                          ),
                           Padding(
                             padding: const EdgeInsets.all(12),
                             // minHeight only takes effect when scrollable is
@@ -232,9 +234,7 @@ class _KnowledgeBaseEditorPageState
                             // already scrolls) — so the minimum height is
                             // enforced with a ConstrainedBox instead.
                             child: ConstrainedBox(
-                              constraints: const BoxConstraints(
-                                minHeight: 260,
-                              ),
+                              constraints: const BoxConstraints(minHeight: 260),
                               child: QuillEditor(
                                 focusNode: _editorFocusNode,
                                 scrollController: _editorScrollController,
@@ -306,7 +306,10 @@ class _VisibilityPicker extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Who can view this', style: Theme.of(context).textTheme.titleSmall),
+        Text(
+          'Who can view this',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
         const SizedBox(height: 4),
         RadioGroup<String>(
           groupValue: visibilityType,

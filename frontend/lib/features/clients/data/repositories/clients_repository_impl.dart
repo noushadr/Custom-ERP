@@ -15,8 +15,9 @@ class ClientsRepositoryImpl implements ClientsRepository {
   final ClientsRemoteDataSource _remoteDataSource;
 
   @override
-  Future<List<Client>> getClients({bool includeArchived = false}) =>
-      _guard(() => _remoteDataSource.getClients(includeArchived: includeArchived));
+  Future<List<Client>> getClients({bool includeArchived = false}) => _guard(
+    () => _remoteDataSource.getClients(includeArchived: includeArchived),
+  );
 
   @override
   Future<Client> createClient({
@@ -129,10 +130,17 @@ class ClientsRepositoryImpl implements ClientsRepository {
   );
 
   @override
-  Future<List<Project>> getProjects({String? status, String? clientId}) =>
-      _guard(
-        () => _remoteDataSource.getProjects(status: status, clientId: clientId),
-      );
+  Future<List<Project>> getProjects({
+    String? status,
+    String? clientId,
+    bool includeArchived = false,
+  }) => _guard(
+    () => _remoteDataSource.getProjects(
+      status: status,
+      clientId: clientId,
+      includeArchived: includeArchived,
+    ),
+  );
 
   @override
   Future<Project> getProject(String id) =>
@@ -185,6 +193,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
     List<String>? assignedEmployeeIds,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
+    bool? isArchived,
   }) => _guard(
     () => _remoteDataSource.updateProject(
       id,
@@ -199,6 +208,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
       assignedEmployeeIds: assignedEmployeeIds,
       targetDepartmentIds: targetDepartmentIds,
       serviceIds: serviceIds,
+      isArchived: isArchived,
     ),
   );
 

@@ -74,34 +74,31 @@ void main() {
     expect(find.text('Jane Doe'), findsOneWidget);
   });
 
-  testWidgets(
-    'shows only a plain "Package" section — never "SEO Details" — '
-    'regardless of the project\'s actual service',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          repository: FakeClientsRepository(
-            projects: [
-              buildTestProject(
-                name: 'SMM Retainer',
-                services: const [ProjectServiceRef(id: 's1', name: 'SMM')],
-                packageName: 'GROWTH +',
-              ),
-            ],
-          ),
+  testWidgets('shows only a plain "Package" section — never "SEO Details" — '
+      'regardless of the project\'s actual service', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakeClientsRepository(
+          projects: [
+            buildTestProject(
+              name: 'SMM Retainer',
+              services: const [ProjectServiceRef(id: 's1', name: 'SMM')],
+              packageName: 'GROWTH +',
+            ),
+          ],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('SEO Details'), findsNothing);
-      expect(find.text('Package'), findsOneWidget);
-      expect(find.text('GROWTH +'), findsOneWidget);
-      expect(
-        find.textContaining('kept in the team password manager'),
-        findsNothing,
-      );
-    },
-  );
+    expect(find.text('SEO Details'), findsNothing);
+    expect(find.text('Package'), findsOneWidget);
+    expect(find.text('GROWTH +'), findsOneWidget);
+    expect(
+      find.textContaining('kept in the team password manager'),
+      findsNothing,
+    );
+  });
 
   testWidgets('shows no Package section when the project has none set', (
     tester,
@@ -172,4 +169,45 @@ void main() {
     expect(find.text('Design homepage'), findsOneWidget);
     expect(find.text('New Task'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows an Archive button for an active project, and archiving it calls '
+    'the repository',
+    (tester) async {
+      final repository = FakeClientsRepository(
+        projects: [buildTestProject(name: 'Website Revamp')],
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Archive'), findsOneWidget);
+      expect(find.text('Unarchive'), findsNothing);
+      expect(find.text('Archived'), findsNothing);
+
+      await tester.tap(find.text('Archive'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdateProjectIsArchived, isTrue);
+    },
+  );
+
+  testWidgets(
+    'shows an Unarchive button and an Archived badge for an archived project',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          repository: FakeClientsRepository(
+            projects: [
+              buildTestProject(name: 'Old Project', isArchived: true),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unarchive'), findsOneWidget);
+      expect(find.text('Archive'), findsNothing);
+      expect(find.text('Archived'), findsOneWidget);
+    },
+  );
 }

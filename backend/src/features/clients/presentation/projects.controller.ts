@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import { CreateProjectDto } from '../application/dto/create-project.dto';
 import { UpdateProjectDto } from '../application/dto/update-project.dto';
@@ -20,8 +28,13 @@ export class ProjectsController {
   getProjects(
     @Query('status') status?: ProjectStatus,
     @Query('clientId') clientId?: string,
+    @Query('includeArchived') includeArchived?: string,
   ) {
-    return this.clientsService.getProjects({ status, clientId });
+    return this.clientsService.getProjects({
+      status,
+      clientId,
+      includeArchived: includeArchived === 'true',
+    });
   }
 
   @Post()

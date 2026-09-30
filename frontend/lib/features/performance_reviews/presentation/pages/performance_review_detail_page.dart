@@ -225,8 +225,7 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
     // guess here is only ever a UX gap, never a security one.
     final canEditResponses =
         !isFinalized &&
-        (widget.hasOverride ||
-            (review.status == 'pending' && !widget.isSelf));
+        (widget.hasOverride || (review.status == 'pending' && !widget.isSelf));
     final canFinalize = widget.hasOverride && review.status == 'completed';
     final canUnfinalize = widget.hasOverride && isFinalized;
     final canEditSelfAssessment = widget.isSelf && !isFinalized;
@@ -417,7 +416,10 @@ class _ResponseField extends StatelessWidget {
               for (var star = 1; star <= 5; star++)
                 IconButton(
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                   icon: Icon(
                     rating != null && star <= rating!
                         ? Icons.star

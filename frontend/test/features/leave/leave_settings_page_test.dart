@@ -104,12 +104,16 @@ void main() {
     await tester.tap(find.text('Adjust a balance'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Employee'));
+    await tester.tap(
+      find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Jane Doe').last);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Leave type'));
+    await tester.tap(
+      find.widgetWithText(DropdownButtonFormField<String>, 'Leave type'),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Annual Leave').last);
     await tester.pumpAndSettle();

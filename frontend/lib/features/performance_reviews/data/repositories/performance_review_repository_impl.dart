@@ -116,9 +116,8 @@ class PerformanceReviewRepositoryImpl implements PerformanceReviewRepository {
   Future<PerformanceReview> completeReview(
     String id, {
     required List<PerformanceReviewResponseInput> responses,
-  }) => _guard(
-    () => _remoteDataSource.completeReview(id, responses: responses),
-  );
+  }) =>
+      _guard(() => _remoteDataSource.completeReview(id, responses: responses));
 
   @override
   Future<PerformanceReview> setSelfAssessment(String id, String comments) =>

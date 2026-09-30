@@ -43,7 +43,9 @@ class HolidaysPage extends ConsumerWidget {
             ),
             data: (holidays) {
               if (holidays.isEmpty) {
-                return const Center(child: Text('No public holidays added yet.'));
+                return const Center(
+                  child: Text('No public holidays added yet.'),
+                );
               }
               return ListView.separated(
                 padding: const EdgeInsets.all(20),
@@ -116,9 +118,9 @@ class _HolidayCard extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   formatDisplayDate(holiday.date),
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -152,8 +154,7 @@ class _HolidayFormDialog extends ConsumerStatefulWidget {
   final Holiday? holiday;
 
   @override
-  ConsumerState<_HolidayFormDialog> createState() =>
-      _HolidayFormDialogState();
+  ConsumerState<_HolidayFormDialog> createState() => _HolidayFormDialogState();
 }
 
 class _HolidayFormDialogState extends ConsumerState<_HolidayFormDialog> {
@@ -256,9 +257,7 @@ class _HolidayFormDialogState extends ConsumerState<_HolidayFormDialog> {
               OutlinedButton.icon(
                 onPressed: _saving ? null : _pickDate,
                 icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                label: Text(
-                  _date == null ? 'Pick a date' : _isoDate(_date!),
-                ),
+                label: Text(_date == null ? 'Pick a date' : _isoDate(_date!)),
               ),
             ],
           ),

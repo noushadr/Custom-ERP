@@ -408,7 +408,10 @@ class _LeadsBreakdownRow extends ConsumerWidget {
             title: 'Top Countries',
             icon: Icons.public_outlined,
             color: AppColors.primary,
-            counts: computeTopCounts(leads, (l) => formatCountryFlag(l.country)),
+            counts: computeTopCounts(
+              leads,
+              (l) => formatCountryFlag(l.country),
+            ),
           ),
           TopBreakdownPanel(
             title: 'Top Services',
@@ -498,7 +501,9 @@ class _LeadsTableState extends State<_LeadsTable> {
               total: widget.leads.length,
               page: page,
               pageCount: pageCount,
-              onPrevious: page > 0 ? () => setState(() => _page = page - 1) : null,
+              onPrevious: page > 0
+                  ? () => setState(() => _page = page - 1)
+                  : null,
               onNext: page < pageCount - 1
                   ? () => setState(() => _page = page + 1)
                   : null,
@@ -578,9 +583,9 @@ class _LeadsTableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
-      color: AppColors.textSecondary,
-    );
+    final style = Theme.of(
+      context,
+    ).textTheme.labelMedium?.copyWith(color: AppColors.textSecondary);
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.fieldFill,

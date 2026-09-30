@@ -5,7 +5,11 @@ import '../../domain/entities/project_status.dart';
 import '../../domain/entities/project_type.dart';
 
 class ProjectStatusBadge extends StatelessWidget {
-  const ProjectStatusBadge({super.key, required this.status, this.dense = false});
+  const ProjectStatusBadge({
+    super.key,
+    required this.status,
+    this.dense = false,
+  });
 
   final String status;
   final bool dense;

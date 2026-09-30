@@ -200,9 +200,7 @@ class LeaveRemoteDataSource {
         .toList();
   }
 
-  Future<List<LeaveBalanceModel>> getEmployeeBalances(
-    String employeeId,
-  ) async {
+  Future<List<LeaveBalanceModel>> getEmployeeBalances(String employeeId) async {
     final response = await _dio.get<List<dynamic>>(
       '/leave/balances/$employeeId',
     );

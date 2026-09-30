@@ -284,8 +284,7 @@ class _ApplyLeaveForEmployeeDialogState
     final leaveTypesAsync = ref.watch(leaveTypesProvider(false));
     final holidaysAsync = ref.watch(holidaysProvider);
     final holidayDates = <String>{
-      for (final holiday in holidaysAsync.valueOrNull ?? const [])
-        holiday.date,
+      for (final holiday in holidaysAsync.valueOrNull ?? const []) holiday.date,
     };
 
     return AlertDialog(
@@ -301,9 +300,9 @@ class _ApplyLeaveForEmployeeDialogState
               Text(
                 'Created as already approved — no manager or HR review '
                 'needed, since you already are that final approval.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
               if (_errorMessage != null) ...[
@@ -479,10 +478,7 @@ class _EmployeeBalancesPreview extends ConsumerWidget {
           children: [
             for (final balance in balances)
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.fieldFill,
                   borderRadius: BorderRadius.circular(20),
@@ -536,7 +532,8 @@ class _MyLeaveRequestsSection extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: LinearProgressIndicator(),
               ),
-              error: (_, _) => const Text('Could not load your leave requests.'),
+              error: (_, _) =>
+                  const Text('Could not load your leave requests.'),
               data: (requests) {
                 if (requests.isEmpty) {
                   return Text(
@@ -552,7 +549,10 @@ class _MyLeaveRequestsSection extends ConsumerWidget {
                     for (var i = 0; i < requests.length; i++) ...[
                       _MyLeaveRequestRow(request: requests[i]),
                       if (i < requests.length - 1)
-                        const Divider(height: 20, color: AppColors.borderSubtle),
+                        const Divider(
+                          height: 20,
+                          color: AppColors.borderSubtle,
+                        ),
                     ],
                   ],
                 );
@@ -584,7 +584,9 @@ class _MyLeaveRequestRowState extends ConsumerState<_MyLeaveRequestRow> {
   Future<void> _cancel() async {
     setState(() => _cancelling = true);
     try {
-      await ref.read(leaveRepositoryProvider).cancelLeaveRequest(widget.request.id);
+      await ref
+          .read(leaveRepositoryProvider)
+          .cancelLeaveRequest(widget.request.id);
       ref.invalidate(myLeaveRequestsProvider);
     } on LeaveException catch (error) {
       if (!mounted) return;
@@ -726,7 +728,9 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
       return;
     }
     if (_endDate!.isBefore(_startDate!)) {
-      setState(() => _errorMessage = 'End date must be on or after the start date.');
+      setState(
+        () => _errorMessage = 'End date must be on or after the start date.',
+      );
       return;
     }
 
@@ -760,8 +764,7 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
     final leaveTypesAsync = ref.watch(leaveTypesProvider(false));
     final holidaysAsync = ref.watch(holidaysProvider);
     final holidayDates = <String>{
-      for (final holiday in holidaysAsync.valueOrNull ?? const [])
-        holiday.date,
+      for (final holiday in holidaysAsync.valueOrNull ?? const []) holiday.date,
     };
 
     return AlertDialog(
@@ -803,9 +806,13 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
                   Expanded(
                     child: InkWell(
                       key: const Key('leave-start-date'),
-                      onTap: _submitting ? null : () => _pickDate(isStart: true),
+                      onTap: _submitting
+                          ? null
+                          : () => _pickDate(isStart: true),
                       child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Start date'),
+                        decoration: const InputDecoration(
+                          labelText: 'Start date',
+                        ),
                         child: Text(
                           _startDate == null ? '—' : isoDate(_startDate!),
                         ),
@@ -816,9 +823,13 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
                   Expanded(
                     child: InkWell(
                       key: const Key('leave-end-date'),
-                      onTap: _submitting ? null : () => _pickDate(isStart: false),
+                      onTap: _submitting
+                          ? null
+                          : () => _pickDate(isStart: false),
                       child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'End date'),
+                        decoration: const InputDecoration(
+                          labelText: 'End date',
+                        ),
                         child: Text(
                           _endDate == null ? '—' : isoDate(_endDate!),
                         ),
@@ -906,7 +917,9 @@ class _PendingMyApprovalSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final requestsAsync = ref.watch(pendingManagerApprovalLeaveRequestsProvider);
+    final requestsAsync = ref.watch(
+      pendingManagerApprovalLeaveRequestsProvider,
+    );
 
     return FormSection(
       title: 'Leave Requests Awaiting My Approval',
@@ -920,9 +933,9 @@ class _PendingMyApprovalSection extends ConsumerWidget {
           if (requests.isEmpty) {
             return Text(
               'Nothing is waiting for your approval.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
           return Column(
@@ -931,12 +944,15 @@ class _PendingMyApprovalSection extends ConsumerWidget {
               for (var i = 0; i < requests.length; i++) ...[
                 _PendingLeaveRequestRow(
                   request: requests[i],
-                  onApprove: (id, comment) =>
-                      ref.read(leaveRepositoryProvider).approveAsManager(id, comment: comment),
-                  onReject: (id, comment) =>
-                      ref.read(leaveRepositoryProvider).rejectAsManager(id, comment: comment),
-                  onDecided: () =>
-                      ref.invalidate(pendingManagerApprovalLeaveRequestsProvider),
+                  onApprove: (id, comment) => ref
+                      .read(leaveRepositoryProvider)
+                      .approveAsManager(id, comment: comment),
+                  onReject: (id, comment) => ref
+                      .read(leaveRepositoryProvider)
+                      .rejectAsManager(id, comment: comment),
+                  onDecided: () => ref.invalidate(
+                    pendingManagerApprovalLeaveRequestsProvider,
+                  ),
                 ),
                 if (i < requests.length - 1)
                   const Divider(height: 20, color: AppColors.borderSubtle),
@@ -970,9 +986,9 @@ class _PendingHrApprovalSection extends ConsumerWidget {
           if (requests.isEmpty) {
             return Text(
               'Nothing is awaiting HR approval right now.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             );
           }
           return Column(
@@ -981,10 +997,12 @@ class _PendingHrApprovalSection extends ConsumerWidget {
               for (var i = 0; i < requests.length; i++) ...[
                 _PendingLeaveRequestRow(
                   request: requests[i],
-                  onApprove: (id, comment) =>
-                      ref.read(leaveRepositoryProvider).approveAsHr(id, comment: comment),
-                  onReject: (id, comment) =>
-                      ref.read(leaveRepositoryProvider).rejectAsHr(id, comment: comment),
+                  onApprove: (id, comment) => ref
+                      .read(leaveRepositoryProvider)
+                      .approveAsHr(id, comment: comment),
+                  onReject: (id, comment) => ref
+                      .read(leaveRepositoryProvider)
+                      .rejectAsHr(id, comment: comment),
                   onDecided: () {
                     ref.invalidate(pendingHrApprovalLeaveRequestsProvider);
                     ref.invalidate(myLeaveBalancesProvider);
@@ -1030,9 +1048,15 @@ class _PendingLeaveRequestRowState
     setState(() => _working = true);
     try {
       if (approve) {
-        await widget.onApprove(widget.request.id, comment.isEmpty ? null : comment);
+        await widget.onApprove(
+          widget.request.id,
+          comment.isEmpty ? null : comment,
+        );
       } else {
-        await widget.onReject(widget.request.id, comment.isEmpty ? null : comment);
+        await widget.onReject(
+          widget.request.id,
+          comment.isEmpty ? null : comment,
+        );
       }
       widget.onDecided();
     } on LeaveException catch (error) {
@@ -1063,7 +1087,8 @@ class _PendingLeaveRequestRowState
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
             child: Text(approve ? 'Approve' : 'Reject'),
           ),
         ],
@@ -1095,9 +1120,9 @@ class _PendingLeaveRequestRowState
               const SizedBox(height: 4),
               Text(
                 request.reason,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               if (request.managerDecisionByName != null) ...[
                 const SizedBox(height: 4),

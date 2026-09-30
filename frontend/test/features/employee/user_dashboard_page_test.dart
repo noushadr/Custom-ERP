@@ -13,6 +13,7 @@ import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notices/domain/entities/notice.dart';
+import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
 import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
 import 'package:zera_erp/shared/models/named_ref.dart';
@@ -23,6 +24,7 @@ import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_goal.dart';
 import '../../helpers/fake_leave.dart';
 import '../../helpers/fake_notice.dart';
+import '../../helpers/fake_payroll.dart';
 import '../../helpers/fake_performance_review.dart';
 import '../../helpers/fake_task.dart';
 
@@ -47,6 +49,7 @@ Widget _app({
   FakeAuthRepository? authRepository,
   FakeLeaveRepository? leaveRepository,
   FakeTaskRepository? taskRepository,
+  FakePayrollRepository? payrollRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -75,6 +78,9 @@ Widget _app({
       checklistRepositoryProvider.overrideWithValue(FakeChecklistRepository()),
       performanceReviewRepositoryProvider.overrideWithValue(
         FakePerformanceReviewRepository(),
+      ),
+      payrollRepositoryProvider.overrideWithValue(
+        payrollRepository ?? FakePayrollRepository(),
       ),
     ],
     child: const MaterialApp(home: Scaffold(body: UserDashboardPage())),
@@ -571,5 +577,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Employee Profile'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows a friendly empty state when the viewer has no payslips yet',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(payrollRepository: FakePayrollRepository(myPayslips: [])),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('My Payslips'), findsOneWidget);
+      expect(find.textContaining('No payslips yet'), findsOneWidget);
+    },
+  );
+
+  testWidgets('lists the viewer\'s own payslips with a download button each', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        payrollRepository: FakePayrollRepository(
+          myPayslips: [
+            buildTestPayslipListItem(month: 8, year: 2026, netPay: 51500),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('August 2026'), findsOneWidget);
+    expect(find.text('PKR 51,500.00'), findsOneWidget);
+    expect(find.byIcon(Icons.download_outlined), findsOneWidget);
   });
 }

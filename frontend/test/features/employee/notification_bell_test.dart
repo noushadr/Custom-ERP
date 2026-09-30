@@ -833,84 +833,81 @@ void main() {
     },
   );
 
-  testWidgets(
-    'shows a newly-assigned task and opens it on tap',
-    (tester) async {
-      String? openedTaskId;
-      final taskRepository = FakeTaskRepository(
-        myTasks: [
-          buildTestTask(
-            id: 'task-1',
-            title: 'Write report',
-            assignedByName: 'Manager Person',
-            status: TaskStatus.todo,
-          ),
-        ],
-      );
-
-      await tester.pumpWidget(
-        _app(
-          permissions: const [],
-          employeeRepository: FakeEmployeeRepository(),
-          requestRepository: FakeRequestRepository(),
-          taskRepository: taskRepository,
-          onOpenTask: (id) => openedTaskId = id,
+  testWidgets('shows a newly-assigned task and opens it on tap', (
+    tester,
+  ) async {
+    String? openedTaskId;
+    final taskRepository = FakeTaskRepository(
+      myTasks: [
+        buildTestTask(
+          id: 'task-1',
+          title: 'Write report',
+          assignedByName: 'Manager Person',
+          status: TaskStatus.todo,
         ),
-      );
-      await tester.pumpAndSettle();
+      ],
+    );
 
-      await tester.tap(find.byIcon(Icons.notifications_outlined));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(
+        permissions: const [],
+        employeeRepository: FakeEmployeeRepository(),
+        requestRepository: FakeRequestRepository(),
+        taskRepository: taskRepository,
+        onOpenTask: (id) => openedTaskId = id,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Write report'), findsOneWidget);
-      expect(find.text('Assigned by Manager Person'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Write report'));
-      await tester.pumpAndSettle();
+    expect(find.text('Write report'), findsOneWidget);
+    expect(find.text('Assigned by Manager Person'), findsOneWidget);
 
-      expect(openedTaskId, 'task-1');
-    },
-  );
+    await tester.tap(find.text('Write report'));
+    await tester.pumpAndSettle();
 
-  testWidgets(
-    'does not show an in-progress task under newly-assigned',
-    (tester) async {
-      final taskRepository = FakeTaskRepository(
-        myTasks: [
-          buildTestTask(
-            id: 'task-1',
-            title: 'Already started',
-            status: TaskStatus.inProgress,
-            dueDate: '2099-01-01',
-          ),
-        ],
-      );
+    expect(openedTaskId, 'task-1');
+  });
 
-      await tester.pumpWidget(
-        _app(
-          permissions: const [],
-          employeeRepository: FakeEmployeeRepository(),
-          requestRepository: FakeRequestRepository(),
-          taskRepository: taskRepository,
+  testWidgets('does not show an in-progress task under newly-assigned', (
+    tester,
+  ) async {
+    final taskRepository = FakeTaskRepository(
+      myTasks: [
+        buildTestTask(
+          id: 'task-1',
+          title: 'Already started',
+          status: TaskStatus.inProgress,
+          dueDate: '2099-01-01',
         ),
-      );
-      await tester.pumpAndSettle();
+      ],
+    );
 
-      await tester.tap(find.byIcon(Icons.notifications_outlined));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(
+        permissions: const [],
+        employeeRepository: FakeEmployeeRepository(),
+        requestRepository: FakeRequestRepository(),
+        taskRepository: taskRepository,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Already started'), findsNothing);
-    },
-  );
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Already started'), findsNothing);
+  });
 
   testWidgets('shows a task that is due soon, but not a completed one', (
     tester,
   ) async {
-    final soonDueDate =
-        DateTime.now().add(const Duration(days: 1)).toIso8601String().substring(
-          0,
-          10,
-        );
+    final soonDueDate = DateTime.now()
+        .add(const Duration(days: 1))
+        .toIso8601String()
+        .substring(0, 10);
     final taskRepository = FakeTaskRepository(
       myTasks: [
         buildTestTask(

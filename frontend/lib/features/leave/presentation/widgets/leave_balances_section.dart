@@ -25,9 +25,9 @@ class LeaveBalancesSection extends ConsumerWidget {
         if (balances.isEmpty) {
           return Text(
             'No leave balances yet.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
           );
         }
         return Wrap(

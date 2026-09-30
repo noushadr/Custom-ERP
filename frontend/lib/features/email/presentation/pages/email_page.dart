@@ -12,6 +12,16 @@ import '../../domain/entities/email_account.dart';
 import '../../domain/entities/inbox_message.dart';
 import '../../domain/exceptions/email_exception.dart';
 
+/// Strips a leading "Re: " (any casing, possibly repeated) so replying to a
+/// reply doesn't pile up "Re: Re: Re: ...".
+String _replySubject(String subject) {
+  final stripped = subject.replaceFirst(
+    RegExp(r'^(re:\s*)+', caseSensitive: false),
+    '',
+  );
+  return 'Re: $stripped';
+}
+
 /// Each employee's own real cPanel mailbox (created manually in cPanel first
 /// — this "lighter version" doesn't auto-provision one), used for send and
 /// receive from inside the ERP. Admin/HR (`email.manage`) can additionally
@@ -64,12 +74,10 @@ class EmailPage extends ConsumerWidget {
                     // stuck that way — this state's TextEditingController
                     // is only ever seeded on first build.
                     return myProfileAsync.when(
-                      loading: () => const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                      error: (_, _) => const _MailboxSetupCard(
-                        forEmployeeId: null,
-                      ),
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (_, _) =>
+                          const _MailboxSetupCard(forEmployeeId: null),
                       data: (profile) => _MailboxSetupCard(
                         forEmployeeId: null,
                         defaultFirstName: profile.firstName,
@@ -101,7 +109,16 @@ class _MailboxWorkspace extends ConsumerStatefulWidget {
 
 class _MailboxWorkspaceState extends ConsumerState<_MailboxWorkspace> {
   bool _editingSettings = false;
-  int? _selectedUid;
+  String? _selectedThreadId;
+  String _mailbox = 'inbox';
+
+  void _selectMailbox(String mailbox) {
+    if (mailbox == _mailbox) return;
+    setState(() {
+      _mailbox = mailbox;
+      _selectedThreadId = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -144,23 +161,46 @@ class _MailboxWorkspaceState extends ConsumerState<_MailboxWorkspace> {
           children: [
             SizedBox(
               width: 320,
-              child: _InboxList(
-                selectedUid: _selectedUid,
-                onSelect: (uid) => setState(() => _selectedUid = uid),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'inbox', label: Text('Inbox')),
+                        ButtonSegment(value: 'sent', label: Text('Sent')),
+                      ],
+                      selected: {_mailbox},
+                      onSelectionChanged: (selection) =>
+                          _selectMailbox(selection.first),
+                    ),
+                  ),
+                  Expanded(
+                    child: _ThreadList(
+                      mailbox: _mailbox,
+                      selectedThreadId: _selectedThreadId,
+                      onSelect: (threadId) =>
+                          setState(() => _selectedThreadId = threadId),
+                    ),
+                  ),
+                ],
               ),
             ),
             const VerticalDivider(width: 1, color: AppColors.borderSubtle),
             Expanded(
-              child: _selectedUid == null
+              child: _selectedThreadId == null
                   ? Center(
                       child: Text(
-                        'Select a message to read it.',
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(color: AppColors.textSecondary),
+                        'Select a conversation to read it.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     )
-                  : _MessageDetailPane(
-                      uid: _selectedUid!,
+                  : _ThreadDetailPane(
+                      key: ValueKey(_selectedThreadId),
+                      threadId: _selectedThreadId!,
                       account: widget.account,
                     ),
             ),
@@ -171,42 +211,62 @@ class _MailboxWorkspaceState extends ConsumerState<_MailboxWorkspace> {
   }
 }
 
-class _InboxList extends ConsumerWidget {
-  const _InboxList({required this.selectedUid, required this.onSelect});
+class _ThreadList extends ConsumerWidget {
+  const _ThreadList({
+    required this.mailbox,
+    required this.selectedThreadId,
+    required this.onSelect,
+  });
 
-  final int? selectedUid;
-  final ValueChanged<int> onSelect;
+  final String mailbox;
+  final String? selectedThreadId;
+  final ValueChanged<String> onSelect;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inboxAsync = ref.watch(inboxMessagesProvider);
+    final threadsAsync = ref.watch(emailThreadsProvider);
 
-    return inboxAsync.when(
+    return threadsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Text(
-          error is EmailException ? error.message : 'Could not load inbox.',
+          error is EmailException
+              ? error.message
+              : 'Could not load conversations.',
         ),
       ),
-      data: (messages) {
-        if (messages.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('No messages yet.'),
+      data: (threads) {
+        // Each tab shows a conversation if any of its messages live in that
+        // folder — mirrors Gmail's own folder views over one underlying
+        // conversation.
+        final filtered = threads
+            .where(
+              (t) => mailbox == 'sent' ? t.hasSentMessage : t.hasInboxMessage,
+            )
+            .toList();
+        if (filtered.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              mailbox == 'sent'
+                  ? 'No sent conversations yet.'
+                  : 'No conversations yet.',
+            ),
           );
         }
         return ListView.separated(
           padding: EdgeInsets.zero,
-          itemCount: messages.length,
+          itemCount: filtered.length,
           separatorBuilder: (_, _) =>
               const Divider(height: 1, color: AppColors.borderSubtle),
           itemBuilder: (context, index) {
-            final message = messages[index];
-            return _InboxRow(
-              message: message,
-              selected: message.uid == selectedUid,
-              onTap: () => onSelect(message.uid),
+            final thread = filtered[index];
+            return _ThreadRow(
+              thread: thread,
+              mailbox: mailbox,
+              selected: thread.threadId == selectedThreadId,
+              onTap: () => onSelect(thread.threadId),
             );
           },
         );
@@ -215,19 +275,27 @@ class _InboxList extends ConsumerWidget {
   }
 }
 
-class _InboxRow extends StatelessWidget {
-  const _InboxRow({
-    required this.message,
+class _ThreadRow extends StatelessWidget {
+  const _ThreadRow({
+    required this.thread,
+    required this.mailbox,
     required this.selected,
     required this.onTap,
   });
 
-  final InboxMessage message;
+  final EmailThread thread;
+  final String mailbox;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final isSent = mailbox == 'sent';
+    final headline = thread.participants.isEmpty
+        ? (isSent ? 'Unknown recipient' : 'Unknown sender')
+        : thread.participants.join(', ');
+    final unread = !isSent && thread.hasUnread;
+
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -239,39 +307,52 @@ class _InboxRow extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  message.isUnread
+                  isSent
+                      ? Icons.send_outlined
+                      : unread
                       ? Icons.mark_email_unread_outlined
                       : Icons.mark_email_read_outlined,
                   size: 14,
-                  color: message.isUnread
-                      ? AppColors.primary
-                      : AppColors.textSecondary,
+                  color: unread ? AppColors.primary : AppColors.textSecondary,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    message.fromName?.isNotEmpty == true
-                        ? message.fromName!
-                        : message.from,
+                    isSent ? 'To: $headline' : headline,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: message.isUnread
-                          ? FontWeight.w700
-                          : FontWeight.w500,
+                      fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (thread.messageCount > 1) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.fieldFill,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${thread.messageCount}',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 2),
             Text(
-              message.subject,
+              thread.subject,
               style: Theme.of(context).textTheme.bodySmall,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
             Text(
-              formatDisplayDateTime(message.date),
+              formatDisplayDateTime(thread.lastDate),
               style: Theme.of(
                 context,
               ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
@@ -283,46 +364,41 @@ class _InboxRow extends StatelessWidget {
   }
 }
 
-class _MessageDetailPane extends ConsumerWidget {
-  const _MessageDetailPane({required this.uid, required this.account});
+/// The full conversation, oldest message first, stacked like Gmail's own
+/// thread view — every prior message in the exchange, not just the one
+/// selected from the list.
+class _ThreadDetailPane extends ConsumerWidget {
+  const _ThreadDetailPane({
+    super.key,
+    required this.threadId,
+    required this.account,
+  });
 
-  final int uid;
+  final String threadId;
   final EmailAccount account;
-
-  /// Strips a leading "Re: " (any casing, possibly repeated) so replying to
-  /// a reply doesn't pile up "Re: Re: Re: ...".
-  String _replySubject(String subject) {
-    final stripped = subject.replaceFirst(
-      RegExp(r'^(re:\s*)+', caseSensitive: false),
-      '',
-    );
-    return 'Re: $stripped';
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final repository = ref.read(emailRepositoryProvider);
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: FutureBuilder(
-        // Keyed off `uid` implicitly via this widget's own rebuild (a new
-        // uid means a new `_MessageDetailPane` instance further up), so the
-        // fetch reruns whenever the selected message changes.
-        future: repository.getMessage(uid),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            final error = snapshot.error;
-            return Text(
-              error is EmailException
-                  ? error.message
-                  : 'Could not load this message.',
-            );
-          }
-          final message = snapshot.data!;
-          return SingleChildScrollView(
+    final detailAsync = ref.watch(emailThreadDetailProvider(threadId));
+
+    return detailAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          error is EmailException
+              ? error.message
+              : 'Could not load this conversation.',
+        ),
+      ),
+      data: (thread) {
+        EmailThreadMessage? lastInbound;
+        for (final message in thread.messages) {
+          if (message.mailbox == 'inbox') lastInbound = message;
+        }
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -331,36 +407,94 @@ class _MessageDetailPane extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        message.subject,
+                        thread.subject,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
-                    TextButton.icon(
-                      onPressed: () => showDialog<void>(
-                        context: context,
-                        builder: (_) => _ComposeDialog(
-                          account: account,
-                          initialTo: message.from,
-                          initialSubject: _replySubject(message.subject),
+                    // Reply threads off the most recent inbound message —
+                    // there's nothing to reply to when every message in the
+                    // conversation is one the viewer sent themself.
+                    if (lastInbound case final inbound?)
+                      TextButton.icon(
+                        onPressed: () => showDialog<void>(
+                          context: context,
+                          builder: (_) => _ComposeDialog(
+                            account: account,
+                            initialTo: inbound.from,
+                            initialSubject: _replySubject(thread.subject),
+                          ),
                         ),
+                        icon: const Icon(Icons.reply_outlined, size: 16),
+                        label: const Text('Reply'),
                       ),
-                      icon: const Icon(Icons.reply_outlined, size: 16),
-                      label: const Text('Reply'),
-                    ),
                   ],
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  'From ${message.from} · ${formatDisplayDateTime(message.date)}',
+                  '${thread.messages.length} message'
+                  '${thread.messages.length == 1 ? '' : 's'}',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 12),
-                SelectableText(message.text),
+                for (final message in thread.messages) ...[
+                  _ThreadMessageCard(message: message),
+                  const SizedBox(height: 12),
+                ],
               ],
             ),
-          );
-        },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ThreadMessageCard extends StatelessWidget {
+  const _ThreadMessageCard({required this.message});
+
+  final EmailThreadMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final isSent = message.mailbox == 'sent';
+    final headline = isSent
+        ? 'To ${message.toName?.isNotEmpty == true ? message.toName! : (message.to ?? "Unknown recipient")}'
+        : 'From ${message.fromName?.isNotEmpty == true ? message.fromName! : message.from}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isSent ? AppColors.fieldFill : AppColors.canvasBackground,
+        border: Border.all(color: AppColors.borderSubtle),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  headline,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                formatDisplayDateTime(message.date),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SelectableText(message.text),
+        ],
       ),
     );
   }
@@ -404,8 +538,7 @@ class _ComposeDialogState extends ConsumerState<_ComposeDialog> {
     final signatureLines = [
       '--',
       if (profile != null) profile.fullName,
-      if (profile?.designation case final title? when title.isNotEmpty)
-        title,
+      if (profile?.designation case final title? when title.isNotEmpty) title,
       widget.account.emailAddress,
       'Zera Creative',
     ];
@@ -429,11 +562,13 @@ class _ComposeDialogState extends ConsumerState<_ComposeDialog> {
       _errorMessage = null;
     });
     try {
-      await ref.read(emailRepositoryProvider).sendMail(
-        to: _toController.text.trim(),
-        subject: _subjectController.text.trim(),
-        body: _bodyController.text,
-      );
+      await ref
+          .read(emailRepositoryProvider)
+          .sendMail(
+            to: _toController.text.trim(),
+            subject: _subjectController.text.trim(),
+            body: _bodyController.text,
+          );
       if (!mounted) return;
       Navigator.of(context).pop();
     } on EmailException catch (error) {
@@ -540,7 +675,8 @@ const _defaultMailHost = 'mail.zeracreative.com';
 class _MailboxSetupCardState extends ConsumerState<_MailboxSetupCard> {
   final _formKey = GlobalKey<FormState>();
   late final _emailController = TextEditingController(
-    text: widget.existing?.emailAddress ??
+    text:
+        widget.existing?.emailAddress ??
         (widget.defaultFirstName == null
             ? ''
             : '${widget.defaultFirstName!.toLowerCase()}@zeracreative.com'),
@@ -692,8 +828,8 @@ class _MailboxSetupCardState extends ConsumerState<_MailboxSetupCard> {
                     ? 'Password (re-enter to change)'
                     : 'Password',
               ),
-              validator: (value) => (!isEditingExisting &&
-                      (value == null || value.isEmpty))
+              validator: (value) =>
+                  (!isEditingExisting && (value == null || value.isEmpty))
                   ? 'Required'
                   : null,
             ),
@@ -837,8 +973,7 @@ class _AdminMailboxManagerState extends ConsumerState<_AdminMailboxManager> {
                     child: Text(employee.fullName),
                   ),
               ],
-              onChanged: (value) =>
-                  setState(() => _selectedEmployeeId = value),
+              onChanged: (value) => setState(() => _selectedEmployeeId = value),
             ),
           ),
           if (_selectedEmployeeId != null) ...[

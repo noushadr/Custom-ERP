@@ -26,7 +26,10 @@ Future<void> _useTallSurface(WidgetTester tester) async {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-Widget _app({required FakeClientsRepository repository, String clientId = 'client-1'}) {
+Widget _app({
+  required FakeClientsRepository repository,
+  String clientId = 'client-1',
+}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
@@ -81,9 +84,7 @@ void main() {
     expect(find.text('No projects for this client yet.'), findsOneWidget);
   });
 
-  testWidgets('shows an Archived badge for an archived client', (
-    tester,
-  ) async {
+  testWidgets('shows an Archived badge for an archived client', (tester) async {
     await tester.pumpWidget(
       _app(
         repository: FakeClientsRepository(
@@ -178,7 +179,9 @@ void main() {
     await tester.tap(find.text('Update Health'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Status'));
+    await tester.tap(
+      find.widgetWithText(DropdownButtonFormField<String>, 'Status'),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('At Risk').last);
     await tester.pumpAndSettle();
@@ -223,10 +226,7 @@ void main() {
       // A regression check: updateClientHealth alone isn't enough — the
       // client list/detail providers (which the health badge reads) must
       // also be invalidated so the badge doesn't show stale data.
-      expect(
-        repository.getClientsCallCount,
-        greaterThan(callsBeforeSave),
-      );
+      expect(repository.getClientsCallCount, greaterThan(callsBeforeSave));
     },
   );
 }

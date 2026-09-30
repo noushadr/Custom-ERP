@@ -67,23 +67,24 @@ void main() {
     expect(find.text('48,000.00'), findsOneWidget); // net pay
   });
 
-  testWidgets('shows Finalize for a draft run, and Mark Paid after finalizing', (
-    tester,
-  ) async {
-    final repository = FakePayrollRepository(
-      runDetail: buildTestPayrollRunDetail(status: PayrollRunStatus.draft),
-    );
-    await tester.pumpWidget(_app(repository: repository));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'shows Finalize for a draft run, and Mark Paid after finalizing',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(status: PayrollRunStatus.draft),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(FilledButton, 'Finalize'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Mark Paid'), findsNothing);
+      expect(find.widgetWithText(FilledButton, 'Finalize'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Mark Paid'), findsNothing);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Finalize'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Finalize'));
+      await tester.pumpAndSettle();
 
-    expect(repository.lastFinalizedRunId, 'run-1');
-  });
+      expect(repository.lastFinalizedRunId, 'run-1');
+    },
+  );
 
   testWidgets('shows Mark Paid for a finalized run and calls payRun', (
     tester,
@@ -119,7 +120,9 @@ void main() {
       final repository = FakePayrollRepository(
         runDetail: buildTestPayrollRunDetail(
           status: PayrollRunStatus.draft,
-          lineItems: [buildTestPayrollLineItem(id: 'item-9', employeeName: 'Jane Doe')],
+          lineItems: [
+            buildTestPayrollLineItem(id: 'item-9', employeeName: 'Jane Doe'),
+          ],
         ),
       );
       await tester.pumpWidget(_app(repository: repository));
@@ -151,53 +154,53 @@ void main() {
     },
   );
 
-  testWidgets(
-    'editing piece-rate quantity and per-unit rate submits both',
-    (tester) async {
-      final repository = FakePayrollRepository(
-        runDetail: buildTestPayrollRunDetail(
-          status: PayrollRunStatus.draft,
-          lineItems: [
-            buildTestPayrollLineItem(id: 'item-9', employeeName: 'Kulsum Zehra'),
-          ],
-        ),
-      );
-      await tester.pumpWidget(_app(repository: repository));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Kulsum Zehra'));
-      await tester.pumpAndSettle();
-
-      await tester.enterText(find.widgetWithText(TextField, 'Quantity'), '5');
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Per unit (PKR)'),
-        '1000',
-      );
-      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-      await tester.pumpAndSettle();
-
-      expect(repository.lastUpdatedQuantity, 5);
-      expect(repository.lastUpdatedPerUnitRate, 1000);
-    },
-  );
-
-  testWidgets('does not open the edit dialog for a finalized run\'s line items', (
+  testWidgets('editing piece-rate quantity and per-unit rate submits both', (
     tester,
   ) async {
     final repository = FakePayrollRepository(
       runDetail: buildTestPayrollRunDetail(
-        status: PayrollRunStatus.finalized,
-        lineItems: [buildTestPayrollLineItem(employeeName: 'Jane Doe')],
+        status: PayrollRunStatus.draft,
+        lineItems: [
+          buildTestPayrollLineItem(id: 'item-9', employeeName: 'Kulsum Zehra'),
+        ],
       ),
     );
     await tester.pumpWidget(_app(repository: repository));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Jane Doe'));
+    await tester.tap(find.text('Kulsum Zehra'));
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(TextField, 'Additions (PKR)'), findsNothing);
+    await tester.enterText(find.widgetWithText(TextField, 'Quantity'), '5');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Per unit (PKR)'),
+      '1000',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUpdatedQuantity, 5);
+    expect(repository.lastUpdatedPerUnitRate, 1000);
   });
+
+  testWidgets(
+    'does not open the edit dialog for a finalized run\'s line items',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(
+          status: PayrollRunStatus.finalized,
+          lineItems: [buildTestPayrollLineItem(employeeName: 'Jane Doe')],
+        ),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Jane Doe'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextField, 'Additions (PKR)'), findsNothing);
+    },
+  );
 
   testWidgets(
     'the line items table shows Employee, Base, Additions, Deductions, and Net Pay',
@@ -283,10 +286,7 @@ void main() {
           repository: repository,
           freelancersRepository: FakeFreelancersRepository(
             freelancers: [
-              buildTestFreelancer(
-                id: 'freelancer-2',
-                fullName: 'Hamza Saqib',
-              ),
+              buildTestFreelancer(id: 'freelancer-2', fullName: 'Hamza Saqib'),
             ],
           ),
         ),
@@ -352,5 +352,48 @@ void main() {
     expect(find.text('Freelancers'), findsOneWidget);
     expect(find.text('20.0% of payroll'), findsOneWidget);
     expect(find.text('PKR 20,000 · 1 person'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows a payslip download button only for a Paid run\'s employee rows',
+    (tester) async {
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(
+          status: PayrollRunStatus.paid,
+          lineItems: [
+            buildTestPayrollLineItem(
+              id: 'item-employee',
+              employeeName: 'Jane Doe',
+            ),
+            buildTestPayrollLineItem(
+              id: 'item-freelancer',
+              employeeId: null,
+              freelancerId: 'freelancer-1',
+              isFreelancer: true,
+              employeeName: 'Kulsum Zehra',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.download_outlined), findsOneWidget);
+    },
+  );
+
+  testWidgets('shows no payslip download button for a Draft run', (
+    tester,
+  ) async {
+    final repository = FakePayrollRepository(
+      runDetail: buildTestPayrollRunDetail(
+        status: PayrollRunStatus.draft,
+        lineItems: [buildTestPayrollLineItem(employeeName: 'Jane Doe')],
+      ),
+    );
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.download_outlined), findsNothing);
   });
 }

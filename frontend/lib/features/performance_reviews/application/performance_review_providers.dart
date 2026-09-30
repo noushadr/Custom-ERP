@@ -9,16 +9,16 @@ import '../domain/repositories/performance_review_repository.dart';
 
 final performanceReviewRemoteDataSourceProvider =
     Provider<PerformanceReviewRemoteDataSource>(
-      (ref) => PerformanceReviewRemoteDataSource(
-        ref.watch(dioClientProvider).dio,
-      ),
+      (ref) =>
+          PerformanceReviewRemoteDataSource(ref.watch(dioClientProvider).dio),
     );
 
-final performanceReviewRepositoryProvider = Provider<PerformanceReviewRepository>(
-  (ref) => PerformanceReviewRepositoryImpl(
-    ref.watch(performanceReviewRemoteDataSourceProvider),
-  ),
-);
+final performanceReviewRepositoryProvider =
+    Provider<PerformanceReviewRepository>(
+      (ref) => PerformanceReviewRepositoryImpl(
+        ref.watch(performanceReviewRemoteDataSourceProvider),
+      ),
+    );
 
 // Every provider below re-watches authControllerProvider purely to create a
 // dependency edge, so switching identity (impersonate/returnToAdmin/logout)
@@ -103,23 +103,27 @@ final employeePerformanceReviewsProvider = FutureProvider.autoDispose
 /// Keyed by employeeId for O(1) lookup in list views (e.g. the employee
 /// directory) — a `performance.manage` holder fetches every employee's
 /// latest review in one call rather than one request per card.
-final latestPerformanceReviewsByEmployeeProvider = FutureProvider.autoDispose<
-    Map<String, PerformanceReviewSummary>>((ref) async {
-  ref.watch(authControllerProvider);
-  final summaries = await ref
-      .watch(performanceReviewRepositoryProvider)
-      .getLatestReviewSummaries();
-  return {for (final summary in summaries) summary.employeeId: summary};
-});
+final latestPerformanceReviewsByEmployeeProvider =
+    FutureProvider.autoDispose<Map<String, PerformanceReviewSummary>>((
+      ref,
+    ) async {
+      ref.watch(authControllerProvider);
+      final summaries = await ref
+          .watch(performanceReviewRepositoryProvider)
+          .getLatestReviewSummaries();
+      return {for (final summary in summaries) summary.employeeId: summary};
+    });
 
 /// Same as [latestPerformanceReviewsByEmployeeProvider], but scoped to the
 /// caller's own direct reports and reachable without `performance.manage` —
 /// for the "My Team" section on a Team Lead's User Dashboard.
-final latestPerformanceReviewsForMyTeamProvider = FutureProvider.autoDispose<
-    Map<String, PerformanceReviewSummary>>((ref) async {
-  ref.watch(authControllerProvider);
-  final summaries = await ref
-      .watch(performanceReviewRepositoryProvider)
-      .getLatestForMyTeam();
-  return {for (final summary in summaries) summary.employeeId: summary};
-});
+final latestPerformanceReviewsForMyTeamProvider =
+    FutureProvider.autoDispose<Map<String, PerformanceReviewSummary>>((
+      ref,
+    ) async {
+      ref.watch(authControllerProvider);
+      final summaries = await ref
+          .watch(performanceReviewRepositoryProvider)
+          .getLatestForMyTeam();
+      return {for (final summary in summaries) summary.employeeId: summary};
+    });

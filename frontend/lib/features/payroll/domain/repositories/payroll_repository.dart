@@ -1,5 +1,6 @@
 import '../entities/payroll_run_detail.dart';
 import '../entities/payroll_run_summary.dart';
+import '../entities/payslip_list_item.dart';
 
 abstract interface class PayrollRepository {
   Future<List<PayrollRunSummary>> getRuns();
@@ -31,4 +32,17 @@ abstract interface class PayrollRepository {
   Future<PayrollRunSummary> finalizeRun(String id);
 
   Future<PayrollRunSummary> payRun(String id);
+
+  /// HR/Admin path: any employee's payslip PDF bytes for a Paid run.
+  Future<List<int>> downloadPayslip(String runId, String lineItemId);
+
+  /// HR/Admin path: a specific employee's payslips across every Paid run —
+  /// shown on that employee's own profile page.
+  Future<List<PayslipListItem>> getEmployeePayslips(String employeeId);
+
+  /// Self-service path: the caller's own payslips across every Paid run.
+  Future<List<PayslipListItem>> getMyPayslips();
+
+  /// Self-service path: the caller's own payslip PDF bytes.
+  Future<List<int>> downloadMyPayslip(String lineItemId);
 }

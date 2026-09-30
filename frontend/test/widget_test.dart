@@ -395,10 +395,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Last Birthday'), findsOneWidget);
+      expect(find.text('Birthdays'), findsOneWidget);
       expect(find.text('Aamna Irfan'), findsOneWidget);
       expect(find.text('Aug 13 · 2 days ago'), findsOneWidget);
-      expect(find.text('Upcoming Birthday'), findsOneWidget);
       expect(find.text('Babar Hussain'), findsOneWidget);
       expect(find.text('Sep 20 · in 5 days'), findsOneWidget);
     },

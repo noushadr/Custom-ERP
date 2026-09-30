@@ -16,13 +16,15 @@ import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_holiday.dart';
 import '../../helpers/fake_leave.dart';
 
-AuthUser _viewer({String role = 'Employee', List<String> permissions = const []}) =>
-    AuthUser(
-      id: 'user-1',
-      email: 'jane.doe@zeracreative.com',
-      role: role,
-      permissions: permissions,
-    );
+AuthUser _viewer({
+  String role = 'Employee',
+  List<String> permissions = const [],
+}) => AuthUser(
+  id: 'user-1',
+  email: 'jane.doe@zeracreative.com',
+  role: role,
+  permissions: permissions,
+);
 
 Future<void> _useTallSurface(WidgetTester tester) async {
   tester.view.physicalSize = const Size(900, 2200);
@@ -99,44 +101,38 @@ void main() {
     expect(find.text('No leave balances yet.'), findsOneWidget);
   });
 
-  testWidgets(
-    'shows the company-wide On Leave stat for a leave.manage holder '
-    '(moved here from the Dashboard)',
-    (tester) async {
-      await _useTallSurface(tester);
-      await tester.pumpWidget(
-        _app(
-          role: 'HR/Manager',
-          permissions: const ['leave.manage'],
-          employeeRepository: FakeEmployeeRepository(
-            employees: [
-              buildTestEmployee(id: 'employee-1', employmentStatus: 'on_leave'),
-              buildTestEmployee(id: 'employee-2', employmentStatus: 'active'),
-            ],
-          ),
+  testWidgets('shows the company-wide On Leave stat for a leave.manage holder '
+      '(moved here from the Dashboard)', (tester) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        role: 'HR/Manager',
+        permissions: const ['leave.manage'],
+        employeeRepository: FakeEmployeeRepository(
+          employees: [
+            buildTestEmployee(id: 'employee-1', employmentStatus: 'on_leave'),
+            buildTestEmployee(id: 'employee-2', employmentStatus: 'active'),
+          ],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      final onLeaveCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate(
-          (w) => w is MetricCard && w.label == 'On Leave',
-        ),
-      );
-      expect(onLeaveCard.value, '1');
-    },
-  );
+    final onLeaveCard = tester.widget<MetricCard>(
+      find.byWidgetPredicate((w) => w is MetricCard && w.label == 'On Leave'),
+    );
+    expect(onLeaveCard.value, '1');
+  });
 
-  testWidgets(
-    'hides the On Leave stat from a viewer without leave.manage',
-    (tester) async {
-      await _useTallSurface(tester);
-      await tester.pumpWidget(_app());
-      await tester.pumpAndSettle();
+  testWidgets('hides the On Leave stat from a viewer without leave.manage', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
 
-      expect(find.text('On Leave'), findsNothing);
-    },
-  );
+    expect(find.text('On Leave'), findsNothing);
+  });
 
   testWidgets(
     'shows the Apply Leave for Employee button only for a leave.manage holder',
@@ -218,10 +214,7 @@ void main() {
           leaveRepository: leaveRepository,
           employeeRepository: FakeEmployeeRepository(
             employees: [
-              buildTestEmployee(
-                id: 'employee-1',
-                fullName: 'Babar Hussain',
-              ),
+              buildTestEmployee(id: 'employee-1', fullName: 'Babar Hussain'),
             ],
           ),
         ),
@@ -278,47 +271,50 @@ void main() {
     },
   );
 
-  testWidgets(
-    'previews the working-day count once both dates are selected',
-    (tester) async {
-      await _useTallSurface(tester);
-      final leaveRepository = FakeLeaveRepository(
-        leaveTypes: [buildTestLeaveType(id: 'type-1', name: 'Casual Leave')],
-      );
-      await tester.pumpWidget(_app(leaveRepository: leaveRepository));
-      await tester.pumpAndSettle();
+  testWidgets('previews the working-day count once both dates are selected', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    final leaveRepository = FakeLeaveRepository(
+      leaveTypes: [buildTestLeaveType(id: 'type-1', name: 'Casual Leave')],
+    );
+    await tester.pumpWidget(_app(leaveRepository: leaveRepository));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Apply for leave'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Apply for leave'));
+    await tester.pumpAndSettle();
 
-      expect(find.textContaining('selected'), findsNothing);
-      expect(find.textContaining('No working days'), findsNothing);
+    expect(find.textContaining('selected'), findsNothing);
+    expect(find.textContaining('No working days'), findsNothing);
 
-      await tester.tap(find.byKey(const Key('leave-start-date')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('leave-start-date')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('leave-end-date')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('leave-end-date')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
 
-      // Start == end == "today" here, since both date pickers were confirmed
-      // without picking a different day. Whether that lands on a working day
-      // depends on which day of the week the suite happens to run — assert
-      // the label's shape rather than an exact count so this stays stable.
-      final label = find.byWidgetPredicate(
-        (widget) =>
-            widget is Text &&
-            (RegExp(r'^\d+ working days? selected$').hasMatch(widget.data ?? '') ||
-                widget.data == 'No working days in this range'),
-      );
-      expect(label, findsOneWidget);
-    },
-  );
+    // Start == end == "today" here, since both date pickers were confirmed
+    // without picking a different day. Whether that lands on a working day
+    // depends on which day of the week the suite happens to run — assert
+    // the label's shape rather than an exact count so this stays stable.
+    final label = find.byWidgetPredicate(
+      (widget) =>
+          widget is Text &&
+          (RegExp(
+                r'^\d+ working days? selected$',
+              ).hasMatch(widget.data ?? '') ||
+              widget.data == 'No working days in this range'),
+    );
+    expect(label, findsOneWidget);
+  });
 
-  testWidgets('submitting a leave request calls the repository', (tester) async {
+  testWidgets('submitting a leave request calls the repository', (
+    tester,
+  ) async {
     await _useTallSurface(tester);
     final leaveRepository = FakeLeaveRepository(
       leaveTypes: [buildTestLeaveType(id: 'type-1', name: 'Casual Leave')],
@@ -355,7 +351,9 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
   });
 
-  testWidgets('shows a validation error when dates are missing', (tester) async {
+  testWidgets('shows a validation error when dates are missing', (
+    tester,
+  ) async {
     await _useTallSurface(tester);
     final leaveRepository = FakeLeaveRepository(
       leaveTypes: [buildTestLeaveType(id: 'type-1', name: 'Casual Leave')],
@@ -398,50 +396,55 @@ void main() {
     expect(leaveRepository.lastCancelledRequestId, 'request-1');
   });
 
-  testWidgets('approving a pending request prompts for a comment and calls approveAsManager', (
-    tester,
-  ) async {
-    await _useTallSurface(tester);
-    final leaveRepository = FakeLeaveRepository(
-      pendingManagerApproval: [
-        buildTestLeaveRequest(id: 'request-1', requesterName: 'Babar Hussain'),
-      ],
-    );
-    await tester.pumpWidget(_app(leaveRepository: leaveRepository));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'approving a pending request prompts for a comment and calls approveAsManager',
+    (tester) async {
+      await _useTallSurface(tester);
+      final leaveRepository = FakeLeaveRepository(
+        pendingManagerApproval: [
+          buildTestLeaveRequest(
+            id: 'request-1',
+            requesterName: 'Babar Hussain',
+          ),
+        ],
+      );
+      await tester.pumpWidget(_app(leaveRepository: leaveRepository));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Approve'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Approve'));
+      await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'Enjoy your trip!');
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.widgetWithText(FilledButton, 'Approve'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(leaveRepository.lastDecidedRequestId, 'request-1');
-    expect(leaveRepository.lastDecisionApproved, isTrue);
-    expect(leaveRepository.lastDecisionComment, 'Enjoy your trip!');
-  });
-
-  testWidgets('hides the HR approval section from a viewer without leave.manage', (
-    tester,
-  ) async {
-    await _useTallSurface(tester);
-    await tester.pumpWidget(
-      _app(
-        leaveRepository: FakeLeaveRepository(
-          pendingHrApproval: [buildTestLeaveRequest(id: 'request-hr')],
+      await tester.enterText(find.byType(TextField), 'Enjoy your trip!');
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(FilledButton, 'Approve'),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Leave Requests Awaiting HR Approval'), findsNothing);
-  });
+      expect(leaveRepository.lastDecidedRequestId, 'request-1');
+      expect(leaveRepository.lastDecisionApproved, isTrue);
+      expect(leaveRepository.lastDecisionComment, 'Enjoy your trip!');
+    },
+  );
+
+  testWidgets(
+    'hides the HR approval section from a viewer without leave.manage',
+    (tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          leaveRepository: FakeLeaveRepository(
+            pendingHrApproval: [buildTestLeaveRequest(id: 'request-hr')],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Leave Requests Awaiting HR Approval'), findsNothing);
+    },
+  );
 
   testWidgets('HR/Admin can approve a request awaiting HR approval', (
     tester,
@@ -497,21 +500,20 @@ void main() {
     },
   );
 
-  testWidgets(
-    'hides the reset reminder once balances are initialized',
-    (tester) async {
-      await _useTallSurface(tester);
-      await tester.pumpWidget(
-        _app(
-          permissions: ['leave.manage'],
-          leaveRepository: FakeLeaveRepository(
-            resetStatus: const LeaveResetStatus(year: 2026, isInitialized: true),
-          ),
+  testWidgets('hides the reset reminder once balances are initialized', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        permissions: ['leave.manage'],
+        leaveRepository: FakeLeaveRepository(
+          resetStatus: const LeaveResetStatus(year: 2026, isInitialized: true),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Reset now'), findsNothing);
-    },
-  );
+    expect(find.text('Reset now'), findsNothing);
+  });
 }

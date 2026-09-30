@@ -142,8 +142,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
       emergencyContactPhone: _emergencyPhoneController.text.trim().isEmpty
           ? null
           : _emergencyPhoneController.text.trim(),
-      emergencyContactRelation:
-          _emergencyRelationController.text.trim().isEmpty
+      emergencyContactRelation: _emergencyRelationController.text.trim().isEmpty
           ? null
           : _emergencyRelationController.text.trim(),
       address: _addressController.text.trim().isEmpty
@@ -182,7 +181,9 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
         ref.invalidate(myAuditLogProvider);
         if (!mounted) return;
         Navigator.of(context).pop();
-        messenger.showSnackBar(const SnackBar(content: Text('Profile updated.')));
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Profile updated.')),
+        );
       } else {
         await ref
             .read(requestRepositoryProvider)
@@ -350,9 +351,7 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                         TextFormField(
                           controller: _ibanController,
                           enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'IBAN',
-                          ),
+                          decoration: const InputDecoration(labelText: 'IBAN'),
                         ),
                       ],
                     ),
@@ -366,17 +365,13 @@ class _EditMyProfilePageState extends ConsumerState<EditMyProfilePage> {
                         TextFormField(
                           controller: _emergencyNameController,
                           enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Name',
-                          ),
+                          decoration: const InputDecoration(labelText: 'Name'),
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _emergencyPhoneController,
                           enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone',
-                          ),
+                          decoration: const InputDecoration(labelText: 'Phone'),
                           keyboardType: TextInputType.phone,
                         ),
                         const SizedBox(height: 16),

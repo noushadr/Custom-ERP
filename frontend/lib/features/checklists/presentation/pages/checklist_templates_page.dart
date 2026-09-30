@@ -42,10 +42,8 @@ class _ChecklistTemplatesPageState
             icon: const Icon(Icons.add),
             onPressed: () => showDialog<void>(
               context: context,
-              builder: (_) => _ChecklistTemplateItemFormDialog(
-                type: _type,
-                item: null,
-              ),
+              builder: (_) =>
+                  _ChecklistTemplateItemFormDialog(type: _type, item: null),
             ),
           ),
           const SizedBox(width: 8),
@@ -172,9 +170,9 @@ class _ChecklistTemplateItemCard extends ConsumerWidget {
     reordered.insert(newIndex, moved);
 
     try {
-      await ref
-          .read(checklistRepositoryProvider)
-          .reorderTemplateItems(type, [for (final i in reordered) i.id]);
+      await ref.read(checklistRepositoryProvider).reorderTemplateItems(type, [
+        for (final i in reordered) i.id,
+      ]);
       ref.invalidate(checklistTemplateItemsProvider);
     } on ChecklistException catch (error) {
       if (!context.mounted) return;
@@ -324,9 +322,7 @@ class _Chip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: color),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
       ),
     );
   }
@@ -449,12 +445,13 @@ class _ChecklistTemplateItemFormDialogState
               const SizedBox(height: 16),
               DropdownButtonFormField<String?>(
                 initialValue: _appliesToWorkMode,
-                decoration: const InputDecoration(
-                  labelText: 'Applies to',
-                ),
+                decoration: const InputDecoration(labelText: 'Applies to'),
                 items: const [
                   DropdownMenuItem(value: null, child: Text('Everyone')),
-                  DropdownMenuItem(value: 'on_site', child: Text('On-site only')),
+                  DropdownMenuItem(
+                    value: 'on_site',
+                    child: Text('On-site only'),
+                  ),
                   DropdownMenuItem(value: 'remote', child: Text('Remote only')),
                   DropdownMenuItem(value: 'hybrid', child: Text('Hybrid only')),
                 ],

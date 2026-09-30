@@ -42,13 +42,17 @@ class TopBreakdownRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = (constraints.maxWidth / _minPanelWidth)
-            .floor()
-            .clamp(1, panels.length);
+        final columns = (constraints.maxWidth / _minPanelWidth).floor().clamp(
+          1,
+          panels.length,
+        );
         if (columns == 1) {
           return Column(
             children: [
-              for (final panel in panels) ...[panel, const SizedBox(height: 12)],
+              for (final panel in panels) ...[
+                panel,
+                const SizedBox(height: 12),
+              ],
             ],
           );
         }
@@ -75,7 +79,10 @@ class TopBreakdownRow extends StatelessWidget {
           );
           if (i + columns < panels.length) rows.add(const SizedBox(height: 12));
         }
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: rows,
+        );
       },
     );
   }

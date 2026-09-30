@@ -14,13 +14,15 @@ import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
 import '../../helpers/fake_request.dart';
 
-AuthUser _viewer({String role = 'Employee', List<String> permissions = const []}) =>
-    AuthUser(
-      id: 'user-1',
-      email: 'jane.doe@zeracreative.com',
-      role: role,
-      permissions: permissions,
-    );
+AuthUser _viewer({
+  String role = 'Employee',
+  List<String> permissions = const [],
+}) => AuthUser(
+  id: 'user-1',
+  email: 'jane.doe@zeracreative.com',
+  role: role,
+  permissions: permissions,
+);
 
 Widget _app({
   String role = 'Employee',
@@ -51,9 +53,7 @@ Widget _app({
 }
 
 void main() {
-  testWidgets('submitting a new request calls the repository', (
-    tester,
-  ) async {
+  testWidgets('submitting a new request calls the repository', (tester) async {
     final requestRepository = FakeRequestRepository();
     await tester.pumpWidget(_app(requestRepository: requestRepository));
     await tester.pumpAndSettle();
@@ -82,10 +82,7 @@ void main() {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Nominate Employee of the Month'),
-        findsNothing,
-      );
+      expect(find.text('Nominate Employee of the Month'), findsNothing);
     },
   );
 
@@ -152,21 +149,20 @@ void main() {
     expect(requestRepository.lastDecisionApproved, isTrue);
   });
 
-  testWidgets(
-    'hides the manager approval section from a plain employee',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          requestRepository: FakeRequestRepository(
-            pendingManagerApproval: [buildTestRequest(id: 'request-1')],
-          ),
+  testWidgets('hides the manager approval section from a plain employee', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        requestRepository: FakeRequestRepository(
+          pendingManagerApproval: [buildTestRequest(id: 'request-1')],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Requests Awaiting My Approval'), findsNothing);
-    },
-  );
+    expect(find.text('Requests Awaiting My Approval'), findsNothing);
+  });
 
   testWidgets(
     'shows the manager approval section for an actual department head',
@@ -226,10 +222,7 @@ void main() {
       ],
     );
     await tester.pumpWidget(
-      _app(
-        permissions: ['users.manage'],
-        requestRepository: requestRepository,
-      ),
+      _app(permissions: ['users.manage'], requestRepository: requestRepository),
     );
     await tester.pumpAndSettle();
 
@@ -364,14 +357,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Request History'), findsOneWidget);
-      expect(
-        find.textContaining('Approved by Noushad Ranani'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Reason: Needs a valid phone number'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Approved by Noushad Ranani'), findsOneWidget);
+      expect(find.text('Reason: Needs a valid phone number'), findsOneWidget);
     },
   );
 
@@ -399,10 +386,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Request History'), findsOneWidget);
-      expect(
-        find.textContaining('Approved by Noushad Ranani'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Approved by Noushad Ranani'), findsOneWidget);
     },
   );
 
@@ -427,10 +411,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('Approved by Noushad Ranani'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Approved by Noushad Ranani'), findsOneWidget);
       expect(
         find.textContaining('noushad.ranani@zeracreative.com'),
         findsNothing,

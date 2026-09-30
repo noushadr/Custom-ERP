@@ -192,8 +192,9 @@ class _RoleCard extends ConsumerWidget {
                     if (role.permissions.isEmpty)
                       Text(
                         'No permissions granted',
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: AppColors.textSecondary),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                   ],
                 ),

@@ -60,3 +60,15 @@ export interface PayrollRunDetailDto extends PayrollRunSummaryDto {
    * highest-total first. */
   departmentTotals: PayrollDepartmentTotal[];
 }
+
+/** One row of a self-service "my payslips" list — only ever a Paid run's
+ * employee line item (never a freelancer's, who has no ERP login to view
+ * this from). */
+export interface PayslipListItemDto {
+  runId: string;
+  lineItemId: string;
+  month: number;
+  year: number;
+  netPay: number;
+  paidAt: string;
+}

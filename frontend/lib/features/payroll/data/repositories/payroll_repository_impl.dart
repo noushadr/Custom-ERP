@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../domain/entities/payroll_run_detail.dart';
 import '../../domain/entities/payroll_run_summary.dart';
+import '../../domain/entities/payslip_list_item.dart';
 import '../../domain/exceptions/payroll_exception.dart';
 import '../../domain/repositories/payroll_repository.dart';
 import '../datasources/payroll_remote_data_source.dart';
@@ -69,6 +70,22 @@ class PayrollRepositoryImpl implements PayrollRepository {
   @override
   Future<PayrollRunSummary> payRun(String id) =>
       _guard(() => _remoteDataSource.payRun(id));
+
+  @override
+  Future<List<int>> downloadPayslip(String runId, String lineItemId) =>
+      _guard(() => _remoteDataSource.downloadPayslip(runId, lineItemId));
+
+  @override
+  Future<List<PayslipListItem>> getEmployeePayslips(String employeeId) =>
+      _guard(() => _remoteDataSource.getEmployeePayslips(employeeId));
+
+  @override
+  Future<List<PayslipListItem>> getMyPayslips() =>
+      _guard(() => _remoteDataSource.getMyPayslips());
+
+  @override
+  Future<List<int>> downloadMyPayslip(String lineItemId) =>
+      _guard(() => _remoteDataSource.downloadMyPayslip(lineItemId));
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

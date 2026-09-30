@@ -22,7 +22,8 @@ class CompanyAuditLogSection extends ConsumerStatefulWidget {
       _CompanyAuditLogSectionState();
 }
 
-class _CompanyAuditLogSectionState extends ConsumerState<CompanyAuditLogSection> {
+class _CompanyAuditLogSectionState
+    extends ConsumerState<CompanyAuditLogSection> {
   final _searchController = TextEditingController();
   Timer? _debounce;
   String? _search;
@@ -91,7 +92,8 @@ class _CompanyAuditLogSectionState extends ConsumerState<CompanyAuditLogSection>
               padding: EdgeInsets.symmetric(vertical: 12),
               child: LinearProgressIndicator(),
             ),
-            error: (_, _) => const Text('Could not load the combined change log.'),
+            error: (_, _) =>
+                const Text('Could not load the combined change log.'),
             data: (result) {
               if (result.items.isEmpty) {
                 return Text(

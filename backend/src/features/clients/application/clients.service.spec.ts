@@ -85,10 +85,7 @@ describe('ClientsService', () => {
   let userRepository: jest.Mocked<UserRepository>;
 
   beforeEach(() => {
-    const stampTimestamps = (item: {
-      createdAt?: Date;
-      updatedAt?: Date;
-    }) => ({
+    const stampTimestamps = (item: { createdAt?: Date; updatedAt?: Date }) => ({
       ...item,
       createdAt: item.createdAt ?? new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: item.updatedAt ?? new Date('2026-01-01T00:00:00.000Z'),
@@ -265,8 +262,7 @@ describe('ClientsService', () => {
       expect(result.healthNotes).toBe('Invoice overdue 30 days');
 
       expect(clientHealthHistoryRepository.save).toHaveBeenCalledTimes(1);
-      const savedHistory = clientHealthHistoryRepository.save.mock
-        .calls[0][0];
+      const savedHistory = clientHealthHistoryRepository.save.mock.calls[0][0];
       expect(savedHistory.previousStatus).toBe(ClientHealthStatus.HEALTHY);
       expect(savedHistory.newStatus).toBe(ClientHealthStatus.AT_RISK);
       expect(savedHistory.factors).toEqual([
@@ -284,8 +280,7 @@ describe('ClientsService', () => {
         status: ClientHealthStatus.ATTENTION_REQUIRED,
       });
 
-      const savedHistory = clientHealthHistoryRepository.save.mock
-        .calls[0][0];
+      const savedHistory = clientHealthHistoryRepository.save.mock.calls[0][0];
       expect(savedHistory.factors).toEqual([]);
       expect(savedHistory.notes).toBeNull();
     });
@@ -300,8 +295,7 @@ describe('ClientsService', () => {
         status: ClientHealthStatus.AT_RISK,
       });
 
-      const savedHistory = clientHealthHistoryRepository.save.mock
-        .calls[0][0];
+      const savedHistory = clientHealthHistoryRepository.save.mock.calls[0][0];
       expect(savedHistory.actorName).toBe('Noushad Ranani');
     });
 
@@ -457,6 +451,33 @@ describe('ClientsService', () => {
       expect(result.backlinksTarget).toBe('20/40');
     });
 
+    it('sets archivedAt when archiving a project', async () => {
+      const project = buildProject({ isArchived: false, archivedAt: null });
+      projectRepository.findById.mockResolvedValue(project);
+
+      const result = await service.updateProject('project-1', {
+        isArchived: true,
+      });
+
+      expect(result.isArchived).toBe(true);
+      expect(project.archivedAt).not.toBeNull();
+    });
+
+    it('clears archivedAt when unarchiving a project', async () => {
+      const project = buildProject({
+        isArchived: true,
+        archivedAt: new Date('2026-01-05'),
+      });
+      projectRepository.findById.mockResolvedValue(project);
+
+      const result = await service.updateProject('project-1', {
+        isArchived: false,
+      });
+
+      expect(result.isArchived).toBe(false);
+      expect(project.archivedAt).toBeNull();
+    });
+
     it('defaults SEO fields to null when omitted', async () => {
       projectRepository.findById.mockImplementation((id) =>
         Promise.resolve(buildProject({ id })),
@@ -495,9 +516,29 @@ describe('ClientsService', () => {
 
       await service.getProjects({ clientId: 'client-1' });
 
-      expect(projectRepository.findByClientId).toHaveBeenCalledWith(
-        'client-1',
-      );
+      expect(projectRepository.findByClientId).toHaveBeenCalledWith('client-1');
+    });
+
+    it('excludes archived projects by default', async () => {
+      projectRepository.findAll.mockResolvedValue([
+        buildProject({ id: 'p1', isArchived: false }),
+        buildProject({ id: 'p2', isArchived: true }),
+      ]);
+
+      const result = await service.getProjects({});
+
+      expect(result.map((p) => p.id)).toEqual(['p1']);
+    });
+
+    it('includes archived projects when includeArchived is true', async () => {
+      projectRepository.findAll.mockResolvedValue([
+        buildProject({ id: 'p1', isArchived: false }),
+        buildProject({ id: 'p2', isArchived: true }),
+      ]);
+
+      const result = await service.getProjects({ includeArchived: true });
+
+      expect(result.map((p) => p.id).sort()).toEqual(['p1', 'p2']);
     });
   });
 

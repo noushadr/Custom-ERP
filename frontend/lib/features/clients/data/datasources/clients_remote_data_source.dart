@@ -117,9 +117,7 @@ class ClientsRemoteDataSource {
         .toList();
   }
 
-  Future<List<ServiceModel>> getServices({
-    bool includeArchived = false,
-  }) async {
+  Future<List<ServiceModel>> getServices({bool includeArchived = false}) async {
     final response = await _dio.get<List<dynamic>>(
       '/services',
       queryParameters: {'includeArchived': includeArchived.toString()},
@@ -161,10 +159,15 @@ class ClientsRemoteDataSource {
   Future<List<ProjectModel>> getProjects({
     String? status,
     String? clientId,
+    bool includeArchived = false,
   }) async {
     final response = await _dio.get<List<dynamic>>(
       '/projects',
-      queryParameters: {'status': ?status, 'clientId': ?clientId},
+      queryParameters: {
+        'status': ?status,
+        'clientId': ?clientId,
+        'includeArchived': includeArchived.toString(),
+      },
     );
     return response.data!
         .cast<Map<String, dynamic>>()
@@ -227,6 +230,7 @@ class ClientsRemoteDataSource {
     List<String>? assignedEmployeeIds,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
+    bool? isArchived,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/projects/$id',
@@ -242,6 +246,7 @@ class ClientsRemoteDataSource {
         'assignedEmployeeIds': ?assignedEmployeeIds,
         'targetDepartmentIds': ?targetDepartmentIds,
         'serviceIds': ?serviceIds,
+        'isArchived': ?isArchived,
       },
     );
     return ProjectModel.fromJson(response.data!);

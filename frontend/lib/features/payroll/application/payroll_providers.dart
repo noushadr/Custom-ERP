@@ -4,6 +4,7 @@ import '../data/datasources/payroll_remote_data_source.dart';
 import '../data/repositories/payroll_repository_impl.dart';
 import '../domain/entities/payroll_run_detail.dart';
 import '../domain/entities/payroll_run_summary.dart';
+import '../domain/entities/payslip_list_item.dart';
 import '../domain/repositories/payroll_repository.dart';
 
 final payrollRemoteDataSourceProvider = Provider<PayrollRemoteDataSource>(
@@ -14,15 +15,29 @@ final payrollRepositoryProvider = Provider<PayrollRepository>(
   (ref) => PayrollRepositoryImpl(ref.watch(payrollRemoteDataSourceProvider)),
 );
 
-final payrollRunsListProvider = FutureProvider.autoDispose<List<PayrollRunSummary>>((
-  ref,
-) {
-  ref.watch(authControllerProvider);
-  return ref.watch(payrollRepositoryProvider).getRuns();
-});
+final payrollRunsListProvider =
+    FutureProvider.autoDispose<List<PayrollRunSummary>>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(payrollRepositoryProvider).getRuns();
+    });
 
 final payrollRunDetailProvider = FutureProvider.autoDispose
     .family<PayrollRunDetail, String>((ref, id) {
       ref.watch(authControllerProvider);
       return ref.watch(payrollRepositoryProvider).getRun(id);
+    });
+
+final myPayslipsProvider = FutureProvider.autoDispose<List<PayslipListItem>>((
+  ref,
+) {
+  ref.watch(authControllerProvider);
+  return ref.watch(payrollRepositoryProvider).getMyPayslips();
+});
+
+final employeePayslipsProvider = FutureProvider.autoDispose
+    .family<List<PayslipListItem>, String>((ref, employeeId) {
+      ref.watch(authControllerProvider);
+      return ref
+          .watch(payrollRepositoryProvider)
+          .getEmployeePayslips(employeeId);
     });

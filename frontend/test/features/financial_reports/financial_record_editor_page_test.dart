@@ -108,14 +108,8 @@ void main() {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
 
-      expect(
-        find.widgetWithText(TextFormField, 'Revenue (USD)'),
-        findsNothing,
-      );
-      expect(
-        find.widgetWithText(TextFormField, 'Expense (USD)'),
-        findsNothing,
-      );
+      expect(find.widgetWithText(TextFormField, 'Revenue (USD)'), findsNothing);
+      expect(find.widgetWithText(TextFormField, 'Expense (USD)'), findsNothing);
       // Nothing computed yet.
       expect(find.text('—'), findsWidgets);
 

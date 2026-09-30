@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsOptional,
@@ -81,4 +82,8 @@ export class UpdateProjectDto {
   @IsArray()
   @IsString({ each: true })
   serviceIds?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  isArchived?: boolean;
 }

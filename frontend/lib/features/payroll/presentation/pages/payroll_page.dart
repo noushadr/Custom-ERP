@@ -58,7 +58,10 @@ class PayrollPage extends ConsumerWidget {
                     labelColor: AppColors.primary,
                     unselectedLabelColor: AppColors.textSecondary,
                     indicatorColor: AppColors.primary,
-                    tabs: [Tab(text: 'Runs'), Tab(text: 'Freelancers')],
+                    tabs: [
+                      Tab(text: 'Runs'),
+                      Tab(text: 'Freelancers'),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   const SizedBox(
@@ -206,8 +209,7 @@ class _TotalFreelancersCard extends ConsumerWidget {
     return MetricCard(
       label: 'Total Freelancers',
       value: freelancersAsync.when(
-        data: (freelancers) =>
-            '${freelancers.where((f) => f.isActive).length}',
+        data: (freelancers) => '${freelancers.where((f) => f.isActive).length}',
         loading: () => '…',
         error: (_, _) => '—',
       ),
@@ -285,9 +287,7 @@ class _RunsTab extends ConsumerWidget {
                 ? Center(
                     child: Text(
                       'No payroll runs generated yet.',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -340,9 +340,7 @@ class _FreelancersTab extends ConsumerWidget {
                 ? Center(
                     child: Text(
                       'No freelancers added yet.',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -388,9 +386,7 @@ class _FreelancerRow extends ConsumerWidget {
           child: Text(
             freelancer.isActive ? 'Active' : 'Inactive',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: freelancer.isActive
-                  ? AppColors.success
-                  : AppColors.error,
+              color: freelancer.isActive ? AppColors.success : AppColors.error,
             ),
           ),
         ),
@@ -566,7 +562,9 @@ class _RunRow extends StatelessWidget {
     return Card(
       child: ListTile(
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => PayrollRunDetailPage(runId: run.id)),
+          MaterialPageRoute(
+            builder: (_) => PayrollRunDetailPage(runId: run.id),
+          ),
         ),
         title: Text(formatPayrollRunPeriod(run.month, run.year)),
         subtitle: Text('${run.employeeCount} employee(s)'),
@@ -596,7 +594,8 @@ class _GeneratePayrollDialog extends ConsumerStatefulWidget {
       _GeneratePayrollDialogState();
 }
 
-class _GeneratePayrollDialogState extends ConsumerState<_GeneratePayrollDialog> {
+class _GeneratePayrollDialogState
+    extends ConsumerState<_GeneratePayrollDialog> {
   late int _month;
   late int _year;
   bool _saving = false;
@@ -655,7 +654,9 @@ class _GeneratePayrollDialogState extends ConsumerState<_GeneratePayrollDialog> 
                       for (var m = 1; m <= 12; m++)
                         DropdownMenuItem(
                           value: m,
-                          child: Text(formatPayrollRunPeriod(m, _year).split(' ').first),
+                          child: Text(
+                            formatPayrollRunPeriod(m, _year).split(' ').first,
+                          ),
                         ),
                     ],
                     onChanged: _saving

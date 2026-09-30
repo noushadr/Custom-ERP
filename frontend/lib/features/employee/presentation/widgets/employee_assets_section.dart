@@ -36,7 +36,9 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _invalidate() {
@@ -159,7 +161,9 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
                   _AssetRow(
                     asset: assets[i],
                     isWorking: _workingAssetId == assets[i].id,
-                    onEdit: widget.canManage ? () => _editAsset(assets[i]) : null,
+                    onEdit: widget.canManage
+                        ? () => _editAsset(assets[i])
+                        : null,
                     onDelete: widget.canManage
                         ? () => _delete(assets[i])
                         : null,
@@ -350,9 +354,8 @@ class _AddAssetDialogState extends State<_AddAssetDialog> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Name'),
-                validator: (value) => (value == null || value.trim().isEmpty)
-                    ? 'Required'
-                    : null,
+                validator: (value) =>
+                    (value == null || value.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -421,12 +424,15 @@ class _EditAssetDialogState extends State<_EditAssetDialog> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    Navigator.of(context).pop((
-      name: _nameController.text.trim(),
-      value: _valueController.text.trim().isEmpty
-          ? null
-          : double.tryParse(_valueController.text.trim()),
-    ) as _EditAssetResult);
+    Navigator.of(context).pop(
+      (
+            name: _nameController.text.trim(),
+            value: _valueController.text.trim().isEmpty
+                ? null
+                : double.tryParse(_valueController.text.trim()),
+          )
+          as _EditAssetResult,
+    );
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/currency_format.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../../shared/utils/file_download/file_download.dart';
 import '../../../../shared/widgets/department_breakdown_section.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../freelancers/application/freelancers_providers.dart';
@@ -176,6 +177,7 @@ class _RunDetailBody extends ConsumerWidget {
                   DataColumn(label: Text('Additions'), numeric: true),
                   DataColumn(label: Text('Deductions'), numeric: true),
                   DataColumn(label: Text('Net Pay'), numeric: true),
+                  DataColumn(label: Text('Payslip')),
                 ],
                 rows: [
                   for (final item in run.lineItems)
@@ -217,7 +219,9 @@ class _RunDetailBody extends ConsumerWidget {
                                         style: Theme.of(context)
                                             .textTheme
                                             .labelSmall
-                                            ?.copyWith(color: AppColors.primary),
+                                            ?.copyWith(
+                                              color: AppColors.primary,
+                                            ),
                                       ),
                                     ),
                                   ],
@@ -251,6 +255,25 @@ class _RunDetailBody extends ConsumerWidget {
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
+                        DataCell(
+                          item.isFreelancer ||
+                                  run.status != PayrollRunStatus.paid
+                              ? const SizedBox.shrink()
+                              : IconButton(
+                                  icon: const Icon(
+                                    Icons.download_outlined,
+                                    size: 18,
+                                  ),
+                                  tooltip: 'Download payslip',
+                                  onPressed: () => _downloadPayslip(
+                                    context,
+                                    ref,
+                                    runId: run.id,
+                                    lineItemId: item.id,
+                                    employeeName: item.employeeName,
+                                  ),
+                                ),
+                        ),
                       ],
                     ),
                 ],
@@ -260,6 +283,27 @@ class _RunDetailBody extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+Future<void> _downloadPayslip(
+  BuildContext context,
+  WidgetRef ref, {
+  required String runId,
+  required String lineItemId,
+  required String employeeName,
+}) async {
+  try {
+    final bytes = await ref
+        .read(payrollRepositoryProvider)
+        .downloadPayslip(runId, lineItemId);
+    downloadBytes(bytes, 'Payslip-$employeeName.pdf');
+  } on PayrollException catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 }
 
@@ -324,7 +368,8 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
     final quantity = int.tryParse(_quantityController.text);
     final perUnitRate = double.tryParse(_perUnitRateController.text);
     final baseSalary = double.tryParse(_baseSalaryController.text) ?? 0;
-    final effectiveBase = (quantity != null && quantity > 0 && perUnitRate != null)
+    final effectiveBase =
+        (quantity != null && quantity > 0 && perUnitRate != null)
         ? quantity * perUnitRate
         : baseSalary;
     final additions = double.tryParse(_additionsController.text) ?? 0;
@@ -477,7 +522,9 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
                 controller: _notesController,
                 enabled: !_saving,
                 maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Notes (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Notes (optional)',
+                ),
               ),
             ],
           ),

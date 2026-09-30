@@ -122,7 +122,8 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
     }
   }
 
-  String? _emptyToNull(String value) => value.trim().isEmpty ? null : value.trim();
+  String? _emptyToNull(String value) =>
+      value.trim().isEmpty ? null : value.trim();
 
   @override
   Widget build(BuildContext context) {

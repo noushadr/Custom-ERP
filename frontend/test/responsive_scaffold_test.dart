@@ -116,11 +116,7 @@ void main() {
       id: 'admin-1',
       email: 'admin@zeracreative.com',
       role: 'Super Admin',
-      permissions: [
-        'employees.manage',
-        'clients.manage',
-        'payroll.manage',
-      ],
+      permissions: ['employees.manage', 'clients.manage', 'payroll.manage'],
     );
 
     testWidgets(
@@ -175,34 +171,32 @@ void main() {
       },
     );
 
-    testWidgets(
-      'does not show section headings at compact tablet width',
-      (tester) async {
-        await _setSurfaceWidth(tester, 800);
-        await tester.pumpWidget(_authenticatedApp(user: superAdmin));
-        await tester.pumpAndSettle();
+    testWidgets('does not show section headings at compact tablet width', (
+      tester,
+    ) async {
+      await _setSurfaceWidth(tester, 800);
+      await tester.pumpWidget(_authenticatedApp(user: superAdmin));
+      await tester.pumpAndSettle();
 
-        expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
-        expect(find.text('HR & ADMIN FEATURES'), findsNothing);
-        expect(find.text('GENERAL FEATURES'), findsNothing);
-      },
-    );
+      expect(find.text('ADMIN ONLY FEATURES'), findsNothing);
+      expect(find.text('HR & ADMIN FEATURES'), findsNothing);
+      expect(find.text('GENERAL FEATURES'), findsNothing);
+    });
 
-    testWidgets(
-      'shows section headings once the tablet rail is expanded',
-      (tester) async {
-        await _setSurfaceWidth(tester, 800);
-        await tester.pumpWidget(_authenticatedApp(user: superAdmin));
-        await tester.pumpAndSettle();
+    testWidgets('shows section headings once the tablet rail is expanded', (
+      tester,
+    ) async {
+      await _setSurfaceWidth(tester, 800);
+      await tester.pumpWidget(_authenticatedApp(user: superAdmin));
+      await tester.pumpAndSettle();
 
-        await tester.tap(find.byIcon(Icons.menu));
-        await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
 
-        expect(find.text('ADMIN ONLY FEATURES'), findsOneWidget);
-        expect(find.text('HR & ADMIN FEATURES'), findsOneWidget);
-        expect(find.text('GENERAL FEATURES'), findsOneWidget);
-      },
-    );
+      expect(find.text('ADMIN ONLY FEATURES'), findsOneWidget);
+      expect(find.text('HR & ADMIN FEATURES'), findsOneWidget);
+      expect(find.text('GENERAL FEATURES'), findsOneWidget);
+    });
 
     testWidgets(
       'tapping a destination in the HR & Admin group switches to it',
@@ -222,27 +216,26 @@ void main() {
       },
     );
 
-    testWidgets(
-      'tapping a destination in the general group switches to it',
-      (tester) async {
-        await _setSurfaceWidth(tester, 1280);
-        await tester.pumpWidget(_authenticatedApp(user: superAdmin));
-        await tester.pumpAndSettle();
+    testWidgets('tapping a destination in the general group switches to it', (
+      tester,
+    ) async {
+      await _setSurfaceWidth(tester, 1280);
+      await tester.pumpWidget(_authenticatedApp(user: superAdmin));
+      await tester.pumpAndSettle();
 
-        final navRail = find.byKey(const Key('navRail'));
-        // Start on one general-group destination, then switch to another,
-        // to exercise both halves of the selectedIndex round-trip.
-        await tester.tap(
-          find.descendant(of: navRail, matching: find.text('Dashboard')),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.descendant(of: navRail, matching: find.text('Employees')),
-        );
-        await tester.pumpAndSettle();
+      final navRail = find.byKey(const Key('navRail'));
+      // Start on one general-group destination, then switch to another,
+      // to exercise both halves of the selectedIndex round-trip.
+      await tester.tap(
+        find.descendant(of: navRail, matching: find.text('Dashboard')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: navRail, matching: find.text('Employees')),
+      );
+      await tester.pumpAndSettle();
 
-        expect(find.text('Add Employee'), findsOneWidget);
-      },
-    );
+      expect(find.text('Add Employee'), findsOneWidget);
+    });
   });
 }

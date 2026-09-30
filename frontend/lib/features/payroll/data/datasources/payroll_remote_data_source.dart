@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../models/payroll_run_detail_model.dart';
 import '../models/payroll_run_summary_model.dart';
+import '../models/payslip_list_item_model.dart';
 
 class PayrollRemoteDataSource {
   const PayrollRemoteDataSource(this._dio);
@@ -84,5 +85,41 @@ class PayrollRemoteDataSource {
       '/payroll/runs/$id/pay',
     );
     return PayrollRunSummaryModel.fromJson(response.data!);
+  }
+
+  Future<List<int>> downloadPayslip(String runId, String lineItemId) async {
+    final response = await _dio.get<List<int>>(
+      '/payroll/runs/$runId/line-items/$lineItemId/payslip',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return response.data!;
+  }
+
+  Future<List<PayslipListItemModel>> getEmployeePayslips(
+    String employeeId,
+  ) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/payroll/employees/$employeeId/payslips',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(PayslipListItemModel.fromJson)
+        .toList();
+  }
+
+  Future<List<PayslipListItemModel>> getMyPayslips() async {
+    final response = await _dio.get<List<dynamic>>('/payslips/mine');
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(PayslipListItemModel.fromJson)
+        .toList();
+  }
+
+  Future<List<int>> downloadMyPayslip(String lineItemId) async {
+    final response = await _dio.get<List<int>>(
+      '/payslips/mine/$lineItemId',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return response.data!;
   }
 }

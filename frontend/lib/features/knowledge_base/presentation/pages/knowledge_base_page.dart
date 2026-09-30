@@ -78,15 +78,11 @@ class _KnowledgeBaseBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (articles.isEmpty) {
-      return const Center(
-        child: Text('No articles have been published yet.'),
-      );
+      return const Center(child: Text('No articles have been published yet.'));
     }
 
     final sortedArticles = [...articles]
-      ..sort(
-        (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-      );
+      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
 
     return SingleChildScrollView(
       child: FormSection(

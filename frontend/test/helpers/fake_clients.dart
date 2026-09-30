@@ -114,6 +114,7 @@ Project buildTestProject({
   List<ProjectEmployeeRef> assignedEmployees = const [],
   List<ProjectDepartmentRef> targetDepartments = const [],
   List<ProjectServiceRef> services = const [],
+  bool isArchived = false,
   DateTime? createdAt,
   DateTime? updatedAt,
 }) {
@@ -131,6 +132,7 @@ Project buildTestProject({
     assignedEmployees: assignedEmployees,
     targetDepartments: targetDepartments,
     services: services,
+    isArchived: isArchived,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
     updatedAt: updatedAt ?? DateTime(2026, 1, 1),
   );
@@ -175,6 +177,9 @@ class FakeClientsRepository implements ClientsRepository {
 
   /// The `name` passed to the most recent [createProject] call.
   String? lastCreatedProjectName;
+
+  /// The `isArchived` passed to the most recent [updateProject] call.
+  bool? lastUpdateProjectIsArchived;
 
   /// The arguments passed to the most recent [updateClientHealth] call.
   String? lastHealthUpdateClientId;
@@ -280,16 +285,23 @@ class FakeClientsRepository implements ClientsRepository {
   }) async => buildTestService(id: id, isArchived: isArchived ?? false);
 
   @override
-  Future<List<Project>> getProjects({String? status, String? clientId}) async {
+  Future<List<Project>> getProjects({
+    String? status,
+    String? clientId,
+    bool includeArchived = false,
+  }) async {
     return projects
         .where((p) => status == null || p.status == status)
         .where((p) => clientId == null || p.clientId == clientId)
+        .where((p) => includeArchived || !p.isArchived)
         .toList();
   }
 
   @override
-  Future<Project> getProject(String id) async =>
-      projects.firstWhere((p) => p.id == id, orElse: () => buildTestProject(id: id));
+  Future<Project> getProject(String id) async => projects.firstWhere(
+    (p) => p.id == id,
+    orElse: () => buildTestProject(id: id),
+  );
 
   @override
   Future<Project> createProject({
@@ -323,8 +335,17 @@ class FakeClientsRepository implements ClientsRepository {
     List<String>? assignedEmployeeIds,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
+    bool? isArchived,
   }) async {
-    return buildTestProject(id: id);
+    lastUpdateProjectIsArchived = isArchived;
+    final existing = projects.firstWhere(
+      (p) => p.id == id,
+      orElse: () => buildTestProject(id: id),
+    );
+    return buildTestProject(
+      id: id,
+      isArchived: isArchived ?? existing.isArchived,
+    );
   }
 
   @override

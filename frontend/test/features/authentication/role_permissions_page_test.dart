@@ -242,41 +242,39 @@ void main() {
       find.widgetWithText(TextFormField, 'Name'),
     );
     expect(nameField.enabled, isFalse);
-    expect(
-      find.text("System roles can't be renamed"),
-      findsOneWidget,
-    );
+    expect(find.text("System roles can't be renamed"), findsOneWidget);
   });
 
-  testWidgets('deleting a role asks for confirmation before calling deleteRole', (
-    tester,
-  ) async {
-    final repository = FakeRoleRepository(
-      roles: const [
-        Role(
-          id: 'role-2',
-          name: 'Project Coordinator',
-          isSystem: false,
-          permissions: [],
-          userCount: 0,
-        ),
-      ],
-    );
+  testWidgets(
+    'deleting a role asks for confirmation before calling deleteRole',
+    (tester) async {
+      final repository = FakeRoleRepository(
+        roles: const [
+          Role(
+            id: 'role-2',
+            name: 'Project Coordinator',
+            isSystem: false,
+            permissions: [],
+            userCount: 0,
+          ),
+        ],
+      );
 
-    await tester.pumpWidget(_app(repository));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_app(repository));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.delete_outline));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Delete role?'), findsOneWidget);
-    expect(repository.lastDeleteId, isNull);
+      expect(find.text('Delete role?'), findsOneWidget);
+      expect(repository.lastDeleteId, isNull);
 
-    await tester.tap(find.text('Delete').last);
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete').last);
+      await tester.pumpAndSettle();
 
-    expect(repository.lastDeleteId, 'role-2');
-  });
+      expect(repository.lastDeleteId, 'role-2');
+    },
+  );
 
   testWidgets(
     'shows the conflict message when a role still has employees assigned',
@@ -315,71 +313,68 @@ void main() {
     },
   );
 
-  testWidgets(
-    'disables editing the Super Admin role for a viewer missing any '
-    'permission',
-    (tester) async {
-      final repository = FakeRoleRepository(
-        roles: const [
-          Role(
-            id: 'role-super-admin',
-            name: 'Super Admin',
-            isSystem: true,
-            permissions: ['a', 'b'],
-            userCount: 1,
-          ),
-        ],
-        permissions: const [Permission(key: 'a'), Permission(key: 'b')],
-      );
-
-      await tester.pumpWidget(
-        _app(repository, viewerPermissions: const ['roles.manage', 'a']),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byTooltip('Only a Super Admin can edit the Super Admin role'),
-        findsOneWidget,
-      );
-      final editButton = tester.widget<IconButton>(
-        find.widgetWithIcon(IconButton, Icons.edit_outlined),
-      );
-      expect(editButton.onPressed, isNull);
-    },
-  );
-
-  testWidgets(
-    'allows editing the Super Admin role for a viewer holding every '
-    'permission',
-    (tester) async {
-      final repository = FakeRoleRepository(
-        roles: const [
-          Role(
-            id: 'role-super-admin',
-            name: 'Super Admin',
-            isSystem: true,
-            permissions: ['a', 'b'],
-            userCount: 1,
-          ),
-        ],
-        permissions: const [Permission(key: 'a'), Permission(key: 'b')],
-      );
-
-      await tester.pumpWidget(
-        _app(
-          repository,
-          viewerPermissions: const ['roles.manage', 'a', 'b'],
+  testWidgets('disables editing the Super Admin role for a viewer missing any '
+      'permission', (tester) async {
+    final repository = FakeRoleRepository(
+      roles: const [
+        Role(
+          id: 'role-super-admin',
+          name: 'Super Admin',
+          isSystem: true,
+          permissions: ['a', 'b'],
+          userCount: 1,
         ),
-      );
-      await tester.pumpAndSettle();
+      ],
+      permissions: const [
+        Permission(key: 'a'),
+        Permission(key: 'b'),
+      ],
+    );
 
-      expect(find.byTooltip('Edit'), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.edit_outlined));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(repository, viewerPermissions: const ['roles.manage', 'a']),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Edit role'), findsOneWidget);
-    },
-  );
+    expect(
+      find.byTooltip('Only a Super Admin can edit the Super Admin role'),
+      findsOneWidget,
+    );
+    final editButton = tester.widget<IconButton>(
+      find.widgetWithIcon(IconButton, Icons.edit_outlined),
+    );
+    expect(editButton.onPressed, isNull);
+  });
+
+  testWidgets('allows editing the Super Admin role for a viewer holding every '
+      'permission', (tester) async {
+    final repository = FakeRoleRepository(
+      roles: const [
+        Role(
+          id: 'role-super-admin',
+          name: 'Super Admin',
+          isSystem: true,
+          permissions: ['a', 'b'],
+          userCount: 1,
+        ),
+      ],
+      permissions: const [
+        Permission(key: 'a'),
+        Permission(key: 'b'),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _app(repository, viewerPermissions: const ['roles.manage', 'a', 'b']),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Edit'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit role'), findsOneWidget);
+  });
 
   testWidgets(
     'disables newly granting a permission the viewer does not hold, but '
@@ -395,7 +390,10 @@ void main() {
             userCount: 1,
           ),
         ],
-        permissions: const [Permission(key: 'a'), Permission(key: 'b')],
+        permissions: const [
+          Permission(key: 'a'),
+          Permission(key: 'b'),
+        ],
       );
 
       // Viewer holds 'a' (already on the role) but not 'b'.
@@ -421,7 +419,9 @@ void main() {
       // newly checked.
       expect(checkboxB.onChanged, isNull);
       expect(
-        find.byTooltip("You don't hold this permission, so you can't grant it."),
+        find.byTooltip(
+          "You don't hold this permission, so you can't grant it.",
+        ),
         findsOneWidget,
       );
     },
@@ -441,7 +441,10 @@ void main() {
             userCount: 1,
           ),
         ],
-        permissions: const [Permission(key: 'a'), Permission(key: 'b')],
+        permissions: const [
+          Permission(key: 'a'),
+          Permission(key: 'b'),
+        ],
       );
 
       // Viewer holds neither 'a' nor 'b' themselves, but 'b' is already on

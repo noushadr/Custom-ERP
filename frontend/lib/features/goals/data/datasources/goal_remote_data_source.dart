@@ -8,17 +8,26 @@ class GoalRemoteDataSource {
 
   Future<List<GoalModel>> getAll() async {
     final response = await _dio.get<List<dynamic>>('/goals');
-    return response.data!.cast<Map<String, dynamic>>().map(GoalModel.fromJson).toList();
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(GoalModel.fromJson)
+        .toList();
   }
 
   Future<List<GoalModel>> getMine() async {
     final response = await _dio.get<List<dynamic>>('/goals/me');
-    return response.data!.cast<Map<String, dynamic>>().map(GoalModel.fromJson).toList();
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(GoalModel.fromJson)
+        .toList();
   }
 
   Future<List<GoalModel>> getTeam() async {
     final response = await _dio.get<List<dynamic>>('/goals/team');
-    return response.data!.cast<Map<String, dynamic>>().map(GoalModel.fromJson).toList();
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(GoalModel.fromJson)
+        .toList();
   }
 
   Future<GoalModel> createForEmployee({
@@ -77,7 +86,10 @@ class GoalRemoteDataSource {
         'description': ?description,
       },
     );
-    return response.data!.cast<Map<String, dynamic>>().map(GoalModel.fromJson).toList();
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(GoalModel.fromJson)
+        .toList();
   }
 
   Future<GoalModel> update(
@@ -126,8 +138,7 @@ class GoalRemoteDataSource {
     return GoalModel.fromJson(response.data!);
   }
 
-  Future<void> archive(String goalId) =>
-      _dio.patch('/goals/$goalId/archive');
+  Future<void> archive(String goalId) => _dio.patch('/goals/$goalId/archive');
 
   Future<void> archiveAsManager(String goalId) =>
       _dio.patch('/goals/$goalId/team/archive');

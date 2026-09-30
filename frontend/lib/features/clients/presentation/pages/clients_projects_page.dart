@@ -101,7 +101,11 @@ class _SummaryRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final clientsAsync = ref.watch(clientsListProvider(false));
     final projectsAsync = ref.watch(
-      projectsListProvider((status: null, clientId: null)),
+      projectsListProvider((
+        status: null,
+        clientId: null,
+        includeArchived: false,
+      )),
     );
 
     if (clientsAsync.isLoading || projectsAsync.isLoading) {
@@ -192,7 +196,11 @@ class _ClientsBreakdownRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final clientsAsync = ref.watch(clientsListProvider(false));
     final projectsAsync = ref.watch(
-      projectsListProvider((status: null, clientId: null)),
+      projectsListProvider((
+        status: null,
+        clientId: null,
+        includeArchived: false,
+      )),
     );
 
     if (!clientsAsync.hasValue || !projectsAsync.hasValue) {
@@ -300,8 +308,14 @@ class _ProjectsTabState extends ConsumerState<_ProjectsTab> {
 
   @override
   Widget build(BuildContext context) {
+    // Always fetches both archived and non-archived so the toggle below is
+    // instant/client-side rather than triggering a refetch.
     final projectsAsync = ref.watch(
-      projectsListProvider((status: null, clientId: null)),
+      projectsListProvider((
+        status: null,
+        clientId: null,
+        includeArchived: true,
+      )),
     );
 
     return projectsAsync.when(
@@ -317,16 +331,12 @@ class _ProjectsTabState extends ConsumerState<_ProjectsTab> {
           return const Center(child: Text('No projects yet.'));
         }
 
-        // Only Active projects show by default — On Hold/Completed/
-        // Cancelled all live behind the Archived toggle instead, same
-        // "hide inactive by default" convention as the Employees directory's
-        // own Archived toggle.
+        // Archived projects (a real, independent flag — not a status
+        // proxy) hide behind the Archived toggle by default, same
+        // "hide inactive by default" convention as the Employees
+        // directory's own Archived toggle.
         final scoped =
-            projects
-                .where(
-                  (p) => (p.status == ProjectStatus.active) != _showArchived,
-                )
-                .toList()
+            projects.where((p) => p.isArchived == _showArchived).toList()
               ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         return Column(

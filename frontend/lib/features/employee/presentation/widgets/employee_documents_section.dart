@@ -37,9 +37,9 @@ class _EmployeeDocumentsSectionState
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _pickAndUpload(DocumentType documentType) async {
@@ -204,6 +204,14 @@ String _formatFileSize(int bytes) {
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
+const _imageExtensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'};
+
+bool _isImageFile(String fileName) {
+  final dot = fileName.lastIndexOf('.');
+  if (dot == -1) return false;
+  return _imageExtensions.contains(fileName.substring(dot).toLowerCase());
+}
+
 class _DocumentSlot extends StatelessWidget {
   const _DocumentSlot({
     required this.label,
@@ -234,6 +242,32 @@ class _DocumentSlot extends StatelessWidget {
       ),
       child: Row(
         children: [
+          if (document != null && _isImageFile(document!.fileName)) ...[
+            InkWell(
+              onTap: onOpen,
+              borderRadius: BorderRadius.circular(8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  document!.url,
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 44,
+                    height: 44,
+                    color: AppColors.borderSubtle,
+                    child: const Icon(
+                      Icons.broken_image_outlined,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,9 +287,9 @@ class _DocumentSlot extends StatelessWidget {
                     child: Text(
                       '${document!.fileName} · ${_formatFileSize(document!.fileSize)}',
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primary,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
                     ),
                   ),
               ],
@@ -276,10 +310,7 @@ class _DocumentSlot extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextButton(
-                  onPressed: onUpload,
-                  child: const Text('Replace'),
-                ),
+                TextButton(onPressed: onUpload, child: const Text('Replace')),
                 IconButton(
                   icon: const Icon(Icons.close, size: 18),
                   tooltip: 'Remove',
@@ -320,18 +351,18 @@ class _DocumentTile extends StatelessWidget {
               child: Text(
                 document.fileName,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.primary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppColors.primary),
               ),
             ),
           ),
           const SizedBox(width: 12),
           Text(
             _formatFileSize(document.fileSize),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
           isDeleting
               ? const Padding(

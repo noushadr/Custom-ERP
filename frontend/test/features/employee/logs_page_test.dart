@@ -56,45 +56,42 @@ void main() {
     expect(find.textContaining('Jane Doe'), findsOneWidget);
   });
 
-  testWidgets(
-    'shows the viewer\'s own change history for a viewer without '
-    'audit.viewAll, not the company-wide section or an access-denied '
-    'message',
-    (tester) async {
-      final repository = FakeEmployeeRepository(
-        auditLog: [
-          AuditLogEntry(
-            id: 'log-1',
-            employeeName: 'Employee User',
-            actorName: 'Admin User',
-            fieldLabel: 'Designation',
-            oldValue: 'Engineer',
-            newValue: 'Senior Engineer',
-            createdAt: DateTime(2026, 8, 1),
-          ),
-        ],
-      );
-
-      await tester.pumpWidget(
-        _app(
-          repository: repository,
-          viewer: const AuthUser(
-            id: 'employee-1',
-            email: 'employee@zeracreative.com',
-            role: 'Employee',
-            permissions: [],
-          ),
+  testWidgets('shows the viewer\'s own change history for a viewer without '
+      'audit.viewAll, not the company-wide section or an access-denied '
+      'message', (tester) async {
+    final repository = FakeEmployeeRepository(
+      auditLog: [
+        AuditLogEntry(
+          id: 'log-1',
+          employeeName: 'Employee User',
+          actorName: 'Admin User',
+          fieldLabel: 'Designation',
+          oldValue: 'Engineer',
+          newValue: 'Senior Engineer',
+          createdAt: DateTime(2026, 8, 1),
         ),
-      );
-      await tester.pumpAndSettle();
+      ],
+    );
 
-      expect(find.text('Change History'), findsOneWidget);
-      expect(find.textContaining('Designation'), findsOneWidget);
-      expect(find.text('Company-wide Changes'), findsNothing);
-      expect(
-        find.text("You don't have permission to view this page."),
-        findsNothing,
-      );
-    },
-  );
+    await tester.pumpWidget(
+      _app(
+        repository: repository,
+        viewer: const AuthUser(
+          id: 'employee-1',
+          email: 'employee@zeracreative.com',
+          role: 'Employee',
+          permissions: [],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Change History'), findsOneWidget);
+    expect(find.textContaining('Designation'), findsOneWidget);
+    expect(find.text('Company-wide Changes'), findsNothing);
+    expect(
+      find.text("You don't have permission to view this page."),
+      findsNothing,
+    );
+  });
 }

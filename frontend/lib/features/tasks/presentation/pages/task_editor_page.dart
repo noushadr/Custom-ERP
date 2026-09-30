@@ -695,7 +695,13 @@ class _ClientProjectFieldState extends ConsumerState<_ClientProjectField> {
 
     final project = await _showQuickAddProjectDialog(context, ref, client);
     if (project == null || !mounted) return;
-    ref.invalidate(projectsListProvider((status: null, clientId: null)));
+    ref.invalidate(
+      projectsListProvider((
+        status: null,
+        clientId: null,
+        includeArchived: false,
+      )),
+    );
     setState(() => _selected = project);
     widget.onChanged(project);
   }
@@ -703,7 +709,11 @@ class _ClientProjectFieldState extends ConsumerState<_ClientProjectField> {
   @override
   Widget build(BuildContext context) {
     final projectsAsync = ref.watch(
-      projectsListProvider((status: null, clientId: null)),
+      projectsListProvider((
+        status: null,
+        clientId: null,
+        includeArchived: false,
+      )),
     );
     return projectsAsync.when(
       loading: () => const LinearProgressIndicator(),

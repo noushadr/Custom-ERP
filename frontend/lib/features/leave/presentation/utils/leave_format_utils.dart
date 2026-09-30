@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 /// Formats a day count without a trailing ".0" for whole numbers.
-String formatLeaveDays(double days) =>
-    days == days.roundToDouble() ? days.toInt().toString() : days.toStringAsFixed(1);
+String formatLeaveDays(double days) => days == days.roundToDouble()
+    ? days.toInt().toString()
+    : days.toStringAsFixed(1);
 
 Color? parseLeaveColor(String? hex) {
   if (hex == null) return null;
@@ -28,7 +29,8 @@ int countWorkingDays(DateTime start, DateTime end, Set<String> holidayDates) {
   var count = 0;
   while (!cursor.isAfter(last)) {
     final isWeekend =
-        cursor.weekday == DateTime.saturday || cursor.weekday == DateTime.sunday;
+        cursor.weekday == DateTime.saturday ||
+        cursor.weekday == DateTime.sunday;
     if (!isWeekend && !holidayDates.contains(isoDate(cursor))) count++;
     cursor = cursor.add(const Duration(days: 1));
   }

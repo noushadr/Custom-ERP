@@ -16,7 +16,12 @@ String formatEmploymentType(String employmentType) =>
 /// A small icon + label chip, e.g. for showing an employee code, email, or
 /// joining date inline.
 class InfoChip extends StatelessWidget {
-  const InfoChip({super.key, required this.icon, required this.label, this.maxWidth});
+  const InfoChip({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.maxWidth,
+  });
 
   final IconData icon;
   final String label;
@@ -120,11 +125,7 @@ class ProbationBadge extends StatelessWidget {
 }
 
 class WorkModeBadge extends StatelessWidget {
-  const WorkModeBadge({
-    super.key,
-    required this.workMode,
-    this.dense = false,
-  });
+  const WorkModeBadge({super.key, required this.workMode, this.dense = false});
 
   final String workMode;
   final bool dense;

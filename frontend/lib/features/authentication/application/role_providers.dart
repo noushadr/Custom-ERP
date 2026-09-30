@@ -23,9 +23,7 @@ final rolesProvider = FutureProvider.autoDispose<List<Role>>((ref) {
   return ref.watch(roleRepositoryProvider).getRoles();
 });
 
-final permissionsProvider = FutureProvider.autoDispose<List<Permission>>((
-  ref,
-) {
+final permissionsProvider = FutureProvider.autoDispose<List<Permission>>((ref) {
   ref.watch(authControllerProvider);
   return ref.watch(roleRepositoryProvider).getPermissions();
 });
@@ -45,5 +43,7 @@ final viewerIsUnrestrictedProvider = FutureProvider.autoDispose<bool>((
   if (authUser == null) return false;
 
   final permissions = await ref.watch(permissionsProvider.future);
-  return permissions.every((permission) => authUser.hasPermission(permission.key));
+  return permissions.every(
+    (permission) => authUser.hasPermission(permission.key),
+  );
 });

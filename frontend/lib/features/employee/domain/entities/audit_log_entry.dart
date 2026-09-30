@@ -12,6 +12,7 @@ class AuditLogEntry {
   });
 
   final String id;
+
   /// Only populated on the combined company-wide feed.
   final String? employeeName;
   final String actorName;

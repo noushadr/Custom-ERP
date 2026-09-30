@@ -64,7 +64,9 @@ class RequestRepositoryImpl implements RequestRepository {
 
   @override
   Future<EmployeeRequest> rejectAsManager(String requestId, {String? reason}) =>
-      _guard(() => _remoteDataSource.rejectAsManager(requestId, reason: reason));
+      _guard(
+        () => _remoteDataSource.rejectAsManager(requestId, reason: reason),
+      );
 
   @override
   Future<EmployeeRequest> approveAsHr(String requestId) =>

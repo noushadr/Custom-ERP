@@ -338,7 +338,9 @@ void main() {
         for (var i = 0; i < 60; i++)
           buildTestLead(id: 'lead-$i', fullName: 'Lead Number $i'),
       ];
-      await tester.pumpWidget(_app(repository: FakeLeadsRepository(leads: leads)));
+      await tester.pumpWidget(
+        _app(repository: FakeLeadsRepository(leads: leads)),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Showing 1–50 of 60'), findsOneWidget);

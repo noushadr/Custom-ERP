@@ -40,7 +40,9 @@ class _EmployeeChecklistSectionState
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _invalidate(String type) {
@@ -118,7 +120,8 @@ class _EmployeeChecklistSectionState
   }
 }
 
-typedef _ToggleCallback = void Function(EmployeeChecklistItem item, bool isCompleted);
+typedef _ToggleCallback =
+    void Function(EmployeeChecklistItem item, bool isCompleted);
 
 class _ChecklistBlock extends StatelessWidget {
   const _ChecklistBlock({
@@ -214,9 +217,7 @@ class _ChecklistItemRow extends StatelessWidget {
           Checkbox(
             value: item.isCompleted,
             activeColor: AppColors.success,
-            onChanged: canManage
-                ? (value) => onToggle(value ?? false)
-                : null,
+            onChanged: canManage ? (value) => onToggle(value ?? false) : null,
           ),
         const SizedBox(width: 4),
         Expanded(

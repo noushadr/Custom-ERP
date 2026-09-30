@@ -11,12 +11,11 @@ final financialReportsRemoteDataSourceProvider =
           FinancialReportsRemoteDataSource(ref.watch(dioClientProvider).dio),
     );
 
-final financialReportsRepositoryProvider =
-    Provider<FinancialReportsRepository>(
-      (ref) => FinancialReportsRepositoryImpl(
-        ref.watch(financialReportsRemoteDataSourceProvider),
-      ),
-    );
+final financialReportsRepositoryProvider = Provider<FinancialReportsRepository>(
+  (ref) => FinancialReportsRepositoryImpl(
+    ref.watch(financialReportsRemoteDataSourceProvider),
+  ),
+);
 
 // Re-watches authControllerProvider purely to create a dependency edge, so
 // switching identity (impersonate/returnToAdmin/logout) triggers a refetch —

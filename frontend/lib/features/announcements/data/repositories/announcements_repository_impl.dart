@@ -10,9 +10,8 @@ class AnnouncementsRepositoryImpl implements AnnouncementsRepository {
   final AnnouncementsRemoteDataSource _remoteDataSource;
 
   @override
-  Future<TodayAnnouncements> getToday() => _guard(
-    () => _remoteDataSource.getToday(),
-  );
+  Future<TodayAnnouncements> getToday() =>
+      _guard(() => _remoteDataSource.getToday());
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

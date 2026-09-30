@@ -4,7 +4,11 @@ import '../../../employee/presentation/widgets/employee_status_badges.dart';
 import '../../domain/entities/payroll_run_status.dart';
 
 class PayrollRunStatusBadge extends StatelessWidget {
-  const PayrollRunStatusBadge({super.key, required this.status, this.dense = false});
+  const PayrollRunStatusBadge({
+    super.key,
+    required this.status,
+    this.dense = false,
+  });
 
   final String status;
   final bool dense;
@@ -29,8 +33,18 @@ String formatPayrollRunStatusLabel(String status) => switch (status) {
 };
 
 const _monthNames = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 String formatPayrollRunPeriod(int month, int year) =>

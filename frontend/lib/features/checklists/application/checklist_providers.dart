@@ -23,13 +23,16 @@ final checklistRepositoryProvider = Provider<ChecklistRepository>(
 /// toggles both independently.
 final checklistTemplateItemsProvider = FutureProvider.autoDispose
     .family<List<ChecklistTemplateItem>, ({String type, bool includeArchived})>(
-  (ref, query) {
-    ref.watch(authControllerProvider);
-    return ref
-        .watch(checklistRepositoryProvider)
-        .getTemplateItems(query.type, includeArchived: query.includeArchived);
-  },
-);
+      (ref, query) {
+        ref.watch(authControllerProvider);
+        return ref
+            .watch(checklistRepositoryProvider)
+            .getTemplateItems(
+              query.type,
+              includeArchived: query.includeArchived,
+            );
+      },
+    );
 
 final myChecklistProvider = FutureProvider.autoDispose
     .family<List<EmployeeChecklistItem>, String>((ref, type) {
@@ -38,11 +41,12 @@ final myChecklistProvider = FutureProvider.autoDispose
     });
 
 final employeeChecklistProvider = FutureProvider.autoDispose
-    .family<List<EmployeeChecklistItem>, ({String employeeId, String type})>(
-  (ref, query) {
-    ref.watch(authControllerProvider);
-    return ref
-        .watch(checklistRepositoryProvider)
-        .getEmployeeChecklist(query.employeeId, query.type);
-  },
-);
+    .family<List<EmployeeChecklistItem>, ({String employeeId, String type})>((
+      ref,
+      query,
+    ) {
+      ref.watch(authControllerProvider);
+      return ref
+          .watch(checklistRepositoryProvider)
+          .getEmployeeChecklist(query.employeeId, query.type);
+    });

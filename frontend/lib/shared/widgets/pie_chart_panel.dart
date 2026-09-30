@@ -223,10 +223,7 @@ class _LegendRow extends StatelessWidget {
           ),
         ),
         SizedBox(width: compact ? 4 : 8),
-        Text(
-          '$count',
-          style: textStyle?.copyWith(fontWeight: FontWeight.w600),
-        ),
+        Text('$count', style: textStyle?.copyWith(fontWeight: FontWeight.w600)),
         SizedBox(width: compact ? 4 : 6),
         SizedBox(
           width: compact ? 30 : 38,
@@ -235,9 +232,9 @@ class _LegendRow extends StatelessWidget {
             textAlign: TextAlign.right,
             style:
                 (compact
-                        ? Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontSize: 9,
-                          )
+                        ? Theme.of(
+                            context,
+                          ).textTheme.labelSmall?.copyWith(fontSize: 9)
                         : Theme.of(context).textTheme.labelSmall)
                     ?.copyWith(color: AppColors.textSecondary),
           ),

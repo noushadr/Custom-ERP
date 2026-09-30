@@ -36,7 +36,10 @@ final myAndTeamGoalsProvider = FutureProvider.autoDispose<List<Goal>>((
 ) async {
   ref.watch(authControllerProvider);
   final repository = ref.watch(goalRepositoryProvider);
-  final results = await Future.wait([repository.getMine(), repository.getTeam()]);
+  final results = await Future.wait([
+    repository.getMine(),
+    repository.getTeam(),
+  ]);
   return [...results[0], ...results[1]];
 });
 

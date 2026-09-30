@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
+import 'package:flutter_quill/flutter_quill.dart'
+    show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
@@ -23,10 +24,7 @@ Future<void> _useTallSurface(WidgetTester tester) async {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-Widget _app({
-  required Widget child,
-  FakeKnowledgeBaseRepository? repository,
-}) {
+Widget _app({required Widget child, FakeKnowledgeBaseRepository? repository}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
@@ -80,30 +78,29 @@ void main() {
     expect(repository.lastCreatedTitle, isNull);
   });
 
-  testWidgets(
-    'requires at least one role when visibility is Specific roles',
-    (tester) async {
-      await _useTallSurface(tester);
-      final repository = FakeKnowledgeBaseRepository();
+  testWidgets('requires at least one role when visibility is Specific roles', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    final repository = FakeKnowledgeBaseRepository();
 
-      await tester.pumpWidget(
-        _app(child: const KnowledgeBaseEditorPage(), repository: repository),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(child: const KnowledgeBaseEditorPage(), repository: repository),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextFormField).first, 'SOP Title');
-      await tester.tap(find.text('Specific roles'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Publish'));
-      await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, 'SOP Title');
+    await tester.tap(find.text('Specific roles'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Publish'));
+    await tester.pumpAndSettle();
 
-      expect(
-        find.text('Select at least one role for this visibility type.'),
-        findsOneWidget,
-      );
-      expect(repository.lastCreatedTitle, isNull);
-    },
-  );
+    expect(
+      find.text('Select at least one role for this visibility type.'),
+      findsOneWidget,
+    );
+    expect(repository.lastCreatedTitle, isNull);
+  });
 
   testWidgets('creates an Everyone-visibility article', (tester) async {
     await _useTallSurface(tester);
@@ -126,33 +123,29 @@ void main() {
     expect(repository.lastCreatedTargetRoleIds, isEmpty);
   });
 
-  testWidgets(
-    'creates a roles-targeted article with the selected role id',
-    (tester) async {
-      await _useTallSurface(tester);
-      final repository = FakeKnowledgeBaseRepository();
+  testWidgets('creates a roles-targeted article with the selected role id', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    final repository = FakeKnowledgeBaseRepository();
 
-      await tester.pumpWidget(
-        _app(child: const KnowledgeBaseEditorPage(), repository: repository),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _app(child: const KnowledgeBaseEditorPage(), repository: repository),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextFormField).first, 'Leave Policy');
-      await tester.tap(find.text('Specific roles'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Team Lead'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Publish'));
-      await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, 'Leave Policy');
+    await tester.tap(find.text('Specific roles'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Team Lead'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Publish'));
+    await tester.pumpAndSettle();
 
-      expect(repository.lastCreatedTitle, 'Leave Policy');
-      expect(
-        repository.lastCreatedVisibilityType,
-        KnowledgeBaseVisibility.roles,
-      );
-      expect(repository.lastCreatedTargetRoleIds, ['role-team-lead']);
-    },
-  );
+    expect(repository.lastCreatedTitle, 'Leave Policy');
+    expect(repository.lastCreatedVisibilityType, KnowledgeBaseVisibility.roles);
+    expect(repository.lastCreatedTargetRoleIds, ['role-team-lead']);
+  });
 
   testWidgets(
     'pre-fills the form and saves an update when editing an existing article',

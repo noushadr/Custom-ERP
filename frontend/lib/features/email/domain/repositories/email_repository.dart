@@ -42,7 +42,25 @@ abstract interface class EmailRepository {
     required String body,
   });
 
-  Future<List<InboxMessage>> listInbox({int limit = 25});
+  /// [mailbox] is `'inbox'` or `'sent'`. Scoped to the last [monthsBack]
+  /// months (via IMAP SEARCH, not a blind recent-count fetch) and capped
+  /// at [limit] messages.
+  Future<List<InboxMessage>> listMessages({
+    String mailbox = 'inbox',
+    int monthsBack = 6,
+    int limit = 200,
+  });
 
-  Future<EmailMessageDetail> getMessage(int uid);
+  Future<EmailMessageDetail> getMessage(int uid, {String mailbox = 'inbox'});
+
+  /// Gmail-style conversations grouped across Inbox + Sent by subject.
+  /// Scoped to the last [monthsBack] months and capped at [limit]
+  /// conversations.
+  Future<List<EmailThread>> listThreads({
+    int monthsBack = 6,
+    int limit = 200,
+  });
+
+  /// Every message in one conversation, oldest first, with full bodies.
+  Future<EmailThreadDetail> getThread(String threadId, {int monthsBack = 6});
 }

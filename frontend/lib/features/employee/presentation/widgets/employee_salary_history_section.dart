@@ -13,11 +13,7 @@ import '../../domain/exceptions/employee_exception.dart';
 /// current user's own history; pass an id (requires `employees.manage`) for
 /// another employee's.
 class SalaryHeadlineValue extends ConsumerWidget {
-  const SalaryHeadlineValue({
-    super.key,
-    this.employeeId,
-    required this.which,
-  });
+  const SalaryHeadlineValue({super.key, this.employeeId, required this.which});
 
   final String? employeeId;
   final SalaryHeadline which;
@@ -76,9 +72,9 @@ class _EmployeeSalaryHistorySectionState
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _invalidate() {
@@ -342,18 +338,14 @@ class _AddRaiseDialogState extends State<_AddRaiseDialog> {
             InkWell(
               onTap: _pickDate,
               child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Effective date',
-                ),
+                decoration: const InputDecoration(labelText: 'Effective date'),
                 child: Text(formatDisplayDate(_isoDate(_effectiveDate))),
               ),
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _noteController,
-              decoration: const InputDecoration(
-                labelText: 'Note (optional)',
-              ),
+              decoration: const InputDecoration(labelText: 'Note (optional)'),
             ),
           ],
         ),

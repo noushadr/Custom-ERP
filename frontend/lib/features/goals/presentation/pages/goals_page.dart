@@ -204,9 +204,7 @@ class _GoalsListState extends ConsumerState<_GoalsList> {
             ),
             error: (_, _) => const Text('Could not load goals.'),
             data: (goals) {
-              final filtered = showSearch
-                  ? _applyFilters(goals)
-                  : goals;
+              final filtered = showSearch ? _applyFilters(goals) : goals;
               if (filtered.isEmpty) {
                 return Text(
                   goals.isEmpty
@@ -365,8 +363,9 @@ class _GoalCard extends ConsumerWidget {
                     children: [
                       Text(
                         goal.employeeName,
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (goal.departmentName != null)
@@ -563,9 +562,7 @@ class _AddGoalDialogState extends ConsumerState<_AddGoalDialog> {
               if (_errorMessage != null) ...[
                 Text(
                   _errorMessage!,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -785,8 +782,9 @@ class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
                 label: '$_achievementPercentage%',
                 onChanged: _submitting
                     ? null
-                    : (value) =>
-                          setState(() => _achievementPercentage = value.round()),
+                    : (value) => setState(
+                        () => _achievementPercentage = value.round(),
+                      ),
               ),
             ],
           ],

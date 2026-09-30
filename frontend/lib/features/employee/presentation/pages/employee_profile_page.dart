@@ -10,12 +10,15 @@ import '../../../../shared/utils/date_format.dart';
 import '../../../checklists/presentation/widgets/employee_checklist_section.dart';
 import '../../../goals/application/goal_providers.dart';
 import '../../../goals/domain/entities/goal.dart';
+import '../../../goals/domain/exceptions/goal_exception.dart';
 import '../../../leave/application/leave_providers.dart';
 import '../../../leave/presentation/widgets/leave_balances_section.dart';
+import '../../../payroll/presentation/widgets/payslip_list_section.dart';
 import '../../../performance_reviews/presentation/widgets/employee_performance_reviews_section.dart';
 import '../../../tasks/application/task_providers.dart';
 import '../../../tasks/domain/entities/task.dart';
 import '../../../tasks/domain/entities/task_status.dart';
+import '../../../tasks/presentation/widgets/task_summary_row.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/employee.dart';
 import '../widgets/employee_assets_section.dart';
@@ -95,128 +98,143 @@ class _ProfileBody extends ConsumerWidget {
         isOwnProfile ||
         (authState is AuthAuthenticated &&
             authState.user.hasPermission('goals.manage'));
+    // Not tied to isOwnProfile — the viewer's own payslips already live on
+    // their User Dashboard (see MyPayslipsSection); this is specifically
+    // the HR/Admin-facing "someone else's payslips" view.
+    final canViewPayslips =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('payroll.manage');
 
-    final mainContent = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final headerCard = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    EmployeeAvatar(
-                      fullName: employee.fullName,
-                      photoUrl: employee.profilePhotoUrl,
-                      radius: 32,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            employee.fullName,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          Text(
-                            employee.designation ?? employee.role,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: AppColors.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (canResetPassword) ...[
-                          _ProfileActionButton(
-                            onPressed: () =>
-                                _resetPassword(context, ref, employee),
-                            icon: Icons.password,
-                            label: 'Reset password',
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        if (canImpersonate) ...[
-                          _ProfileActionButton(
-                            onPressed: () =>
-                                _loginAsUser(context, ref, employee),
-                            icon: Icons.login,
-                            label: 'Login as',
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        if (isOwnProfile)
-                          _ProfileActionButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    EditMyProfilePage(employee: employee),
-                              ),
-                            ),
-                            icon: Icons.edit_outlined,
-                            label: 'Edit',
-                          )
-                        else if (canManage)
-                          _ProfileActionButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    EditEmployeePage(employee: employee),
-                              ),
-                            ),
-                            icon: Icons.edit_outlined,
-                            label: 'Edit',
-                          ),
-                      ],
-                    ),
-                  ],
+                EmployeeAvatar(
+                  fullName: employee.fullName,
+                  photoUrl: employee.profilePhotoUrl,
+                  radius: 32,
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    EmploymentStatusBadge(status: employee.employmentStatus),
-                    if (employee.employmentStatus == 'resigned' &&
-                        employee.dateOfLeaving != null)
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Resigned on ${formatDisplayDate(employee.dateOfLeaving!)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        employee.fullName,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      Text(
+                        employee.designation ?? employee.role,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
-                    WorkModeBadge(workMode: employee.workMode),
-                    InfoChip(
-                      icon: Icons.badge_outlined,
-                      label: employee.employeeCode,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: employee.profileCompletionPercentage / 100,
-                    minHeight: 6,
-                    backgroundColor: AppColors.borderSubtle,
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Profile ${employee.profileCompletionPercentage}% complete',
-                  style: Theme.of(context).textTheme.bodySmall,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (canResetPassword) ...[
+                      _ProfileActionButton(
+                        onPressed: () => _resetPassword(context, ref, employee),
+                        icon: Icons.password,
+                        label: 'Reset password',
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    if (canImpersonate) ...[
+                      _ProfileActionButton(
+                        onPressed: () => _loginAsUser(context, ref, employee),
+                        icon: Icons.login,
+                        label: 'Login as',
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    if (isOwnProfile)
+                      _ProfileActionButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                EditMyProfilePage(employee: employee),
+                          ),
+                        ),
+                        icon: Icons.edit_outlined,
+                        label: 'Edit',
+                      )
+                    else if (canManage)
+                      _ProfileActionButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                EditEmployeePage(employee: employee),
+                          ),
+                        ),
+                        icon: Icons.edit_outlined,
+                        label: 'Edit',
+                      ),
+                  ],
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                EmploymentStatusBadge(status: employee.employmentStatus),
+                if (employee.employmentStatus == 'resigned' &&
+                    employee.dateOfLeaving != null)
+                  Text(
+                    'Resigned on ${formatDisplayDate(employee.dateOfLeaving!)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                WorkModeBadge(workMode: employee.workMode),
+                InfoChip(
+                  icon: Icons.badge_outlined,
+                  label: employee.employeeCode,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: employee.profileCompletionPercentage / 100,
+                minHeight: 6,
+                backgroundColor: AppColors.borderSubtle,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Profile ${employee.profileCompletionPercentage}% complete',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
+      ),
+    );
+
+    // Left (60%): day-to-day, activity-oriented data someone visiting this
+    // profile most likely wants first. Right (40%): administrative/reference
+    // data (banking, documents, emergency contact, ...) filled in once and
+    // rarely revisited, same split as EditEmployeePage's own layout.
+    final leftColumn = Column(
+      // Stretch, not start — several of these sections (Leave Balances,
+      // Tasks, Goals) hold a `Wrap` or bare `Text` rather than a full-width
+      // `Row`, so without stretching their cards shrink-wrap to their own
+      // content width instead of matching the Work/Contact/Bank cards,
+      // which happen to fill the width anyway because `_LabeledRow` uses a
+      // `Row`.
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         _Section(
           title: 'Work',
           children: [
@@ -325,34 +343,11 @@ class _ProfileBody extends ConsumerWidget {
             isOwnProfile: isOwnProfile,
           ),
         ],
-        if (showAuditLog) ...[
-          const SizedBox(height: 16),
-          EmployeeSalaryHistorySection(
-            employeeId: employee.id,
-            isSelf: isOwnProfile,
-            canManage: canManage,
-          ),
-          const SizedBox(height: 16),
-          EmployeeAssetsSection(
-            employeeId: employee.id,
-            isSelf: isOwnProfile,
-            canManage: canManage,
-          ),
-          const SizedBox(height: 16),
-          EmployeeDocumentsSection(
-            employeeId: isOwnProfile ? null : employee.id,
-          ),
-          const SizedBox(height: 16),
-          EmployeeChecklistSection(
-            employeeId: employee.id,
-            isSelf: isOwnProfile,
-            canManage: canManage,
-          ),
-        ],
-        // Not nested under showAuditLog (which gates on employees.manage) —
-        // this section gates itself on the separate performance.manage
+        // Not nested under any of the permission checks above — this
+        // section gates itself on the separate performance.manage
         // permission, so it stays visible to a custom role that holds
-        // performance.manage without employees.manage too.
+        // performance.manage without any of leave.manage/tasks.manage/
+        // goals.manage too.
         const SizedBox(height: 16),
         EmployeePerformanceReviewsSection(
           employeeId: employee.id,
@@ -415,24 +410,6 @@ class _ProfileBody extends ConsumerWidget {
               _LabeledRow(label: 'IBAN', child: Text(employee.iban ?? '—')),
             ],
           ),
-          const SizedBox(height: 16),
-          EmployeeEducationSection(
-            employeeId: isOwnProfile ? null : employee.id,
-          ),
-          const SizedBox(height: 16),
-          EmployeeTagsSection(
-            title: 'Skills',
-            values: employee.skills,
-            field: EmployeeTagsField.skills,
-            employeeId: isOwnProfile ? null : employee.id,
-          ),
-          const SizedBox(height: 16),
-          EmployeeTagsSection(
-            title: 'Certifications',
-            values: employee.certifications,
-            field: EmployeeTagsField.certifications,
-            employeeId: isOwnProfile ? null : employee.id,
-          ),
         ],
         if (showAuditLog) ...[
           const SizedBox(height: 16),
@@ -457,27 +434,82 @@ class _ProfileBody extends ConsumerWidget {
       ],
     );
 
-    final auditPanel = showAuditLog
-        ? EmployeeAuditLogPanel(employeeId: isOwnProfile ? null : employee.id)
-        : null;
+    final rightColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showAuditLog) ...[
+          EmployeeSalaryHistorySection(
+            employeeId: employee.id,
+            isSelf: isOwnProfile,
+            canManage: canManage,
+          ),
+          if (canViewPayslips) ...[
+            const SizedBox(height: 16),
+            EmployeePayslipsSection(employeeId: employee.id),
+          ],
+          const SizedBox(height: 16),
+          EmployeeAssetsSection(
+            employeeId: employee.id,
+            isSelf: isOwnProfile,
+            canManage: canManage,
+          ),
+          const SizedBox(height: 16),
+          EmployeeDocumentsSection(
+            employeeId: isOwnProfile ? null : employee.id,
+          ),
+          const SizedBox(height: 16),
+          EmployeeChecklistSection(
+            employeeId: employee.id,
+            isSelf: isOwnProfile,
+            canManage: canManage,
+          ),
+          const SizedBox(height: 16),
+          EmployeeEducationSection(
+            employeeId: isOwnProfile ? null : employee.id,
+          ),
+          const SizedBox(height: 16),
+          EmployeeTagsSection(
+            title: 'Skills',
+            values: employee.skills,
+            field: EmployeeTagsField.skills,
+            employeeId: isOwnProfile ? null : employee.id,
+          ),
+          const SizedBox(height: 16),
+          EmployeeTagsSection(
+            title: 'Certifications',
+            values: employee.certifications,
+            field: EmployeeTagsField.certifications,
+            employeeId: isOwnProfile ? null : employee.id,
+          ),
+          const SizedBox(height: 16),
+          EmployeeAuditLogPanel(employeeId: isOwnProfile ? null : employee.id),
+        ],
+      ],
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWide =
-            constraints.maxWidth >= Breakpoints.tabletMax && auditPanel != null;
+        final isWide = constraints.maxWidth >= Breakpoints.tabletMax;
 
         if (isWide) {
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1040),
-                child: Row(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: mainContent),
-                    const SizedBox(width: 24),
-                    SizedBox(width: 320, child: auditPanel),
+                    headerCard,
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 6, child: leftColumn),
+                        const SizedBox(width: 24),
+                        Expanded(flex: 4, child: rightColumn),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -493,11 +525,11 @@ class _ProfileBody extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  mainContent,
-                  if (auditPanel != null) ...[
-                    const SizedBox(height: 16),
-                    auditPanel,
-                  ],
+                  headerCard,
+                  const SizedBox(height: 16),
+                  leftColumn,
+                  const SizedBox(height: 16),
+                  rightColumn,
                 ],
               ),
             ),
@@ -665,10 +697,11 @@ class _ProfileActionButton extends StatelessWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children});
+  const _Section({required this.title, required this.children, this.trailing});
 
   final String title;
   final List<Widget> children;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -678,7 +711,17 @@ class _Section extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                ?trailing,
+              ],
+            ),
             const SizedBox(height: 10),
             ...children,
           ],
@@ -807,7 +850,7 @@ class _EmployeeTasksSection extends ConsumerWidget {
               error: (_, _) => const Text('Could not load tasks.'),
               data: (assignedByMe) => _TaskCounts(
                 assignedToThem: myTasks,
-                assignedByThem: assignedByMe.length,
+                assignedByThem: assignedByMe,
               ),
             ),
           ),
@@ -842,15 +885,15 @@ class _TaskCounts extends StatelessWidget {
 
   final List<Task> assignedToThem;
 
-  /// How many tasks this employee has assigned to others — only known (and
-  /// only shown) for the viewer's own profile, since a `tasks.manage`
-  /// viewer looking at someone else's profile only gets that person's
+  /// The tasks this employee has assigned to others — only known (and only
+  /// shown) for the viewer's own profile, since a `tasks.manage` viewer
+  /// looking at someone else's profile only gets that person's
   /// assigned-to-them tasks from the filtered company-wide list.
-  final int? assignedByThem;
+  final List<Task>? assignedByThem;
 
   @override
   Widget build(BuildContext context) {
-    if (assignedToThem.isEmpty && (assignedByThem ?? 0) == 0) {
+    if (assignedToThem.isEmpty && (assignedByThem?.isEmpty ?? true)) {
       return Text(
         'No tasks yet.',
         style: Theme.of(
@@ -871,27 +914,53 @@ class _TaskCounts extends StatelessWidget {
         .where((t) => t.status == TaskStatus.completed)
         .length;
 
-    return Wrap(
-      spacing: 28,
-      runSpacing: 12,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _StatBlock(
-          label: 'Total',
-          value: assignedToThem.length,
-          color: AppColors.textPrimary,
+        Wrap(
+          spacing: 28,
+          runSpacing: 12,
+          children: [
+            _StatBlock(
+              label: 'Total',
+              value: assignedToThem.length,
+              color: AppColors.textPrimary,
+            ),
+            _StatBlock(
+              label: 'Pending / In Progress',
+              value: pendingOrInProgress,
+              color: AppColors.warning,
+            ),
+            _StatBlock(label: 'Done', value: done, color: AppColors.success),
+            if (assignedByThem != null)
+              _StatBlock(
+                label: 'Assigned by them',
+                value: assignedByThem!.length,
+                color: AppColors.textSecondary,
+              ),
+          ],
         ),
-        _StatBlock(
-          label: 'Pending / In Progress',
-          value: pendingOrInProgress,
-          color: AppColors.warning,
-        ),
-        _StatBlock(label: 'Done', value: done, color: AppColors.success),
-        if (assignedByThem != null)
-          _StatBlock(
-            label: 'Assigned by them',
-            value: assignedByThem!,
-            color: AppColors.textSecondary,
+        if (assignedToThem.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          for (var i = 0; i < assignedToThem.length; i++) ...[
+            TaskSummaryRow(task: assignedToThem[i]),
+            if (i < assignedToThem.length - 1)
+              const Divider(height: 16, color: AppColors.borderSubtle),
+          ],
+        ],
+        if (assignedByThem != null && assignedByThem!.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Assigned by them',
+            style: Theme.of(context).textTheme.labelLarge,
           ),
+          const SizedBox(height: 8),
+          for (var i = 0; i < assignedByThem!.length; i++) ...[
+            TaskSummaryRow(task: assignedByThem![i]),
+            if (i < assignedByThem!.length - 1)
+              const Divider(height: 16, color: AppColors.borderSubtle),
+          ],
+        ],
       ],
     );
   }
@@ -953,6 +1022,17 @@ class _EmployeeGoalsSection extends ConsumerWidget {
 
     return _Section(
       title: 'Goals',
+      trailing: IconButton(
+        icon: const Icon(Icons.add, size: 20),
+        tooltip: 'Add goal',
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (_) => _AddEmployeeGoalDialog(
+            employeeId: employeeId,
+            isOwnProfile: isOwnProfile,
+          ),
+        ),
+      ),
       children: [
         goalsAsync.when(
           loading: () => const Padding(
@@ -976,7 +1056,20 @@ class _EmployeeGoalsSection extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var i = 0; i < relevant.length; i++) ...[
-                  _GoalSummaryRow(goal: relevant[i]),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => _EditEmployeeGoalDialog(
+                        goal: relevant[i],
+                        isOwnProfile: isOwnProfile,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: _GoalSummaryRow(goal: relevant[i]),
+                    ),
+                  ),
                   if (i < relevant.length - 1)
                     const Divider(height: 20, color: AppColors.borderSubtle),
                 ],
@@ -1025,6 +1118,334 @@ class _GoalSummaryRow extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
               ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// A goal for [employeeId] specifically — no employee/department picker,
+/// unlike the standalone Goals page's own Add Goal dialog, since the
+/// employee is already fixed by whichever profile this was opened from.
+class _AddEmployeeGoalDialog extends ConsumerStatefulWidget {
+  const _AddEmployeeGoalDialog({
+    required this.employeeId,
+    required this.isOwnProfile,
+  });
+
+  final String employeeId;
+  final bool isOwnProfile;
+
+  @override
+  ConsumerState<_AddEmployeeGoalDialog> createState() =>
+      _AddEmployeeGoalDialogState();
+}
+
+class _AddEmployeeGoalDialogState
+    extends ConsumerState<_AddEmployeeGoalDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  bool _submitting = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _invalidateGoalProviders() {
+    ref.invalidate(allGoalsProvider);
+    ref.invalidate(myGoalsProvider);
+    ref.invalidate(teamGoalsProvider);
+    ref.invalidate(myAndTeamGoalsProvider);
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final description = _descriptionController.text.trim().isEmpty
+        ? null
+        : _descriptionController.text.trim();
+
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
+    try {
+      final repository = ref.read(goalRepositoryProvider);
+      if (widget.isOwnProfile) {
+        await repository.createForSelf(
+          title: _titleController.text,
+          description: description,
+        );
+      } else {
+        await repository.createForEmployee(
+          employeeId: widget.employeeId,
+          title: _titleController.text,
+          description: description,
+        );
+      }
+      _invalidateGoalProviders();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } on GoalException catch (error) {
+      setState(() => _errorMessage = error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Goal'),
+      content: SizedBox(
+        width: 380,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_errorMessage != null) ...[
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 12),
+              ],
+              TextFormField(
+                controller: _titleController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: 'Goal'),
+                validator: (value) =>
+                    (value == null || value.isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _descriptionController,
+                enabled: !_submitting,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Description (optional)',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditEmployeeGoalDialog extends ConsumerStatefulWidget {
+  const _EditEmployeeGoalDialog({
+    required this.goal,
+    required this.isOwnProfile,
+  });
+
+  final Goal goal;
+  final bool isOwnProfile;
+
+  @override
+  ConsumerState<_EditEmployeeGoalDialog> createState() =>
+      _EditEmployeeGoalDialogState();
+}
+
+class _EditEmployeeGoalDialogState
+    extends ConsumerState<_EditEmployeeGoalDialog> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
+  late int _achievementPercentage;
+  bool _submitting = false;
+  bool _archiving = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.goal.title);
+    _descriptionController = TextEditingController(
+      text: widget.goal.description ?? '',
+    );
+    _achievementPercentage = widget.goal.achievementPercentage;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _invalidateGoalProviders() {
+    ref.invalidate(allGoalsProvider);
+    ref.invalidate(myGoalsProvider);
+    ref.invalidate(teamGoalsProvider);
+    ref.invalidate(myAndTeamGoalsProvider);
+  }
+
+  Future<void> _submit() async {
+    final description = _descriptionController.text.trim().isEmpty
+        ? null
+        : _descriptionController.text.trim();
+
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
+    try {
+      final repository = ref.read(goalRepositoryProvider);
+      if (widget.isOwnProfile) {
+        await repository.updateAsSelf(
+          widget.goal.id,
+          title: _titleController.text,
+          description: description,
+          achievementPercentage: _achievementPercentage,
+        );
+      } else {
+        await repository.update(
+          widget.goal.id,
+          title: _titleController.text,
+          description: description,
+          achievementPercentage: _achievementPercentage,
+        );
+      }
+      _invalidateGoalProviders();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } on GoalException catch (error) {
+      setState(() => _errorMessage = error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _archive() async {
+    setState(() {
+      _archiving = true;
+      _errorMessage = null;
+    });
+    try {
+      final repository = ref.read(goalRepositoryProvider);
+      if (widget.isOwnProfile) {
+        await repository.archiveAsSelf(widget.goal.id);
+      } else {
+        await repository.archive(widget.goal.id);
+      }
+      _invalidateGoalProviders();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } on GoalException catch (error) {
+      setState(() => _errorMessage = error.message);
+    } finally {
+      if (mounted) setState(() => _archiving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = _submitting || _archiving;
+    return AlertDialog(
+      title: const Text('Edit Goal'),
+      content: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_errorMessage != null) ...[
+              Text(
+                _errorMessage!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              controller: _titleController,
+              enabled: !busy,
+              decoration: const InputDecoration(labelText: 'Goal'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descriptionController,
+              enabled: !busy,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Achievement: $_achievementPercentage%',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+            Slider(
+              value: _achievementPercentage.toDouble(),
+              min: 0,
+              max: 100,
+              divisions: 20,
+              label: '$_achievementPercentage%',
+              onChanged: busy
+                  ? null
+                  : (value) =>
+                        setState(() => _achievementPercentage = value.round()),
+            ),
+          ],
+        ),
+      ),
+      actionsAlignment: MainAxisAlignment.spaceBetween,
+      actions: [
+        TextButton(
+          onPressed: busy ? null : _archive,
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+          child: _archiving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Archive'),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: busy ? null : () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: busy ? null : _submit,
+              child: _submitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save'),
             ),
           ],
         ),

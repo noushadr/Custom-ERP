@@ -22,6 +22,7 @@ class EditEmployeeController extends StateNotifier<EditEmployeeState> {
 }
 
 final editEmployeeControllerProvider =
-    StateNotifierProvider.autoDispose<EditEmployeeController, EditEmployeeState>(
-      (ref) => EditEmployeeController(ref.watch(employeeRepositoryProvider)),
-    );
+    StateNotifierProvider.autoDispose<
+      EditEmployeeController,
+      EditEmployeeState
+    >((ref) => EditEmployeeController(ref.watch(employeeRepositoryProvider)));

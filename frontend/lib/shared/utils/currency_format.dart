@@ -17,7 +17,8 @@ String formatAmount(double amount) {
 
 /// Like [formatAmount] but without cents, e.g. 50000.49 -> "50,000" — for
 /// headline figures (dashboard totals) where exact cents aren't meaningful.
-String formatWholeAmount(double amount) => formatAmount(amount).split('.').first;
+String formatWholeAmount(double amount) =>
+    formatAmount(amount).split('.').first;
 
 /// A fixed, manually-maintained approximate PKR→USD rate for the dashboard's
 /// secondary USD figures — not a live/fetched exchange rate. Update this

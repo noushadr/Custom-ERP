@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/layout/breakpoints.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../employee/application/employee_providers.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
@@ -25,7 +26,57 @@ class UserMenu extends ConsumerWidget {
     // loaded yet.
     final profile = ref.watch(myProfileProvider).valueOrNull;
     final displayName = profile?.fullName ?? email;
+    // First name only — "Hello, Jane" reads friendlier in a tight top-bar
+    // strip than the full name, and falls back to the same display name the
+    // avatar/menu use when there's no linked employee profile.
+    final greetingName = profile?.firstName ?? displayName;
+    // Desktop-only — the tablet/mobile AppBar has too little room for a
+    // greeting alongside the title and the rest of these actions without
+    // overflowing (confirmed by the widget-test suite before this guard).
+    final showGreeting =
+        MediaQuery.sizeOf(context).width >= Breakpoints.tabletMax;
 
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showGreeting) ...[
+          Text(
+            'Hello, $greetingName',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 12),
+        ],
+        _UserMenuButton(
+          displayName: displayName,
+          photoUrl: profile?.profilePhotoUrl,
+          email: email,
+          role: role,
+          onSignOut: onSignOut,
+        ),
+      ],
+    );
+  }
+}
+
+class _UserMenuButton extends StatelessWidget {
+  const _UserMenuButton({
+    required this.displayName,
+    required this.photoUrl,
+    required this.email,
+    required this.role,
+    required this.onSignOut,
+  });
+
+  final String displayName;
+  final String? photoUrl;
+  final String email;
+  final String role;
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
     return PopupMenuButton<_UserMenuAction>(
       tooltip: 'Account menu',
       offset: const Offset(0, 44),
@@ -42,9 +93,9 @@ class UserMenu extends ConsumerWidget {
               Text(email, style: Theme.of(context).textTheme.bodyMedium),
               Text(
                 role,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -64,13 +115,13 @@ class UserMenu extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          EmployeeAvatar(
-            fullName: displayName,
-            photoUrl: profile?.profilePhotoUrl,
-            radius: 16,
-          ),
+          EmployeeAvatar(fullName: displayName, photoUrl: photoUrl, radius: 16),
           const SizedBox(width: 4),
-          const Icon(Icons.expand_more, size: 18, color: AppColors.textSecondary),
+          const Icon(
+            Icons.expand_more,
+            size: 18,
+            color: AppColors.textSecondary,
+          ),
         ],
       ),
     );

@@ -54,7 +54,11 @@ abstract interface class ClientsRepository {
     bool? isArchived,
   });
 
-  Future<List<Project>> getProjects({String? status, String? clientId});
+  Future<List<Project>> getProjects({
+    String? status,
+    String? clientId,
+    bool includeArchived = false,
+  });
   Future<Project> getProject(String id);
   Future<Project> createProject({
     required String clientId,
@@ -82,6 +86,7 @@ abstract interface class ClientsRepository {
     List<String>? assignedEmployeeIds,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
+    bool? isArchived,
   });
   Future<ProjectsSummary> getProjectsSummary();
 }

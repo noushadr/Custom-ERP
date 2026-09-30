@@ -3,7 +3,26 @@ import 'package:zera_erp/features/payroll/domain/entities/payroll_line_item.dart
 import 'package:zera_erp/features/payroll/domain/entities/payroll_run_detail.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_run_status.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_run_summary.dart';
+import 'package:zera_erp/features/payroll/domain/entities/payslip_list_item.dart';
 import 'package:zera_erp/features/payroll/domain/repositories/payroll_repository.dart';
+
+PayslipListItem buildTestPayslipListItem({
+  String runId = 'run-1',
+  String lineItemId = 'item-1',
+  int month = 8,
+  int year = 2026,
+  double netPay = 50000,
+  DateTime? paidAt,
+}) {
+  return PayslipListItem(
+    runId: runId,
+    lineItemId: lineItemId,
+    month: month,
+    year: year,
+    netPay: netPay,
+    paidAt: paidAt ?? DateTime(2026, 9, 1),
+  );
+}
 
 PayrollLineItem buildTestPayrollLineItem({
   String id = 'item-1',
@@ -104,11 +123,20 @@ PayrollRunDetail buildTestPayrollRunDetail({
 }
 
 class FakePayrollRepository implements PayrollRepository {
-  FakePayrollRepository({List<PayrollRunSummary>? runs, this.runDetail})
-    : runs = runs ?? [buildTestPayrollRunSummary()];
+  FakePayrollRepository({
+    List<PayrollRunSummary>? runs,
+    this.runDetail,
+    List<PayslipListItem>? myPayslips,
+  }) : runs = runs ?? [buildTestPayrollRunSummary()],
+       myPayslips = myPayslips ?? [buildTestPayslipListItem()];
 
   final List<PayrollRunSummary> runs;
   final PayrollRunDetail? runDetail;
+  final List<PayslipListItem> myPayslips;
+
+  String? lastDownloadedRunId;
+  String? lastDownloadedLineItemId;
+  String? lastDownloadedMyLineItemId;
 
   int? lastGeneratedMonth;
   int? lastGeneratedYear;
@@ -189,12 +217,35 @@ class FakePayrollRepository implements PayrollRepository {
   @override
   Future<PayrollRunSummary> finalizeRun(String id) async {
     lastFinalizedRunId = id;
-    return buildTestPayrollRunSummary(id: id, status: PayrollRunStatus.finalized);
+    return buildTestPayrollRunSummary(
+      id: id,
+      status: PayrollRunStatus.finalized,
+    );
   }
 
   @override
   Future<PayrollRunSummary> payRun(String id) async {
     lastPaidRunId = id;
     return buildTestPayrollRunSummary(id: id, status: PayrollRunStatus.paid);
+  }
+
+  @override
+  Future<List<int>> downloadPayslip(String runId, String lineItemId) async {
+    lastDownloadedRunId = runId;
+    lastDownloadedLineItemId = lineItemId;
+    return [1, 2, 3];
+  }
+
+  @override
+  Future<List<PayslipListItem>> getMyPayslips() async => myPayslips;
+
+  @override
+  Future<List<PayslipListItem>> getEmployeePayslips(String employeeId) async =>
+      myPayslips;
+
+  @override
+  Future<List<int>> downloadMyPayslip(String lineItemId) async {
+    lastDownloadedMyLineItemId = lineItemId;
+    return [1, 2, 3];
   }
 }

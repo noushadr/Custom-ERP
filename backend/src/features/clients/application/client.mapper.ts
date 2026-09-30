@@ -89,6 +89,7 @@ export function toProjectResponse(project: Project): ProjectResponseDto {
       id: service.id,
       name: service.name,
     })),
+    isArchived: project.isArchived,
     createdAt: project.createdAt.toISOString(),
     updatedAt: project.updatedAt.toISOString(),
   };

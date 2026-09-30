@@ -28,11 +28,22 @@ class FakeEmailRepository implements EmailRepository {
   FakeEmailRepository({
     this.myAccount,
     this.inbox = const [],
+    this.sent = const [],
+    this.threads,
+    this.threadDetail,
     this.actionError,
   });
 
   EmailAccount? myAccount;
   final List<InboxMessage> inbox;
+  final List<InboxMessage> sent;
+
+  /// When set, `listThreads` returns this directly instead of deriving
+  /// conversations from [inbox]/[sent] — most tests want a hand-built
+  /// thread rather than exercising the real grouping logic (that's covered
+  /// by the backend's own tests).
+  final List<EmailThread>? threads;
+  final EmailThreadDetail? threadDetail;
   final Object? actionError;
 
   @override
@@ -96,15 +107,37 @@ class FakeEmailRepository implements EmailRepository {
   }
 
   @override
-  Future<List<InboxMessage>> listInbox({int limit = 25}) async => inbox;
+  Future<List<InboxMessage>> listMessages({
+    String mailbox = 'inbox',
+    int monthsBack = 6,
+    int limit = 200,
+  }) async => mailbox == 'sent' ? sent : inbox;
 
   @override
-  Future<EmailMessageDetail> getMessage(int uid) async {
+  Future<EmailMessageDetail> getMessage(
+    int uid, {
+    String mailbox = 'inbox',
+  }) async {
     return EmailMessageDetail(
       subject: 'Subject',
       from: 'sender@example.com',
+      to: 'recipient@example.com',
       date: DateTime(2026, 9, 9),
       text: 'Body',
     );
   }
+
+  @override
+  Future<List<EmailThread>> listThreads({
+    int monthsBack = 6,
+    int limit = 200,
+  }) async => threads ?? [];
+
+  @override
+  Future<EmailThreadDetail> getThread(
+    String threadId, {
+    int monthsBack = 6,
+  }) async =>
+      threadDetail ??
+      EmailThreadDetail(threadId: threadId, subject: 'Subject', messages: const []);
 }

@@ -56,19 +56,14 @@ class ChecklistRepositoryImpl implements ChecklistRepository {
     String id, {
     required bool isArchived,
   }) => _guard(
-    () => _remoteDataSource.setTemplateItemArchived(
-      id,
-      isArchived: isArchived,
-    ),
+    () => _remoteDataSource.setTemplateItemArchived(id, isArchived: isArchived),
   );
 
   @override
   Future<List<ChecklistTemplateItem>> reorderTemplateItems(
     String type,
     List<String> orderedIds,
-  ) => _guard(
-    () => _remoteDataSource.reorderTemplateItems(type, orderedIds),
-  );
+  ) => _guard(() => _remoteDataSource.reorderTemplateItems(type, orderedIds));
 
   @override
   Future<void> deleteTemplateItem(String id) =>
@@ -82,9 +77,7 @@ class ChecklistRepositoryImpl implements ChecklistRepository {
   Future<List<EmployeeChecklistItem>> getEmployeeChecklist(
     String employeeId,
     String type,
-  ) => _guard(
-    () => _remoteDataSource.getEmployeeChecklist(employeeId, type),
-  );
+  ) => _guard(() => _remoteDataSource.getEmployeeChecklist(employeeId, type));
 
   @override
   Future<EmployeeChecklistItem> setChecklistItemCompleted(

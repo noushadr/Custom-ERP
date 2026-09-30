@@ -115,7 +115,9 @@ void main() {
           permissions: ['goals.manage'],
           goalRepository: goalRepository,
           employeeRepository: FakeEmployeeRepository(
-            employees: [buildTestEmployee(id: 'employee-2', fullName: 'Aamna Irfan')],
+            employees: [
+              buildTestEmployee(id: 'employee-2', fullName: 'Aamna Irfan'),
+            ],
           ),
         ),
       );
@@ -131,7 +133,9 @@ void main() {
       expect(find.text('Individual'), findsOneWidget);
       expect(find.text('Whole department'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Employee'));
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Aamna Irfan').last);
       await tester.pumpAndSettle();
@@ -158,9 +162,7 @@ void main() {
           permissions: ['goals.manage'],
           goalRepository: goalRepository,
           employeeRepository: FakeEmployeeRepository(
-            departments: [
-              const Department(id: 'dept-seo', name: 'SEO'),
-            ],
+            departments: [const Department(id: 'dept-seo', name: 'SEO')],
           ),
         ),
       );
@@ -257,7 +259,9 @@ void main() {
       await tester.tap(find.text('Add Goal'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Employee'));
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Myself'), findsOneWidget);
       await tester.tap(find.text('Babar Hussain').last);
@@ -276,7 +280,9 @@ void main() {
       await tester.tap(find.text('Add Goal'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Employee'));
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Myself').last);
       await tester.pumpAndSettle();
@@ -296,7 +302,9 @@ void main() {
   testWidgets('archiving a goal as Admin/HR calls the unscoped archive', (
     tester,
   ) async {
-    final goalRepository = FakeGoalRepository(all: [buildTestGoal(id: 'goal-9')]);
+    final goalRepository = FakeGoalRepository(
+      all: [buildTestGoal(id: 'goal-9')],
+    );
     await tester.pumpWidget(
       _app(permissions: ['goals.manage'], goalRepository: goalRepository),
     );

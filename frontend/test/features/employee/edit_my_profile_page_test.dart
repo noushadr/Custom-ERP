@@ -75,13 +75,14 @@ void main() {
       // profile itself isn't touched until HR/Admin approves.
       expect(find.text('Edit My Profile'), findsNothing);
       expect(find.text('open'), findsOneWidget);
-      expect(requestRepository.lastProfileChanges?['phoneNumber'], '+15551234567');
+      expect(
+        requestRepository.lastProfileChanges?['phoneNumber'],
+        '+15551234567',
+      );
     },
   );
 
-  testWidgets('shows an error snackbar when submitting fails', (
-    tester,
-  ) async {
+  testWidgets('shows an error snackbar when submitting fails', (tester) async {
     await _useTallSurface(tester);
     final employee = buildTestEmployee();
     final requestRepository = FakeRequestRepository(
@@ -166,10 +167,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Edit My Profile'), findsNothing);
-      expect(
-        employeeRepository.lastUpdateMeInput?.phoneNumber,
-        '+15551234567',
-      );
+      expect(employeeRepository.lastUpdateMeInput?.phoneNumber, '+15551234567');
       expect(requestRepository.lastProfileChanges, isNull);
       expect(find.text('Profile updated.'), findsOneWidget);
     },

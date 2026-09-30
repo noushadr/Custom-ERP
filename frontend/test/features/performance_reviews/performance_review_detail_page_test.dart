@@ -51,42 +51,41 @@ Widget _app({
 }
 
 void main() {
-  testWidgets(
-    'a manager viewing a pending review can rate and complete it',
-    (tester) async {
-      final review = buildTestPerformanceReview(
-        status: 'pending',
-        responses: [
-          buildTestPerformanceReviewResponse(
-            id: 'r1',
-            criterionName: 'Overall Performance',
-            responseType: 'rating',
-          ),
-        ],
-      );
-      final repository = FakePerformanceReviewRepository(reviewById: review);
-
-      await _useTallSurface(tester);
-      await tester.pumpWidget(
-        _app(
-          // The manager's own profile, distinct from the review's employee.
-          viewerProfile: buildTestEmployee(id: 'manager-1'),
-          performanceReviewRepository: repository,
+  testWidgets('a manager viewing a pending review can rate and complete it', (
+    tester,
+  ) async {
+    final review = buildTestPerformanceReview(
+      status: 'pending',
+      responses: [
+        buildTestPerformanceReviewResponse(
+          id: 'r1',
+          criterionName: 'Overall Performance',
+          responseType: 'rating',
         ),
-      );
-      await tester.pumpAndSettle();
+      ],
+    );
+    final repository = FakePerformanceReviewRepository(reviewById: review);
 
-      expect(find.text('Overall Performance'), findsOneWidget);
-      expect(find.text('Complete Review'), findsOneWidget);
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(
+        // The manager's own profile, distinct from the review's employee.
+        viewerProfile: buildTestEmployee(id: 'manager-1'),
+        performanceReviewRepository: repository,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.star_border).at(2));
-      await tester.tap(find.text('Complete Review'));
-      await tester.pumpAndSettle();
+    expect(find.text('Overall Performance'), findsOneWidget);
+    expect(find.text('Complete Review'), findsOneWidget);
 
-      expect(repository.lastCompletedReviewId, 'review-1');
-      expect(repository.lastCompletedResponses!.single.ratingValue, 3);
-    },
-  );
+    await tester.tap(find.byIcon(Icons.star_border).at(2));
+    await tester.tap(find.text('Complete Review'));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastCompletedReviewId, 'review-1');
+    expect(repository.lastCompletedResponses!.single.ratingValue, 3);
+  });
 
   testWidgets(
     "the review's own employee sees read-only ratings but can save a self-assessment",
@@ -117,10 +116,7 @@ void main() {
       );
       expect(starButton.onPressed, isNull);
 
-      await tester.enterText(
-        find.byType(TextField).first,
-        'Had a great year!',
-      );
+      await tester.enterText(find.byType(TextField).first, 'Had a great year!');
       await tester.tap(find.text('Save Comments'));
       await tester.pumpAndSettle();
 

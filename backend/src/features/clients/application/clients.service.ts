@@ -116,7 +116,10 @@ export class ClientsService {
   ): Promise<ClientResponseDto> {
     const client = await this.getClientOrThrow(id);
     const changes = definedFieldsOnly(dto);
-    if (changes.isArchived !== undefined && changes.isArchived !== client.isArchived) {
+    if (
+      changes.isArchived !== undefined &&
+      changes.isArchived !== client.isArchived
+    ) {
       client.archivedAt = changes.isArchived ? new Date() : null;
     }
     Object.assign(client, changes);
@@ -227,12 +230,14 @@ export class ClientsService {
   async getProjects(filters: {
     status?: ProjectStatus;
     clientId?: string;
+    includeArchived?: boolean;
   }): Promise<ProjectResponseDto[]> {
     const projects = filters.clientId
       ? await this.projectRepository.findByClientId(filters.clientId)
       : await this.projectRepository.findAll();
     return projects
       .filter((project) => !filters.status || project.status === filters.status)
+      .filter((project) => filters.includeArchived || !project.isArchived)
       .map(toProjectResponse);
   }
 
@@ -274,6 +279,16 @@ export class ClientsService {
   ): Promise<ProjectResponseDto> {
     const project = await this.getProjectOrThrow(id);
     const changes = definedFieldsOnly(dto);
+
+    if (
+      changes.isArchived !== undefined &&
+      changes.isArchived !== project.isArchived
+    ) {
+      project.archivedAt = changes.isArchived ? new Date() : null;
+    }
+    if (changes.isArchived !== undefined) {
+      project.isArchived = changes.isArchived;
+    }
 
     if (changes.assignedEmployeeIds !== undefined) {
       project.assignedEmployees = await this.resolveEmployees(

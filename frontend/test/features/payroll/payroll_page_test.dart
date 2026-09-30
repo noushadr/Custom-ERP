@@ -52,35 +52,32 @@ Widget _app({
 }
 
 void main() {
-  testWidgets(
-    'shows monthly, daily, and average payroll figures '
-    '(moved here from the Dashboard)',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          employeeRepository: FakeEmployeeRepository(
-            payrollSummary: const PayrollSummary(
-              totalMonthlyPayroll: 250000,
-              dailyPayroll: 8333.33,
-              activeEmployeeCount: 4,
-              departmentTotals: [],
-            ),
+  testWidgets('shows monthly, daily, and average payroll figures '
+      '(moved here from the Dashboard)', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        employeeRepository: FakeEmployeeRepository(
+          payrollSummary: const PayrollSummary(
+            totalMonthlyPayroll: 250000,
+            dailyPayroll: 8333.33,
+            activeEmployeeCount: 4,
+            departmentTotals: [],
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Monthly Payroll'), findsOneWidget);
-      expect(find.text('PKR 250,000'), findsOneWidget);
-      expect(find.text('≈ \$899'), findsOneWidget);
-      expect(find.text('Daily Payroll'), findsOneWidget);
-      expect(find.text('PKR 8,333'), findsOneWidget);
-      expect(find.text('≈ \$29'), findsOneWidget);
-      expect(find.text('Average Salary'), findsOneWidget);
-      expect(find.text('PKR 62,500'), findsOneWidget);
-      expect(find.text('≈ \$224'), findsOneWidget);
-    },
-  );
+    expect(find.text('Monthly Payroll'), findsOneWidget);
+    expect(find.text('PKR 250,000'), findsOneWidget);
+    expect(find.text('≈ \$899'), findsOneWidget);
+    expect(find.text('Daily Payroll'), findsOneWidget);
+    expect(find.text('PKR 8,333'), findsOneWidget);
+    expect(find.text('≈ \$29'), findsOneWidget);
+    expect(find.text('Average Salary'), findsOneWidget);
+    expect(find.text('PKR 62,500'), findsOneWidget);
+    expect(find.text('≈ \$224'), findsOneWidget);
+  });
 
   testWidgets(
     'shows departmental payroll totals (moved here from the Dashboard)',
@@ -122,49 +119,46 @@ void main() {
     },
   );
 
-  testWidgets(
-    'shows the Latest Payroll Run and Total Freelancers tiles '
-    '(moved here from the Dashboard)',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          repository: FakePayrollRepository(
-            runs: [
-              buildTestPayrollRunSummary(
-                month: 8,
-                year: 2026,
-                status: PayrollRunStatus.draft,
-                totalNetPay: 600000,
-              ),
-            ],
-          ),
-          freelancersRepository: FakeFreelancersRepository(
-            freelancers: [
-              buildTestFreelancer(id: 'f1', isActive: true),
-              buildTestFreelancer(id: 'f2', isActive: true),
-              buildTestFreelancer(id: 'f3', isActive: false),
-            ],
-          ),
+  testWidgets('shows the Latest Payroll Run and Total Freelancers tiles '
+      '(moved here from the Dashboard)', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakePayrollRepository(
+          runs: [
+            buildTestPayrollRunSummary(
+              month: 8,
+              year: 2026,
+              status: PayrollRunStatus.draft,
+              totalNetPay: 600000,
+            ),
+          ],
         ),
-      );
-      await tester.pumpAndSettle();
+        freelancersRepository: FakeFreelancersRepository(
+          freelancers: [
+            buildTestFreelancer(id: 'f1', isActive: true),
+            buildTestFreelancer(id: 'f2', isActive: true),
+            buildTestFreelancer(id: 'f3', isActive: false),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      final latestRunCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate(
-          (w) => w is MetricCard && w.label == 'Latest Payroll Run',
-        ),
-      );
-      expect(latestRunCard.value, 'Draft');
-      expect(latestRunCard.secondaryValue, 'PKR 600,000');
-      // Only 2 of the 3 freelancers are active.
-      final freelancersCard = tester.widget<MetricCard>(
-        find.byWidgetPredicate(
-          (w) => w is MetricCard && w.label == 'Total Freelancers',
-        ),
-      );
-      expect(freelancersCard.value, '2');
-    },
-  );
+    final latestRunCard = tester.widget<MetricCard>(
+      find.byWidgetPredicate(
+        (w) => w is MetricCard && w.label == 'Latest Payroll Run',
+      ),
+    );
+    expect(latestRunCard.value, 'Draft');
+    expect(latestRunCard.secondaryValue, 'PKR 600,000');
+    // Only 2 of the 3 freelancers are active.
+    final freelancersCard = tester.widget<MetricCard>(
+      find.byWidgetPredicate(
+        (w) => w is MetricCard && w.label == 'Total Freelancers',
+      ),
+    );
+    expect(freelancersCard.value, '2');
+  });
 
   testWidgets(
     'the Latest Payroll Run card picks the most recent of several runs '
@@ -358,9 +352,7 @@ void main() {
     tester,
   ) async {
     final freelancersRepository = FakeFreelancersRepository(freelancers: []);
-    await tester.pumpWidget(
-      _app(freelancersRepository: freelancersRepository),
-    );
+    await tester.pumpWidget(_app(freelancersRepository: freelancersRepository));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Freelancers'));
@@ -384,29 +376,26 @@ void main() {
     expect(freelancersRepository.lastCreatedRole, 'Content Writer');
   });
 
-  testWidgets(
-    'tapping a freelancer and toggling Active submits the update',
-    (tester) async {
-      final freelancersRepository = FakeFreelancersRepository(
-        freelancers: [buildTestFreelancer(fullName: 'Kulsum Zehra')],
-      );
-      await tester.pumpWidget(
-        _app(freelancersRepository: freelancersRepository),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('tapping a freelancer and toggling Active submits the update', (
+    tester,
+  ) async {
+    final freelancersRepository = FakeFreelancersRepository(
+      freelancers: [buildTestFreelancer(fullName: 'Kulsum Zehra')],
+    );
+    await tester.pumpWidget(_app(freelancersRepository: freelancersRepository));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Freelancers'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Freelancers'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Kulsum Zehra'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Kulsum Zehra'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(SwitchListTile));
-      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
 
-      expect(freelancersRepository.lastUpdatedId, 'freelancer-1');
-      expect(freelancersRepository.lastUpdatedIsActive, false);
-    },
-  );
+    expect(freelancersRepository.lastUpdatedId, 'freelancer-1');
+    expect(freelancersRepository.lastUpdatedIsActive, false);
+  });
 }

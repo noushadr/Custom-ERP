@@ -302,467 +302,446 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     final departmentsAsync = ref.watch(departmentsProvider);
     final employeesAsync = ref.watch(employeeListProvider);
 
+    final photoSection = FormSection(
+      child: Row(
+        children: [
+          EmployeeAvatar(
+            fullName: widget.employee.fullName,
+            photoUrl: _photoUrl,
+            radius: 32,
+          ),
+          const SizedBox(width: 16),
+          TextButton(
+            onPressed: (isSubmitting || _isUploadingPhoto)
+                ? null
+                : _pickAndUploadPhoto,
+            child: _isUploadingPhoto
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Change photo'),
+          ),
+        ],
+      ),
+    );
+
+    // Left (60%): identity and organizational fields — what someone editing
+    // this profile is most likely here for. Right (40%): contact, banking,
+    // and emergency-contact fields — filled in once and rarely revisited.
+    final leftColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        photoSection,
+        const SizedBox(height: 14),
+        FormSection(
+          title: 'Identity',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _firstNameController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'First name'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'First name is required'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _lastNameController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Last name'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Last name is required'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _designationController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Designation'),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _companyEmailController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Company email'),
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  final trimmed = value?.trim() ?? '';
+                  if (trimmed.isEmpty) {
+                    return 'Company email is required';
+                  }
+                  final domainEmailRegExp = RegExp(
+                    r'^[\w.+-]+@zeracreative\.com$',
+                    caseSensitive: false,
+                  );
+                  return domainEmailRegExp.hasMatch(trimmed)
+                      ? null
+                      : 'Must be a @zeracreative.com email';
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        FormSection(
+          title: 'Organization',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              departmentsAsync.when(
+                loading: () => const LinearProgressIndicator(),
+                error: (_, _) => const Text('Could not load departments.'),
+                data: (departments) => DropdownButtonFormField<String>(
+                  initialValue: _departmentId,
+                  decoration: const InputDecoration(labelText: 'Department'),
+                  items: [
+                    for (final d in departments)
+                      DropdownMenuItem(value: d.id, child: Text(d.name)),
+                  ],
+                  onChanged: isSubmitting
+                      ? null
+                      : (value) => setState(() => _departmentId = value),
+                ),
+              ),
+              const SizedBox(height: 16),
+              employeesAsync.when(
+                loading: () => const LinearProgressIndicator(),
+                error: (_, _) => const Text('Could not load employees.'),
+                data: (employees) {
+                  final candidates = employees
+                      .where((e) => e.id != widget.employee.id)
+                      .toList();
+                  final validValue =
+                      candidates.any((e) => e.id == _reportingManagerId)
+                      ? _reportingManagerId
+                      : null;
+                  return DropdownButtonFormField<String?>(
+                    initialValue: validValue,
+                    decoration: const InputDecoration(
+                      labelText: 'Reporting manager',
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('None'),
+                      ),
+                      for (final e in candidates)
+                        DropdownMenuItem<String?>(
+                          value: e.id,
+                          child: Text(e.fullName),
+                        ),
+                    ],
+                    onChanged: isSubmitting
+                        ? null
+                        : (value) =>
+                              setState(() => _reportingManagerId = value),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _employmentType,
+                decoration: const InputDecoration(labelText: 'Employment type'),
+                items: [
+                  for (final entry in _employmentTypes.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                ],
+                onChanged: isSubmitting
+                    ? null
+                    : (value) => setState(() => _employmentType = value!),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _employmentStatus,
+                decoration: const InputDecoration(
+                  labelText: 'Employment status',
+                ),
+                items: [
+                  for (final entry in _employmentStatuses.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                ],
+                onChanged: isSubmitting
+                    ? null
+                    : (value) => _onEmploymentStatusChanged(value!),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _workMode,
+                decoration: const InputDecoration(labelText: 'Work mode'),
+                items: [
+                  for (final entry in _workModes.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                ],
+                onChanged: isSubmitting
+                    ? null
+                    : (value) => setState(() => _workMode = value!),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: isSubmitting
+                    ? null
+                    : () => _pickDate(
+                        initial: _joiningDate,
+                        onPicked: (d) => setState(() => _joiningDate = d!),
+                      ),
+                child: InputDecorator(
+                  decoration: const InputDecoration(labelText: 'Joining date'),
+                  child: Text(formatDisplayDate(_isoDate(_joiningDate))),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: isSubmitting
+                          ? null
+                          : () => _pickDate(
+                              initial: _dateOfLeaving,
+                              onPicked: (d) =>
+                                  setState(() => _dateOfLeaving = d),
+                            ),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: _employmentStatus == 'resigned'
+                              ? 'Resignation date'
+                              : 'Date of leaving',
+                        ),
+                        child: Text(
+                          _dateOfLeaving == null
+                              ? '—'
+                              : formatDisplayDate(_isoDate(_dateOfLeaving!)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_dateOfLeaving != null)
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Clear',
+                      onPressed: isSubmitting
+                          ? null
+                          : () => setState(() => _dateOfLeaving = null),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: isSubmitting
+                          ? null
+                          : () => _pickDate(
+                              initial: _probationEndDate,
+                              onPicked: (d) =>
+                                  setState(() => _probationEndDate = d),
+                            ),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Probation end date',
+                          helperText:
+                              'Every employee has their own '
+                              'probation length — set or adjust it '
+                              'here.',
+                        ),
+                        child: Text(
+                          _probationEndDate == null
+                              ? '—'
+                              : formatDisplayDate(_isoDate(_probationEndDate!)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_probationEndDate != null)
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Clear',
+                      onPressed: isSubmitting
+                          ? null
+                          : () => setState(() => _probationEndDate = null),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final rightColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FormSection(
+          title: 'Contact',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _personalEmailController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Personal email'),
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return null;
+                  }
+                  final emailRegExp = RegExp(
+                    r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$',
+                  );
+                  return emailRegExp.hasMatch(value.trim())
+                      ? null
+                      : 'Enter a valid email address';
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _phoneController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Phone number'),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: isSubmitting
+                    ? null
+                    : () => _pickDate(
+                        initial: _dateOfBirth,
+                        onPicked: (d) => setState(() => _dateOfBirth = d),
+                      ),
+                child: InputDecorator(
+                  decoration: const InputDecoration(labelText: 'Date of birth'),
+                  child: Text(
+                    _dateOfBirth == null
+                        ? '—'
+                        : formatDisplayDate(_isoDate(_dateOfBirth!)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _addressController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Address'),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        FormSection(
+          title: 'Bank Information',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _bankNameController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Bank name'),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _accountTitleController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Account title'),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _accountNumberController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Account number'),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _branchCodeController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Branch code'),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _ibanController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'IBAN'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        FormSection(
+          title: 'Emergency contact',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _emergencyNameController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Name'),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _emergencyPhoneController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Phone'),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _emergencyRelationController,
+                enabled: !isSubmitting,
+                decoration: const InputDecoration(labelText: 'Relation'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
     return Scaffold(
       appBar: AppBar(title: Text('Edit ${widget.employee.fullName}')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
+            constraints: const BoxConstraints(maxWidth: 1000),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  FormSection(
-                    child: Row(
-                      children: [
-                        EmployeeAvatar(
-                          fullName: widget.employee.fullName,
-                          photoUrl: _photoUrl,
-                          radius: 32,
-                        ),
-                        const SizedBox(width: 16),
-                        TextButton(
-                          onPressed: (isSubmitting || _isUploadingPhoto)
-                              ? null
-                              : _pickAndUploadPhoto,
-                          child: _isUploadingPhoto
-                              ? const SizedBox(
-                                  height: 16,
-                                  width: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Change photo'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FormSection(
-                    title: 'Identity',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          controller: _firstNameController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'First name',
-                          ),
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? 'First name is required'
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _lastNameController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Last name',
-                          ),
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? 'Last name is required'
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _designationController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Designation',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _companyEmailController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Company email',
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            final trimmed = value?.trim() ?? '';
-                            if (trimmed.isEmpty) {
-                              return 'Company email is required';
-                            }
-                            final domainEmailRegExp = RegExp(
-                              r'^[\w.+-]+@zeracreative\.com$',
-                              caseSensitive: false,
-                            );
-                            return domainEmailRegExp.hasMatch(trimmed)
-                                ? null
-                                : 'Must be a @zeracreative.com email';
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FormSection(
-                    title: 'Organization',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        departmentsAsync.when(
-                          loading: () => const LinearProgressIndicator(),
-                          error: (_, _) =>
-                              const Text('Could not load departments.'),
-                          data: (departments) =>
-                              DropdownButtonFormField<String>(
-                                initialValue: _departmentId,
-                                decoration: const InputDecoration(
-                                  labelText: 'Department',
-                                ),
-                                items: [
-                                  for (final d in departments)
-                                    DropdownMenuItem(
-                                      value: d.id,
-                                      child: Text(d.name),
-                                    ),
-                                ],
-                                onChanged: isSubmitting
-                                    ? null
-                                    : (value) =>
-                                          setState(() => _departmentId = value),
-                              ),
-                        ),
-                        const SizedBox(height: 16),
-                        employeesAsync.when(
-                          loading: () => const LinearProgressIndicator(),
-                          error: (_, _) =>
-                              const Text('Could not load employees.'),
-                          data: (employees) {
-                            final candidates = employees
-                                .where((e) => e.id != widget.employee.id)
-                                .toList();
-                            final validValue =
-                                candidates.any(
-                                  (e) => e.id == _reportingManagerId,
-                                )
-                                ? _reportingManagerId
-                                : null;
-                            return DropdownButtonFormField<String?>(
-                              initialValue: validValue,
-                              decoration: const InputDecoration(
-                                labelText: 'Reporting manager',
-                              ),
-                              items: [
-                                const DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text('None'),
-                                ),
-                                for (final e in candidates)
-                                  DropdownMenuItem<String?>(
-                                    value: e.id,
-                                    child: Text(e.fullName),
-                                  ),
-                              ],
-                              onChanged: isSubmitting
-                                  ? null
-                                  : (value) => setState(
-                                      () => _reportingManagerId = value,
-                                    ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          initialValue: _employmentType,
-                          decoration: const InputDecoration(
-                            labelText: 'Employment type',
-                          ),
-                          items: [
-                            for (final entry in _employmentTypes.entries)
-                              DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(entry.value),
-                              ),
-                          ],
-                          onChanged: isSubmitting
-                              ? null
-                              : (value) =>
-                                    setState(() => _employmentType = value!),
-                        ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          initialValue: _employmentStatus,
-                          decoration: const InputDecoration(
-                            labelText: 'Employment status',
-                          ),
-                          items: [
-                            for (final entry in _employmentStatuses.entries)
-                              DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(entry.value),
-                              ),
-                          ],
-                          onChanged: isSubmitting
-                              ? null
-                              : (value) => _onEmploymentStatusChanged(value!),
-                        ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          initialValue: _workMode,
-                          decoration: const InputDecoration(
-                            labelText: 'Work mode',
-                          ),
-                          items: [
-                            for (final entry in _workModes.entries)
-                              DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(entry.value),
-                              ),
-                          ],
-                          onChanged: isSubmitting
-                              ? null
-                              : (value) => setState(() => _workMode = value!),
-                        ),
-                        const SizedBox(height: 16),
-                        InkWell(
-                          onTap: isSubmitting
-                              ? null
-                              : () => _pickDate(
-                                  initial: _joiningDate,
-                                  onPicked: (d) =>
-                                      setState(() => _joiningDate = d!),
-                                ),
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: 'Joining date',
-                            ),
-                            child: Text(
-                              formatDisplayDate(_isoDate(_joiningDate)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth >= 760) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: isSubmitting
-                                    ? null
-                                    : () => _pickDate(
-                                        initial: _dateOfLeaving,
-                                        onPicked: (d) =>
-                                            setState(() => _dateOfLeaving = d),
-                                      ),
-                                child: InputDecorator(
-                                  decoration: InputDecoration(
-                                    labelText: _employmentStatus == 'resigned'
-                                        ? 'Resignation date'
-                                        : 'Date of leaving',
-                                  ),
-                                  child: Text(
-                                    _dateOfLeaving == null
-                                        ? '—'
-                                        : formatDisplayDate(
-                                            _isoDate(_dateOfLeaving!),
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (_dateOfLeaving != null)
-                              IconButton(
-                                icon: const Icon(Icons.close, size: 18),
-                                tooltip: 'Clear',
-                                onPressed: isSubmitting
-                                    ? null
-                                    : () =>
-                                          setState(() => _dateOfLeaving = null),
-                              ),
+                            Expanded(flex: 6, child: leftColumn),
+                            const SizedBox(width: 24),
+                            Expanded(flex: 4, child: rightColumn),
                           ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: isSubmitting
-                                    ? null
-                                    : () => _pickDate(
-                                        initial: _probationEndDate,
-                                        onPicked: (d) => setState(
-                                          () => _probationEndDate = d,
-                                        ),
-                                      ),
-                                child: InputDecorator(
-                                  decoration: const InputDecoration(
-                                    labelText: 'Probation end date',
-                                    helperText:
-                                        'Every employee has their own '
-                                        'probation length — set or adjust it '
-                                        'here.',
-                                  ),
-                                  child: Text(
-                                    _probationEndDate == null
-                                        ? '—'
-                                        : formatDisplayDate(
-                                            _isoDate(_probationEndDate!),
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (_probationEndDate != null)
-                              IconButton(
-                                icon: const Icon(Icons.close, size: 18),
-                                tooltip: 'Clear',
-                                onPressed: isSubmitting
-                                    ? null
-                                    : () => setState(
-                                        () => _probationEndDate = null,
-                                      ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FormSection(
-                    title: 'Contact',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          controller: _personalEmailController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Personal email',
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return null;
-                            }
-                            final emailRegExp = RegExp(
-                              r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$',
-                            );
-                            return emailRegExp.hasMatch(value.trim())
-                                ? null
-                                : 'Enter a valid email address';
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _phoneController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone number',
-                          ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 16),
-                        InkWell(
-                          onTap: isSubmitting
-                              ? null
-                              : () => _pickDate(
-                                  initial: _dateOfBirth,
-                                  onPicked: (d) =>
-                                      setState(() => _dateOfBirth = d),
-                                ),
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: 'Date of birth',
-                            ),
-                            child: Text(
-                              _dateOfBirth == null
-                                  ? '—'
-                                  : formatDisplayDate(_isoDate(_dateOfBirth!)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _addressController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Address',
-                          ),
-                          maxLines: 2,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FormSection(
-                    title: 'Bank Information',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          controller: _bankNameController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Bank name',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _accountTitleController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Account title',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _accountNumberController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Account number',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _branchCodeController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Branch code',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _ibanController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(labelText: 'IBAN'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FormSection(
-                    title: 'Emergency contact',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          controller: _emergencyNameController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(labelText: 'Name'),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _emergencyPhoneController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(labelText: 'Phone'),
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _emergencyRelationController,
-                          enabled: !isSubmitting,
-                          decoration: const InputDecoration(
-                            labelText: 'Relation',
-                          ),
-                        ),
-                      ],
-                    ),
+                        );
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          leftColumn,
+                          const SizedBox(height: 14),
+                          rightColumn,
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(

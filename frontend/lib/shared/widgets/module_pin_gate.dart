@@ -50,9 +50,9 @@ class _ModulePinGateState extends ConsumerState<ModulePinGate> {
           .verifyPin(pin);
       if (!mounted) return;
       if (valid) {
-        ref.read(unlockedModulesProvider.notifier).update(
-          (state) => {...state, widget.moduleKey},
-        );
+        ref
+            .read(unlockedModulesProvider.notifier)
+            .update((state) => {...state, widget.moduleKey});
       } else {
         setState(() => _error = 'Incorrect PIN.');
       }
@@ -81,7 +81,11 @@ class _ModulePinGateState extends ConsumerState<ModulePinGate> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.lock_outline, size: 36, color: AppColors.primary),
+              const Icon(
+                Icons.lock_outline,
+                size: 36,
+                color: AppColors.primary,
+              ),
               const SizedBox(height: 16),
               Text(
                 '${widget.moduleLabel} is PIN-protected',
@@ -104,7 +108,10 @@ class _ModulePinGateState extends ConsumerState<ModulePinGate> {
                 textAlign: TextAlign.center,
                 autofocus: true,
                 onSubmitted: (_) => _submit(),
-                decoration: InputDecoration(labelText: 'PIN', errorText: _error),
+                decoration: InputDecoration(
+                  labelText: 'PIN',
+                  errorText: _error,
+                ),
               ),
               const SizedBox(height: 16),
               SizedBox(

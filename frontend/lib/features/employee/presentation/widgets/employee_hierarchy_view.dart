@@ -61,8 +61,7 @@ class _EmployeeHierarchyViewState extends State<EmployeeHierarchyView> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final root in roots)
-              _buildSubtree(root, reportsByManagerId),
+            for (final root in roots) _buildSubtree(root, reportsByManagerId),
           ],
         ),
       ),
@@ -237,11 +236,7 @@ class _NodeCard extends StatelessWidget {
                       color: AppColors.primary,
                       alignment: Alignment.topRight,
                       padding: const EdgeInsets.all(8),
-                      child: Icon(
-                        workModeIcon,
-                        size: 16,
-                        color: Colors.white,
-                      ),
+                      child: Icon(workModeIcon, size: 16, color: Colors.white),
                     ),
                     Padding(
                       padding: const EdgeInsets.only(

@@ -44,9 +44,7 @@ abstract final class AppTheme {
         shadowColor: AppColors.navActive.withValues(alpha: 0.10),
         surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.borderSubtle,
@@ -220,9 +218,7 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 6,
         shadowColor: AppColors.navActive.withValues(alpha: 0.12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       // The `showDatePicker` calendar popup, used throughout (leave dates,
       // joining/probation/leaving dates, ...) — same default-tint issue as

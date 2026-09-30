@@ -81,6 +81,7 @@ export interface ProjectResponseDto {
   assignedEmployees: ProjectEmployeeRef[];
   targetDepartments: ProjectDepartmentRef[];
   services: ProjectServiceRef[];
+  isArchived: boolean;
   createdAt: string;
   updatedAt: string;
 }

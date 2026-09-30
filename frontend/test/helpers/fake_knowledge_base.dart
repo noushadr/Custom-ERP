@@ -65,8 +65,7 @@ KnowledgeBaseArticle buildTestKnowledgeBaseArticle({
   );
 }
 
-KnowledgeBaseArticleVersionSummary
-buildTestKnowledgeBaseArticleVersionSummary({
+KnowledgeBaseArticleVersionSummary buildTestKnowledgeBaseArticleVersionSummary({
   String id = 'version-1',
   int versionNumber = 1,
   String title = 'Onboarding SOP',

@@ -6,7 +6,9 @@ class FreelancersRemoteDataSource {
 
   final Dio _dio;
 
-  Future<List<FreelancerModel>> getFreelancers({bool activeOnly = false}) async {
+  Future<List<FreelancerModel>> getFreelancers({
+    bool activeOnly = false,
+  }) async {
     final response = await _dio.get<List<dynamic>>(
       '/freelancers',
       queryParameters: {'activeOnly': activeOnly.toString()},

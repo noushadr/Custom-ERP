@@ -39,7 +39,13 @@ import {
   PayrollRunDetailDto,
   PayrollRunSummaryDto,
 } from './payroll-response.interface';
-import { toPayrollRunDetail, toPayrollRunSummary } from './payroll.mapper';
+import {
+  toPayrollLineItemResponse,
+  toPayrollRunDetail,
+  toPayrollRunSummary,
+} from './payroll.mapper';
+import { generatePayslipPdf } from './payslip.generator';
+import { PayslipListItemDto } from './payroll-response.interface';
 
 /** Last calendar day of [month] (1-12) in [year], as 'YYYY-MM-DD' — plain
  * arithmetic, no Date-to-string timezone conversion involved. */
@@ -49,8 +55,18 @@ function endOfMonthIso(year: number, month: number): string {
 }
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 @Injectable()
@@ -161,9 +177,7 @@ export class PayrollService {
   ): Promise<PayrollRunDetailDto> {
     const run = await this.getRunOrThrow(runId);
     if (run.status !== PayrollRunStatus.DRAFT) {
-      throw new BadRequestException(
-        'Only a draft payroll run can be edited.',
-      );
+      throw new BadRequestException('Only a draft payroll run can be edited.');
     }
 
     const item = await this.lineItemRepository.findById(lineItemId);
@@ -207,9 +221,7 @@ export class PayrollService {
   ): Promise<PayrollRunDetailDto> {
     const run = await this.getRunOrThrow(runId);
     if (run.status !== PayrollRunStatus.DRAFT) {
-      throw new BadRequestException(
-        'Only a draft payroll run can be edited.',
-      );
+      throw new BadRequestException('Only a draft payroll run can be edited.');
     }
 
     const freelancer = await this.freelancerRepository.findById(
@@ -246,7 +258,9 @@ export class PayrollService {
   ): Promise<PayrollRunSummaryDto> {
     const run = await this.getRunOrThrow(id);
     if (run.status !== PayrollRunStatus.DRAFT) {
-      throw new BadRequestException('Only a draft payroll run can be finalized.');
+      throw new BadRequestException(
+        'Only a draft payroll run can be finalized.',
+      );
     }
 
     run.status = PayrollRunStatus.FINALIZED;
@@ -292,6 +306,109 @@ export class PayrollService {
     }
 
     return toPayrollRunSummary(saved, lineItems);
+  }
+
+  /** HR/Admin path: any employee's payslip for a Paid run. */
+  async getPayslipPdf(
+    runId: string,
+    lineItemId: string,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const run = await this.getRunOrThrow(runId);
+    const item = await this.getPayableLineItemOrThrow(run, lineItemId);
+    return this.renderPayslip(run, item);
+  }
+
+  /** HR/Admin path: a specific employee's payslips across every Paid run —
+   * same scan-every-Paid-run shape as `getMyPayslips`, just keyed directly
+   * off the given employee id instead of resolving it from the caller's own
+   * JWT. Used by the Employee Profile page's Payslips section. */
+  async getEmployeePayslips(employeeId: string): Promise<PayslipListItemDto[]> {
+    const runs = (await this.runRepository.findAll()).filter(
+      (run) => run.status === PayrollRunStatus.PAID,
+    );
+
+    const results: PayslipListItemDto[] = [];
+    for (const run of runs) {
+      const lineItems = await this.lineItemRepository.findByRunId(run.id);
+      const own = lineItems.find((item) => item.employeeId === employeeId);
+      if (!own) continue;
+      results.push({
+        runId: run.id,
+        lineItemId: own.id,
+        month: run.month,
+        year: run.year,
+        netPay: toPayrollLineItemResponse(own).netPay,
+        paidAt: run.paidAt!.toISOString(),
+      });
+    }
+
+    return results.sort((a, b) =>
+      a.year !== b.year ? b.year - a.year : b.month - a.month,
+    );
+  }
+
+  /** Self-service path: the caller's own line items across every Paid run,
+   * newest period first — computed by scanning every Paid run rather than a
+   * dedicated query, matching this app's established "filter client/
+   * service-side over a small, bounded dataset" convention (payroll runs
+   * are monthly, so this never scans more than a couple dozen rows). */
+  async getMyPayslips(actorUserId: string): Promise<PayslipListItemDto[]> {
+    const employee = await this.employeeRepository.findByUserId(actorUserId);
+    if (!employee) return [];
+    return this.getEmployeePayslips(employee.id);
+  }
+
+  /** Self-service path: the caller's own payslip PDF — refuses anything
+   * that isn't the caller's own line item, regardless of what id is
+   * requested. */
+  async getMyPayslipPdf(
+    actorUserId: string,
+    lineItemId: string,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const employee = await this.employeeRepository.findByUserId(actorUserId);
+    if (!employee) throw new NotFoundException('Employee profile not found');
+
+    const item = await this.lineItemRepository.findById(lineItemId);
+    if (!item || item.employeeId !== employee.id) {
+      throw new NotFoundException('Payslip not found');
+    }
+
+    const run = await this.getRunOrThrow(item.runId);
+    const payableItem = await this.getPayableLineItemOrThrow(run, item.id);
+    return this.renderPayslip(run, payableItem);
+  }
+
+  private async getPayableLineItemOrThrow(
+    run: PayrollRun,
+    lineItemId: string,
+  ): Promise<PayrollLineItem> {
+    if (run.status !== PayrollRunStatus.PAID) {
+      throw new BadRequestException(
+        'A payslip is only available once its payroll run is marked Paid.',
+      );
+    }
+
+    const item = await this.lineItemRepository.findById(lineItemId);
+    if (!item || item.runId !== run.id) {
+      throw new NotFoundException('Payroll line item not found');
+    }
+    if (item.employeeId == null) {
+      throw new BadRequestException(
+        'Freelancers have no ERP login and no payslip.',
+      );
+    }
+
+    return item;
+  }
+
+  private async renderPayslip(
+    run: PayrollRun,
+    item: PayrollLineItem,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const buffer = await generatePayslipPdf(run, item);
+    const employee = item.employee!;
+    const filename = `Payslip-${employee.employeeCode}-${run.year}-${String(run.month).padStart(2, '0')}.pdf`;
+    return { buffer, filename };
   }
 
   private async getRunOrThrow(id: string): Promise<PayrollRun> {

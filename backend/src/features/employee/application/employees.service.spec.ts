@@ -51,7 +51,9 @@ function buildAsset(overrides: Partial<Asset> = {}): Asset {
   } as Asset;
 }
 
-function buildSalaryRecord(overrides: Partial<SalaryRecord> = {}): SalaryRecord {
+function buildSalaryRecord(
+  overrides: Partial<SalaryRecord> = {},
+): SalaryRecord {
   return {
     id: 'salary-1',
     employeeId: 'employee-1',
@@ -526,7 +528,11 @@ describe('EmployeesService', () => {
         .mockResolvedValueOnce({ ...employee, designation: 'Team Lead' });
       employeeRepository.save.mockResolvedValue(employee);
 
-      await service.update(employee.id, { designation: 'Team Lead' }, 'actor-1');
+      await service.update(
+        employee.id,
+        { designation: 'Team Lead' },
+        'actor-1',
+      );
 
       expect(checklistsService.createInstance).not.toHaveBeenCalled();
     });
@@ -537,7 +543,10 @@ describe('EmployeesService', () => {
       employeeRepository.findById.mockResolvedValue(null);
 
       await expect(
-        service.findById('missing', buildViewer({ permissions: ['employees.manage'] })),
+        service.findById(
+          'missing',
+          buildViewer({ permissions: ['employees.manage'] }),
+        ),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -601,8 +610,16 @@ describe('EmployeesService', () => {
   describe('findAll', () => {
     it('strips financial and personal-contact fields for a viewer without employees.manage', async () => {
       employeeRepository.findAll.mockResolvedValue([
-        buildEmployee({ id: 'employee-1', userId: 'user-1', bankName: 'Habib Bank' }),
-        buildEmployee({ id: 'employee-2', userId: 'user-2', bankName: 'Meezan Bank' }),
+        buildEmployee({
+          id: 'employee-1',
+          userId: 'user-1',
+          bankName: 'Habib Bank',
+        }),
+        buildEmployee({
+          id: 'employee-2',
+          userId: 'user-2',
+          bankName: 'Meezan Bank',
+        }),
       ]);
 
       const [first, second] = await service.findAll(
@@ -615,7 +632,11 @@ describe('EmployeesService', () => {
 
     it('keeps every field for an employees.manage viewer', async () => {
       employeeRepository.findAll.mockResolvedValue([
-        buildEmployee({ id: 'employee-1', userId: 'user-1', bankName: 'Habib Bank' }),
+        buildEmployee({
+          id: 'employee-1',
+          userId: 'user-1',
+          bankName: 'Habib Bank',
+        }),
       ]);
 
       const [result] = await service.findAll(
@@ -627,8 +648,16 @@ describe('EmployeesService', () => {
 
     it("keeps the viewer's own record unstripped even without employees.manage", async () => {
       employeeRepository.findAll.mockResolvedValue([
-        buildEmployee({ id: 'employee-1', userId: 'user-1', bankName: 'Habib Bank' }),
-        buildEmployee({ id: 'employee-2', userId: 'user-2', bankName: 'Meezan Bank' }),
+        buildEmployee({
+          id: 'employee-1',
+          userId: 'user-1',
+          bankName: 'Habib Bank',
+        }),
+        buildEmployee({
+          id: 'employee-2',
+          userId: 'user-2',
+          bankName: 'Meezan Bank',
+        }),
       ]);
 
       const [own, other] = await service.findAll(
@@ -767,11 +796,7 @@ describe('EmployeesService', () => {
         id: 'employee-upcoming',
         dateOfBirth: isoDobInDays(2),
       });
-      employeeRepository.findAll.mockResolvedValue([
-        upcoming,
-        today,
-        passed,
-      ]);
+      employeeRepository.findAll.mockResolvedValue([upcoming, today, passed]);
 
       const result = await service.getUpcomingBirthdays(7);
 
@@ -865,6 +890,43 @@ describe('EmployeesService', () => {
 
       expect(result.last).toBeNull();
       expect(result.upcoming).toBeNull();
+    });
+
+    it('excludes birthdays more than 15 days in the past or future', async () => {
+      const tooFarPast = buildEmployee({
+        id: 'employee-too-far-past',
+        dateOfBirth: isoDobInDays(-16),
+      });
+      const tooFarFuture = buildEmployee({
+        id: 'employee-too-far-future',
+        dateOfBirth: isoDobInDays(16),
+      });
+      employeeRepository.findAll.mockResolvedValue([tooFarPast, tooFarFuture]);
+
+      const result = await service.getBirthdaySpotlight();
+
+      expect(result.last).toBeNull();
+      expect(result.upcoming).toBeNull();
+    });
+
+    it('includes birthdays exactly 15 days in the past or future', async () => {
+      const exactlyPast = buildEmployee({
+        id: 'employee-exactly-past',
+        dateOfBirth: isoDobInDays(-15),
+      });
+      const exactlyFuture = buildEmployee({
+        id: 'employee-exactly-future',
+        dateOfBirth: isoDobInDays(15),
+      });
+      employeeRepository.findAll.mockResolvedValue([
+        exactlyPast,
+        exactlyFuture,
+      ]);
+
+      const result = await service.getBirthdaySpotlight();
+
+      expect(result.last?.employeeId).toBe('employee-exactly-past');
+      expect(result.upcoming?.employeeId).toBe('employee-exactly-future');
     });
   });
 
@@ -999,7 +1061,11 @@ describe('EmployeesService', () => {
         id: 'employee-later-month',
         joiningDate: isoJoiningDateAnniversaryInDays(4, 60),
       });
-      employeeRepository.findAll.mockResolvedValue([soon, sameMonth, laterMonth]);
+      employeeRepository.findAll.mockResolvedValue([
+        soon,
+        sameMonth,
+        laterMonth,
+      ]);
 
       const result = await service.getWorkAnniversarySpotlight();
 
@@ -1515,7 +1581,10 @@ describe('EmployeesService', () => {
       employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
       employeeRepository.findById.mockResolvedValue(buildEmployee());
       assetRepository.findByAssignedEmployeeId.mockResolvedValue([
-        buildAsset({ status: AssetStatus.ASSIGNED, assignedEmployeeId: 'employee-1' }),
+        buildAsset({
+          status: AssetStatus.ASSIGNED,
+          assignedEmployeeId: 'employee-1',
+        }),
       ]);
 
       const result = await service.getMyAssets('user-1');
