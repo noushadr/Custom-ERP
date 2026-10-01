@@ -237,5 +237,28 @@ void main() {
 
       expect(find.text('Add Employee'), findsOneWidget);
     });
+
+    testWidgets(
+      'Logs sits in the general group, last, after Settings — not the HR & '
+      'Admin group',
+      (tester) async {
+        await _setSurfaceWidth(tester, 1280);
+        await tester.pumpWidget(_authenticatedApp(user: superAdmin));
+        await tester.pumpAndSettle();
+
+        final navRail = find.byKey(const Key('navRail'));
+        double topOf(String label) => tester
+            .getTopLeft(
+              find.descendant(of: navRail, matching: find.text(label)),
+            )
+            .dy;
+
+        final settingsY = topOf('Settings');
+        final logsY = topOf('Logs');
+        final payrollY = topOf('Payroll'); // last member of HR & Admin group
+        expect(logsY, greaterThan(settingsY));
+        expect(logsY, greaterThan(payrollY));
+      },
+    );
   });
 }

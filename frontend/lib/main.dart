@@ -103,11 +103,13 @@ class _SplashScreen extends StatelessWidget {
 // Icons stay outlined regardless of selection — a minimal, single-weight
 // icon style, with the pastel indicator pill (not a glyph swap) carrying the
 // selected state.
-// Order below reflects the 2026-10-01 nav reorder (explicit instruction:
-// "after dashboard it should be tasks then goals then leaves, requests then
-// PR, KB and Logs") — Employees/Settings/Email and the admin-exclusive
-// modules weren't mentioned, so they keep sensible, minimally-disruptive
-// positions rather than being folded into that explicit sequence.
+// Order below reflects two 2026-10-01 nav-reorder instructions: "after
+// dashboard it should be tasks then goals then leaves, requests then PR, KB
+// and Logs", then "make logs come in the end after settings" (Logs moved
+// from right after Knowledge Base to the very end, after Settings).
+// Employees/Settings/Email and the admin-exclusive modules weren't named in
+// either instruction, so they keep sensible, minimally-disruptive positions
+// rather than being folded into the explicit sequence.
 const _allDestinations = [
   AppNavDestination(
     label: 'Dashboard',
@@ -160,11 +162,6 @@ const _allDestinations = [
     selectedIcon: Icons.menu_book_outlined,
   ),
   AppNavDestination(
-    label: 'Logs',
-    icon: Icons.history_outlined,
-    selectedIcon: Icons.history_outlined,
-  ),
-  AppNavDestination(
     label: 'Email',
     icon: Icons.email_outlined,
     selectedIcon: Icons.email_outlined,
@@ -194,6 +191,17 @@ const _allDestinations = [
     icon: Icons.account_balance_outlined,
     selectedIcon: Icons.account_balance_outlined,
   ),
+  // Last on purpose — per explicit instruction ("make logs come in the end
+  // after settings"). Also dropped out of _hrAndAdminOnlyLabels below so the
+  // Super Admin's sidebar no longer buckets it into its own "HR & Admin
+  // Features" section (which always renders before "General Features"
+  // regardless of array position) — it now falls into "General Features"
+  // alongside Settings, where array order actually places it last.
+  AppNavDestination(
+    label: 'Logs',
+    icon: Icons.history_outlined,
+    selectedIcon: Icons.history_outlined,
+  ),
 ];
 
 // Only Super Admin and HR/Manager see these in the nav; everyone else works
@@ -213,9 +221,12 @@ const _adminOnlyLabels = {
 // 2026-09-02) — every role sees it now: Super Admin/HR-Manager get the
 // company-wide change feed (LogsPage's own `audit.viewAll` check), everyone
 // else gets just their own change history, moved here from the bottom of
-// User Dashboard the same day. It stays in _hrAndAdminOnlyLabels below only
-// so the Super Admin's own sidebar keeps grouping it under "HR & Admin
-// Features" rather than "General Features".
+// User Dashboard the same day. It used to also sit in _hrAndAdminOnlyLabels
+// below, purely so the Super Admin's own sidebar grouped it under "HR &
+// Admin Features" — removed from that set 2026-10-01 per explicit
+// instruction ("make logs come in the end after settings"), so it now falls
+// into "General Features" instead, where its last position in
+// _allDestinations actually places it last, after Settings.
 
 // Hidden from Super Admin/HR/Manager — they use Dashboard instead.
 // Visible to everyone else.
@@ -235,14 +246,15 @@ const _superAdminOnlyLabels = {'Financial Reports', 'Leads'};
 
 // Modules shared between Super Admin and HR/Manager, but still off-limits to
 // Team Lead/Employee (who are already excluded via _adminOnlyLabels above) —
-// the original two are Admin Business Management modules; 'Logs' (the
-// company-wide audit trail, formerly an Admin-Dashboard-only section) joined
-// 2026-08-30 and isn't part of that section, just the same access tier. Used
-// only to give the Super Admin's own sidebar a third, distinctly-labeled
-// group — see ResponsiveScaffold.hrAdminSectionCount — so it's obvious at a
-// glance which modules are Super-Admin-exclusive vs. shared with HR/Manager
-// vs. general.
-const _hrAndAdminOnlyLabels = {'Clients & Projects', 'Payroll', 'Logs'};
+// the original two are Admin Business Management modules. Used only to give
+// the Super Admin's own sidebar a third, distinctly-labeled group — see
+// ResponsiveScaffold.hrAdminSectionCount — so it's obvious at a glance which
+// modules are Super-Admin-exclusive vs. shared with HR/Manager vs. general.
+// 'Logs' was a member from 2026-08-30 until 2026-10-01, when it was removed
+// so it could sit in "General Features" instead, last after Settings (see
+// the comment above _adminOnlyLabels and Logs' own entry in
+// _allDestinations).
+const _hrAndAdminOnlyLabels = {'Clients & Projects', 'Payroll'};
 
 bool _isAdminOrHr(WidgetRef ref) {
   final authState = ref.watch(authControllerProvider);
