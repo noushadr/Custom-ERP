@@ -20,7 +20,6 @@ import {
   FREELANCER_REPOSITORY,
   type FreelancerRepository,
 } from '../../freelancers/domain/repositories/freelancer-repository.interface';
-import { NotificationCategory } from '../../notifications/domain/enums/notification-category.enum';
 import { NotificationsService } from '../../notifications/application/notifications.service';
 import { AddFreelancerLineItemDto } from './dto/add-freelancer-line-item.dto';
 import { GeneratePayrollRunDto } from './dto/generate-payroll-run.dto';
@@ -303,7 +302,6 @@ export class PayrollService {
       await this.notificationsService.create({
         recipientUserId: item.employee.userId,
         message: `Your payroll for ${MONTH_NAMES[saved.month - 1]} ${saved.year} has been paid.`,
-        category: NotificationCategory.PAYROLL_PAID,
       });
     }
 

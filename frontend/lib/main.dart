@@ -35,7 +35,6 @@ import 'features/leave/presentation/pages/leave_page.dart';
 import 'features/payroll/presentation/pages/payroll_page.dart';
 import 'features/performance_reviews/presentation/pages/performance_review_detail_page.dart';
 import 'features/performance_reviews/presentation/pages/performance_reviews_page.dart';
-import 'features/notifications/presentation/widgets/notification_preferences_dialog.dart';
 import 'features/requests/application/request_providers.dart';
 import 'features/requests/presentation/pages/requests_page.dart';
 import 'features/search/presentation/widgets/global_search_dialog.dart';
@@ -104,6 +103,11 @@ class _SplashScreen extends StatelessWidget {
 // Icons stay outlined regardless of selection — a minimal, single-weight
 // icon style, with the pastel indicator pill (not a glyph swap) carrying the
 // selected state.
+// Order below reflects the 2026-10-01 nav reorder (explicit instruction:
+// "after dashboard it should be tasks then goals then leaves, requests then
+// PR, KB and Logs") — Employees/Settings/Email and the admin-exclusive
+// modules weren't mentioned, so they keep sensible, minimally-disruptive
+// positions rather than being folded into that explicit sequence.
 const _allDestinations = [
   AppNavDestination(
     label: 'Dashboard',
@@ -112,6 +116,11 @@ const _allDestinations = [
   ),
   AppNavDestination(
     label: 'User Dashboard',
+    // Reads as plain "Dashboard" to the employee viewing it — 'label'
+    // stays 'User Dashboard' everywhere internally (switch-cases,
+    // visibility sets, badge map) so it never collides with the Super
+    // Admin's own, separate 'Dashboard' entry above.
+    displayLabel: 'Dashboard',
     icon: Icons.home_outlined,
     selectedIcon: Icons.home_outlined,
   ),
@@ -121,9 +130,9 @@ const _allDestinations = [
     selectedIcon: Icons.people_outline,
   ),
   AppNavDestination(
-    label: 'Requests',
-    icon: Icons.assignment_outlined,
-    selectedIcon: Icons.assignment_outlined,
+    label: 'Tasks',
+    icon: Icons.checklist_outlined,
+    selectedIcon: Icons.checklist_outlined,
   ),
   AppNavDestination(
     label: 'Goals',
@@ -131,19 +140,14 @@ const _allDestinations = [
     selectedIcon: Icons.flag_outlined,
   ),
   AppNavDestination(
-    label: 'Email',
-    icon: Icons.email_outlined,
-    selectedIcon: Icons.email_outlined,
-  ),
-  AppNavDestination(
     label: 'Leaves',
     icon: Icons.beach_access_outlined,
     selectedIcon: Icons.beach_access_outlined,
   ),
   AppNavDestination(
-    label: 'Tasks',
-    icon: Icons.checklist_outlined,
-    selectedIcon: Icons.checklist_outlined,
+    label: 'Requests',
+    icon: Icons.assignment_outlined,
+    selectedIcon: Icons.assignment_outlined,
   ),
   AppNavDestination(
     label: 'Performance Reviews',
@@ -154,6 +158,16 @@ const _allDestinations = [
     label: 'Knowledge Base',
     icon: Icons.menu_book_outlined,
     selectedIcon: Icons.menu_book_outlined,
+  ),
+  AppNavDestination(
+    label: 'Logs',
+    icon: Icons.history_outlined,
+    selectedIcon: Icons.history_outlined,
+  ),
+  AppNavDestination(
+    label: 'Email',
+    icon: Icons.email_outlined,
+    selectedIcon: Icons.email_outlined,
   ),
   AppNavDestination(
     label: 'Settings',
@@ -179,11 +193,6 @@ const _allDestinations = [
     label: 'Financial Reports',
     icon: Icons.account_balance_outlined,
     selectedIcon: Icons.account_balance_outlined,
-  ),
-  AppNavDestination(
-    label: 'Logs',
-    icon: Icons.history_outlined,
-    selectedIcon: Icons.history_outlined,
   ),
 ];
 
@@ -304,6 +313,7 @@ AppNavDestination _withBadge(AppNavDestination destination, int badgeCount) {
     selectedIcon: destination.selectedIcon,
     comingSoon: destination.comingSoon,
     badgeCount: badgeCount,
+    displayLabel: destination.displayLabel,
   );
 }
 
@@ -632,14 +642,6 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
                 onOpenPerformanceReview: _openPerformanceReview,
                 onOpenTask: _openTask,
                 onOpenNotification: _openNotification,
-              ),
-              IconButton(
-                onPressed: () => showAppDialog<void>(
-                  context: context,
-                  builder: (_) => const NotificationPreferencesDialog(),
-                ),
-                icon: const Icon(Icons.tune_outlined),
-                tooltip: 'Notification preferences',
               ),
               const SizedBox(width: 16),
               UserMenu(

@@ -20,7 +20,6 @@ import {
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { NotificationsService } from '../../notifications/application/notifications.service';
-import { NotificationCategory } from '../../notifications/domain/enums/notification-category.enum';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { CreatePerformanceReviewCriterionDto } from './dto/create-performance-review-criterion.dto';
 import { CreatePerformanceReviewDto } from './dto/create-performance-review.dto';
@@ -182,7 +181,6 @@ export class PerformanceReviewsService {
     await this.notificationsService.create({
       recipientUserId: employee.userId,
       message: `Your ${review.reviewYear}-year performance review has been created.`,
-      category: NotificationCategory.PERFORMANCE_REVIEW_CREATED,
       linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
       linkEntityId: review.id,
     });
@@ -194,7 +192,6 @@ export class PerformanceReviewsService {
       await this.notificationsService.create({
         recipientUserId: recipient.id,
         message: `A ${review.reviewYear}-year performance review for ${employee.firstName} ${employee.lastName} is ready to rate.`,
-        category: NotificationCategory.PERFORMANCE_REVIEW_ACTION_NEEDED,
         linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
         linkEntityId: review.id,
       });

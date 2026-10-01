@@ -1,8 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { Notification } from '../domain/entities/notification.entity';
-import { NotificationCategory } from '../domain/enums/notification-category.enum';
 import { NotificationLinkTarget } from '../domain/enums/notification-link-target.enum';
-import type { NotificationMutePreferenceRepository } from '../domain/repositories/notification-mute-preference-repository.interface';
 import type { NotificationRepository } from '../domain/repositories/notification-repository.interface';
 import { NotificationsService } from './notifications.service';
 
@@ -13,7 +11,6 @@ function buildNotification(
     id: 'notification-1',
     recipientUserId: 'user-1',
     message: 'Something happened',
-    category: null,
     linkTarget: null,
     linkEntityId: null,
     isRead: false,
@@ -26,7 +23,6 @@ function buildNotification(
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let notificationRepository: jest.Mocked<NotificationRepository>;
-  let mutePreferenceRepository: jest.Mocked<NotificationMutePreferenceRepository>;
 
   beforeEach(() => {
     notificationRepository = {
@@ -42,63 +38,32 @@ describe('NotificationsService', () => {
       ),
       markAllReadForUser: jest.fn().mockResolvedValue(undefined),
     };
-    mutePreferenceRepository = {
-      findCategoriesForUser: jest.fn().mockResolvedValue([]),
-      isMuted: jest.fn().mockResolvedValue(false),
-      mute: jest.fn().mockResolvedValue(undefined),
-      unmute: jest.fn().mockResolvedValue(undefined),
-    };
-    service = new NotificationsService(
-      notificationRepository,
-      mutePreferenceRepository,
-    );
+    service = new NotificationsService(notificationRepository);
   });
 
   describe('create', () => {
-    it('creates a notification with the given category, link target, and entity id', async () => {
+    it('creates a notification with the given link target and entity id', async () => {
       const result = await service.create({
         recipientUserId: 'user-1',
         message: 'Your task is due soon',
-        category: NotificationCategory.TASK_DEADLINE_REMINDER,
         linkTarget: NotificationLinkTarget.TASKS,
         linkEntityId: 'task-1',
       });
 
-      expect(result?.recipientUserId).toBe('user-1');
-      expect(result?.category).toBe(
-        NotificationCategory.TASK_DEADLINE_REMINDER,
-      );
-      expect(result?.linkTarget).toBe(NotificationLinkTarget.TASKS);
-      expect(result?.linkEntityId).toBe('task-1');
-      expect(result?.isRead).toBe(false);
+      expect(result.recipientUserId).toBe('user-1');
+      expect(result.linkTarget).toBe(NotificationLinkTarget.TASKS);
+      expect(result.linkEntityId).toBe('task-1');
+      expect(result.isRead).toBe(false);
     });
 
     it('defaults linkTarget/linkEntityId to null when omitted', async () => {
       const result = await service.create({
         recipientUserId: 'user-1',
         message: 'Leave balances were reset',
-        category: NotificationCategory.LEAVE_BALANCE_RESET,
       });
 
-      expect(result?.linkTarget).toBeNull();
-      expect(result?.linkEntityId).toBeNull();
-    });
-
-    it('silently skips creating a notification when the recipient has muted that category', async () => {
-      mutePreferenceRepository.isMuted.mockResolvedValue(true);
-
-      const result = await service.create({
-        recipientUserId: 'user-1',
-        message: 'Your task is due soon',
-        category: NotificationCategory.TASK_DEADLINE_REMINDER,
-      });
-
-      expect(result).toBeNull();
-      expect(notificationRepository.save).not.toHaveBeenCalled();
-      expect(mutePreferenceRepository.isMuted).toHaveBeenCalledWith(
-        'user-1',
-        NotificationCategory.TASK_DEADLINE_REMINDER,
-      );
+      expect(result.linkTarget).toBeNull();
+      expect(result.linkEntityId).toBeNull();
     });
   });
 
@@ -148,54 +113,5 @@ describe('NotificationsService', () => {
     expect(notificationRepository.markAllReadForUser).toHaveBeenCalledWith(
       'user-1',
     );
-  });
-
-  describe('getMutePreferences', () => {
-    it('returns every known category, flagging only the ones this user has muted', async () => {
-      mutePreferenceRepository.findCategoriesForUser.mockResolvedValue([
-        NotificationCategory.TASK_DEADLINE_REMINDER,
-      ]);
-
-      const result = await service.getMutePreferences('user-1');
-
-      expect(result).toHaveLength(Object.keys(NotificationCategory).length);
-      const deadlineEntry = result.find(
-        (r) => r.category === NotificationCategory.TASK_DEADLINE_REMINDER,
-      );
-      expect(deadlineEntry?.muted).toBe(true);
-      const otherEntry = result.find(
-        (r) => r.category === NotificationCategory.PAYROLL_PAID,
-      );
-      expect(otherEntry?.muted).toBe(false);
-      expect(deadlineEntry?.label).toBeTruthy();
-    });
-  });
-
-  describe('setMutePreference', () => {
-    it('mutes a category', async () => {
-      await service.setMutePreference(
-        'user-1',
-        NotificationCategory.PAYROLL_PAID,
-        true,
-      );
-      expect(mutePreferenceRepository.mute).toHaveBeenCalledWith(
-        'user-1',
-        NotificationCategory.PAYROLL_PAID,
-      );
-      expect(mutePreferenceRepository.unmute).not.toHaveBeenCalled();
-    });
-
-    it('unmutes a category', async () => {
-      await service.setMutePreference(
-        'user-1',
-        NotificationCategory.PAYROLL_PAID,
-        false,
-      );
-      expect(mutePreferenceRepository.unmute).toHaveBeenCalledWith(
-        'user-1',
-        NotificationCategory.PAYROLL_PAID,
-      );
-      expect(mutePreferenceRepository.mute).not.toHaveBeenCalled();
-    });
   });
 });

@@ -21,7 +21,6 @@ import {
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { NotificationsService } from '../../notifications/application/notifications.service';
-import { NotificationCategory } from '../../notifications/domain/enums/notification-category.enum';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { AssignTeamMemberDto } from './dto/assign-team-member.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
@@ -788,7 +787,6 @@ export class TasksService {
     await this.notificationsService.create({
       recipientUserId: task.assignedByUserId,
       message,
-      category: NotificationCategory.TASK_PROGRESS_UPDATE,
       linkTarget: NotificationLinkTarget.TASKS,
       linkEntityId: task.id,
     });
@@ -807,7 +805,6 @@ export class TasksService {
       await this.notificationsService.create({
         recipientUserId: task.assigneeUserId,
         message: `Task "${task.title}" is due soon.`,
-        category: NotificationCategory.TASK_DEADLINE_REMINDER,
         linkTarget: NotificationLinkTarget.TASKS,
         linkEntityId: task.id,
       });

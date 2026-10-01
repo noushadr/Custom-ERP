@@ -56,14 +56,15 @@ class ResponsiveScaffold extends StatefulWidget {
 class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
   bool _railExpanded = false;
 
-  String get _currentLabel => widget.destinations[widget.selectedIndex].label;
+  String get _currentLabel =>
+      widget.destinations[widget.selectedIndex].visibleLabel;
 
   List<NavigationRailDestination> get _railDestinations => [
     for (final d in widget.destinations)
       NavigationRailDestination(
         icon: _railIcon(d),
         selectedIcon: _railIcon(d, selected: true),
-        label: Text(d.label),
+        label: Text(d.visibleLabel),
       ),
   ];
 
@@ -215,7 +216,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
             NavigationDestination(
               icon: _railIcon(d),
               selectedIcon: _railIcon(d, selected: true),
-              label: d.label,
+              label: d.visibleLabel,
             ),
         ],
       ),
@@ -376,7 +377,7 @@ class _NavRow extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    destination.label,
+                    destination.visibleLabel,
                     overflow: TextOverflow.ellipsis,
                     style: labelStyle,
                   ),

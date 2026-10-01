@@ -24,7 +24,6 @@ import {
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { HolidaysService } from '../../holidays/application/holidays.service';
 import { NotificationsService } from '../../notifications/application/notifications.service';
-import { NotificationCategory } from '../../notifications/domain/enums/notification-category.enum';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { ApplyLeaveForEmployeeDto } from './dto/apply-leave-for-employee.dto';
@@ -269,7 +268,6 @@ export class LeaveService {
     await this.notificationsService.create({
       recipientUserId: employee.userId,
       message: `${actorName} applied ${numberOfDays} day(s) of ${leaveType.name} for you, from ${dto.startDate} to ${dto.endDate}.`,
-      category: NotificationCategory.LEAVE_APPLIED_FOR_YOU,
       linkTarget: NotificationLinkTarget.LEAVE,
     });
 
@@ -580,7 +578,6 @@ export class LeaveService {
       await this.notificationsService.create({
         recipientUserId: employee.userId,
         message: `Your annual leave balances for ${result.year} have been reset.`,
-        category: NotificationCategory.LEAVE_BALANCE_RESET,
         linkTarget: NotificationLinkTarget.LEAVE,
       });
     }
@@ -591,7 +588,6 @@ export class LeaveService {
       await this.notificationsService.create({
         recipientUserId: admin.id,
         message: `Annual leave balances for ${result.year} were reset automatically (${result.balancesCreated} balance(s) created).`,
-        category: NotificationCategory.LEAVE_RESET_ADMIN_SUMMARY,
         linkTarget: NotificationLinkTarget.LEAVE,
       });
     }

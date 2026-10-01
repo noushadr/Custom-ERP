@@ -1,5 +1,4 @@
 import 'package:zera_erp/features/notifications/domain/entities/app_notification.dart';
-import 'package:zera_erp/features/notifications/domain/entities/notification_mute_preference.dart';
 import 'package:zera_erp/features/notifications/domain/repositories/notifications_repository.dart';
 
 AppNotification buildTestAppNotification({
@@ -21,18 +20,12 @@ AppNotification buildTestAppNotification({
 }
 
 class FakeNotificationsRepository implements NotificationsRepository {
-  FakeNotificationsRepository({
-    this.notifications = const [],
-    this.mutePreferences = const [],
-  });
+  FakeNotificationsRepository({this.notifications = const []});
 
   final List<AppNotification> notifications;
-  List<NotificationMutePreference> mutePreferences;
 
   String? lastMarkedReadId;
   bool markedAllRead = false;
-  String? lastSetMuteCategory;
-  bool? lastSetMuteValue;
 
   @override
   Future<List<AppNotification>> getMine({bool unreadOnly = false}) async =>
@@ -48,15 +41,5 @@ class FakeNotificationsRepository implements NotificationsRepository {
   @override
   Future<void> markAllRead() async {
     markedAllRead = true;
-  }
-
-  @override
-  Future<List<NotificationMutePreference>> getMutePreferences() async =>
-      mutePreferences;
-
-  @override
-  Future<void> setMutePreference(String category, bool muted) async {
-    lastSetMuteCategory = category;
-    lastSetMuteValue = muted;
   }
 }

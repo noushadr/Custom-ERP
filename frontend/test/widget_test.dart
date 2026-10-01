@@ -777,7 +777,7 @@ void main() {
     },
   );
 
-  testWidgets('a Super Admin sees only Dashboard, never User Dashboard', (
+  testWidgets('a Super Admin sees the Admin Dashboard, not the employee one', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -792,19 +792,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Both the Super Admin's and a plain employee's dashboard nav entries
+    // now read plain "Dashboard" (the employee one's internal `label` stays
+    // the distinct 'User Dashboard' — see AppNavDestination.displayLabel —
+    // so this asserts on page content, not nav text, to tell them apart.
     expect(find.text('Dashboard'), findsWidgets);
-    expect(find.text('User Dashboard'), findsNothing);
     expect(find.text('Employee of the Month'), findsOneWidget);
   });
 
-  testWidgets('a plain employee sees only User Dashboard, never Dashboard', (
+  testWidgets('a plain employee sees their own Dashboard, not the admin one', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(_authenticatedApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('User Dashboard'), findsWidgets);
-    expect(find.text('Dashboard'), findsNothing);
+    expect(find.text('Dashboard'), findsWidgets);
     expect(find.text('Employee of the Month'), findsNothing);
   });
 
@@ -885,7 +887,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(_badgeCountFor(tester, 'User Dashboard'), 1);
+        expect(_badgeCountFor(tester, 'Dashboard'), 1);
       },
     );
 
@@ -901,7 +903,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(_badgeCountFor(tester, 'User Dashboard'), isNull);
+      expect(_badgeCountFor(tester, 'Dashboard'), isNull);
     });
   });
 }

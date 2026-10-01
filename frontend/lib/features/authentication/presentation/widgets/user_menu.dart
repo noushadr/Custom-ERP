@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/layout/breakpoints.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../employee/application/employee_providers.dart';
+import '../../../employee/domain/entities/employee.dart';
+import '../../../employee/presentation/pages/edit_my_profile_page.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
 
-enum _UserMenuAction { signOut }
+enum _UserMenuAction { editProfile, signOut }
 
 /// Avatar + dropdown shown in the top bar of the authenticated shell.
 class UserMenu extends ConsumerWidget {
@@ -53,6 +55,7 @@ class UserMenu extends ConsumerWidget {
           photoUrl: profile?.profilePhotoUrl,
           email: email,
           role: role,
+          employee: profile,
           onSignOut: onSignOut,
         ),
       ],
@@ -66,6 +69,7 @@ class _UserMenuButton extends StatelessWidget {
     required this.photoUrl,
     required this.email,
     required this.role,
+    required this.employee,
     required this.onSignOut,
   });
 
@@ -73,6 +77,11 @@ class _UserMenuButton extends StatelessWidget {
   final String? photoUrl;
   final String email;
   final String role;
+  // Null until myProfileProvider resolves (or for a login with no linked
+  // employee row, e.g. a bootstrap admin account) — "Edit Profile" is
+  // disabled rather than hidden in that case, same as the rest of this menu
+  // never restructures itself while loading.
+  final Employee? employee;
   final VoidCallback onSignOut;
 
   @override
@@ -81,6 +90,11 @@ class _UserMenuButton extends StatelessWidget {
       tooltip: 'Account menu',
       offset: const Offset(0, 44),
       onSelected: (action) => switch (action) {
+        _UserMenuAction.editProfile => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EditMyProfilePage(employee: employee!),
+          ),
+        ),
         _UserMenuAction.signOut => onSignOut(),
       },
       itemBuilder: (context) => [
@@ -97,6 +111,18 @@ class _UserMenuButton extends StatelessWidget {
                   context,
                 ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.editProfile,
+          enabled: employee != null,
+          child: const Row(
+            children: [
+              Icon(Icons.edit_outlined, size: 20),
+              SizedBox(width: 12),
+              Text('Edit profile'),
             ],
           ),
         ),

@@ -16,7 +16,6 @@ import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
-import { NotificationCategory } from '../../notifications/domain/enums/notification-category.enum';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { NotificationsService } from '../../notifications/application/notifications.service';
 import { EmployeeRequest } from '../domain/entities/employee-request.entity';
@@ -93,7 +92,6 @@ export class RequestsService {
         await this.notificationsService.create({
           recipientUserId: manager.userId,
           message: `${employee.firstName} ${employee.lastName} submitted a request — "${dto.subject}" — awaiting your approval`,
-          category: NotificationCategory.REQUEST_AWAITING_APPROVAL,
           linkTarget: NotificationLinkTarget.REQUESTS,
         });
       }
@@ -343,7 +341,6 @@ export class RequestsService {
       await this.notificationsService.create({
         recipientUserId: request.nominee.userId,
         message: `Congratulations — you've been named Employee of the Month!`,
-        category: NotificationCategory.EMPLOYEE_OF_MONTH,
       });
     }
 

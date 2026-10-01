@@ -1,5 +1,4 @@
 import '../../domain/entities/app_notification.dart';
-import '../../domain/entities/notification_mute_preference.dart';
 import '../../domain/repositories/notifications_repository.dart';
 import '../datasources/notifications_remote_data_source.dart';
 
@@ -17,12 +16,4 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
 
   @override
   Future<void> markAllRead() => _remoteDataSource.markAllRead();
-
-  @override
-  Future<List<NotificationMutePreference>> getMutePreferences() =>
-      _remoteDataSource.getMutePreferences();
-
-  @override
-  Future<void> setMutePreference(String category, bool muted) =>
-      _remoteDataSource.setMutePreference(category, muted);
 }
