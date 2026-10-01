@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../authentication/application/role_providers.dart';
 import '../../../authentication/domain/entities/role.dart';
+import '../../../authentication/domain/exceptions/auth_exception.dart';
 import '../../../employee/application/employee_providers.dart';
 import '../../../employee/domain/entities/department.dart';
+import '../../../employee/domain/exceptions/employee_exception.dart';
 import '../../application/knowledge_base_providers.dart';
 import '../../domain/entities/knowledge_base_article.dart';
 import '../../domain/entities/knowledge_base_visibility.dart';
@@ -344,7 +346,11 @@ class _VisibilityPicker extends ConsumerWidget {
               final rolesAsync = ref.watch(rolesProvider);
               return rolesAsync.when(
                 loading: () => const LinearProgressIndicator(),
-                error: (_, _) => const Text('Could not load roles.'),
+                error: (error, _) => Text(
+                  error is AuthException
+                      ? error.message
+                      : 'Could not load roles.',
+                ),
                 data: (roles) => _ChipMultiSelect<Role>(
                   items: roles,
                   idOf: (role) => role.id,
@@ -363,7 +369,11 @@ class _VisibilityPicker extends ConsumerWidget {
               final departmentsAsync = ref.watch(departmentsProvider);
               return departmentsAsync.when(
                 loading: () => const LinearProgressIndicator(),
-                error: (_, _) => const Text('Could not load departments.'),
+                error: (error, _) => Text(
+                  error is EmployeeException
+                      ? error.message
+                      : 'Could not load departments.',
+                ),
                 data: (departments) => _ChipMultiSelect<Department>(
                   items: departments,
                   idOf: (dept) => dept.id,

@@ -5,6 +5,7 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/performance_review_providers.dart';
+import '../../domain/exceptions/performance_review_exception.dart';
 import 'performance_review_summary_row.dart';
 
 /// Year-by-year performance review history for an employee, shown on their
@@ -42,7 +43,11 @@ class EmployeePerformanceReviewsSection extends ConsumerWidget {
           padding: EdgeInsets.symmetric(vertical: 8),
           child: LinearProgressIndicator(),
         ),
-        error: (_, _) => const Text('Could not load performance reviews.'),
+        error: (error, _) => Text(
+          error is PerformanceReviewException
+              ? error.message
+              : 'Could not load performance reviews.',
+        ),
         data: (reviews) {
           if (reviews.isEmpty) {
             return Text(

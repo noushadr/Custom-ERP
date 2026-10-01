@@ -21,6 +21,7 @@ import {
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { NotificationsService } from '../../notifications/application/notifications.service';
+import { NotificationCategory } from '../../notifications/domain/enums/notification-category.enum';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { AssignTeamMemberDto } from './dto/assign-team-member.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
@@ -324,7 +325,13 @@ export class TasksService {
     task.assigneeEmployeeId = dto.employeeId;
     await this.taskRepository.save(task);
     const assigneeName = await this.employeeName(dto.employeeId);
-    await this.addAuditLog(task.id, actorUserId, 'Assignee', null, assigneeName);
+    await this.addAuditLog(
+      task.id,
+      actorUserId,
+      'Assignee',
+      null,
+      assigneeName,
+    );
     await this.notifyAssigner(
       task,
       actorUserId,
@@ -378,9 +385,7 @@ export class TasksService {
   ): Promise<TaskResponseDto> {
     const task = await this.getTaskOrThrow(id);
     if (!(await this.canEdit(task, actorUserId, actorHasOverride))) {
-      throw new ForbiddenException(
-        "You aren't authorized to edit this task",
-      );
+      throw new ForbiddenException("You aren't authorized to edit this task");
     }
 
     const changes = definedFieldsOnly(dto);
@@ -405,7 +410,13 @@ export class TasksService {
         this.employeeName(changes.assigneeEmployeeId),
         this.employeeRepository.findById(changes.assigneeEmployeeId),
       ]);
-      await this.addAuditLog(task.id, actorUserId, 'Assignee', oldName, newName);
+      await this.addAuditLog(
+        task.id,
+        actorUserId,
+        'Assignee',
+        oldName,
+        newName,
+      );
       const { name: actorName, photoUrl: actorPhotoUrl } =
         await this.resolveActorNameAndPhoto(actorUserId);
       task.assigneeEmployeeId = changes.assigneeEmployeeId;
@@ -416,7 +427,13 @@ export class TasksService {
     }
 
     if (changes.title !== undefined && changes.title !== task.title) {
-      await this.addAuditLog(task.id, actorUserId, 'Title', task.title, changes.title);
+      await this.addAuditLog(
+        task.id,
+        actorUserId,
+        'Title',
+        task.title,
+        changes.title,
+      );
       task.title = changes.title;
     }
 
@@ -498,9 +515,7 @@ export class TasksService {
         ? await this.canEdit(task, actorUserId, actorHasOverride)
         : false;
     if (!isSelf && !hasElevatedAccess) {
-      throw new ForbiddenException(
-        "You aren't authorized to update this task",
-      );
+      throw new ForbiddenException("You aren't authorized to update this task");
     }
     if (dto.dueDate !== undefined && isSelf && !hasElevatedAccess) {
       throw new ForbiddenException(
@@ -519,10 +534,17 @@ export class TasksService {
     const changeSummaries: string[] = [];
 
     if (dto.status !== undefined && dto.status !== task.status) {
-      await this.addAuditLog(task.id, actorUserId, 'Status', task.status, dto.status);
+      await this.addAuditLog(
+        task.id,
+        actorUserId,
+        'Status',
+        task.status,
+        dto.status,
+      );
       changeSummaries.push(`status → ${dto.status}`);
       task.status = dto.status;
-      task.completedAt = dto.status === TaskStatus.COMPLETED ? new Date() : null;
+      task.completedAt =
+        dto.status === TaskStatus.COMPLETED ? new Date() : null;
     }
 
     if (dto.dueDate !== undefined && dto.dueDate !== task.dueDate) {
@@ -558,7 +580,7 @@ export class TasksService {
         await this.notifyAssigner(
           task,
           actorUserId,
-          `${actor!.firstName} ${actor!.lastName} updated task "${task.title}": ${changeSummaries.join(', ')}`,
+          `${actor.firstName} ${actor.lastName} updated task "${task.title}": ${changeSummaries.join(', ')}`,
         );
       }
     }
@@ -671,9 +693,7 @@ export class TasksService {
 
     const actor = await this.employeeRepository.findByUserId(actorUserId);
     if (!actor) return false;
-    const assignee = await this.employeeRepository.findById(
-      assigneeEmployeeId,
-    );
+    const assignee = await this.employeeRepository.findById(assigneeEmployeeId);
     if (!assignee?.departmentId) return false;
 
     const headedDepartmentIds = await this.getHeadedDepartmentIds(actor.id);
@@ -738,9 +758,9 @@ export class TasksService {
   }
 
   private async commentCountFor(taskId: string): Promise<number> {
-    return (await this.commentRepository.countByTaskIds([taskId])).get(
-      taskId,
-    ) ?? 0;
+    return (
+      (await this.commentRepository.countByTaskIds([taskId])).get(taskId) ?? 0
+    );
   }
 
   /** Batched comment-count lookup (one query, not N) for a list of tasks —
@@ -768,6 +788,7 @@ export class TasksService {
     await this.notificationsService.create({
       recipientUserId: task.assignedByUserId,
       message,
+      category: NotificationCategory.TASK_PROGRESS_UPDATE,
       linkTarget: NotificationLinkTarget.TASKS,
       linkEntityId: task.id,
     });
@@ -786,6 +807,7 @@ export class TasksService {
       await this.notificationsService.create({
         recipientUserId: task.assigneeUserId,
         message: `Task "${task.title}" is due soon.`,
+        category: NotificationCategory.TASK_DEADLINE_REMINDER,
         linkTarget: NotificationLinkTarget.TASKS,
         linkEntityId: task.id,
       });

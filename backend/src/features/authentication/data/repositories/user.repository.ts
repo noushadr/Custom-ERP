@@ -11,16 +11,27 @@ export class TypeOrmUserRepository implements UserRepository {
     private readonly repository: Repository<User>,
   ) {}
 
+  // `role.permissions` is no longer eager (see role.entity.ts) — requested
+  // explicitly here since login/refresh/impersonation and
+  // `findUsersWithPermission` all need it.
+  private static readonly RELATIONS = { role: { permissions: true } };
+
   findByEmail(email: string): Promise<User | null> {
-    return this.repository.findOne({ where: { email } });
+    return this.repository.findOne({
+      where: { email },
+      relations: TypeOrmUserRepository.RELATIONS,
+    });
   }
 
   findById(id: string): Promise<User | null> {
-    return this.repository.findOne({ where: { id } });
+    return this.repository.findOne({
+      where: { id },
+      relations: TypeOrmUserRepository.RELATIONS,
+    });
   }
 
   findAll(): Promise<User[]> {
-    return this.repository.find();
+    return this.repository.find({ relations: TypeOrmUserRepository.RELATIONS });
   }
 
   save(user: User): Promise<User> {

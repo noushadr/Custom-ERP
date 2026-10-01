@@ -20,6 +20,7 @@ import {
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { NotificationsService } from '../../notifications/application/notifications.service';
+import { NotificationCategory } from '../../notifications/domain/enums/notification-category.enum';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { CreatePerformanceReviewCriterionDto } from './dto/create-performance-review-criterion.dto';
 import { CreatePerformanceReviewDto } from './dto/create-performance-review.dto';
@@ -175,27 +176,25 @@ export class PerformanceReviewsService {
    * whoever needs to act on it — their reporting manager, or every
    * `performance.manage` holder if they don't have one set. */
   private async notifyReviewCreated(review: PerformanceReview): Promise<void> {
-    const employee = await this.employeeRepository.findById(
-      review.employeeId,
-    );
+    const employee = await this.employeeRepository.findById(review.employeeId);
     if (!employee) return;
 
     await this.notificationsService.create({
       recipientUserId: employee.userId,
       message: `Your ${review.reviewYear}-year performance review has been created.`,
+      category: NotificationCategory.PERFORMANCE_REVIEW_CREATED,
       linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
       linkEntityId: review.id,
     });
 
     const actionRecipients = employee.reportingManager
       ? [{ id: employee.reportingManager.userId }]
-      : await this.rolesService.findUsersWithPermission(
-          'performance.manage',
-        );
+      : await this.rolesService.findUsersWithPermission('performance.manage');
     for (const recipient of actionRecipients) {
       await this.notificationsService.create({
         recipientUserId: recipient.id,
         message: `A ${review.reviewYear}-year performance review for ${employee.firstName} ${employee.lastName} is ready to rate.`,
+        category: NotificationCategory.PERFORMANCE_REVIEW_ACTION_NEEDED,
         linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
         linkEntityId: review.id,
       });
@@ -490,9 +489,7 @@ export class PerformanceReviewsService {
   ): Promise<PerformanceReviewResponseDto> {
     const review = await this.getReviewById(id);
     if (review.status !== PerformanceReviewStatus.PENDING) {
-      throw new BadRequestException(
-        'This review has already been completed',
-      );
+      throw new BadRequestException('This review has already been completed');
     }
 
     const actor = await this.employeeRepository.findByUserId(actorUserId);
@@ -510,7 +507,8 @@ export class PerformanceReviewsService {
     for (const entry of dto.responses) {
       const response = responsesById.get(entry.responseId);
       if (!response) continue;
-      if (entry.ratingValue !== undefined) response.ratingValue = entry.ratingValue;
+      if (entry.ratingValue !== undefined)
+        response.ratingValue = entry.ratingValue;
       if (entry.textValue !== undefined) response.textValue = entry.textValue;
     }
     await this.responseRepository.saveMany([...responsesById.values()]);
@@ -556,9 +554,7 @@ export class PerformanceReviewsService {
   ): Promise<PerformanceReviewResponseDto> {
     const review = await this.getReviewById(id);
     if (review.status !== PerformanceReviewStatus.COMPLETED) {
-      throw new BadRequestException(
-        'Only a completed review can be finalized',
-      );
+      throw new BadRequestException('Only a completed review can be finalized');
     }
 
     review.status = PerformanceReviewStatus.FINALIZED;
@@ -610,7 +606,8 @@ export class PerformanceReviewsService {
       for (const entry of dto.responses) {
         const response = responsesById.get(entry.responseId);
         if (!response) continue;
-        if (entry.ratingValue !== undefined) response.ratingValue = entry.ratingValue;
+        if (entry.ratingValue !== undefined)
+          response.ratingValue = entry.ratingValue;
         if (entry.textValue !== undefined) response.textValue = entry.textValue;
       }
       await this.responseRepository.saveMany([...responsesById.values()]);

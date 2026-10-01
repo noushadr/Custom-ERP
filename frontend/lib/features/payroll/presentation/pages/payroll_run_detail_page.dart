@@ -7,12 +7,14 @@ import '../../../../shared/utils/file_download/file_download.dart';
 import '../../../../shared/widgets/department_breakdown_section.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../freelancers/application/freelancers_providers.dart';
+import '../../../freelancers/domain/exceptions/freelancer_exception.dart';
 import '../../application/payroll_providers.dart';
 import '../../domain/entities/payroll_line_item.dart';
 import '../../domain/entities/payroll_run_detail.dart';
 import '../../domain/entities/payroll_run_status.dart';
 import '../../domain/exceptions/payroll_exception.dart';
 import '../widgets/payroll_run_status_badge.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 class PayrollRunDetailPage extends ConsumerWidget {
   const PayrollRunDetailPage({super.key, required this.runId});
@@ -32,8 +34,10 @@ class PayrollRunDetailPage extends ConsumerWidget {
             constraints: const BoxConstraints(maxWidth: 1000),
             child: runAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, _) => Text(
-                'Could not load this payroll run. Please try again.',
+              error: (error, _) => Text(
+                error is PayrollException
+                    ? error.message
+                    : 'Could not load this payroll run. Please try again.',
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
               data: (run) => _RunDetailBody(run: run),
@@ -157,7 +161,7 @@ class _RunDetailBody extends ConsumerWidget {
             trailing: run.status == PayrollRunStatus.draft
                 ? OutlinedButton.icon(
                     onPressed: () async {
-                      await showDialog<void>(
+                      await showAppDialog<void>(
                         context: context,
                         builder: (_) => _AddFreelancerDialog(run: run),
                       );
@@ -184,7 +188,7 @@ class _RunDetailBody extends ConsumerWidget {
                     DataRow(
                       onSelectChanged: run.status == PayrollRunStatus.draft
                           ? (_) async {
-                              await showDialog<void>(
+                              await showAppDialog<void>(
                                 context: context,
                                 builder: (_) => _EditLineItemDialog(
                                   runId: run.id,
@@ -625,7 +629,11 @@ class _AddFreelancerDialogState extends ConsumerState<_AddFreelancerDialog> {
             ],
             freelancersAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, _) => const Text('Could not load freelancers.'),
+              error: (error, _) => Text(
+                error is FreelancerException
+                    ? error.message
+                    : 'Could not load freelancers.',
+              ),
               data: (freelancers) {
                 final available = freelancers
                     .where((f) => f.isActive && !alreadyInRun.contains(f.id))

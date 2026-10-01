@@ -21,6 +21,7 @@ import '../widgets/company_notices_section.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_status_badges.dart';
 import 'employee_profile_page.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 class UserDashboardPage extends ConsumerWidget {
   const UserDashboardPage({super.key});
@@ -276,7 +277,7 @@ class _ReportingManagerChip extends StatelessWidget {
 }
 
 void _showChangePasswordDialog(BuildContext context) {
-  showDialog<void>(
+  showAppDialog<void>(
     context: context,
     builder: (_) => const _ChangePasswordDialog(),
   );

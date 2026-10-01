@@ -6,6 +6,7 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../application/holiday_providers.dart';
 import '../../domain/entities/holiday.dart';
 import '../../domain/exceptions/holiday_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Lets Super Admin/HR-Manager view, add, edit, and delete the public
 /// holiday list — Leave Management subtracts these dates (in addition to
@@ -25,7 +26,7 @@ class HolidaysPage extends ConsumerWidget {
           IconButton(
             tooltip: 'Add holiday',
             icon: const Icon(Icons.add),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => const _HolidayFormDialog(holiday: null),
             ),
@@ -68,7 +69,7 @@ class _HolidayCard extends ConsumerWidget {
   final Holiday holiday;
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete holiday?'),
@@ -128,7 +129,7 @@ class _HolidayCard extends ConsumerWidget {
           IconButton(
             tooltip: 'Edit',
             icon: const Icon(Icons.edit_outlined, size: 20),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => _HolidayFormDialog(holiday: holiday),
             ),
@@ -252,6 +253,7 @@ class _HolidayFormDialogState extends ConsumerState<_HolidayFormDialog> {
                 validator: (value) => (value == null || value.trim().isEmpty)
                     ? 'Name is required'
                     : null,
+                onFieldSubmitted: _saving ? null : onEnterSubmit(_submit),
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(

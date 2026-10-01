@@ -8,6 +8,7 @@ import '../../domain/entities/employee.dart';
 import '../../domain/exceptions/employee_exception.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_status_badges.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Refetches both the archived and non-archived department lists — since
 /// [departmentsManagementProvider] is keyed by that bool, invalidating the
@@ -49,7 +50,7 @@ class _DepartmentsPageState extends ConsumerState<DepartmentsPage> {
           IconButton(
             tooltip: 'Add department',
             icon: const Icon(Icons.add),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => const _DepartmentFormDialog(department: null),
             ),
@@ -158,7 +159,7 @@ class _DepartmentCard extends ConsumerWidget {
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete department?'),
@@ -291,7 +292,7 @@ class _DepartmentCard extends ConsumerWidget {
           IconButton(
             tooltip: 'Edit',
             icon: const Icon(Icons.edit_outlined, size: 20),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => _DepartmentFormDialog(department: department),
             ),
@@ -499,6 +500,7 @@ class _DepartmentFormDialogState extends ConsumerState<_DepartmentFormDialog> {
                 validator: (value) => (value == null || value.trim().isEmpty)
                     ? 'Name is required'
                     : null,
+                onFieldSubmitted: _saving ? null : onEnterSubmit(_submit),
               ),
               const SizedBox(height: 16),
               TextFormField(

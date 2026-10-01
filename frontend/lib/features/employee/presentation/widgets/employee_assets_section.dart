@@ -8,6 +8,7 @@ import '../../application/employee_providers.dart';
 import '../../domain/entities/asset.dart';
 import '../../domain/exceptions/employee_exception.dart';
 import 'employee_status_badges.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Company assets assigned to an employee — visible to the employee
 /// themselves and to HR/Admin; only HR/Admin (when [canManage] is true) can
@@ -51,7 +52,7 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
   }
 
   Future<void> _addAsset() async {
-    final result = await showDialog<_AddAssetResult>(
+    final result = await showAppDialog<_AddAssetResult>(
       context: context,
       builder: (_) => const _AddAssetDialog(),
     );
@@ -72,7 +73,7 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
   }
 
   Future<void> _editAsset(Asset asset) async {
-    final result = await showDialog<_EditAssetResult>(
+    final result = await showAppDialog<_EditAssetResult>(
       context: context,
       builder: (_) => _EditAssetDialog(asset: asset),
     );
@@ -94,7 +95,7 @@ class _EmployeeAssetsSectionState extends ConsumerState<EmployeeAssetsSection> {
   }
 
   Future<void> _delete(Asset asset) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete asset?'),

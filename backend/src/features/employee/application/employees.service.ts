@@ -266,21 +266,50 @@ export class EmployeesService {
       }));
   }
 
-  /** The single most-recently-passed and single soonest-upcoming birthday
-   * among active employees, for the Admin Dashboard's Birthdays card —
-   * reuses `getUpcomingBirthdays`'s own date math rather than recomputing
-   * it. Scoped to the last/next 15 days only — a birthday further out than
-   * that shouldn't show as "last"/"upcoming" on the dashboard. */
+  /** Every active employee's birthday falling in the current calendar month
+   * or the next one, for the Admin Dashboard's Birthdays card — grouped by
+   * month rather than `getUpcomingBirthdays`'s rolling day-window, since
+   * "this month"/"next month" is a calendar concept, not a distance one (an
+   * early-in-the-month birthday can have already passed and still belong to
+   * "this month"). `daysUntil` on each entry is still `closestAnnualOccurrence`'s
+   * own signed distance, purely for display/sorting — grouping itself is by
+   * `dateOfBirth`'s month component directly. */
   async getBirthdaySpotlight(): Promise<BirthdaySpotlightResponse> {
-    const all = await this.getUpcomingBirthdays(15, 15);
-    const past = all.filter((b) => b.daysUntil < 0);
-    const future = all.filter((b) => b.daysUntil >= 0);
+    const employees = await this.employeeRepository.findAll();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const thisMonthIndex = today.getMonth();
+    const nextMonthIndex = (thisMonthIndex + 1) % 12;
+
+    const active = employees.filter(
+      (employee) =>
+        employee.employmentStatus === EmploymentStatus.ACTIVE &&
+        employee.dateOfBirth,
+    );
+
+    const forMonth = (monthIndex: number): UpcomingBirthdayResponse[] =>
+      active
+        .filter(
+          (employee) =>
+            new Date(employee.dateOfBirth!).getMonth() === monthIndex,
+        )
+        .map((employee) => ({
+          employeeId: employee.id,
+          fullName: this.fullName(employee),
+          profilePhotoUrl: employee.profilePhotoUrl ?? null,
+          dateOfBirth: employee.dateOfBirth!,
+          daysUntil: this.closestAnnualOccurrence(employee.dateOfBirth!, today)
+            .daysUntil,
+        }))
+        .sort(
+          (a, b) =>
+            new Date(a.dateOfBirth).getDate() -
+            new Date(b.dateOfBirth).getDate(),
+        );
+
     return {
-      // `all` is sorted ascending by daysUntil, so the last past entry is
-      // the one closest to today (most recent) and the first future entry
-      // is the soonest upcoming one.
-      last: past.length > 0 ? past[past.length - 1] : null,
-      upcoming: future.length > 0 ? future[0] : null,
+      thisMonth: forMonth(thisMonthIndex),
+      nextMonth: forMonth(nextMonthIndex),
     };
   }
 

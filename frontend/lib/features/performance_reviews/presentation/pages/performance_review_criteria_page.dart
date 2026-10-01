@@ -5,6 +5,7 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../application/performance_review_providers.dart';
 import '../../domain/entities/performance_review_criterion.dart';
 import '../../domain/exceptions/performance_review_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 const _responseTypeLabels = {'rating': 'Rating (1-5)', 'text': 'Written'};
 
@@ -36,7 +37,7 @@ class _PerformanceReviewCriteriaPageState
           IconButton(
             tooltip: 'Add criterion',
             icon: const Icon(Icons.add),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => const _CriterionFormDialog(item: null),
             ),
@@ -72,8 +73,10 @@ class _PerformanceReviewCriteriaPageState
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Center(child: CircularProgressIndicator()),
                   ),
-                  error: (_, _) => const Text(
-                    'Could not load review criteria. Please try again.',
+                  error: (error, _) => Text(
+                    error is PerformanceReviewException
+                        ? error.message
+                        : 'Could not load review criteria. Please try again.',
                   ),
                   data: (items) {
                     if (items.isEmpty) {
@@ -156,7 +159,7 @@ class _CriterionCard extends ConsumerWidget {
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete criterion?'),
@@ -242,7 +245,7 @@ class _CriterionCard extends ConsumerWidget {
           IconButton(
             tooltip: 'Edit',
             icon: const Icon(Icons.edit_outlined, size: 20),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => _CriterionFormDialog(item: item),
             ),

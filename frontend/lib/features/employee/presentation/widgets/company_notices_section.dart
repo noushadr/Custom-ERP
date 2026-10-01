@@ -9,6 +9,7 @@ import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/entities/notice.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
 import '../../../../shared/widgets/simple_pager.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 const _pageSize = 3;
 
@@ -34,14 +35,14 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
   String? _deletingId;
 
   Future<void> _openEditDialog(Notice notice) async {
-    await showDialog<void>(
+    await showAppDialog<void>(
       context: context,
       builder: (_) => _EditNoticeDialog(notice: notice),
     );
   }
 
   Future<void> _confirmDelete(Notice notice) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete notice?'),

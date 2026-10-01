@@ -5,6 +5,7 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/service.dart';
 import '../../domain/exceptions/client_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Lets Super Admin/HR-Manager configure the catalog of services that
 /// projects can be tagged with. Requires `clients.manage`. Modeled on
@@ -31,7 +32,7 @@ class _ServicesSettingsPageState extends ConsumerState<ServicesSettingsPage> {
           IconButton(
             tooltip: 'Add service',
             icon: const Icon(Icons.add),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => const _ServiceFormDialog(service: null),
             ),
@@ -174,7 +175,7 @@ class _ServiceCard extends ConsumerWidget {
           IconButton(
             tooltip: 'Edit',
             icon: const Icon(Icons.edit_outlined, size: 20),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => _ServiceFormDialog(service: service),
             ),
@@ -282,6 +283,7 @@ class _ServiceFormDialogState extends ConsumerState<_ServiceFormDialog> {
                 validator: (value) => (value == null || value.trim().isEmpty)
                     ? 'Name is required'
                     : null,
+                onFieldSubmitted: _saving ? null : onEnterSubmit(_submit),
               ),
               const SizedBox(height: 16),
               TextFormField(

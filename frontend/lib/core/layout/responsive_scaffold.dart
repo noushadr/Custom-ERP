@@ -474,7 +474,9 @@ class _TitleWithLogo extends StatelessWidget {
       children: [
         const ZeraLogo(height: 24),
         const SizedBox(width: 8),
-        Text(title),
+        Flexible(
+          child: Text(title, overflow: TextOverflow.ellipsis, maxLines: 1),
+        ),
       ],
     );
   }

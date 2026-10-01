@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
@@ -132,6 +133,54 @@ void main() {
     expect(repository.lastUpdateInput?.id, 'holiday-1');
     expect(repository.lastUpdateInput?.name, 'Independence Day (PK)');
     expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  testWidgets('pressing Enter in the Name field submits the form', (
+    tester,
+  ) async {
+    final repository = FakeHolidayRepository(
+      holidays: const [
+        Holiday(id: 'holiday-1', name: 'Independence Day', date: '2026-08-14'),
+      ],
+    );
+
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField), 'Independence Day (PK)');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUpdateInput?.id, 'holiday-1');
+    expect(repository.lastUpdateInput?.name, 'Independence Day (PK)');
+    expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  testWidgets('pressing Escape closes the dialog without saving', (
+    tester,
+  ) async {
+    final repository = FakeHolidayRepository(
+      holidays: const [
+        Holiday(id: 'holiday-1', name: 'Independence Day', date: '2026-08-14'),
+      ],
+    );
+
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(repository.lastUpdateInput, isNull);
   });
 
   testWidgets(

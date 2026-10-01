@@ -43,7 +43,11 @@ class PayslipListSection extends ConsumerWidget {
           padding: EdgeInsets.symmetric(vertical: 12),
           child: LinearProgressIndicator(),
         ),
-        error: (_, _) => const Text('Could not load payslips.'),
+        error: (error, _) => Text(
+          error is PayrollException
+              ? error.message
+              : 'Could not load payslips.',
+        ),
         data: (payslips) {
           if (payslips.isEmpty) {
             return Text(

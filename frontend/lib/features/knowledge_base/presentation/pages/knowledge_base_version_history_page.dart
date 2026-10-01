@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../application/knowledge_base_providers.dart';
 import '../../domain/entities/knowledge_base_article_version_summary.dart';
+import '../../domain/exceptions/knowledge_base_exception.dart';
 import 'knowledge_base_version_page.dart';
 
 /// Every past version of an article — who changed it and when. Visible to
@@ -27,9 +28,13 @@ class KnowledgeBaseVersionHistoryPage extends ConsumerWidget {
           constraints: const BoxConstraints(maxWidth: 760),
           child: versionsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Could not load the version history.'),
+            error: (error, _) => Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                error is KnowledgeBaseException
+                    ? error.message
+                    : 'Could not load the version history.',
+              ),
             ),
             data: (versions) =>
                 _VersionList(articleId: articleId, versions: versions),

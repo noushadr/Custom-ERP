@@ -31,6 +31,7 @@ import '../widgets/employee_status_badges.dart';
 import '../widgets/employee_tags_section.dart';
 import 'edit_employee_page.dart';
 import 'edit_my_profile_page.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Shows an employee's profile. Pass null for [employeeId] to view the
 /// current user's own profile.
@@ -568,7 +569,7 @@ Future<void> _resetPassword(
   WidgetRef ref,
   Employee employee,
 ) async {
-  final confirmed = await showDialog<bool>(
+  final confirmed = await showAppDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: const Text('Reset password?'),
@@ -595,7 +596,7 @@ Future<void> _resetPassword(
         .read(authControllerProvider.notifier)
         .resetPassword(employee.userId);
     if (!context.mounted) return;
-    await showDialog<void>(
+    await showAppDialog<void>(
       context: context,
       builder: (_) => _TemporaryPasswordDialog(password: temporaryPassword),
     );
@@ -1025,7 +1026,7 @@ class _EmployeeGoalsSection extends ConsumerWidget {
       trailing: IconButton(
         icon: const Icon(Icons.add, size: 20),
         tooltip: 'Add goal',
-        onPressed: () => showDialog<void>(
+        onPressed: () => showAppDialog<void>(
           context: context,
           builder: (_) => _AddEmployeeGoalDialog(
             employeeId: employeeId,
@@ -1058,7 +1059,7 @@ class _EmployeeGoalsSection extends ConsumerWidget {
                 for (var i = 0; i < relevant.length; i++) ...[
                   InkWell(
                     borderRadius: BorderRadius.circular(8),
-                    onTap: () => showDialog<void>(
+                    onTap: () => showAppDialog<void>(
                       context: context,
                       builder: (_) => _EditEmployeeGoalDialog(
                         goal: relevant[i],

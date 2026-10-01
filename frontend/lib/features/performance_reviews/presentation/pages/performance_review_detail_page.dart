@@ -47,9 +47,13 @@ class PerformanceReviewDetailPage extends ConsumerWidget {
           constraints: const BoxConstraints(maxWidth: 720),
           child: reviewAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Could not load this review.'),
+            error: (error, _) => Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                error is PerformanceReviewException
+                    ? error.message
+                    : 'Could not load this review.',
+              ),
             ),
             data: (review) => _ReviewForm(
               review: review,

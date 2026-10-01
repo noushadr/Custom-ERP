@@ -15,6 +15,7 @@ import '../widgets/client_health_badges.dart';
 import '../widgets/project_badges.dart';
 import 'client_editor_page.dart';
 import 'project_detail_page.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 class ClientDetailPage extends ConsumerWidget {
   const ClientDetailPage({super.key, required this.clientId});
@@ -119,7 +120,7 @@ class _ClientDetailBody extends ConsumerWidget {
                     const Spacer(),
                     OutlinedButton.icon(
                       onPressed: () async {
-                        await showDialog<void>(
+                        await showAppDialog<void>(
                           context: context,
                           builder: (_) => _UpdateHealthDialog(client: client),
                         );

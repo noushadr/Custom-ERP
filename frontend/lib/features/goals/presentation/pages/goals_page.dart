@@ -12,6 +12,7 @@ import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../application/goal_providers.dart';
 import '../../domain/entities/goal.dart';
 import '../../domain/exceptions/goal_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Who's looking at this page, from most to least broad reach — decides
 /// which goals are listed, what "Add Goal" creates, and what Edit/Archive
@@ -69,7 +70,7 @@ class GoalsPage extends ConsumerWidget {
                       ),
                     ),
                     FilledButton.icon(
-                      onPressed: () => showDialog<void>(
+                      onPressed: () => showAppDialog<void>(
                         context: context,
                         builder: (_) => _AddGoalDialog(mode: mode),
                       ),
@@ -379,7 +380,7 @@ class _GoalCard extends ConsumerWidget {
                   ),
                 ),
                 IconButton(
-                  onPressed: () => showDialog<void>(
+                  onPressed: () => showAppDialog<void>(
                     context: context,
                     builder: (_) => _EditGoalDialog(goal: goal, mode: mode),
                   ),

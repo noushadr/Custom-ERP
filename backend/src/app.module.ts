@@ -26,6 +26,7 @@ import { NotificationsModule } from './features/notifications/notifications.modu
 import { PayrollModule } from './features/payroll/payroll.module';
 import { PerformanceReviewsModule } from './features/performance-reviews/performance-reviews.module';
 import { RequestsModule } from './features/requests/requests.module';
+import { SearchModule } from './features/search/search.module';
 import { TasksModule } from './features/tasks/tasks.module';
 
 @Module({
@@ -58,6 +59,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     GoalsModule,
     EmailModule,
     ModuleLockModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [AppService],

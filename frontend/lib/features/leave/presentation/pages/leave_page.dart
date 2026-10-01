@@ -14,6 +14,7 @@ import '../../domain/exceptions/leave_exception.dart';
 import '../utils/leave_format_utils.dart';
 import '../widgets/leave_balances_section.dart';
 import '../widgets/leave_calendar_view.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Consolidates everything about leave in one place: the viewer's own
 /// balances and submitted requests, requests awaiting their approval as a
@@ -179,7 +180,7 @@ class _ApplyLeaveForEmployeeSection extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: OutlinedButton.icon(
-        onPressed: () => showDialog<void>(
+        onPressed: () => showAppDialog<void>(
           context: context,
           builder: (_) => const _ApplyLeaveForEmployeeDialog(),
         ),
@@ -517,7 +518,7 @@ class _MyLeaveRequestsSection extends ConsumerWidget {
                   ),
                 ),
                 FilledButton.icon(
-                  onPressed: () => showDialog<void>(
+                  onPressed: () => showAppDialog<void>(
                     context: context,
                     builder: (_) => const _ApplyLeaveDialog(),
                   ),
@@ -1071,7 +1072,7 @@ class _PendingLeaveRequestRowState
 
   Future<String?> _promptForComment(bool approve) {
     final controller = TextEditingController();
-    return showDialog<String>(
+    return showAppDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(approve ? 'Approve leave request' : 'Reject leave request'),

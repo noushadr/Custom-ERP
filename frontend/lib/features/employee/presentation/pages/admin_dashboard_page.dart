@@ -17,6 +17,7 @@ import '../../domain/entities/upcoming_work_anniversary.dart';
 import '../widgets/company_notices_section.dart';
 import '../widgets/employee_avatar.dart';
 import 'employee_profile_page.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 class AdminDashboardPage extends ConsumerWidget {
   const AdminDashboardPage({super.key});
@@ -60,7 +61,7 @@ class _DashboardStats extends StatelessWidget {
           const SizedBox(height: 18),
           CompanyNoticesSection(
             trailing: FilledButton.icon(
-              onPressed: () => showDialog<void>(
+              onPressed: () => showAppDialog<void>(
                 context: context,
                 builder: (_) => const _PostNoticeDialog(),
               ),
@@ -258,47 +259,75 @@ class _BirthdaysCard extends ConsumerWidget {
         loading: () => const _SpotlightEmpty('Loading…'),
         error: (_, _) => const _SpotlightEmpty('Could not load.'),
         data: (spotlight) {
-          final last = spotlight.last;
-          final upcoming = spotlight.upcoming;
-          if (last == null && upcoming == null) {
+          if (spotlight.thisMonth.isEmpty && spotlight.nextMonth.isEmpty) {
             return const _SpotlightEmpty('No birthdays to show.');
           }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (last != null)
-                _SpotlightPerson(
-                  employeeId: last.employeeId,
-                  fullName: last.fullName,
-                  photoUrl: last.profilePhotoUrl,
-                  caption:
-                      '${formatMonthDay(last.dateOfBirth)} · ${_agoLabel(last)}',
-                ),
-              if (last != null && upcoming != null) const SizedBox(height: 10),
-              if (upcoming != null)
-                _SpotlightPerson(
-                  employeeId: upcoming.employeeId,
-                  fullName: upcoming.fullName,
-                  photoUrl: upcoming.profilePhotoUrl,
-                  caption: upcoming.daysUntil == 0
-                      ? 'Today! 🎉'
-                      : '${formatMonthDay(upcoming.dateOfBirth)} · ${_inLabel(upcoming.daysUntil)}',
-                ),
+              _BirthdayMonthGroup(
+                label: 'This Month',
+                people: spotlight.thisMonth,
+              ),
+              if (spotlight.thisMonth.isNotEmpty &&
+                  spotlight.nextMonth.isNotEmpty)
+                const SizedBox(height: 12),
+              _BirthdayMonthGroup(
+                label: 'Next Month',
+                people: spotlight.nextMonth,
+              ),
             ],
           );
         },
       ),
     );
   }
+}
 
-  String _agoLabel(UpcomingBirthday birthday) {
-    final daysAgo = -birthday.daysUntil;
-    return daysAgo == 1 ? '1 day ago' : '$daysAgo days ago';
+class _BirthdayMonthGroup extends StatelessWidget {
+  const _BirthdayMonthGroup({required this.label, required this.people});
+
+  final String label;
+  final List<UpcomingBirthday> people;
+
+  @override
+  Widget build(BuildContext context) {
+    if (people.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 6),
+        for (var i = 0; i < people.length; i++) ...[
+          _SpotlightPerson(
+            employeeId: people[i].employeeId,
+            fullName: people[i].fullName,
+            photoUrl: people[i].profilePhotoUrl,
+            caption: _captionFor(people[i]),
+          ),
+          if (i < people.length - 1) const SizedBox(height: 10),
+        ],
+      ],
+    );
   }
 
-  String _inLabel(int daysUntil) =>
-      daysUntil == 1 ? 'in 1 day' : 'in $daysUntil days';
+  String _captionFor(UpcomingBirthday birthday) {
+    final day = formatMonthDay(birthday.dateOfBirth);
+    if (birthday.daysUntil == 0) return '$day · Today! 🎉';
+    if (birthday.daysUntil > 0) {
+      return '$day · ${birthday.daysUntil == 1 ? 'in 1 day' : 'in ${birthday.daysUntil} days'}';
+    }
+    final daysAgo = -birthday.daysUntil;
+    return '$day · ${daysAgo == 1 ? '1 day ago' : '$daysAgo days ago'}';
+  }
 }
 
 /// Unlike the birthday cards (always exactly one person), a work-anniversary

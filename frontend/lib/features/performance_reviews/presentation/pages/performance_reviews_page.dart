@@ -5,6 +5,7 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/performance_review_providers.dart';
+import '../../domain/exceptions/performance_review_exception.dart';
 import '../widgets/performance_review_summary_row.dart';
 
 /// Consolidates everything about performance reviews in one place: the
@@ -74,7 +75,11 @@ class _MyReviewsSection extends ConsumerWidget {
           padding: EdgeInsets.symmetric(vertical: 12),
           child: LinearProgressIndicator(),
         ),
-        error: (_, _) => const Text('Could not load your reviews.'),
+        error: (error, _) => Text(
+          error is PerformanceReviewException
+              ? error.message
+              : 'Could not load your reviews.',
+        ),
         data: (reviews) {
           if (reviews.isEmpty) {
             return Text(
@@ -118,7 +123,11 @@ class _PendingManagerActionSection extends ConsumerWidget {
           padding: EdgeInsets.symmetric(vertical: 12),
           child: LinearProgressIndicator(),
         ),
-        error: (_, _) => const Text('Could not load pending reviews.'),
+        error: (error, _) => Text(
+          error is PerformanceReviewException
+              ? error.message
+              : 'Could not load pending reviews.',
+        ),
         data: (reviews) {
           if (reviews.isEmpty) {
             return Text(
@@ -162,7 +171,11 @@ class _PendingHrFinalizationSection extends ConsumerWidget {
           padding: EdgeInsets.symmetric(vertical: 12),
           child: LinearProgressIndicator(),
         ),
-        error: (_, _) => const Text('Could not load pending reviews.'),
+        error: (error, _) => Text(
+          error is PerformanceReviewException
+              ? error.message
+              : 'Could not load pending reviews.',
+        ),
         data: (reviews) {
           if (reviews.isEmpty) {
             return Text(
@@ -209,7 +222,11 @@ class _PendingReviewsSection extends ConsumerWidget {
           padding: EdgeInsets.symmetric(vertical: 12),
           child: LinearProgressIndicator(),
         ),
-        error: (_, _) => const Text('Could not load pending reviews.'),
+        error: (error, _) => Text(
+          error is PerformanceReviewException
+              ? error.message
+              : 'Could not load pending reviews.',
+        ),
         data: (reviews) {
           if (reviews.isEmpty) {
             return Text(
@@ -256,7 +273,11 @@ class _FinalizedReviewsSection extends ConsumerWidget {
           padding: EdgeInsets.symmetric(vertical: 12),
           child: LinearProgressIndicator(),
         ),
-        error: (_, _) => const Text('Could not load finalized reviews.'),
+        error: (error, _) => Text(
+          error is PerformanceReviewException
+              ? error.message
+              : 'Could not load finalized reviews.',
+        ),
         data: (reviews) {
           if (reviews.isEmpty) {
             return Text(

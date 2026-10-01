@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import type { StringValue } from 'ms';
 import { AuthService } from './application/auth.service';
@@ -39,10 +39,12 @@ import { UsersController } from './presentation/users.controller';
         },
       }),
     }),
-    // Used only by the login route's own @Throttle override (see
-    // AuthController) — not registered as a global guard, so it never
-    // affects any other route's rate.
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 5 }]),
+    // A generous app-wide default (120 req/min/IP) applied to every route via
+    // the global ThrottlerGuard below — cheap defense-in-depth against
+    // scripted abuse, not meant to ever affect real usage. The login route
+    // keeps its own much stricter @Throttle override (see AuthController),
+    // which takes precedence over this default on that route only.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
   ],
   controllers: [
     AuthController,
@@ -57,6 +59,9 @@ import { UsersController } from './presentation/users.controller';
     { provide: USER_REPOSITORY, useClass: TypeOrmUserRepository },
     { provide: ROLE_REPOSITORY, useClass: TypeOrmRoleRepository },
     { provide: PERMISSION_REPOSITORY, useClass: TypeOrmPermissionRepository },
+    // Throttling runs first — reject abusive request rates before paying
+    // for auth/permission checks on each one.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],

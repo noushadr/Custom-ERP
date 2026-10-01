@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { Department } from '../../../departments/domain/entities/department.entity';
 import { Project } from '../../../clients/domain/entities/project.entity';
@@ -22,6 +22,7 @@ export class Task extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
+  @Index('IDX_tasks_assigneeEmployeeId')
   @Column({ nullable: true })
   assigneeEmployeeId: string | null;
 
@@ -29,6 +30,7 @@ export class Task extends BaseEntity {
   @JoinColumn({ name: 'assigneeEmployeeId' })
   assignee: Employee | null;
 
+  @Index('IDX_tasks_departmentId')
   @Column({ nullable: true })
   departmentId: string | null;
 
@@ -78,6 +80,7 @@ export class Task extends BaseEntity {
    * `clients.manage` holder (see TasksService.linkToProject). Unrelated to
    * this task's own visibility/authorization for its assignee, which stays
    * exactly the same whether or not it's linked to a project. */
+  @Index('IDX_tasks_projectId')
   @Column({ type: 'varchar', nullable: true })
   projectId: string | null;
 

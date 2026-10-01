@@ -8,6 +8,7 @@ import '../../application/role_providers.dart';
 import '../../domain/entities/permission.dart';
 import '../../domain/entities/role.dart';
 import '../../domain/exceptions/auth_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 const _superAdminRoleName = 'Super Admin';
 
@@ -34,7 +35,7 @@ class RolePermissionsPage extends ConsumerWidget {
           IconButton(
             tooltip: 'Add role',
             icon: const Icon(Icons.add),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => const _RoleFormDialog(role: null),
             ),
@@ -69,7 +70,7 @@ class _RoleCard extends ConsumerWidget {
   final Role role;
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete role?'),
@@ -208,7 +209,7 @@ class _RoleCard extends ConsumerWidget {
             icon: const Icon(Icons.edit_outlined, size: 20),
             onPressed: !canEditSuperAdmin
                 ? null
-                : () => showDialog<void>(
+                : () => showAppDialog<void>(
                     context: context,
                     builder: (_) => _RoleFormDialog(role: role),
                   ),

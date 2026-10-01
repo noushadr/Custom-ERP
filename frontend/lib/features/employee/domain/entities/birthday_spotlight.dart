@@ -1,11 +1,11 @@
 import 'upcoming_birthday.dart';
 
-/// The single most-recently-passed and single soonest-upcoming birthday
-/// among active employees — either side is null when no active employee
-/// has a date of birth on file in that direction.
+/// Every active employee's birthday falling in the current calendar month
+/// or the next one — grouped by month, not a single closest-past/closest-
+/// upcoming pair, since several people can share a month.
 class BirthdaySpotlight {
-  const BirthdaySpotlight({this.last, this.upcoming});
+  const BirthdaySpotlight({required this.thisMonth, required this.nextMonth});
 
-  final UpcomingBirthday? last;
-  final UpcomingBirthday? upcoming;
+  final List<UpcomingBirthday> thisMonth;
+  final List<UpcomingBirthday> nextMonth;
 }

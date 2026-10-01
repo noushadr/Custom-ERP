@@ -10,6 +10,19 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
 
+  // The Leads/Financial Reports PIN gate falls back to a known, publicly
+  // documented default ('2803') when unset — fine for local dev, but that
+  // default must never silently carry into production. Fails loudly at
+  // boot rather than relying on someone remembering to check.
+  if (
+    config.get<string>('nodeEnv') === 'production' &&
+    !process.env.MODULE_LOCK_PIN
+  ) {
+    throw new Error(
+      'MODULE_LOCK_PIN must be set explicitly in production — refusing to start with the default PIN.',
+    );
+  }
+
   app.use(helmet());
   // Never wide-open: falls back to the local Flutter-web dev origin when
   // CORS_ORIGIN isn't set, rather than defaulting to "*".

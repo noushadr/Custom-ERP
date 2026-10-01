@@ -5,6 +5,7 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../application/checklist_providers.dart';
 import '../../domain/entities/checklist_template_item.dart';
 import '../../domain/exceptions/checklist_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 const _workModeLabels = {
   'on_site': 'On-site',
@@ -40,7 +41,7 @@ class _ChecklistTemplatesPageState
           IconButton(
             tooltip: 'Add item',
             icon: const Icon(Icons.add),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) =>
                   _ChecklistTemplateItemFormDialog(type: _type, item: null),
@@ -181,7 +182,7 @@ class _ChecklistTemplateItemCard extends ConsumerWidget {
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete checklist item?'),
@@ -281,7 +282,7 @@ class _ChecklistTemplateItemCard extends ConsumerWidget {
           IconButton(
             tooltip: 'Edit',
             icon: const Icon(Icons.edit_outlined, size: 20),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) =>
                   _ChecklistTemplateItemFormDialog(type: type, item: item),
@@ -432,6 +433,7 @@ class _ChecklistTemplateItemFormDialogState
                 validator: (value) => (value == null || value.trim().isEmpty)
                     ? 'Title is required'
                     : null,
+                onFieldSubmitted: _saving ? null : onEnterSubmit(_submit),
               ),
               const SizedBox(height: 16),
               TextFormField(

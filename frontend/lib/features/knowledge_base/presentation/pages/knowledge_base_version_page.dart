@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../application/knowledge_base_providers.dart';
+import '../../domain/exceptions/knowledge_base_exception.dart';
 import '../widgets/knowledge_base_content_view.dart';
 
 /// A single past version's content — read-only, exactly as it was saved at
@@ -31,9 +32,13 @@ class KnowledgeBaseVersionPage extends ConsumerWidget {
           constraints: const BoxConstraints(maxWidth: 760),
           child: versionAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Could not load this version.'),
+            error: (error, _) => Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                error is KnowledgeBaseException
+                    ? error.message
+                    : 'Could not load this version.',
+              ),
             ),
             data: (version) => SingleChildScrollView(
               padding: const EdgeInsets.all(20),

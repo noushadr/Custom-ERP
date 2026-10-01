@@ -77,6 +77,17 @@ function isoDobInDays(offsetDays: number): string {
   return `1990-${month}-${day}`;
 }
 
+/** ISO 'YYYY-MM-DD' with an arbitrary birth year, [monthOffset] calendar
+ * months from the current one (0 = this month, 1 = next month, etc.), and
+ * the given [day] of that month. */
+function isoDobInMonth(monthOffset: number, day: number): string {
+  const target = new Date();
+  target.setDate(1);
+  target.setMonth(target.getMonth() + monthOffset);
+  const month = String(target.getMonth() + 1).padStart(2, '0');
+  return `1990-${month}-${String(day).padStart(2, '0')}`;
+}
+
 /** ISO 'YYYY-MM-DD' joining date whose anniversary falls [offsetDays] from
  * today, [yearsAgo] years in the past — so both the day-window and the
  * years-of-service math can be controlled independently in a test. */
@@ -840,93 +851,97 @@ describe('EmployeesService', () => {
   });
 
   describe('getBirthdaySpotlight', () => {
-    it('picks the closest past birthday as last and the closest future one as upcoming', async () => {
-      const longPassed = buildEmployee({
-        id: 'employee-long-passed',
-        dateOfBirth: isoDobInDays(-30),
+    it('groups birthdays into this month and next month by calendar month, not distance', async () => {
+      const thisMonthEarly = buildEmployee({
+        id: 'employee-this-month-early',
+        dateOfBirth: isoDobInMonth(0, 1),
       });
-      const recentlyPassed = buildEmployee({
-        id: 'employee-recently-passed',
-        dateOfBirth: isoDobInDays(-2),
+      const thisMonthLate = buildEmployee({
+        id: 'employee-this-month-late',
+        dateOfBirth: isoDobInMonth(0, 28),
       });
-      const soon = buildEmployee({
-        id: 'employee-soon',
-        dateOfBirth: isoDobInDays(5),
+      const nextMonth = buildEmployee({
+        id: 'employee-next-month',
+        dateOfBirth: isoDobInMonth(1, 1),
       });
-      const farAway = buildEmployee({
-        id: 'employee-far-away',
-        dateOfBirth: isoDobInDays(60),
+      const twoMonthsOut = buildEmployee({
+        id: 'employee-two-months-out',
+        dateOfBirth: isoDobInMonth(2, 1),
       });
       employeeRepository.findAll.mockResolvedValue([
-        longPassed,
-        recentlyPassed,
-        soon,
-        farAway,
+        thisMonthEarly,
+        thisMonthLate,
+        nextMonth,
+        twoMonthsOut,
       ]);
 
       const result = await service.getBirthdaySpotlight();
 
-      expect(result.last?.employeeId).toBe('employee-recently-passed');
-      expect(result.upcoming?.employeeId).toBe('employee-soon');
+      expect(result.thisMonth.map((b) => b.employeeId)).toEqual([
+        'employee-this-month-early',
+        'employee-this-month-late',
+      ]);
+      expect(result.nextMonth.map((b) => b.employeeId)).toEqual([
+        'employee-next-month',
+      ]);
     });
 
-    it("treats today's birthday as upcoming, not last", async () => {
-      const today = buildEmployee({
-        id: 'employee-today',
-        dateOfBirth: isoDobInDays(0),
+    it('sorts each month by day-of-month ascending', async () => {
+      const late = buildEmployee({
+        id: 'employee-late',
+        dateOfBirth: isoDobInMonth(0, 20),
       });
-      employeeRepository.findAll.mockResolvedValue([today]);
+      const early = buildEmployee({
+        id: 'employee-early',
+        dateOfBirth: isoDobInMonth(0, 3),
+      });
+      employeeRepository.findAll.mockResolvedValue([late, early]);
 
       const result = await service.getBirthdaySpotlight();
 
-      expect(result.upcoming?.employeeId).toBe('employee-today');
-      expect(result.last).toBeNull();
+      expect(result.thisMonth.map((b) => b.employeeId)).toEqual([
+        'employee-early',
+        'employee-late',
+      ]);
     });
 
-    it('returns null for either side with no active employee birthdays on file', async () => {
+    it('includes a this-month birthday that already passed', async () => {
+      const passedEarlyThisMonth = buildEmployee({
+        id: 'employee-passed-early',
+        dateOfBirth: isoDobInMonth(0, 1),
+      });
+      employeeRepository.findAll.mockResolvedValue([passedEarlyThisMonth]);
+
+      const result = await service.getBirthdaySpotlight();
+
+      // Day 1 of the current month is on or before "today" for every day
+      // of the month except the 1st itself — either way it still belongs
+      // to thisMonth by calendar month, regardless of daysUntil's sign.
+      expect(result.thisMonth.map((b) => b.employeeId)).toContain(
+        'employee-passed-early',
+      );
+    });
+
+    it('returns empty arrays with no active employee birthdays on file', async () => {
       employeeRepository.findAll.mockResolvedValue([]);
 
       const result = await service.getBirthdaySpotlight();
 
-      expect(result.last).toBeNull();
-      expect(result.upcoming).toBeNull();
+      expect(result.thisMonth).toEqual([]);
+      expect(result.nextMonth).toEqual([]);
     });
 
-    it('excludes birthdays more than 15 days in the past or future', async () => {
-      const tooFarPast = buildEmployee({
-        id: 'employee-too-far-past',
-        dateOfBirth: isoDobInDays(-16),
+    it('excludes employees who are not active', async () => {
+      const onLeave = buildEmployee({
+        id: 'employee-on-leave',
+        dateOfBirth: isoDobInMonth(0, 15),
+        employmentStatus: EmploymentStatus.ON_LEAVE,
       });
-      const tooFarFuture = buildEmployee({
-        id: 'employee-too-far-future',
-        dateOfBirth: isoDobInDays(16),
-      });
-      employeeRepository.findAll.mockResolvedValue([tooFarPast, tooFarFuture]);
+      employeeRepository.findAll.mockResolvedValue([onLeave]);
 
       const result = await service.getBirthdaySpotlight();
 
-      expect(result.last).toBeNull();
-      expect(result.upcoming).toBeNull();
-    });
-
-    it('includes birthdays exactly 15 days in the past or future', async () => {
-      const exactlyPast = buildEmployee({
-        id: 'employee-exactly-past',
-        dateOfBirth: isoDobInDays(-15),
-      });
-      const exactlyFuture = buildEmployee({
-        id: 'employee-exactly-future',
-        dateOfBirth: isoDobInDays(15),
-      });
-      employeeRepository.findAll.mockResolvedValue([
-        exactlyPast,
-        exactlyFuture,
-      ]);
-
-      const result = await service.getBirthdaySpotlight();
-
-      expect(result.last?.employeeId).toBe('employee-exactly-past');
-      expect(result.upcoming?.employeeId).toBe('employee-exactly-future');
+      expect(result.thisMonth).toEqual([]);
     });
   });
 

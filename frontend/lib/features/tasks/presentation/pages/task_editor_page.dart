@@ -14,6 +14,7 @@ import '../../application/task_providers.dart';
 import '../../domain/entities/task.dart';
 import '../../domain/entities/task_priority.dart';
 import '../../domain/exceptions/task_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Formats a [DateTime] as an ISO 'YYYY-MM-DD' string — same convention as
 /// the Leave feature's own local `isoDate` helper.
@@ -768,7 +769,7 @@ Future<Client?> _showQuickAddClientDialog(BuildContext context, WidgetRef ref) {
   var submitting = false;
   String? error;
 
-  return showDialog<Client>(
+  return showAppDialog<Client>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setState) => AlertDialog(
@@ -861,7 +862,7 @@ Future<Project?> _showQuickAddProjectDialog(
   var submitting = false;
   String? error;
 
-  return showDialog<Project>(
+  return showAppDialog<Project>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setState) => AlertDialog(

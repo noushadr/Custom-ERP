@@ -7,6 +7,7 @@ import '../../application/leave_providers.dart';
 import '../../domain/entities/leave_type.dart';
 import '../../domain/exceptions/leave_exception.dart';
 import '../utils/leave_format_utils.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Lets Super Admin/HR-Manager configure leave types and their policies,
 /// and manually adjust any employee's leave balance. Requires `leave.manage`.
@@ -31,7 +32,7 @@ class _LeaveSettingsPageState extends ConsumerState<LeaveSettingsPage> {
           IconButton(
             tooltip: 'Add leave type',
             icon: const Icon(Icons.add),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => const _LeaveTypeFormDialog(leaveType: null),
             ),
@@ -182,7 +183,7 @@ class _LeaveTypeCard extends ConsumerWidget {
           IconButton(
             tooltip: 'Edit',
             icon: const Icon(Icons.edit_outlined, size: 20),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => _LeaveTypeFormDialog(leaveType: leaveType),
             ),
@@ -386,7 +387,7 @@ class _AdjustBalanceSection extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton.icon(
-              onPressed: () => showDialog<void>(
+              onPressed: () => showAppDialog<void>(
                 context: context,
                 builder: (_) => const _AdjustBalanceDialog(),
               ),

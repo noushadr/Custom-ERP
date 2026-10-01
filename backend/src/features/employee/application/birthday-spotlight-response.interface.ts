@@ -1,10 +1,10 @@
 import { UpcomingBirthdayResponse } from './upcoming-birthday-response.interface';
 
-/** The single most-recently-passed and single soonest-upcoming birthday
- * among active employees — for the Admin Dashboard's "Last Birthday"/
- * "Upcoming Birthday" cards. Either side is `null` when no active employee
- * has a `dateOfBirth` on file in that direction. */
+/** Every active employee's birthday falling in the current calendar month
+ * or the next one, for the Admin Dashboard's Birthdays card. Grouped by
+ * month rather than a single "last"/"upcoming" pair, since several people
+ * can share a month. Each list is sorted by day-of-month ascending. */
 export interface BirthdaySpotlightResponse {
-  last: UpcomingBirthdayResponse | null;
-  upcoming: UpcomingBirthdayResponse | null;
+  thisMonth: UpcomingBirthdayResponse[];
+  nextMonth: UpcomingBirthdayResponse[];
 }

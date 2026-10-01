@@ -6,9 +6,8 @@ import {
   HttpStatus,
   Param,
   Post,
-  UseGuards,
 } from '@nestjs/common';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import {
   AuthService,
   type AuthenticatedUser,
@@ -27,9 +26,9 @@ export class AuthController {
 
   // Unauthenticated by design (@Public), so it's the one route an attacker
   // can hit repeatedly with password guesses — throttled tighter than the
-  // app-wide default to make that impractical.
+  // app-wide default (the global ThrottlerGuard, registered in
+  // AuthenticationModule) via this route-level override.
   @Public()
-  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')

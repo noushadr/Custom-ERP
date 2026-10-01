@@ -12,6 +12,7 @@ import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
 import 'features/authentication/presentation/widgets/impersonation_banner.dart';
 import 'features/authentication/presentation/widgets/user_menu.dart';
+import 'features/clients/presentation/pages/client_detail_page.dart';
 import 'features/clients/presentation/pages/clients_projects_page.dart';
 import 'features/clients/presentation/pages/project_detail_page.dart';
 import 'features/employee/application/employee_providers.dart';
@@ -24,20 +25,27 @@ import 'features/employee/presentation/widgets/notification_bell.dart';
 import 'features/email/presentation/pages/email_page.dart';
 import 'features/financial_reports/presentation/pages/financial_reports_page.dart';
 import 'features/goals/presentation/pages/goals_page.dart';
+import 'features/knowledge_base/presentation/pages/knowledge_base_article_page.dart';
 import 'features/knowledge_base/presentation/pages/knowledge_base_page.dart';
+import 'features/leads/application/leads_providers.dart';
+import 'features/leads/domain/entities/lead.dart';
+import 'features/leads/presentation/pages/lead_editor_page.dart';
 import 'features/leads/presentation/pages/leads_page.dart';
 import 'features/leave/presentation/pages/leave_page.dart';
 import 'features/payroll/presentation/pages/payroll_page.dart';
 import 'features/performance_reviews/presentation/pages/performance_review_detail_page.dart';
 import 'features/performance_reviews/presentation/pages/performance_reviews_page.dart';
+import 'features/notifications/presentation/widgets/notification_preferences_dialog.dart';
 import 'features/requests/application/request_providers.dart';
 import 'features/requests/presentation/pages/requests_page.dart';
+import 'features/search/presentation/widgets/global_search_dialog.dart';
 import 'features/settings/presentation/pages/settings_page.dart';
 import 'features/tasks/application/task_providers.dart';
 import 'features/tasks/domain/entities/task_status.dart';
 import 'features/tasks/presentation/pages/task_detail_page.dart';
 import 'features/tasks/presentation/pages/tasks_page.dart';
 import 'shared/widgets/module_pin_gate.dart';
+import './shared/widgets/app_dialog.dart';
 
 void main() {
   runApp(const ProviderScope(child: ZeraApp()));
@@ -430,6 +438,57 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
     setState(() => _selectedIndex = index);
   }
 
+  void _openClient(String clientId) {
+    final index = _allDestinations.indexWhere(
+      (d) => d.label == 'Clients & Projects',
+    );
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    navigatorState?.push(
+      MaterialPageRoute(builder: (_) => ClientDetailPage(clientId: clientId)),
+    );
+    setState(() => _selectedIndex = index);
+  }
+
+  void _openArticle(String articleId) {
+    final index = _allDestinations.indexWhere(
+      (d) => d.label == 'Knowledge Base',
+    );
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    navigatorState?.push(
+      MaterialPageRoute(
+        builder: (_) => KnowledgeBaseArticlePage(articleId: articleId),
+      ),
+    );
+    setState(() => _selectedIndex = index);
+  }
+
+  void _openLead(String leadId) {
+    // Leads has no dedicated read-only detail page — the editor doubles as
+    // both create and edit, same as every other `*EditorPage` in this app.
+    final index = _allDestinations.indexWhere((d) => d.label == 'Leads');
+    if (index == -1) return;
+    final navigatorState = _sectionNavigatorKeys[index].currentState;
+    navigatorState?.popUntil((route) => route.isFirst);
+    final leads = ref.read(leadsListProvider).valueOrNull ?? [];
+    Lead? lead;
+    for (final candidate in leads) {
+      if (candidate.id == leadId) {
+        lead = candidate;
+        break;
+      }
+    }
+    if (lead != null) {
+      navigatorState?.push(
+        MaterialPageRoute(builder: (_) => LeadEditorPage(existingLead: lead)),
+      );
+    }
+    setState(() => _selectedIndex = index);
+  }
+
   /// Routes a persisted notification's raw backend `linkTarget`/
   /// `linkEntityId` to a concrete destination — falls back to just
   /// switching to the relevant section when there's no specific entity to
@@ -548,6 +607,21 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
             adminSectionCount: adminSectionCount,
             hrAdminSectionCount: hrAdminSectionCount,
             actions: [
+              IconButton(
+                onPressed: () => showAppDialog<void>(
+                  context: context,
+                  builder: (_) => GlobalSearchDialog(
+                    onOpenEmployee: _openEmployeeProfile,
+                    onOpenTask: _openTask,
+                    onOpenProject: _openProject,
+                    onOpenClient: _openClient,
+                    onOpenArticle: _openArticle,
+                    onOpenLead: _openLead,
+                  ),
+                ),
+                icon: const Icon(Icons.search),
+                tooltip: 'Search',
+              ),
               NotificationBell(
                 onNavigate: (target) => _goToDestination(switch (target) {
                   NotificationLinkTarget.adminDashboard => 'Dashboard',
@@ -558,6 +632,14 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
                 onOpenPerformanceReview: _openPerformanceReview,
                 onOpenTask: _openTask,
                 onOpenNotification: _openNotification,
+              ),
+              IconButton(
+                onPressed: () => showAppDialog<void>(
+                  context: context,
+                  builder: (_) => const NotificationPreferencesDialog(),
+                ),
+                icon: const Icon(Icons.tune_outlined),
+                tooltip: 'Notification preferences',
               ),
               const SizedBox(width: 16),
               UserMenu(

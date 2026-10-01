@@ -17,6 +17,7 @@ import '../../domain/entities/payroll_run_summary.dart';
 import '../../domain/exceptions/payroll_exception.dart';
 import '../widgets/payroll_run_status_badge.dart';
 import 'payroll_run_detail_page.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Payroll Runs + a Freelancers roster — shared by Super Admin and
 /// HR/Manager (gated by nav visibility in main.dart, and by
@@ -95,8 +96,10 @@ class _PayrollStats extends ConsumerWidget {
         padding: EdgeInsets.symmetric(vertical: 8),
         child: LinearProgressIndicator(),
       ),
-      error: (_, _) => Text(
-        'Could not load payroll figures.',
+      error: (error, _) => Text(
+        error is PayrollException
+            ? error.message
+            : 'Could not load payroll figures.',
         style: TextStyle(color: Theme.of(context).colorScheme.error),
       ),
       data: (payroll) {
@@ -265,7 +268,7 @@ class _RunsTab extends ConsumerWidget {
           alignment: Alignment.centerRight,
           child: FilledButton.icon(
             onPressed: () async {
-              await showDialog<void>(
+              await showAppDialog<void>(
                 context: context,
                 builder: (_) => const _GeneratePayrollDialog(),
               );
@@ -279,8 +282,10 @@ class _RunsTab extends ConsumerWidget {
         Expanded(
           child: runsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => Text(
-              'Could not load payroll runs. Please try again.',
+            error: (error, _) => Text(
+              error is PayrollException
+                  ? error.message
+                  : 'Could not load payroll runs. Please try again.',
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
             data: (runs) => runs.isEmpty
@@ -318,7 +323,7 @@ class _FreelancersTab extends ConsumerWidget {
           alignment: Alignment.centerRight,
           child: FilledButton.icon(
             onPressed: () async {
-              await showDialog<void>(
+              await showAppDialog<void>(
                 context: context,
                 builder: (_) => const _FreelancerEditorDialog(),
               );
@@ -332,8 +337,10 @@ class _FreelancersTab extends ConsumerWidget {
         Expanded(
           child: freelancersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => Text(
-              'Could not load freelancers. Please try again.',
+            error: (error, _) => Text(
+              error is FreelancerException
+                  ? error.message
+                  : 'Could not load freelancers. Please try again.',
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
             data: (freelancers) => freelancers.isEmpty
@@ -368,7 +375,7 @@ class _FreelancerRow extends ConsumerWidget {
     return Card(
       child: ListTile(
         onTap: () async {
-          await showDialog<void>(
+          await showAppDialog<void>(
             context: context,
             builder: (_) => _FreelancerEditorDialog(freelancer: freelancer),
           );

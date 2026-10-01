@@ -7,6 +7,7 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/knowledge_base_providers.dart';
 import '../../domain/entities/knowledge_base_article_summary.dart';
+import '../../domain/exceptions/knowledge_base_exception.dart';
 import 'knowledge_base_article_page.dart';
 import 'knowledge_base_editor_page.dart';
 
@@ -53,7 +54,9 @@ class KnowledgeBasePage extends ConsumerWidget {
                       const Center(child: CircularProgressIndicator()),
                   error: (error, _) => Center(
                     child: Text(
-                      'Could not load the knowledge base. Please try again.',
+                      error is KnowledgeBaseException
+                          ? error.message
+                          : 'Could not load the knowledge base. Please try again.',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),

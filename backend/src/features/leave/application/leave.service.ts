@@ -24,6 +24,7 @@ import {
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { HolidaysService } from '../../holidays/application/holidays.service';
 import { NotificationsService } from '../../notifications/application/notifications.service';
+import { NotificationCategory } from '../../notifications/domain/enums/notification-category.enum';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { ApplyLeaveForEmployeeDto } from './dto/apply-leave-for-employee.dto';
@@ -268,6 +269,7 @@ export class LeaveService {
     await this.notificationsService.create({
       recipientUserId: employee.userId,
       message: `${actorName} applied ${numberOfDays} day(s) of ${leaveType.name} for you, from ${dto.startDate} to ${dto.endDate}.`,
+      category: NotificationCategory.LEAVE_APPLIED_FOR_YOU,
       linkTarget: NotificationLinkTarget.LEAVE,
     });
 
@@ -300,7 +302,9 @@ export class LeaveService {
     return toLeaveRequestResponse(saved);
   }
 
-  async getMyLeaveRequests(actorUserId: string): Promise<LeaveRequestResponse[]> {
+  async getMyLeaveRequests(
+    actorUserId: string,
+  ): Promise<LeaveRequestResponse[]> {
     const employee = await this.employeeRepository.findByUserId(actorUserId);
     if (!employee) throw new NotFoundException('Employee profile not found');
 
@@ -576,15 +580,18 @@ export class LeaveService {
       await this.notificationsService.create({
         recipientUserId: employee.userId,
         message: `Your annual leave balances for ${result.year} have been reset.`,
+        category: NotificationCategory.LEAVE_BALANCE_RESET,
         linkTarget: NotificationLinkTarget.LEAVE,
       });
     }
 
-    const admins = await this.rolesService.findUsersWithPermission('leave.manage');
+    const admins =
+      await this.rolesService.findUsersWithPermission('leave.manage');
     for (const admin of admins) {
       await this.notificationsService.create({
         recipientUserId: admin.id,
         message: `Annual leave balances for ${result.year} were reset automatically (${result.balancesCreated} balance(s) created).`,
+        category: NotificationCategory.LEAVE_RESET_ADMIN_SUMMARY,
         linkTarget: NotificationLinkTarget.LEAVE,
       });
     }
@@ -613,9 +620,7 @@ export class LeaveService {
     if (scope === 'team') {
       const viewer = await this.employeeRepository.findByUserId(actorUserId);
       if (!viewer) return [];
-      const headedDepartmentIds = await this.getHeadedDepartmentIds(
-        viewer.id,
-      );
+      const headedDepartmentIds = await this.getHeadedDepartmentIds(viewer.id);
       if (headedDepartmentIds.size === 0) return [];
       scoped = requests.filter(
         (request) =>
@@ -628,7 +633,10 @@ export class LeaveService {
       .filter((request) => {
         const start = new Date(`${request.startDate}T00:00:00Z`);
         const end = new Date(`${request.endDate}T00:00:00Z`);
-        return start.getTime() <= rangeEnd.getTime() && end.getTime() >= rangeStart.getTime();
+        return (
+          start.getTime() <= rangeEnd.getTime() &&
+          end.getTime() >= rangeStart.getTime()
+        );
       })
       .map((request) => ({
         employeeId: request.employeeId,
@@ -695,7 +703,9 @@ export class LeaveService {
       leaveType.id,
       year,
     );
-    return existing ?? { allocated: leaveType.annualAllowanceDays, used: '0.0' };
+    return (
+      existing ?? { allocated: leaveType.annualAllowanceDays, used: '0.0' }
+    );
   }
 
   /** Same lookup as [resolveBalanceSnapshot], but returns a real (possibly
@@ -798,9 +808,8 @@ export class LeaveService {
     const currentYear = new Date().getUTCFullYear();
     const currentYearBalances = await this.buildCurrentYearBalances(employeeId);
 
-    const persisted = await this.leaveBalanceRepository.findByEmployeeId(
-      employeeId,
-    );
+    const persisted =
+      await this.leaveBalanceRepository.findByEmployeeId(employeeId);
     const priorYears = persisted
       .filter((balance) => balance.year !== currentYear)
       .map((balance) => ({
@@ -864,9 +873,7 @@ export class LeaveService {
     const request = await this.leaveRequestRepository.findById(requestId);
     if (!request) throw new NotFoundException('Leave request not found');
     if (request.status !== LeaveRequestStatus.MANAGER_APPROVED) {
-      throw new BadRequestException(
-        'This request is not awaiting HR approval',
-      );
+      throw new BadRequestException('This request is not awaiting HR approval');
     }
     return request;
   }

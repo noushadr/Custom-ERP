@@ -15,9 +15,15 @@ export class Role extends BaseEntity {
   @Column({ default: false })
   isSystem: boolean;
 
-  @ManyToMany(() => Permission, (permission) => permission.roles, {
-    eager: true,
-  })
+  /** Deliberately NOT eager — `User.role` (and `Employee.user`, and every
+   * entity that eager-loads an `Employee`/`assignee`/`user` relation, e.g.
+   * `Task`, `Project`, `PayrollLineItem`) would otherwise drag this whole
+   * relation along on every single row of every list endpoint, even though
+   * almost none of those consumers ever read `.role.permissions` (only
+   * `.role.name`). The few call sites that genuinely need permissions
+   * (login/refresh, role management, `findUsersWithPermission`) request
+   * this relation explicitly via their repository. */
+  @ManyToMany(() => Permission, (permission) => permission.roles)
   @JoinTable({ name: 'role_permissions' })
   permissions: Permission[];
 

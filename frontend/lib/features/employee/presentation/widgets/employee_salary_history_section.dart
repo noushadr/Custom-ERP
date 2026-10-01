@@ -7,6 +7,7 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/salary_record.dart';
 import '../../domain/exceptions/employee_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// A single label + value line reused by the Work section for the "Joining
 /// salary" and "Current salary" rows. Pass null for [employeeId] to show the
@@ -87,7 +88,7 @@ class _EmployeeSalaryHistorySectionState
   }
 
   Future<void> _addRaise() async {
-    final result = await showDialog<_AddRaiseResult>(
+    final result = await showAppDialog<_AddRaiseResult>(
       context: context,
       builder: (_) => const _AddRaiseDialog(),
     );

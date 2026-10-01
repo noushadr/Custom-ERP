@@ -11,6 +11,7 @@ import '../../application/email_providers.dart';
 import '../../domain/entities/email_account.dart';
 import '../../domain/entities/inbox_message.dart';
 import '../../domain/exceptions/email_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Strips a leading "Re: " (any casing, possibly repeated) so replying to a
 /// reply doesn't pile up "Re: Re: Re: ...".
@@ -136,7 +137,7 @@ class _MailboxWorkspaceState extends ConsumerState<_MailboxWorkspace> {
         mainAxisSize: MainAxisSize.min,
         children: [
           FilledButton.icon(
-            onPressed: () => showDialog<void>(
+            onPressed: () => showAppDialog<void>(
               context: context,
               builder: (_) => _ComposeDialog(account: widget.account),
             ),
@@ -416,7 +417,7 @@ class _ThreadDetailPane extends ConsumerWidget {
                     // conversation is one the viewer sent themself.
                     if (lastInbound case final inbound?)
                       TextButton.icon(
-                        onPressed: () => showDialog<void>(
+                        onPressed: () => showAppDialog<void>(
                           context: context,
                           builder: (_) => _ComposeDialog(
                             account: account,

@@ -361,8 +361,7 @@ void main() {
   );
 
   testWidgets(
-    'admin dashboard shows the most recent past birthday and the soonest '
-    'upcoming one',
+    'admin dashboard shows this month and next month birthdays, grouped',
     (WidgetTester tester) async {
       const admin = AuthUser(
         id: 'admin-1',
@@ -377,18 +376,22 @@ void main() {
           employeeRepository: FakeEmployeeRepository(
             employees: [buildTestEmployee()],
             birthdaySpotlight: const BirthdaySpotlight(
-              last: UpcomingBirthday(
-                employeeId: 'employee-2',
-                fullName: 'Aamna Irfan',
-                dateOfBirth: '1997-08-13',
-                daysUntil: -2,
-              ),
-              upcoming: UpcomingBirthday(
-                employeeId: 'employee-3',
-                fullName: 'Babar Hussain',
-                dateOfBirth: '1995-09-20',
-                daysUntil: 5,
-              ),
+              thisMonth: [
+                UpcomingBirthday(
+                  employeeId: 'employee-2',
+                  fullName: 'Aamna Irfan',
+                  dateOfBirth: '1997-08-13',
+                  daysUntil: -2,
+                ),
+              ],
+              nextMonth: [
+                UpcomingBirthday(
+                  employeeId: 'employee-3',
+                  fullName: 'Babar Hussain',
+                  dateOfBirth: '1995-09-20',
+                  daysUntil: 5,
+                ),
+              ],
             ),
           ),
         ),
@@ -396,8 +399,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Birthdays'), findsOneWidget);
+      expect(find.text('This Month'), findsOneWidget);
       expect(find.text('Aamna Irfan'), findsOneWidget);
       expect(find.text('Aug 13 · 2 days ago'), findsOneWidget);
+      expect(find.text('Next Month'), findsOneWidget);
       expect(find.text('Babar Hussain'), findsOneWidget);
       expect(find.text('Sep 20 · in 5 days'), findsOneWidget);
     },

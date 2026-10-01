@@ -11,6 +11,7 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/leads_providers.dart';
 import '../../domain/entities/lead.dart';
+import '../../domain/exceptions/lead_exception.dart';
 import 'lead_editor_page.dart';
 import 'lead_import_page.dart';
 
@@ -112,11 +113,13 @@ class LeadsPage extends ConsumerWidget {
                 height: 300,
                 child: Center(child: CircularProgressIndicator()),
               ),
-              error: (_, _) => SizedBox(
+              error: (error, _) => SizedBox(
                 height: 120,
                 child: Center(
                   child: Text(
-                    'Could not load leads. Please try again.',
+                    error is LeadException
+                        ? error.message
+                        : 'Could not load leads. Please try again.',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                     ),

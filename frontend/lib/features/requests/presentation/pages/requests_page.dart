@@ -12,6 +12,7 @@ import '../../../employee/presentation/widgets/employee_status_badges.dart';
 import '../../application/request_providers.dart';
 import '../../domain/entities/employee_request.dart';
 import '../../domain/exceptions/request_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Consolidates everything about employee requests in one place: the
 /// viewer's own submitted requests (general and profile-change), any
@@ -121,7 +122,7 @@ class _MyRequestsSection extends ConsumerWidget {
                 ),
                 if (hasDirectReports)
                   TextButton.icon(
-                    onPressed: () => showDialog<void>(
+                    onPressed: () => showAppDialog<void>(
                       context: context,
                       builder: (_) => const _NominateEmployeeOfMonthDialog(),
                     ),
@@ -129,7 +130,7 @@ class _MyRequestsSection extends ConsumerWidget {
                     label: const Text('Nominate Employee of the Month'),
                   ),
                 TextButton.icon(
-                  onPressed: () => showDialog<void>(
+                  onPressed: () => showAppDialog<void>(
                     context: context,
                     builder: (_) => const _SubmitRequestDialog(),
                   ),

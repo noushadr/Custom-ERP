@@ -5,6 +5,7 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../application/employee_providers.dart';
 import '../../domain/entities/education_record.dart';
 import '../../domain/exceptions/employee_exception.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 /// Lists degrees earned, with an "Add degree" action and per-record delete.
 /// Pass null for [employeeId] to manage the current user's own education
@@ -44,7 +45,7 @@ class _EmployeeEducationSectionState
   }
 
   Future<void> _addDegree() async {
-    final result = await showDialog<_AddEducationResult>(
+    final result = await showAppDialog<_AddEducationResult>(
       context: context,
       builder: (_) => const _AddEducationDialog(),
     );

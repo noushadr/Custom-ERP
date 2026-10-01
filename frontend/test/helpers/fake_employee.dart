@@ -139,7 +139,10 @@ class FakeEmployeeRepository implements EmployeeRepository {
     this.deleteDepartmentError,
     this.upcomingBirthdays = const [],
     this.getUpcomingBirthdaysError,
-    this.birthdaySpotlight = const BirthdaySpotlight(),
+    this.birthdaySpotlight = const BirthdaySpotlight(
+      thisMonth: [],
+      nextMonth: [],
+    ),
     this.getBirthdaySpotlightError,
     this.upcomingWorkAnniversaries = const [],
     this.getUpcomingWorkAnniversariesError,
