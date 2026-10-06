@@ -632,6 +632,20 @@ Two changes: `'Logs'` removed from `_hrAndAdminOnlyLabels` (now just `{'Clients 
 
 1 new test (`responsive_scaffold_test.dart` — confirms Logs renders below both Settings and Payroll, the last member of the HR & Admin group, for a Super Admin). Full regression: 516 frontend tests (1 new) + `flutter analyze` clean — no backend changes, frontend rebuilt and redeployed (port 5050). Not live-verified in the browser this round either, same credential gap as the entry above — confidence rests on the new, passing position-assertion test plus the unchanged backing logic (bucket membership via `_hrAndAdminOnlyLabels`, display order via array position) already proven correct by the existing "grouped nav" test suite.
 
+## Keeping the app running (Windows scheduled tasks)
+
+**2026-10-06**, per explicit instruction ("is the app not running? make sure it's always running"). The backend (port 3000) was found dead: every deploy this whole project had been done with `nohup node ...` from the Claude session's shell, so each server was a child of that session and died whenever it ended (the frontend `serve` happened to still be alive from a later session). PostgreSQL was fine (a Windows service set to Automatic).
+
+Both servers now run as two Windows scheduled tasks, **`ZeraERP-Backend`** (`node dist/main` in `backend/`) and **`ZeraERP-Frontend`** (`serve -s build/web -l tcp://0.0.0.0:5050` in `frontend/`), registered by `scripts/install-services.ps1` (re-runnable; it replaces the tasks). Each has an at-startup/at-logon trigger plus a 5-minute repeating trigger with `MultipleInstances=IgnoreNew` (no-op while the server is up, relaunches a dead one) and restart-on-failure, run through a hidden `wscript` VBS launcher so no console window appears. Verified by killing the backend: it was back in 21 seconds. Logs go to `D:\Zera ERP (Claude Code)\logs\backend.log` / `frontend.log`; the `serve` binary lives in `D:\Zera ERP (Claude Code)\tools` (both outside the repo).
+
+**From now on, deploy with the tasks, not `nohup`:**
+- Backend: `nest build`, then `Stop-ScheduledTask ZeraERP-Backend` (also kill any leftover `node` on port 3000), then `Start-ScheduledTask ZeraERP-Backend`. It takes ~10s to start listening.
+- Frontend: `Stop-ScheduledTask ZeraERP-Frontend` and make sure nothing is still on port 5050 **before** `flutter build web` (a running `serve` locks `build/web` and breaks the build), then rebuild, then `Start-ScheduledTask ZeraERP-Frontend`.
+
+Two environment gotchas this turned up:
+- **The Claude desktop app is a packaged (MSIX) app, so anything its shells write under `%APPDATA%` / `%LOCALAPPDATA%` is redirected into a private per-app copy that other processes (including scheduled tasks) can't see.** This is why the installer keeps logs, launcher scripts and `serve` on `D:` instead — an earlier attempt that used `%LOCALAPPDATA%` ran "successfully" but the tasks could never find their files. Never put anything a scheduled task or another program must read under AppData when running from this app.
+- Registering a *boot-time* task needs an elevated PowerShell; this session isn't elevated, so the tasks currently start at **logon** of the Windows user (who is normally logged in on the console) rather than at boot. If the server machine reboots unattended, right-click PowerShell → Run as administrator and re-run `scripts\install-services.ps1` once to upgrade them to true boot-time tasks.
+
 ## Development Workflow
 1. Understand the requirement.
 2. Design the architecture.
