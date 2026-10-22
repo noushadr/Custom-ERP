@@ -24,6 +24,21 @@ export class KnowledgeBaseArticleVersion extends BaseEntity {
   @Column({ type: 'jsonb' })
   content: unknown;
 
+  /** The file this version pointed at, for versions of a FILE article (all
+   * null for written ones). Replaced files stay on disk so an old version
+   * can still be opened from the history. */
+  @Column({ type: 'varchar', nullable: true })
+  fileName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  storedFileName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  fileMimeType: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  fileSizeBytes: number | null;
+
   @Column()
   editorUserId: string;
 

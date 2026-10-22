@@ -39,12 +39,15 @@ import { UsersController } from './presentation/users.controller';
         },
       }),
     }),
-    // A generous app-wide default (120 req/min/IP) applied to every route via
+    // A generous app-wide default (300 req/min/IP) applied to every route via
     // the global ThrottlerGuard below — cheap defense-in-depth against
-    // scripted abuse, not meant to ever affect real usage. The login route
-    // keeps its own much stricter @Throttle override (see AuthController),
-    // which takes precedence over this default on that route only.
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    // scripted abuse, not meant to ever affect real usage. (Started at 120,
+    // raised to 300 on 2026-10-06: a single screen load in the Flutter app
+    // fans out 20-40 requests, so 120 was within reach of normal heavy use,
+    // e.g. HR working through several employees.) The login route keeps its
+    // own much stricter @Throttle override (see AuthController), which takes
+    // precedence over this default on that route only.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
   ],
   controllers: [
     AuthController,

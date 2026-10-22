@@ -1,6 +1,15 @@
-export interface KnowledgeBaseArticleSummaryDto {
+/** Describes an uploaded file; all null for a written (rich-text) article. */
+export interface KnowledgeBaseFileInfoDto {
+  fileName: string | null;
+  fileMimeType: string | null;
+  fileSizeBytes: number | null;
+}
+
+export interface KnowledgeBaseArticleSummaryDto extends KnowledgeBaseFileInfoDto {
   id: string;
   title: string;
+  /** 'rich_text' (written in the editor) or 'file' (uploaded). */
+  contentKind: string;
   visibilityType: string;
   authorName: string;
   lastEditedByName: string;
@@ -17,7 +26,8 @@ export interface KnowledgeBaseArticleResponseDto
   targetDepartmentIds: string[];
 }
 
-export interface KnowledgeBaseArticleVersionSummaryDto {
+export interface KnowledgeBaseArticleVersionSummaryDto
+  extends KnowledgeBaseFileInfoDto {
   id: string;
   versionNumber: number;
   title: string;

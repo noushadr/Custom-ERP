@@ -1,7 +1,9 @@
 import 'knowledge_base_article_summary.dart';
 
 /// The full article, including its current rich-text content and targeting
-/// — used by the article-view and editor pages.
+/// — used by the article-view and editor pages. For an uploaded-file article
+/// [content] is just an empty document and the file details on the summary
+/// describe the upload.
 class KnowledgeBaseArticle extends KnowledgeBaseArticleSummary {
   const KnowledgeBaseArticle({
     required super.id,
@@ -13,6 +15,10 @@ class KnowledgeBaseArticle extends KnowledgeBaseArticleSummary {
     required super.isArchived,
     required super.createdAt,
     required super.updatedAt,
+    super.contentKind,
+    super.fileName,
+    super.fileMimeType,
+    super.fileSizeBytes,
     required this.content,
     required this.targetRoleIds,
     required this.targetDepartmentIds,

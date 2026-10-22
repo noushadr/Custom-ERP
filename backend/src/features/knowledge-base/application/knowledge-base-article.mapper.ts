@@ -17,6 +17,10 @@ export function toKnowledgeBaseArticleSummary(
   return {
     id: article.id,
     title: article.title,
+    contentKind: article.contentKind,
+    fileName: article.fileName,
+    fileMimeType: article.fileMimeType,
+    fileSizeBytes: article.fileSizeBytes,
     visibilityType: article.visibilityType,
     authorName: article.authorName,
     lastEditedByName: article.lastEditedByName,
@@ -45,6 +49,9 @@ export function toKnowledgeBaseArticleVersionSummary(
     id: version.id,
     versionNumber: version.versionNumber,
     title: version.title,
+    fileName: version.fileName,
+    fileMimeType: version.fileMimeType,
+    fileSizeBytes: version.fileSizeBytes,
     editorName: version.editorName,
     createdAt: version.createdAt.toISOString(),
   };

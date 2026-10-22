@@ -5,10 +5,16 @@ import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/responsive_card_row.dart';
 import '../../../announcements/application/announcement_providers.dart';
+import '../../../authentication/application/auth_providers.dart';
+import '../../../authentication/application/auth_state.dart';
 import '../../../holidays/application/holiday_providers.dart';
 import '../../../holidays/domain/entities/holiday.dart';
+import '../../../leave/presentation/widgets/all_employees_leave_section.dart';
+import '../../../leave/presentation/widgets/leave_calendar_view.dart';
 import '../../../notices/application/notice_providers.dart';
+import '../../../notices/domain/entities/notice_display_duration.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
+import '../../../notices/presentation/widgets/notice_duration_field.dart';
 import '../../../tasks/application/task_providers.dart';
 import '../../../tasks/domain/entities/task_status.dart';
 import '../../application/employee_providers.dart';
@@ -38,11 +44,18 @@ class AdminDashboardPage extends ConsumerWidget {
 // removed outright per explicit instruction, replaced with the four
 // "spotlight" cards below. "Post notice" stays here; it's an action, not a
 // stat.
-class _DashboardStats extends StatelessWidget {
+class _DashboardStats extends ConsumerWidget {
   const _DashboardStats();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    // The same all-employees leave table as on the Leaves page — gated by the
+    // same permission the backend endpoint requires.
+    final canSeeLeaveTable =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('leave.manage');
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,6 +71,14 @@ class _DashboardStats extends StatelessWidget {
               _TasksSummaryCard(),
             ],
           ),
+          if (canSeeLeaveTable) ...[
+            const SizedBox(height: 18),
+            const AllEmployeesLeaveSection(),
+          ],
+          const SizedBox(height: 18),
+          // Whole-company leave calendar (the same widget as on the Leaves
+          // page, opened on the Company scope even for a department head).
+          const LeaveCalendarView(initialScope: 'company'),
           const SizedBox(height: 18),
           CompanyNoticesSection(
             trailing: FilledButton.icon(
@@ -566,6 +587,7 @@ class _PostNoticeDialogState extends ConsumerState<_PostNoticeDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
+  NoticeDisplayDuration _duration = NoticeDisplayDuration.always;
   bool _submitting = false;
   String? _errorMessage;
 
@@ -587,8 +609,12 @@ class _PostNoticeDialogState extends ConsumerState<_PostNoticeDialog> {
     try {
       await ref
           .read(noticeRepositoryProvider)
-          .create(title: _titleController.text, body: _bodyController.text);
-      ref.invalidate(noticeListProvider);
+          .create(
+            title: _titleController.text,
+            body: _bodyController.text,
+            displayDuration: _duration,
+          );
+      refreshNotices(ref);
       if (!mounted) return;
       Navigator.of(context).pop();
     } on NoticeException catch (error) {
@@ -630,6 +656,13 @@ class _PostNoticeDialogState extends ConsumerState<_PostNoticeDialog> {
                 decoration: const InputDecoration(labelText: 'Message'),
                 validator: (value) =>
                     (value == null || value.isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              NoticeDurationField(
+                value: _duration,
+                enabled: !_submitting,
+                onChanged: (value) =>
+                    setState(() => _duration = value ?? _duration),
               ),
             ],
           ),

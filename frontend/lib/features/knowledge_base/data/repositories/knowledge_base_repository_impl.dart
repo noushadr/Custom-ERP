@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../domain/entities/knowledge_base_article.dart';
 import '../../domain/entities/knowledge_base_article_summary.dart';
@@ -52,6 +53,48 @@ class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
   );
 
   @override
+  Future<KnowledgeBaseArticle> createFileArticle({
+    required String title,
+    required Uint8List bytes,
+    required String fileName,
+    required String visibilityType,
+    List<String>? targetRoleIds,
+    List<String>? targetDepartmentIds,
+  }) => _guard(
+    () => _remoteDataSource.createFileArticle(
+      title: title,
+      bytes: bytes,
+      fileName: fileName,
+      visibilityType: visibilityType,
+      targetRoleIds: targetRoleIds,
+      targetDepartmentIds: targetDepartmentIds,
+    ),
+  );
+
+  @override
+  Future<KnowledgeBaseArticle> replaceArticleFile(
+    String id, {
+    required Uint8List bytes,
+    required String fileName,
+    String? title,
+  }) => _guard(
+    () => _remoteDataSource.replaceArticleFile(
+      id,
+      bytes: bytes,
+      fileName: fileName,
+      title: title,
+    ),
+  );
+
+  @override
+  Future<Uint8List> downloadArticleFile(String articleId) =>
+      _guard(() => _remoteDataSource.downloadArticleFile(articleId));
+
+  @override
+  Future<Uint8List> downloadVersionFile(String articleId, String versionId) =>
+      _guard(() => _remoteDataSource.downloadVersionFile(articleId, versionId));
+
+  @override
   Future<KnowledgeBaseArticle> updateArticle(
     String id, {
     String? title,
@@ -91,6 +134,9 @@ class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
         return (data['message'] as List).join(', ');
       }
       return 'Invalid request.';
+    }
+    if (status == 413) {
+      return 'That file is too large — the maximum size is 25 MB.';
     }
     if (status == 403) return "You don't have permission to do that.";
     if (status == 404) return 'That could not be found.';

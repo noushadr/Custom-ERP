@@ -1,3 +1,4 @@
+import 'package:zera_erp/features/leave/domain/entities/employee_leave_overview.dart';
 import 'package:zera_erp/features/leave/domain/entities/leave_balance.dart';
 import 'package:zera_erp/features/leave/domain/entities/leave_calendar_entry.dart';
 import 'package:zera_erp/features/leave/domain/entities/leave_request.dart';
@@ -64,6 +65,28 @@ LeaveBalance buildTestLeaveBalance({
   );
 }
 
+EmployeeLeaveOverview buildTestEmployeeLeaveOverview({
+  String employeeId = 'employee-1',
+  String employeeCode = 'ZC-00001',
+  String employeeName = 'Jane Doe',
+  String? departmentName = 'Engineering',
+  List<LeaveBalance>? balances,
+}) {
+  final resolved = balances ?? [buildTestLeaveBalance()];
+  double sum(double Function(LeaveBalance) pick) =>
+      resolved.fold(0, (total, b) => total + pick(b));
+  return EmployeeLeaveOverview(
+    employeeId: employeeId,
+    employeeCode: employeeCode,
+    employeeName: employeeName,
+    departmentName: departmentName,
+    balances: resolved,
+    totalAllocated: sum((b) => b.allocated),
+    totalUsed: sum((b) => b.used),
+    totalRemaining: sum((b) => b.remaining),
+  );
+}
+
 LeaveRequest buildTestLeaveRequest({
   String id = 'leave-request-1',
   String employeeId = 'employee-1',
@@ -109,6 +132,8 @@ class FakeLeaveRepository implements LeaveRepository {
     this.decisionError,
     this.resetStatus = const LeaveResetStatus(year: 2026, isInitialized: true),
     this.calendarEntries = const [],
+    this.employeeBalancesFailures = 0,
+    this.employeeOverviews = const [],
   });
 
   final List<LeaveType> leaveTypes;
@@ -120,6 +145,13 @@ class FakeLeaveRepository implements LeaveRepository {
   final Object? decisionError;
   final LeaveResetStatus resetStatus;
   final List<LeaveCalendarEntry> calendarEntries;
+
+  /// How many initial `getEmployeeBalances` calls throw before it starts
+  /// succeeding — simulates a transient load failure.
+  int employeeBalancesFailures;
+
+  /// What `getAllEmployeeBalances` returns — the HR/Admin all-employees table.
+  final List<EmployeeLeaveOverview> employeeOverviews;
 
   String? lastCalendarScope;
 
@@ -272,8 +304,17 @@ class FakeLeaveRepository implements LeaveRepository {
   Future<List<LeaveBalance>> getMyBalanceHistory() async => myBalances;
 
   @override
-  Future<List<LeaveBalance>> getEmployeeBalances(String employeeId) async =>
-      myBalances;
+  Future<List<EmployeeLeaveOverview>> getAllEmployeeBalances() async =>
+      employeeOverviews;
+
+  @override
+  Future<List<LeaveBalance>> getEmployeeBalances(String employeeId) async {
+    if (employeeBalancesFailures > 0) {
+      employeeBalancesFailures--;
+      throw Exception('transient failure');
+    }
+    return myBalances;
+  }
 
   @override
   Future<LeaveBalance> adjustBalance(

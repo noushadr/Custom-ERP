@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../domain/entities/employee_leave_overview.dart';
 import '../../domain/entities/leave_balance.dart';
 import '../../domain/entities/leave_calendar_entry.dart';
 import '../../domain/entities/leave_request.dart';
@@ -135,6 +136,10 @@ class LeaveRepositoryImpl implements LeaveRepository {
   @override
   Future<List<LeaveBalance>> getEmployeeBalances(String employeeId) =>
       _guard(() => _remoteDataSource.getEmployeeBalances(employeeId));
+
+  @override
+  Future<List<EmployeeLeaveOverview>> getAllEmployeeBalances() =>
+      _guard(() => _remoteDataSource.getAllEmployeeBalances());
 
   @override
   Future<LeaveBalance> adjustBalance(

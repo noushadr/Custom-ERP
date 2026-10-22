@@ -7,6 +7,9 @@ class KnowledgeBaseArticleVersionModel extends KnowledgeBaseArticleVersion {
     required super.title,
     required super.editorName,
     required super.createdAt,
+    super.fileName,
+    super.fileMimeType,
+    super.fileSizeBytes,
     required super.content,
   });
 
@@ -18,6 +21,9 @@ class KnowledgeBaseArticleVersionModel extends KnowledgeBaseArticleVersion {
     title: json['title'] as String,
     editorName: json['editorName'] as String,
     createdAt: DateTime.parse(json['createdAt'] as String),
+    fileName: json['fileName'] as String?,
+    fileMimeType: json['fileMimeType'] as String?,
+    fileSizeBytes: json['fileSizeBytes'] as int?,
     content: json['content'],
   );
 }

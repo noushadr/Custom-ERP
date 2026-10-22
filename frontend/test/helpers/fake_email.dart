@@ -139,5 +139,9 @@ class FakeEmailRepository implements EmailRepository {
     int monthsBack = 6,
   }) async =>
       threadDetail ??
-      EmailThreadDetail(threadId: threadId, subject: 'Subject', messages: const []);
+      EmailThreadDetail(
+        threadId: threadId,
+        subject: 'Subject',
+        messages: const [],
+      );
 }

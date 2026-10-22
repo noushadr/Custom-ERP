@@ -810,6 +810,88 @@ describe('LeaveService', () => {
     });
   });
 
+  describe('getAllEmployeeBalances', () => {
+    const year = new Date().getUTCFullYear();
+
+    it("lists every active employee's current-year balance per leave type, with totals", async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({
+          id: 'employee-b',
+          firstName: 'Zed',
+          lastName: 'Last',
+          department: buildDepartment({ name: 'Sales' }),
+        }),
+        buildEmployee({ id: 'employee-a', firstName: 'Amy', lastName: 'First' }),
+      ]);
+      leaveTypeRepository.findAll.mockResolvedValue([
+        buildLeaveType({ id: 'casual', name: 'Casual', annualAllowanceDays: '10.0' }),
+        buildLeaveType({ id: 'sick', name: 'Sick', annualAllowanceDays: '8.0' }),
+      ]);
+      leaveBalanceRepository.findByYear.mockResolvedValue([
+        buildBalance({
+          employeeId: 'employee-b',
+          leaveTypeId: 'casual',
+          year,
+          allocated: '12.0',
+          used: '5.0',
+        }),
+      ]);
+
+      const result = await service.getAllEmployeeBalances();
+
+      // Sorted by name, regardless of repository order.
+      expect(result.map((r) => r.employeeName)).toEqual(['Amy First', 'Zed Last']);
+      const zed = result[1];
+      expect(zed.departmentName).toBe('Sales');
+      expect(zed.balances).toEqual([
+        expect.objectContaining({ leaveTypeName: 'Casual', allocated: 12, used: 5, remaining: 7 }),
+        // No row yet for Sick -> falls back to the type's annual allowance.
+        expect.objectContaining({ leaveTypeName: 'Sick', allocated: 8, used: 0, remaining: 8 }),
+      ]);
+      expect(zed.totalAllocated).toBe(20);
+      expect(zed.totalUsed).toBe(5);
+      expect(zed.totalRemaining).toBe(15);
+      // An employee with no rows at all gets the full allowance for both types.
+      expect(result[0].totalAllocated).toBe(18);
+      expect(result[0].totalRemaining).toBe(18);
+    });
+
+    it('leaves out employees who are not active', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-a' }),
+        buildEmployee({ id: 'employee-gone', employmentStatus: EmploymentStatus.RESIGNED }),
+      ]);
+      leaveTypeRepository.findAll.mockResolvedValue([buildLeaveType()]);
+      leaveBalanceRepository.findByYear.mockResolvedValue([]);
+
+      const result = await service.getAllEmployeeBalances();
+
+      expect(result.map((r) => r.employeeId)).toEqual(['employee-a']);
+    });
+
+    it("does not count another employee's balance toward this one", async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-a' }),
+        buildEmployee({ id: 'employee-b', firstName: 'Bo', lastName: 'Two' }),
+      ]);
+      leaveTypeRepository.findAll.mockResolvedValue([buildLeaveType({ id: 'type-1' })]);
+      leaveBalanceRepository.findByYear.mockResolvedValue([
+        buildBalance({
+          employeeId: 'employee-b',
+          leaveTypeId: 'type-1',
+          year,
+          allocated: '3.0',
+          used: '3.0',
+        }),
+      ]);
+
+      const result = await service.getAllEmployeeBalances();
+
+      expect(result.find((r) => r.employeeId === 'employee-a')?.totalRemaining).toBe(20);
+      expect(result.find((r) => r.employeeId === 'employee-b')?.totalRemaining).toBe(0);
+    });
+  });
+
   describe('runAnnualReset', () => {
     it('creates balances only for combinations that do not already exist this year', async () => {
       const employeeA = buildEmployee({ id: 'employee-a' });

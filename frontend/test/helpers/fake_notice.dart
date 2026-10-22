@@ -1,4 +1,5 @@
 import 'package:zera_erp/features/notices/domain/entities/notice.dart';
+import 'package:zera_erp/features/notices/domain/entities/notice_display_duration.dart';
 import 'package:zera_erp/features/notices/domain/repositories/notice_repository.dart';
 
 class FakeNoticeRepository implements NoticeRepository {
@@ -19,14 +20,27 @@ class FakeNoticeRepository implements NoticeRepository {
   String? lastUpdatedId;
   String? lastUpdatedTitle;
   String? lastUpdatedBody;
+  NoticeDisplayDuration? lastCreatedDuration;
+  NoticeDisplayDuration? lastUpdatedDuration;
+  bool? lastIncludeExpired;
   String? lastDeletedId;
 
   @override
-  Future<List<Notice>> getAll() async => notices;
+  Future<List<Notice>> getAll({bool includeExpired = false}) async {
+    lastIncludeExpired = includeExpired;
+    return includeExpired
+        ? notices
+        : notices.where((notice) => !notice.isExpired).toList();
+  }
 
   @override
-  Future<Notice> create({required String title, required String body}) async {
+  Future<Notice> create({
+    required String title,
+    required String body,
+    NoticeDisplayDuration? displayDuration,
+  }) async {
     lastCreatedTitle = title;
+    lastCreatedDuration = displayDuration;
     if (createError != null) throw createError!;
     return Notice(
       id: 'notice-new',
@@ -38,8 +52,14 @@ class FakeNoticeRepository implements NoticeRepository {
   }
 
   @override
-  Future<Notice> update(String id, {String? title, String? body}) async {
+  Future<Notice> update(
+    String id, {
+    String? title,
+    String? body,
+    NoticeDisplayDuration? displayDuration,
+  }) async {
     lastUpdatedId = id;
+    lastUpdatedDuration = displayDuration;
     lastUpdatedTitle = title;
     lastUpdatedBody = body;
     if (updateError != null) throw updateError!;

@@ -7,7 +7,9 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/entities/notice.dart';
+import '../../../notices/domain/entities/notice_display_duration.dart';
 import '../../../notices/domain/exceptions/notice_exception.dart';
+import '../../../notices/presentation/widgets/notice_duration_field.dart';
 import '../../../../shared/widgets/simple_pager.dart';
 import '../../../../shared/widgets/app_dialog.dart';
 
@@ -67,7 +69,7 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
     setState(() => _deletingId = notice.id);
     try {
       await ref.read(noticeRepositoryProvider).delete(notice.id);
-      ref.invalidate(noticeListProvider);
+      refreshNotices(ref);
     } on NoticeException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -80,11 +82,16 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
 
   @override
   Widget build(BuildContext context) {
-    final noticesAsync = ref.watch(noticeListProvider);
     final authState = ref.watch(authControllerProvider);
     final canDelete =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('notices.manage');
+    // Managers also see notices that have run out their display time, so they
+    // can bring one back; everyone else only gets what is still showing.
+    final listProvider = canDelete
+        ? manageableNoticeListProvider
+        : noticeListProvider;
+    final noticesAsync = ref.watch(listProvider);
 
     // Set by the notification bell when the viewer taps a specific notice —
     // jump to whichever page it's actually on instead of always page 1,
@@ -93,7 +100,7 @@ class _CompanyNoticesSectionState extends ConsumerState<CompanyNoticesSection> {
     // reason doesn't accidentally re-trigger the jump.
     ref.listen<String?>(focusedNoticeIdProvider, (previous, noticeId) {
       if (noticeId == null) return;
-      final notices = ref.read(noticeListProvider).valueOrNull;
+      final notices = ref.read(listProvider).valueOrNull;
       if (notices == null) return;
       final index = notices.indexWhere((n) => n.id == noticeId);
       if (index == -1) return;
@@ -183,6 +190,15 @@ class _NoticeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Only managers are told how long a notice runs - for everyone else it is
+    // simply on the board, so the extra line would be noise.
+    final showDuration = onEdit != null;
+    final expiresAt = notice.expiresAt;
+    final durationText = notice.isExpired
+        ? 'Expired ${formatDisplayDateTime(expiresAt!)}'
+        : expiresAt == null
+        ? 'Always shown'
+        : 'Shown until ${formatDisplayDateTime(expiresAt)}';
     final accent = isLatest ? AppColors.primary : AppColors.textSecondary;
     return Container(
       padding: const EdgeInsets.all(14),
@@ -229,6 +245,18 @@ class _NoticeCard extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
+                if (showDuration) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    durationText,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: notice.isExpired
+                          ? AppColors.error
+                          : AppColors.textSecondary,
+                      fontWeight: notice.isExpired ? FontWeight.w600 : null,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -278,6 +306,8 @@ class _EditNoticeDialogState extends ConsumerState<_EditNoticeDialog> {
     text: widget.notice.title,
   );
   late final _bodyController = TextEditingController(text: widget.notice.body);
+  // null = leave the current end date alone.
+  NoticeDisplayDuration? _duration;
   bool _submitting = false;
   String? _errorMessage;
 
@@ -303,8 +333,9 @@ class _EditNoticeDialogState extends ConsumerState<_EditNoticeDialog> {
             widget.notice.id,
             title: _titleController.text,
             body: _bodyController.text,
+            displayDuration: _duration,
           );
-      ref.invalidate(noticeListProvider);
+      refreshNotices(ref);
       if (!mounted) return;
       Navigator.of(context).pop();
     } on NoticeException catch (error) {
@@ -348,6 +379,14 @@ class _EditNoticeDialogState extends ConsumerState<_EditNoticeDialog> {
                 decoration: const InputDecoration(labelText: 'Message'),
                 validator: (value) =>
                     (value == null || value.isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              NoticeDurationField(
+                value: _duration,
+                enabled: !_submitting,
+                keepCurrentLabel: 'Keep current',
+                helperText: 'Picking a time restarts it from now',
+                onChanged: (value) => setState(() => _duration = value),
               ),
             ],
           ),

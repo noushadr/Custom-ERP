@@ -24,8 +24,17 @@ import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
 } from '../../employee/domain/repositories/employee-repository.interface';
+import { existsSync } from 'fs';
+import { unlink } from 'fs/promises';
 import { CreateKnowledgeBaseArticleDto } from './dto/create-knowledge-base-article.dto';
+import { CreateKnowledgeBaseFileArticleDto } from './dto/create-knowledge-base-file-article.dto';
+import { ReplaceKnowledgeBaseFileDto } from './dto/replace-knowledge-base-file.dto';
 import { UpdateKnowledgeBaseArticleDto } from './dto/update-knowledge-base-article.dto';
+import {
+  mimeTypeForExtension,
+  storedFilePath,
+} from '../presentation/knowledge-base-upload.config';
+import { KnowledgeBaseContentKind } from '../domain/enums/knowledge-base-content-kind.enum';
 import {
   KnowledgeBaseArticleResponseDto,
   KnowledgeBaseArticleSummaryDto,
@@ -53,6 +62,13 @@ import {
 interface Viewer {
   roleName: string | null;
   departmentId: string | null;
+}
+
+/** What the controller needs to stream an uploaded file back to a reader. */
+export interface KnowledgeBaseFileDownload {
+  absolutePath: string;
+  fileName: string;
+  mimeType: string;
 }
 
 @Injectable()
@@ -98,6 +114,18 @@ export class KnowledgeBaseService {
     actorUserId: string,
     actorHasOverride: boolean,
   ): Promise<KnowledgeBaseArticleResponseDto> {
+    return toKnowledgeBaseArticleResponse(
+      await this.getArticleForActorEntity(id, actorUserId, actorHasOverride),
+    );
+  }
+
+  /** The single visibility gate every read of an article — its text, its
+   * history, and its uploaded files — goes through. */
+  private async getArticleForActorEntity(
+    id: string,
+    actorUserId: string,
+    actorHasOverride: boolean,
+  ): Promise<KnowledgeBaseArticle> {
     const article = await this.getArticleOr404(id);
     if (!actorHasOverride) {
       const viewer = await this.resolveViewer(actorUserId);
@@ -107,7 +135,7 @@ export class KnowledgeBaseService {
         );
       }
     }
-    return toKnowledgeBaseArticleResponse(article);
+    return article;
   }
 
   /** Anyone who can view the article can see who changed it and when — not
@@ -136,7 +164,135 @@ export class KnowledgeBaseService {
     return toKnowledgeBaseArticleVersionResponse(version);
   }
 
+  /** The article's current uploaded file. Goes through the same visibility
+   * check as reading the article itself — uploaded files are never reachable
+   * by URL alone (they live outside the statically served `uploads/`). */
+  async getFileForActor(
+    articleId: string,
+    actorUserId: string,
+    actorHasOverride: boolean,
+  ): Promise<KnowledgeBaseFileDownload> {
+    const article = await this.getArticleForActorEntity(
+      articleId,
+      actorUserId,
+      actorHasOverride,
+    );
+    return this.toDownload(article);
+  }
+
+  async getVersionFileForActor(
+    articleId: string,
+    versionId: string,
+    actorUserId: string,
+    actorHasOverride: boolean,
+  ): Promise<KnowledgeBaseFileDownload> {
+    await this.getArticleForActorEntity(
+      articleId,
+      actorUserId,
+      actorHasOverride,
+    );
+    const version = await this.versionRepository.findById(versionId);
+    if (!version || version.articleId !== articleId) {
+      throw new NotFoundException('Version not found');
+    }
+    return this.toDownload(version);
+  }
+
   // ---- Writes ----
+
+  /** Creates an article whose body is an uploaded file instead of written
+   * text. [file] has already been saved to disk by the upload interceptor;
+   * if anything below rejects the request that file is removed again so a
+   * failed create never leaves an orphan behind. */
+  async createFileArticle(
+    dto: CreateKnowledgeBaseFileArticleDto,
+    file: Express.Multer.File,
+    actorUserId: string,
+  ): Promise<KnowledgeBaseArticleResponseDto> {
+    let persisted = false;
+    try {
+      this.validateTargeting(
+        dto.visibilityType,
+        dto.targetRoleIds,
+        dto.targetDepartmentIds,
+      );
+      const actorName = await resolveActorName(
+        this.employeeRepository,
+        this.userRepository,
+        actorUserId,
+      );
+
+      const article = new KnowledgeBaseArticle();
+      article.title = dto.title;
+      article.content = [];
+      article.contentKind = KnowledgeBaseContentKind.FILE;
+      this.applyFile(article, file);
+      article.visibilityType = dto.visibilityType;
+      article.targetRoles = await this.resolveTargetRoles(dto.targetRoleIds);
+      article.targetDepartments = await this.resolveTargetDepartments(
+        dto.targetDepartmentIds,
+      );
+      article.authorUserId = actorUserId;
+      article.authorName = actorName;
+      article.lastEditedByUserId = actorUserId;
+      article.lastEditedByName = actorName;
+      article.versionNumber = 1;
+      article.isArchived = false;
+      const saved = await this.articleRepository.save(article);
+      persisted = true;
+      await this.versionRepository.save(
+        this.buildVersion(saved, actorUserId, actorName),
+      );
+      return toKnowledgeBaseArticleResponse(
+        await this.getArticleOr404(saved.id),
+      );
+    } catch (error) {
+      // Once the article row points at the file it must stay on disk.
+      if (!persisted) await this.discardUpload(file);
+      throw error;
+    }
+  }
+
+  /** Swaps a file article's file for a new one, recording a new version. The
+   * previous file stays on disk so its version can still be opened. */
+  async replaceFile(
+    id: string,
+    file: Express.Multer.File,
+    dto: ReplaceKnowledgeBaseFileDto,
+    actorUserId: string,
+  ): Promise<KnowledgeBaseArticleResponseDto> {
+    let persisted = false;
+    try {
+      const article = await this.getArticleOr404(id);
+      if (article.contentKind !== KnowledgeBaseContentKind.FILE) {
+        throw new BadRequestException(
+          'This is a written article — it has no file to replace',
+        );
+      }
+      const actorName = await resolveActorName(
+        this.employeeRepository,
+        this.userRepository,
+        actorUserId,
+      );
+
+      if (dto.title !== undefined) article.title = dto.title;
+      this.applyFile(article, file);
+      article.versionNumber += 1;
+      article.lastEditedByUserId = actorUserId;
+      article.lastEditedByName = actorName;
+      const saved = await this.articleRepository.save(article);
+      persisted = true;
+      await this.versionRepository.save(
+        this.buildVersion(saved, actorUserId, actorName),
+      );
+      return toKnowledgeBaseArticleResponse(
+        await this.getArticleOr404(saved.id),
+      );
+    } catch (error) {
+      if (!persisted) await this.discardUpload(file);
+      throw error;
+    }
+  }
 
   async createArticle(
     dto: CreateKnowledgeBaseArticleDto,
@@ -156,6 +312,11 @@ export class KnowledgeBaseService {
     const article = new KnowledgeBaseArticle();
     article.title = dto.title;
     article.content = dto.content;
+    article.contentKind = KnowledgeBaseContentKind.RICH_TEXT;
+    article.fileName = null;
+    article.storedFileName = null;
+    article.fileMimeType = null;
+    article.fileSizeBytes = null;
     article.visibilityType = dto.visibilityType;
     article.targetRoles = await this.resolveTargetRoles(dto.targetRoleIds);
     article.targetDepartments = await this.resolveTargetDepartments(
@@ -169,14 +330,9 @@ export class KnowledgeBaseService {
     article.isArchived = false;
     const saved = await this.articleRepository.save(article);
 
-    const version = new KnowledgeBaseArticleVersion();
-    version.articleId = saved.id;
-    version.versionNumber = 1;
-    version.title = saved.title;
-    version.content = saved.content;
-    version.editorUserId = actorUserId;
-    version.editorName = actorName;
-    await this.versionRepository.save(version);
+    await this.versionRepository.save(
+      this.buildVersion(saved, actorUserId, actorName),
+    );
 
     return toKnowledgeBaseArticleResponse(await this.getArticleOr404(saved.id));
   }
@@ -191,6 +347,15 @@ export class KnowledgeBaseService {
     actorUserId: string,
   ): Promise<KnowledgeBaseArticleResponseDto> {
     const article = await this.getArticleOr404(id);
+    if (
+      article.contentKind === KnowledgeBaseContentKind.FILE &&
+      dto.content !== undefined
+    ) {
+      throw new BadRequestException(
+        'This article is an uploaded file and has no written content — ' +
+          'upload a replacement file instead',
+      );
+    }
 
     const visibilityType = dto.visibilityType ?? article.visibilityType;
     const targetRoleIds =
@@ -231,20 +396,81 @@ export class KnowledgeBaseService {
     const saved = await this.articleRepository.save(article);
 
     if (isContentEdit && actorName) {
-      const version = new KnowledgeBaseArticleVersion();
-      version.articleId = saved.id;
-      version.versionNumber = saved.versionNumber;
-      version.title = saved.title;
-      version.content = saved.content;
-      version.editorUserId = actorUserId;
-      version.editorName = actorName;
-      await this.versionRepository.save(version);
+      await this.versionRepository.save(
+        this.buildVersion(saved, actorUserId, actorName),
+      );
     }
 
     return toKnowledgeBaseArticleResponse(await this.getArticleOr404(saved.id));
   }
 
   // ---- Helpers ----
+
+  /** An immutable snapshot of the article as it is right now, including
+   * which file it pointed at (null for a written article). */
+  private buildVersion(
+    article: KnowledgeBaseArticle,
+    editorUserId: string,
+    editorName: string,
+  ): KnowledgeBaseArticleVersion {
+    const version = new KnowledgeBaseArticleVersion();
+    version.articleId = article.id;
+    version.versionNumber = article.versionNumber;
+    version.title = article.title;
+    version.content = article.content;
+    version.fileName = article.fileName;
+    version.storedFileName = article.storedFileName;
+    version.fileMimeType = article.fileMimeType;
+    version.fileSizeBytes = article.fileSizeBytes;
+    version.editorUserId = editorUserId;
+    version.editorName = editorName;
+    return version;
+  }
+
+  /** Points the article at an uploaded file. The Content-Type we will serve
+   * is taken from the file extension (see knowledge-base-upload.config), not
+   * from whatever the uploader's browser claimed. */
+  private applyFile(
+    article: KnowledgeBaseArticle,
+    file: Express.Multer.File,
+  ): void {
+    const mimeType = mimeTypeForExtension(file.originalname);
+    if (!mimeType) {
+      throw new BadRequestException('Unsupported file type');
+    }
+    article.fileName = file.originalname;
+    article.storedFileName = file.filename;
+    article.fileMimeType = mimeType;
+    article.fileSizeBytes = file.size;
+  }
+
+  /** Removes a just-uploaded file that never made it into the database. */
+  private async discardUpload(file: Express.Multer.File): Promise<void> {
+    try {
+      await unlink(file.path);
+    } catch {
+      // Already gone or never written — nothing left to clean up.
+    }
+  }
+
+  private toDownload(source: {
+    fileName: string | null;
+    storedFileName: string | null;
+    fileMimeType: string | null;
+  }): KnowledgeBaseFileDownload {
+    if (!source.fileName || !source.storedFileName || !source.fileMimeType) {
+      throw new NotFoundException('This article has no uploaded file');
+    }
+    const absolutePath = storedFilePath(source.storedFileName);
+    if (!existsSync(absolutePath)) {
+      throw new NotFoundException('The uploaded file is no longer available');
+    }
+    return {
+      absolutePath,
+      fileName: source.fileName,
+      mimeType: source.fileMimeType,
+    };
+  }
 
   private async getArticleOr404(id: string): Promise<KnowledgeBaseArticle> {
     const article = await this.articleRepository.findById(id);

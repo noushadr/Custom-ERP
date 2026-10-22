@@ -60,8 +60,7 @@ class EmailThreadModel extends EmailThread {
       EmailThreadModel(
         threadId: json['threadId'] as String,
         subject: json['subject'] as String,
-        participants: (json['participants'] as List<dynamic>)
-            .cast<String>(),
+        participants: (json['participants'] as List<dynamic>).cast<String>(),
         lastDate: DateTime.parse(json['lastDate'] as String),
         messageCount: json['messageCount'] as int,
         hasUnread: json['hasUnread'] as bool,

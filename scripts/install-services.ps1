@@ -35,11 +35,13 @@ if (-not (Test-Path $serve)) {
 $tasks = @(
   @{
     Name = 'ZeraERP-Backend'
+    Port = 3000
     WorkDir = Join-Path $root 'backend'
     Command = "`"$node`" --enable-source-maps dist/main >> `"$logs\backend.log`" 2>&1"
   },
   @{
     Name = 'ZeraERP-Frontend'
+    Port = 5050
     WorkDir = Join-Path $root 'frontend'
     Command = "`"$node`" `"$serve`" -s build/web -l tcp://0.0.0.0:5050 >> `"$logs\frontend.log`" 2>&1"
   }
@@ -62,12 +64,24 @@ foreach ($t in $tasks) {
   # A tiny VBS launcher runs the command in a hidden window (WshShell.Run
   # style 0) and waits for it, so the task shows as "running" while the
   # server is up and no console window ever appears.
+  #
+  # The launcher script first frees the server's port. The tasks run in
+  # Windows' background session (session 0), whose processes can't be killed
+  # from an ordinary desktop shell - so a restart is just "Stop-/Start-
+  # ScheduledTask": the new instance clears whatever is still on the port (a
+  # leftover from a previous instance) before starting.
+  $cmdFile = Join-Path $logs ($t.Name + '.cmd')
+  Set-Content -Path $cmdFile -Encoding ASCII -Value @(
+    '@echo off',
+    ('cd /d "' + $t.WorkDir + '"'),
+    ('for /f "tokens=5" %%p in (''netstat -ano ^| findstr /R /C:":' + $t.Port + ' .*LISTENING"'') do taskkill /F /PID %%p >nul 2>&1'),
+    $t.Command
+  )
   $vbs = Join-Path $logs ($t.Name + '.vbs')
-  $line = 'cmd.exe /c "' + $t.Command + '"'
   Set-Content -Path $vbs -Encoding ASCII -Value @(
     'Set sh = CreateObject("WScript.Shell")',
     ('sh.CurrentDirectory = "' + $t.WorkDir + '"'),
-    ('sh.Run "' + $line.Replace('"', '""') + '", 0, True')
+    ('sh.Run Chr(34) & "' + $cmdFile + '" & Chr(34), 0, True')
   )
   $action = New-ScheduledTaskAction -Execute 'wscript.exe' `
     -Argument ('//B //Nologo "' + $vbs + '"') -WorkingDirectory $t.WorkDir

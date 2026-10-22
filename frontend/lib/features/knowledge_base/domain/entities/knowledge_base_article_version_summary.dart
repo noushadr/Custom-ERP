@@ -7,6 +7,9 @@ class KnowledgeBaseArticleVersionSummary {
     required this.title,
     required this.editorName,
     required this.createdAt,
+    this.fileName,
+    this.fileMimeType,
+    this.fileSizeBytes,
   });
 
   final String id;
@@ -14,4 +17,12 @@ class KnowledgeBaseArticleVersionSummary {
   final String title;
   final String editorName;
   final DateTime createdAt;
+
+  /// The file this version pointed at — null for a version of a written
+  /// article.
+  final String? fileName;
+  final String? fileMimeType;
+  final int? fileSizeBytes;
+
+  bool get hasFile => fileName != null;
 }

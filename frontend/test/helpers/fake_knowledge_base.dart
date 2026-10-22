@@ -1,7 +1,9 @@
+import 'dart:typed_data';
 import 'package:zera_erp/features/knowledge_base/domain/entities/knowledge_base_article.dart';
 import 'package:zera_erp/features/knowledge_base/domain/entities/knowledge_base_article_summary.dart';
 import 'package:zera_erp/features/knowledge_base/domain/entities/knowledge_base_article_version.dart';
 import 'package:zera_erp/features/knowledge_base/domain/entities/knowledge_base_article_version_summary.dart';
+import 'package:zera_erp/features/knowledge_base/domain/entities/knowledge_base_content_kind.dart';
 import 'package:zera_erp/features/knowledge_base/domain/entities/knowledge_base_visibility.dart';
 import 'package:zera_erp/features/knowledge_base/domain/repositories/knowledge_base_repository.dart';
 
@@ -21,6 +23,10 @@ KnowledgeBaseArticleSummary buildTestKnowledgeBaseArticleSummary({
   bool isArchived = false,
   DateTime? createdAt,
   DateTime? updatedAt,
+  String contentKind = KnowledgeBaseContentKind.richText,
+  String? fileName,
+  String? fileMimeType,
+  int? fileSizeBytes,
 }) {
   return KnowledgeBaseArticleSummary(
     id: id,
@@ -32,6 +38,10 @@ KnowledgeBaseArticleSummary buildTestKnowledgeBaseArticleSummary({
     isArchived: isArchived,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
     updatedAt: updatedAt ?? DateTime(2026, 1, 1),
+    contentKind: contentKind,
+    fileName: fileName,
+    fileMimeType: fileMimeType,
+    fileSizeBytes: fileSizeBytes,
   );
 }
 
@@ -48,6 +58,10 @@ KnowledgeBaseArticle buildTestKnowledgeBaseArticle({
   dynamic content,
   List<String> targetRoleIds = const [],
   List<String> targetDepartmentIds = const [],
+  String contentKind = KnowledgeBaseContentKind.richText,
+  String? fileName,
+  String? fileMimeType,
+  int? fileSizeBytes,
 }) {
   return KnowledgeBaseArticle(
     id: id,
@@ -59,9 +73,34 @@ KnowledgeBaseArticle buildTestKnowledgeBaseArticle({
     isArchived: isArchived,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
     updatedAt: updatedAt ?? DateTime(2026, 1, 1),
+    contentKind: contentKind,
+    fileName: fileName,
+    fileMimeType: fileMimeType,
+    fileSizeBytes: fileSizeBytes,
     content: content ?? _defaultContent,
     targetRoleIds: targetRoleIds,
     targetDepartmentIds: targetDepartmentIds,
+  );
+}
+
+/// An uploaded-file article (a PDF by default).
+KnowledgeBaseArticle buildTestKnowledgeBaseFileArticle({
+  String id = 'article-1',
+  String title = 'Leave Policy',
+  String fileName = 'Leave Policy.pdf',
+  String fileMimeType = 'application/pdf',
+  int fileSizeBytes = 2048,
+  String visibilityType = KnowledgeBaseVisibility.everyone,
+}) {
+  return buildTestKnowledgeBaseArticle(
+    id: id,
+    title: title,
+    content: const [],
+    visibilityType: visibilityType,
+    contentKind: KnowledgeBaseContentKind.file,
+    fileName: fileName,
+    fileMimeType: fileMimeType,
+    fileSizeBytes: fileSizeBytes,
   );
 }
 
@@ -71,6 +110,9 @@ KnowledgeBaseArticleVersionSummary buildTestKnowledgeBaseArticleVersionSummary({
   String title = 'Onboarding SOP',
   String editorName = 'Jane Doe',
   DateTime? createdAt,
+  String? fileName,
+  String? fileMimeType,
+  int? fileSizeBytes,
 }) {
   return KnowledgeBaseArticleVersionSummary(
     id: id,
@@ -78,6 +120,9 @@ KnowledgeBaseArticleVersionSummary buildTestKnowledgeBaseArticleVersionSummary({
     title: title,
     editorName: editorName,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
+    fileName: fileName,
+    fileMimeType: fileMimeType,
+    fileSizeBytes: fileSizeBytes,
   );
 }
 
@@ -88,6 +133,9 @@ KnowledgeBaseArticleVersion buildTestKnowledgeBaseArticleVersion({
   String editorName = 'Jane Doe',
   DateTime? createdAt,
   dynamic content,
+  String? fileName,
+  String? fileMimeType,
+  int? fileSizeBytes,
 }) {
   return KnowledgeBaseArticleVersion(
     id: id,
@@ -95,6 +143,9 @@ KnowledgeBaseArticleVersion buildTestKnowledgeBaseArticleVersion({
     title: title,
     editorName: editorName,
     createdAt: createdAt ?? DateTime(2026, 1, 1),
+    fileName: fileName,
+    fileMimeType: fileMimeType,
+    fileSizeBytes: fileSizeBytes,
     content: content ?? _defaultContent,
   );
 }
@@ -110,6 +161,7 @@ class FakeKnowledgeBaseRepository implements KnowledgeBaseRepository {
     this.createArticleError,
     this.updateArticleError,
     this.getArticleError,
+    this.downloadError,
   });
 
   final List<KnowledgeBaseArticleSummary> articles;
@@ -121,6 +173,9 @@ class FakeKnowledgeBaseRepository implements KnowledgeBaseRepository {
   final Object? createArticleError;
   final Object? updateArticleError;
   final Object? getArticleError;
+
+  /// Thrown by both file downloads when set.
+  final Object? downloadError;
 
   String? lastCreatedTitle;
   dynamic lastCreatedContent;
@@ -135,6 +190,22 @@ class FakeKnowledgeBaseRepository implements KnowledgeBaseRepository {
   List<String>? lastUpdatedTargetRoleIds;
   List<String>? lastUpdatedTargetDepartmentIds;
   bool? lastUpdatedIsArchived;
+
+  // File-article calls.
+  String? lastFileCreatedTitle;
+  String? lastFileCreatedFileName;
+  Uint8List? lastFileCreatedBytes;
+  String? lastFileCreatedVisibilityType;
+  List<String>? lastFileCreatedTargetRoleIds;
+  String? lastReplacedId;
+  String? lastReplacedFileName;
+  String? lastReplacedTitle;
+  String? lastDownloadedArticleId;
+  String? lastDownloadedVersionArticleId;
+  String? lastDownloadedVersionId;
+
+  /// What the download methods return.
+  final Uint8List downloadedBytes = Uint8List.fromList([1, 2, 3]);
 
   @override
   Future<List<KnowledgeBaseArticleSummary>> getArticles({
@@ -173,6 +244,58 @@ class FakeKnowledgeBaseRepository implements KnowledgeBaseRepository {
     lastCreatedTargetDepartmentIds = targetDepartmentIds;
     if (createArticleError != null) throw createArticleError!;
     return createArticleResult ?? buildTestKnowledgeBaseArticle(title: title);
+  }
+
+  @override
+  Future<KnowledgeBaseArticle> createFileArticle({
+    required String title,
+    required Uint8List bytes,
+    required String fileName,
+    required String visibilityType,
+    List<String>? targetRoleIds,
+    List<String>? targetDepartmentIds,
+  }) async {
+    lastFileCreatedTitle = title;
+    lastFileCreatedFileName = fileName;
+    lastFileCreatedBytes = bytes;
+    lastFileCreatedVisibilityType = visibilityType;
+    lastFileCreatedTargetRoleIds = targetRoleIds;
+    if (createArticleError != null) throw createArticleError!;
+    return createArticleResult ??
+        buildTestKnowledgeBaseFileArticle(title: title, fileName: fileName);
+  }
+
+  @override
+  Future<KnowledgeBaseArticle> replaceArticleFile(
+    String id, {
+    required Uint8List bytes,
+    required String fileName,
+    String? title,
+  }) async {
+    lastReplacedId = id;
+    lastReplacedFileName = fileName;
+    lastReplacedTitle = title;
+    if (updateArticleError != null) throw updateArticleError!;
+    return updateArticleResult ??
+        buildTestKnowledgeBaseFileArticle(id: id, fileName: fileName);
+  }
+
+  @override
+  Future<Uint8List> downloadArticleFile(String articleId) async {
+    lastDownloadedArticleId = articleId;
+    if (downloadError != null) throw downloadError!;
+    return downloadedBytes;
+  }
+
+  @override
+  Future<Uint8List> downloadVersionFile(
+    String articleId,
+    String versionId,
+  ) async {
+    lastDownloadedVersionArticleId = articleId;
+    lastDownloadedVersionId = versionId;
+    if (downloadError != null) throw downloadError!;
+    return downloadedBytes;
   }
 
   @override

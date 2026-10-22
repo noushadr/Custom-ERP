@@ -5,6 +5,7 @@ import '../../../../shared/utils/date_format.dart';
 import '../../application/knowledge_base_providers.dart';
 import '../../domain/exceptions/knowledge_base_exception.dart';
 import '../widgets/knowledge_base_content_view.dart';
+import '../widgets/knowledge_base_file_card.dart';
 
 /// A single past version's content — read-only, exactly as it was saved at
 /// that point. No restore/rollback action, since editing always builds on
@@ -59,7 +60,17 @@ class KnowledgeBaseVersionPage extends ConsumerWidget {
                   const SizedBox(height: 20),
                   const Divider(color: AppColors.borderSubtle),
                   const SizedBox(height: 20),
-                  KnowledgeBaseContentView(content: version.content),
+                  if (version.hasFile)
+                    KnowledgeBaseFileCard(
+                      fileName: version.fileName!,
+                      mimeType: version.fileMimeType,
+                      sizeBytes: version.fileSizeBytes,
+                      load: () => ref
+                          .read(knowledgeBaseRepositoryProvider)
+                          .downloadVersionFile(articleId, versionId),
+                    )
+                  else
+                    KnowledgeBaseContentView(content: version.content),
                 ],
               ),
             ),

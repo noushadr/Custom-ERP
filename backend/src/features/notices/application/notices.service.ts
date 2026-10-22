@@ -11,6 +11,10 @@ import {
 } from '../../employee/domain/repositories/employee-repository.interface';
 import { Notice } from '../domain/entities/notice.entity';
 import {
+  NoticeDisplayDuration,
+  expiryDateFor,
+} from '../domain/enums/notice-display-duration.enum';
+import {
   NOTICE_REPOSITORY,
   type NoticeRepository,
 } from '../domain/repositories/notice-repository.interface';
@@ -28,7 +32,14 @@ export class NoticesService {
     private readonly userRepository: UserRepository,
   ) {}
 
-  findAll(): Promise<Notice[]> {
+  /** What staff see: notices that haven't expired yet. */
+  findActive(): Promise<Notice[]> {
+    return this.noticeRepository.findActive(new Date());
+  }
+
+  /** For whoever manages notices, so an expired one can still be edited,
+   * brought back, or deleted. */
+  findAllIncludingExpired(): Promise<Notice[]> {
     return this.noticeRepository.findAll();
   }
 
@@ -44,6 +55,10 @@ export class NoticesService {
     notice.body = dto.body;
     notice.authorUserId = actorUserId;
     notice.authorName = authorName;
+    notice.expiresAt = expiryDateFor(
+      dto.displayDuration ?? NoticeDisplayDuration.ALWAYS,
+      new Date(),
+    );
 
     return this.noticeRepository.save(notice);
   }
@@ -52,7 +67,13 @@ export class NoticesService {
     const notice = await this.noticeRepository.findById(id);
     if (!notice) throw new NotFoundException('Notice not found');
 
-    Object.assign(notice, definedFieldsOnly(dto));
+    // `displayDuration` isn't a column — it's turned into `expiresAt`, counted
+    // from now, so picking a duration on an expired notice brings it back.
+    const { displayDuration, ...fields } = dto;
+    Object.assign(notice, definedFieldsOnly(fields));
+    if (displayDuration !== undefined) {
+      notice.expiresAt = expiryDateFor(displayDuration, new Date());
+    }
     return this.noticeRepository.save(notice);
   }
 

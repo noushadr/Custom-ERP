@@ -7,6 +7,7 @@ class NoticeModel extends Notice {
     required super.body,
     required super.authorName,
     required super.createdAt,
+    super.expiresAt,
   });
 
   factory NoticeModel.fromJson(Map<String, dynamic> json) => NoticeModel(
@@ -15,5 +16,8 @@ class NoticeModel extends Notice {
     body: json['body'] as String,
     authorName: json['authorName'] as String,
     createdAt: DateTime.parse(json['createdAt'] as String),
+    expiresAt: json['expiresAt'] == null
+        ? null
+        : DateTime.parse(json['expiresAt'] as String),
   );
 }

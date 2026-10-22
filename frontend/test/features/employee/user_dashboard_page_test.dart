@@ -13,6 +13,7 @@ import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
 import 'package:zera_erp/features/notices/domain/entities/notice.dart';
+import 'package:zera_erp/features/notices/domain/entities/notice_display_duration.dart';
 import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
 import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
@@ -297,6 +298,119 @@ void main() {
     expect(noticeRepository.lastUpdatedId, 'notice-1');
     expect(noticeRepository.lastUpdatedTitle, 'Office closed early');
     expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  group('notice display duration', () {
+    const manager = AuthUser(
+      id: 'user-1',
+      email: 'jane.doe@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: ['notices.manage'],
+    );
+
+    Notice notice({String id = 'notice-1', DateTime? expiresAt}) => Notice(
+      id: id,
+      title: 'Notice $id',
+      body: 'Body $id',
+      authorName: 'HR Team',
+      createdAt: DateTime(2026, 1, 1),
+      expiresAt: expiresAt,
+    );
+
+    testWidgets('editing without touching "Show for" keeps the end date', (
+      tester,
+    ) async {
+      final repository = FakeNoticeRepository(notices: [notice()]);
+      await tester.pumpWidget(
+        _app(viewer: manager, noticeRepository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Edit notice'));
+      await tester.pumpAndSettle();
+      expect(find.text('Keep current'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedId, 'notice-1');
+      expect(repository.lastUpdatedDuration, isNull);
+    });
+
+    testWidgets('editing can restart the window with a chosen duration', (
+      tester,
+    ) async {
+      final repository = FakeNoticeRepository(notices: [notice()]);
+      await tester.pumpWidget(
+        _app(viewer: manager, noticeRepository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Edit notice'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Keep current'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('1 week').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastUpdatedDuration, NoticeDisplayDuration.oneWeek);
+    });
+
+    testWidgets(
+      'a manager sees expired notices flagged and can still edit them',
+      (tester) async {
+        final repository = FakeNoticeRepository(
+          notices: [notice(id: 'old', expiresAt: DateTime(2020, 1, 1))],
+        );
+        await tester.pumpWidget(
+          _app(viewer: manager, noticeRepository: repository),
+        );
+        await tester.pumpAndSettle();
+
+        expect(repository.lastIncludeExpired, isTrue);
+        expect(find.text('Notice old'), findsOneWidget);
+        expect(find.textContaining('Expired'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a manager is told whether a live notice is timed or always shown',
+      (tester) async {
+        final repository = FakeNoticeRepository(
+          notices: [
+            notice(id: 'timed', expiresAt: DateTime(2999, 1, 1)),
+            notice(id: 'forever'),
+          ],
+        );
+        await tester.pumpWidget(
+          _app(viewer: manager, noticeRepository: repository),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('Shown until'), findsOneWidget);
+        expect(find.text('Always shown'), findsOneWidget);
+      },
+    );
+
+    testWidgets('staff never see expired notices or the duration line', (
+      tester,
+    ) async {
+      final repository = FakeNoticeRepository(
+        notices: [
+          notice(id: 'old', expiresAt: DateTime(2020, 1, 1)),
+          notice(id: 'live', expiresAt: DateTime(2999, 1, 1)),
+        ],
+      );
+      await tester.pumpWidget(_app(noticeRepository: repository));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastIncludeExpired, isFalse);
+      expect(find.text('Notice old'), findsNothing);
+      expect(find.text('Notice live'), findsOneWidget);
+      expect(find.textContaining('Shown until'), findsNothing);
+      expect(find.textContaining('Expired'), findsNothing);
+    });
   });
 
   testWidgets('only highlights the newest notice; older ones are muted', (

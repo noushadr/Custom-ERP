@@ -16,4 +16,11 @@ export class Notice extends BaseEntity {
    * stays readable even if that person is later renamed or removed. */
   @Column()
   authorName: string;
+
+  /** When the notice stops showing to staff; null means it never expires.
+   * Set by the server from a preset (see NoticeDisplayDuration), not by the
+   * client. Nullable, so every notice posted before this existed stays
+   * visible exactly as before. */
+  @Column({ type: 'timestamptz', nullable: true })
+  expiresAt: Date | null;
 }

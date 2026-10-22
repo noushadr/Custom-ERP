@@ -168,6 +168,12 @@ export class LeaveController {
     );
   }
 
+  @Get('balances')
+  @Permissions('leave.manage')
+  getAllEmployeeBalances() {
+    return this.leaveService.getAllEmployeeBalances();
+  }
+
   // Must come after "mine"/"mine/history" above — otherwise those literal
   // segments would be captured as the :employeeId param instead.
   @Get('balances/:employeeId')

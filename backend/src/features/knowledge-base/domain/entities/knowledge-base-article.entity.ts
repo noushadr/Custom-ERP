@@ -2,6 +2,7 @@ import { Column, Entity, JoinTable, ManyToMany } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { Department } from '../../../departments/domain/entities/department.entity';
 import { Role } from '../../../authentication/domain/entities/role.entity';
+import { KnowledgeBaseContentKind } from '../enums/knowledge-base-content-kind.enum';
 import { KnowledgeBaseVisibility } from '../enums/knowledge-base-visibility.enum';
 
 /** The current, live state of a Knowledge Base article. Every edit that
@@ -18,6 +19,33 @@ export class KnowledgeBaseArticle extends BaseEntity {
    * interpretation of its structure. */
   @Column({ type: 'jsonb' })
   content: unknown;
+
+  /** Written in the rich-text editor, or an uploaded file. Fixed at creation.
+   * For a FILE article `content` is just an empty Delta and the `file*`
+   * columns below describe the upload. */
+  @Column({
+    type: 'enum',
+    enum: KnowledgeBaseContentKind,
+    enumName: 'knowledge_base_content_kind_enum',
+    default: KnowledgeBaseContentKind.RICH_TEXT,
+  })
+  contentKind: KnowledgeBaseContentKind;
+
+  /** The name the uploaded file had (shown to readers and used for the
+   * download). Null for written articles. */
+  @Column({ type: 'varchar', nullable: true })
+  fileName: string | null;
+
+  /** Server-generated UUID file name under the private KB storage folder —
+   * never a user-supplied path. */
+  @Column({ type: 'varchar', nullable: true })
+  storedFileName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  fileMimeType: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  fileSizeBytes: number | null;
 
   @Column({ type: 'enum', enum: KnowledgeBaseVisibility })
   visibilityType: KnowledgeBaseVisibility;

@@ -8,6 +8,9 @@ class KnowledgeBaseArticleVersionSummaryModel
     required super.title,
     required super.editorName,
     required super.createdAt,
+    super.fileName,
+    super.fileMimeType,
+    super.fileSizeBytes,
   });
 
   factory KnowledgeBaseArticleVersionSummaryModel.fromJson(
@@ -18,5 +21,8 @@ class KnowledgeBaseArticleVersionSummaryModel
     title: json['title'] as String,
     editorName: json['editorName'] as String,
     createdAt: DateTime.parse(json['createdAt'] as String),
+    fileName: json['fileName'] as String?,
+    fileMimeType: json['fileMimeType'] as String?,
+    fileSizeBytes: json['fileSizeBytes'] as int?,
   );
 }

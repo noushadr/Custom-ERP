@@ -10,7 +10,7 @@ describe('AnnouncementsService', () => {
     Pick<EmployeesService, 'getUpcomingBirthdays' | 'getUpcomingWorkAnniversaries'>
   >;
   let holidaysService: jest.Mocked<Pick<HolidaysService, 'getAll'>>;
-  let noticesService: jest.Mocked<Pick<NoticesService, 'findAll'>>;
+  let noticesService: jest.Mocked<Pick<NoticesService, 'findActive'>>;
   let requestsService: jest.Mocked<
     Pick<RequestsService, 'getCurrentEmployeeOfTheMonth'>
   >;
@@ -21,7 +21,7 @@ describe('AnnouncementsService', () => {
       getUpcomingWorkAnniversaries: jest.fn().mockResolvedValue([]),
     };
     holidaysService = { getAll: jest.fn().mockResolvedValue([]) };
-    noticesService = { findAll: jest.fn().mockResolvedValue([]) };
+    noticesService = { findActive: jest.fn().mockResolvedValue([]) };
     requestsService = { getCurrentEmployeeOfTheMonth: jest.fn() };
 
     service = new AnnouncementsService(

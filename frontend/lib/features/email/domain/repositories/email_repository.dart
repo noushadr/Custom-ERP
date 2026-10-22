@@ -56,10 +56,7 @@ abstract interface class EmailRepository {
   /// Gmail-style conversations grouped across Inbox + Sent by subject.
   /// Scoped to the last [monthsBack] months and capped at [limit]
   /// conversations.
-  Future<List<EmailThread>> listThreads({
-    int monthsBack = 6,
-    int limit = 200,
-  });
+  Future<List<EmailThread>> listThreads({int monthsBack = 6, int limit = 200});
 
   /// Every message in one conversation, oldest first, with full bodies.
   Future<EmailThreadDetail> getThread(String threadId, {int monthsBack = 6});

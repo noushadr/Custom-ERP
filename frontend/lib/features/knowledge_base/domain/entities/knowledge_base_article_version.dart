@@ -8,6 +8,9 @@ class KnowledgeBaseArticleVersion extends KnowledgeBaseArticleVersionSummary {
     required super.title,
     required super.editorName,
     required super.createdAt,
+    super.fileName,
+    super.fileMimeType,
+    super.fileSizeBytes,
     required this.content,
   });
 

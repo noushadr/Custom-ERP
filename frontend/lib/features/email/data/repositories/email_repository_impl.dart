@@ -123,17 +123,14 @@ class EmailRepositoryImpl implements EmailRepository {
     int monthsBack = 6,
     int limit = 200,
   }) => _guard(
-    () =>
-        _remoteDataSource.listThreads(monthsBack: monthsBack, limit: limit),
+    () => _remoteDataSource.listThreads(monthsBack: monthsBack, limit: limit),
   );
 
   @override
-  Future<EmailThreadDetail> getThread(
-    String threadId, {
-    int monthsBack = 6,
-  }) => _guard(
-    () => _remoteDataSource.getThread(threadId, monthsBack: monthsBack),
-  );
+  Future<EmailThreadDetail> getThread(String threadId, {int monthsBack = 6}) =>
+      _guard(
+        () => _remoteDataSource.getThread(threadId, monthsBack: monthsBack),
+      );
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

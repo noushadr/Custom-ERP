@@ -1,4 +1,5 @@
 import '../../domain/entities/knowledge_base_article.dart';
+import '../../domain/entities/knowledge_base_content_kind.dart';
 
 class KnowledgeBaseArticleModel extends KnowledgeBaseArticle {
   const KnowledgeBaseArticleModel({
@@ -11,6 +12,10 @@ class KnowledgeBaseArticleModel extends KnowledgeBaseArticle {
     required super.isArchived,
     required super.createdAt,
     required super.updatedAt,
+    super.contentKind,
+    super.fileName,
+    super.fileMimeType,
+    super.fileSizeBytes,
     required super.content,
     required super.targetRoleIds,
     required super.targetDepartmentIds,
@@ -27,6 +32,11 @@ class KnowledgeBaseArticleModel extends KnowledgeBaseArticle {
         isArchived: json['isArchived'] as bool,
         createdAt: DateTime.parse(json['createdAt'] as String),
         updatedAt: DateTime.parse(json['updatedAt'] as String),
+        contentKind:
+            json['contentKind'] as String? ?? KnowledgeBaseContentKind.richText,
+        fileName: json['fileName'] as String?,
+        fileMimeType: json['fileMimeType'] as String?,
+        fileSizeBytes: json['fileSizeBytes'] as int?,
         content: json['content'],
         targetRoleIds: (json['targetRoleIds'] as List<dynamic>? ?? [])
             .cast<String>(),

@@ -18,6 +18,7 @@ import '../../helpers/fake_leave.dart';
 Widget _app(
   FakeLeaveRepository leaveRepository, {
   bool isDepartmentHead = true,
+  String initialScope = 'team',
 }) {
   return ProviderScope(
     overrides: [
@@ -39,8 +40,12 @@ Widget _app(
         ),
       ),
     ],
-    child: const MaterialApp(
-      home: Scaffold(body: SingleChildScrollView(child: LeaveCalendarView())),
+    child: MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: LeaveCalendarView(initialScope: initialScope),
+        ),
+      ),
     ),
   );
 }
@@ -77,6 +82,20 @@ void main() {
     expect(find.text('Babar'), findsOneWidget);
     expect(leaveRepository.lastCalendarScope, 'team');
   });
+
+  testWidgets(
+    'a department head can open straight on the Company scope (as the dashboard does)',
+    (tester) async {
+      await _useTallSurface(tester);
+      final leaveRepository = FakeLeaveRepository();
+      await tester.pumpWidget(_app(leaveRepository, initialScope: 'company'));
+      await tester.pumpAndSettle();
+
+      // Never queried the team scope, and the toggle is still there to switch.
+      expect(leaveRepository.lastCalendarScope, 'company');
+      expect(find.text('My Team'), findsOneWidget);
+    },
+  );
 
   testWidgets('switching to Company scope refetches with the new scope', (
     tester,

@@ -7,3 +7,9 @@ void downloadBytes(
     'File download is only implemented for the web build.',
   );
 }
+
+bool openBytesInNewTab(List<int> bytes, {required String mimeType}) {
+  throw UnsupportedError(
+    'Opening a file is only implemented for the web build.',
+  );
+}

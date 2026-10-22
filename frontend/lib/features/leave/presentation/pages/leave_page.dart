@@ -12,6 +12,7 @@ import '../../application/leave_providers.dart';
 import '../../domain/entities/leave_request.dart';
 import '../../domain/exceptions/leave_exception.dart';
 import '../utils/leave_format_utils.dart';
+import '../widgets/all_employees_leave_section.dart';
 import '../widgets/leave_balances_section.dart';
 import '../widgets/leave_calendar_view.dart';
 import '../../../../shared/widgets/app_dialog.dart';
@@ -48,6 +49,8 @@ class LeavePage extends ConsumerWidget {
                   const _OnLeaveStatCard(),
                   const SizedBox(height: 16),
                   const _ApplyLeaveForEmployeeSection(),
+                  const SizedBox(height: 16),
+                  const AllEmployeesLeaveSection(),
                   const SizedBox(height: 16),
                 ],
                 if (!isSuperAdmin) ...[
@@ -458,11 +461,25 @@ class _EmployeeBalancesPreview extends ConsumerWidget {
         padding: EdgeInsets.symmetric(vertical: 4),
         child: LinearProgressIndicator(),
       ),
-      error: (_, _) => Text(
-        'Could not load their leave balances.',
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+      // A failed load used to be a dead end (the error stayed cached until the
+      // dialog was reopened) — HR could see no balance and had no way to try
+      // again — so offer a one-tap retry.
+      error: (_, _) => Row(
+        children: [
+          Flexible(
+            child: Text(
+              'Could not load their leave balances.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () =>
+                ref.invalidate(employeeLeaveBalancesProvider(employeeId)),
+            child: const Text('Retry'),
+          ),
+        ],
       ),
       data: (balances) {
         if (balances.isEmpty) {

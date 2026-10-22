@@ -5,6 +5,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { isAllowedOrigin } from './core/security/cors-origin.util';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -27,10 +28,17 @@ async function bootstrap() {
   // Never wide-open: falls back to the local Flutter-web dev origin when
   // CORS_ORIGIN isn't set, rather than defaulting to "*".
   const corsOrigin = config.get<string>('corsOrigin');
+  const allowedOrigins = corsOrigin
+    ? corsOrigin.split(',').map((origin) => origin.trim())
+    : ['http://localhost:5050'];
+  const allowPrivateNetwork =
+    config.get<boolean>('corsAllowPrivateNetwork') ?? false;
   app.enableCors({
-    origin: corsOrigin
-      ? corsOrigin.split(',').map((origin) => origin.trim())
-      : 'http://localhost:5050',
+    origin: (origin, callback) =>
+      callback(
+        null,
+        isAllowedOrigin(origin, { allowedOrigins, allowPrivateNetwork }),
+      ),
   });
   app.useGlobalPipes(
     new ValidationPipe({

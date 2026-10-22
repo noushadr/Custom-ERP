@@ -22,7 +22,9 @@ import 'package:zera_erp/features/holidays/application/holiday_providers.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
 import 'package:zera_erp/features/leads/application/leads_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
+import 'package:zera_erp/features/leave/presentation/widgets/leave_calendar_view.dart';
 import 'package:zera_erp/features/notices/application/notice_providers.dart';
+import 'package:zera_erp/features/notices/domain/entities/notice_display_duration.dart';
 import 'package:zera_erp/features/notifications/application/notifications_providers.dart';
 import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
 import 'package:zera_erp/features/performance_reviews/application/performance_review_providers.dart';
@@ -64,6 +66,8 @@ Widget _authenticatedApp({
   FakePayrollRepository? payrollRepository,
   FakeAnnouncementsRepository? announcementsRepository,
   FakeHolidayRepository? holidayRepository,
+  FakeLeaveRepository? leaveRepository,
+  FakeNoticeRepository? noticeRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -77,7 +81,9 @@ Widget _authenticatedApp({
               payrollSummary: payrollSummary,
             ),
       ),
-      noticeRepositoryProvider.overrideWithValue(FakeNoticeRepository()),
+      noticeRepositoryProvider.overrideWithValue(
+        noticeRepository ?? FakeNoticeRepository(),
+      ),
       announcementsRepositoryProvider.overrideWithValue(
         announcementsRepository ?? FakeAnnouncementsRepository(),
       ),
@@ -87,7 +93,9 @@ Widget _authenticatedApp({
       requestRepositoryProvider.overrideWithValue(
         requestRepository ?? FakeRequestRepository(),
       ),
-      leaveRepositoryProvider.overrideWithValue(FakeLeaveRepository()),
+      leaveRepositoryProvider.overrideWithValue(
+        leaveRepository ?? FakeLeaveRepository(),
+      ),
       performanceReviewRepositoryProvider.overrideWithValue(
         performanceReviewRepository ?? FakePerformanceReviewRepository(),
       ),
@@ -343,6 +351,45 @@ void main() {
   );
 
   testWidgets(
+    'posting a notice defaults to Always and can be set to a shorter time',
+    (WidgetTester tester) async {
+      const admin = AuthUser(
+        id: 'admin-1',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: [],
+      );
+      final repository = FakeNoticeRepository();
+
+      await tester.pumpWidget(
+        _authenticatedApp(user: admin, noticeRepository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Post notice'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Post notice'));
+      await tester.pumpAndSettle();
+      expect(find.text('Always'), findsOneWidget);
+
+      await tester.enterText(find.widgetWithText(TextFormField, 'Title'), 'Hi');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Message'),
+        'Hello team',
+      );
+      await tester.tap(find.text('Always'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('1 month').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Post'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastCreatedTitle, 'Hi');
+      expect(repository.lastCreatedDuration, NoticeDisplayDuration.oneMonth);
+    },
+  );
+
+  testWidgets(
     "admin dashboard shows 'No Employee of the Month right now.' when none "
     'is currently active',
     (WidgetTester tester) async {
@@ -499,6 +546,81 @@ void main() {
   });
 
   testWidgets(
+    'admin dashboard shows the all-employees leave table for a leave.manage '
+    'holder',
+    (WidgetTester tester) async {
+      const hr = AuthUser(
+        id: 'hr-1',
+        email: 'hr@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: ['leave.manage'],
+      );
+
+      await tester.pumpWidget(
+        _authenticatedApp(
+          user: hr,
+          leaveRepository: FakeLeaveRepository(
+            employeeOverviews: [
+              buildTestEmployeeLeaveOverview(
+                employeeName: 'Babar Hussain',
+                balances: [
+                  buildTestLeaveBalance(
+                    leaveTypeName: 'Casual Leave',
+                    allocated: 10,
+                    used: 3,
+                    remaining: 7,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text("All Employees' Leave"), findsOneWidget);
+      expect(find.text('Babar Hussain'), findsOneWidget);
+      expect(find.text('7 / 10'), findsOneWidget);
+    },
+  );
+
+  testWidgets('admin dashboard shows the company leave calendar', (
+    WidgetTester tester,
+  ) async {
+    const admin = AuthUser(
+      id: 'admin-1',
+      email: 'admin@zeracreative.com',
+      role: 'Super Admin',
+      permissions: [],
+    );
+    final leaveRepository = FakeLeaveRepository();
+
+    await tester.pumpWidget(
+      _authenticatedApp(user: admin, leaveRepository: leaveRepository),
+    );
+    await tester.pumpAndSettle();
+
+    // The Leaves page also embeds one, but it's offstage in the nav stack.
+    expect(find.byType(LeaveCalendarView), findsOneWidget);
+    expect(leaveRepository.lastCalendarScope, 'company');
+  });
+
+  testWidgets('admin dashboard hides the all-employees leave table without '
+      'leave.manage', (WidgetTester tester) async {
+    const admin = AuthUser(
+      id: 'admin-1',
+      email: 'admin@zeracreative.com',
+      role: 'Super Admin',
+      permissions: [],
+    );
+
+    await tester.pumpWidget(_authenticatedApp(user: admin));
+    await tester.pumpAndSettle();
+
+    expect(find.text("All Employees' Leave"), findsNothing);
+  });
+
+  testWidgets(
     'admin dashboard shows a company-wide Tasks summary: total, pending/in '
     'progress, and done',
     (WidgetTester tester) async {
@@ -528,12 +650,21 @@ void main() {
 
       // "Tasks" also appears as a nav label — the summary card's own labels
       // below are unambiguous instead.
-      expect(find.text('Total'), findsOneWidget);
-      expect(find.text('6'), findsOneWidget);
+      // The leave calendar on the same dashboard has day numbers ("6",
+      // "3", "2"...), so the counts are looked up inside the Tasks card only.
+      final tasksCard = find.ancestor(
+        of: find.text('Pending / In Progress'),
+        matching: find.byType(Card),
+      );
+      Finder inCard(String text) =>
+          find.descendant(of: tasksCard, matching: find.text(text));
+
+      expect(inCard('Total'), findsOneWidget);
+      expect(inCard('6'), findsOneWidget);
       expect(find.text('Pending / In Progress'), findsOneWidget);
-      expect(find.text('3'), findsOneWidget);
-      expect(find.text('Done'), findsOneWidget);
-      expect(find.text('2'), findsOneWidget);
+      expect(inCard('3'), findsOneWidget);
+      expect(inCard('Done'), findsOneWidget);
+      expect(inCard('2'), findsOneWidget);
     },
   );
 

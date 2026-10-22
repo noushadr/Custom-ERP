@@ -7,6 +7,7 @@ import '../../../authentication/application/auth_state.dart';
 import '../../application/knowledge_base_providers.dart';
 import '../../domain/entities/knowledge_base_article.dart';
 import '../widgets/knowledge_base_content_view.dart';
+import '../widgets/knowledge_base_file_card.dart';
 import 'knowledge_base_editor_page.dart';
 import 'knowledge_base_version_history_page.dart';
 
@@ -77,13 +78,13 @@ class KnowledgeBaseArticlePage extends ConsumerWidget {
   }
 }
 
-class _ArticleBody extends StatelessWidget {
+class _ArticleBody extends ConsumerWidget {
   const _ArticleBody({required this.article});
 
   final KnowledgeBaseArticle article;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -118,7 +119,17 @@ class _ArticleBody extends StatelessWidget {
           const SizedBox(height: 20),
           const Divider(color: AppColors.borderSubtle),
           const SizedBox(height: 20),
-          KnowledgeBaseContentView(content: article.content),
+          if (article.isFile && article.fileName != null)
+            KnowledgeBaseFileCard(
+              fileName: article.fileName!,
+              mimeType: article.fileMimeType,
+              sizeBytes: article.fileSizeBytes,
+              load: () => ref
+                  .read(knowledgeBaseRepositoryProvider)
+                  .downloadArticleFile(article.id),
+            )
+          else
+            KnowledgeBaseContentView(content: article.content),
         ],
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../domain/entities/notice.dart';
+import '../../domain/entities/notice_display_duration.dart';
 import '../../domain/exceptions/notice_exception.dart';
 import '../../domain/repositories/notice_repository.dart';
 import '../datasources/notice_remote_data_source.dart';
@@ -10,15 +11,36 @@ class NoticeRepositoryImpl implements NoticeRepository {
   final NoticeRemoteDataSource _remoteDataSource;
 
   @override
-  Future<List<Notice>> getAll() => _guard(() => _remoteDataSource.getAll());
+  Future<List<Notice>> getAll({bool includeExpired = false}) =>
+      _guard(() => _remoteDataSource.getAll(includeExpired: includeExpired));
 
   @override
-  Future<Notice> create({required String title, required String body}) =>
-      _guard(() => _remoteDataSource.create(title: title, body: body));
+  Future<Notice> create({
+    required String title,
+    required String body,
+    NoticeDisplayDuration? displayDuration,
+  }) => _guard(
+    () => _remoteDataSource.create(
+      title: title,
+      body: body,
+      displayDuration: displayDuration,
+    ),
+  );
 
   @override
-  Future<Notice> update(String id, {String? title, String? body}) =>
-      _guard(() => _remoteDataSource.update(id, title: title, body: body));
+  Future<Notice> update(
+    String id, {
+    String? title,
+    String? body,
+    NoticeDisplayDuration? displayDuration,
+  }) => _guard(
+    () => _remoteDataSource.update(
+      id,
+      title: title,
+      body: body,
+      displayDuration: displayDuration,
+    ),
+  );
 
   @override
   Future<void> delete(String id) => _guard(() => _remoteDataSource.delete(id));

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../domain/repositories/leave_repository.dart';
+import '../models/employee_leave_overview_model.dart';
 import '../models/leave_balance_model.dart';
 import '../models/leave_calendar_entry_model.dart';
 import '../models/leave_request_model.dart';
@@ -207,6 +208,14 @@ class LeaveRemoteDataSource {
     return response.data!
         .cast<Map<String, dynamic>>()
         .map(LeaveBalanceModel.fromJson)
+        .toList();
+  }
+
+  Future<List<EmployeeLeaveOverviewModel>> getAllEmployeeBalances() async {
+    final response = await _dio.get<List<dynamic>>('/leave/balances');
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(EmployeeLeaveOverviewModel.fromJson)
         .toList();
   }
 

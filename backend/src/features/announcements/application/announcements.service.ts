@@ -41,7 +41,7 @@ export class AnnouncementsService {
         this.employeesService.getUpcomingBirthdays(0, 0),
         this.employeesService.getUpcomingWorkAnniversaries(0, 0),
         this.holidaysService.getAll(new Date().getFullYear()),
-        this.noticesService.findAll(),
+        this.noticesService.findActive(),
         this.requestsService.getCurrentEmployeeOfTheMonth(),
       ]);
 

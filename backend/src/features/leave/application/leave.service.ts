@@ -51,6 +51,7 @@ import {
   LEAVE_TYPE_REPOSITORY,
   type LeaveTypeRepository,
 } from '../domain/repositories/leave-type-repository.interface';
+import { EmployeeLeaveOverviewResponse } from './employee-leave-overview-response.interface';
 import { LeaveBalanceResponse } from './leave-balance-response.interface';
 import { LeaveCalendarEntry } from './leave-calendar-entry.interface';
 import { LeaveRequestResponse } from './leave-request-response.interface';
@@ -461,6 +462,57 @@ export class LeaveService {
     const employee = await this.employeeRepository.findById(employeeId);
     if (!employee) throw new NotFoundException('Employee not found');
     return this.buildBalanceHistory(employeeId);
+  }
+
+  /** Every active employee's current-year balance for every non-archived
+   * leave type, in three queries total (not one per employee) — a leave type
+   * with no balance row yet falls back to its annual allowance, same as
+   * [buildCurrentYearBalances]. */
+  async getAllEmployeeBalances(): Promise<EmployeeLeaveOverviewResponse[]> {
+    const year = new Date().getUTCFullYear();
+    const [employees, leaveTypes, yearBalances] = await Promise.all([
+      this.employeeRepository.findAll(),
+      this.leaveTypeRepository.findAll(false),
+      this.leaveBalanceRepository.findByYear(year),
+    ]);
+    const balanceByKey = new Map(
+      yearBalances.map((b) => [`${b.employeeId}:${b.leaveTypeId}`, b]),
+    );
+
+    return employees
+      .filter((e) => e.employmentStatus === EmploymentStatus.ACTIVE)
+      .map((employee) => {
+        const balances: LeaveBalanceResponse[] = leaveTypes.map((type) => {
+          const balance = balanceByKey.get(`${employee.id}:${type.id}`);
+          const allocated = Number(
+            balance?.allocated ?? type.annualAllowanceDays,
+          );
+          const used = Number(balance?.used ?? 0);
+          return {
+            leaveTypeId: type.id,
+            leaveTypeName: type.name,
+            colorHex: type.colorHex ?? null,
+            year,
+            allocated,
+            used,
+            remaining: allocated - used,
+          };
+        });
+        const sum = (pick: (b: LeaveBalanceResponse) => number) =>
+          balances.reduce((total, b) => total + pick(b), 0);
+        return {
+          employeeId: employee.id,
+          employeeCode: employee.employeeCode,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+          departmentName: employee.department?.name ?? null,
+          profilePhotoUrl: employee.profilePhotoUrl ?? null,
+          balances,
+          totalAllocated: sum((b) => b.allocated),
+          totalUsed: sum((b) => b.used),
+          totalRemaining: sum((b) => b.remaining),
+        };
+      })
+      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
   }
 
   async adjustBalance(

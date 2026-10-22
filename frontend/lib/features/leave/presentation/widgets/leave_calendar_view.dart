@@ -30,7 +30,12 @@ const _maxEntriesPerCell = 3;
 /// only meaningful for department heads, so its toggle is hidden for anyone
 /// else (including Super Admin, who has no department at all).
 class LeaveCalendarView extends ConsumerStatefulWidget {
-  const LeaveCalendarView({super.key});
+  const LeaveCalendarView({super.key, this.initialScope = 'team'});
+
+  /// Which scope a department head starts on ('team' or 'company'). Everyone
+  /// else is always on 'company', so this only matters for heads — the
+  /// dashboard passes 'company' so it shows the whole company's leave.
+  final String initialScope;
 
   @override
   ConsumerState<LeaveCalendarView> createState() => _LeaveCalendarViewState();
@@ -38,7 +43,7 @@ class LeaveCalendarView extends ConsumerStatefulWidget {
 
 class _LeaveCalendarViewState extends ConsumerState<LeaveCalendarView> {
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
-  String _scope = 'team';
+  late String _scope = widget.initialScope;
 
   void _shiftMonth(int delta) {
     setState(() => _month = DateTime(_month.year, _month.month + delta));

@@ -27,6 +27,12 @@ export default () => ({
   // Comma-separated list of allowed frontend origins. Falls back to the
   // local Flutter-web dev server when unset — never wide open by default.
   corsOrigin: process.env.CORS_ORIGIN,
+  // When true, any browser origin on localhost or a private-network address
+  // (192.168.x, 10.x, 172.16-31.x) may call the API, in addition to the
+  // explicit CORS_ORIGIN list — so an office LAN keeps working when the
+  // server PC's DHCP address changes. Off by default (a production server
+  // should list its real origin(s) only).
+  corsAllowPrivateNetwork: process.env.CORS_ALLOW_PRIVATE_NETWORK === 'true',
   // Mounts every route (and /uploads) under this path segment, e.g. 'api'
   // so the app owns yourdomain.com/api/* when reverse-proxied at a
   // subdirectory (cPanel's Node.js Selector forwards the full, unstripped

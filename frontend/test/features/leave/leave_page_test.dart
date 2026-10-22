@@ -199,6 +199,195 @@ void main() {
     },
   );
 
+  group('all employees leave table', () {
+    final overviews = [
+      buildTestEmployeeLeaveOverview(
+        employeeId: 'employee-1',
+        employeeCode: 'ZC-00001',
+        employeeName: 'Babar Hussain',
+        departmentName: 'SEO',
+        balances: [
+          buildTestLeaveBalance(
+            leaveTypeId: 'casual',
+            leaveTypeName: 'Casual Leave',
+            allocated: 10,
+            used: 3,
+            remaining: 7,
+          ),
+          buildTestLeaveBalance(
+            leaveTypeId: 'sick',
+            leaveTypeName: 'Sick Leave',
+            allocated: 8,
+            used: 8,
+            remaining: 0,
+          ),
+        ],
+      ),
+      buildTestEmployeeLeaveOverview(
+        employeeId: 'employee-2',
+        employeeCode: 'ZC-00002',
+        employeeName: 'Aamna Irfan',
+        departmentName: 'Design',
+        balances: [
+          buildTestLeaveBalance(
+            leaveTypeId: 'casual',
+            leaveTypeName: 'Casual Leave',
+            allocated: 10,
+            used: 0,
+            remaining: 10,
+          ),
+          buildTestLeaveBalance(
+            leaveTypeId: 'sick',
+            leaveTypeName: 'Sick Leave',
+            allocated: 8,
+            used: 2,
+            remaining: 6,
+          ),
+        ],
+      ),
+    ];
+
+    testWidgets(
+      'HR sees every employee with per-type remaining / total and overall '
+      'total and remaining counts',
+      (tester) async {
+        await _useTallSurface(tester);
+        await tester.pumpWidget(
+          _app(
+            role: 'HR/Manager',
+            permissions: const ['leave.manage'],
+            leaveRepository: FakeLeaveRepository(employeeOverviews: overviews),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text("All Employees' Leave"), findsOneWidget);
+        expect(find.text('Babar Hussain'), findsOneWidget);
+        expect(find.text('Aamna Irfan'), findsOneWidget);
+        expect(find.text('ZC-00001 · SEO'), findsOneWidget);
+        // One column per leave type, with "remaining / total" cells.
+        expect(find.text('Casual Leave'), findsOneWidget);
+        expect(find.text('Sick Leave'), findsOneWidget);
+        expect(find.text('7 / 10'), findsOneWidget);
+        expect(find.text('0 / 8'), findsOneWidget);
+        expect(find.text('10 / 10'), findsOneWidget);
+        expect(find.text('6 / 8'), findsOneWidget);
+        // Overall columns: Babar 18 total / 7 left, Aamna 18 total / 16 left.
+        expect(find.text('Total'), findsOneWidget);
+        expect(find.text('Remaining'), findsOneWidget);
+        Finder inTable(String text) => find.descendant(
+          of: find.byType(DataTable),
+          matching: find.text(text),
+        );
+        expect(inTable('7'), findsOneWidget);
+        expect(inTable('16'), findsOneWidget);
+        expect(inTable('18'), findsNWidgets(2));
+      },
+    );
+
+    testWidgets('is hidden from a viewer without leave.manage', (tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(leaveRepository: FakeLeaveRepository(employeeOverviews: overviews)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text("All Employees' Leave"), findsNothing);
+      expect(find.text('Babar Hussain'), findsNothing);
+    });
+
+    testWidgets('search narrows the table by name', (tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(
+          role: 'HR/Manager',
+          permissions: const ['leave.manage'],
+          leaveRepository: FakeLeaveRepository(employeeOverviews: overviews),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Search by name, code or department'),
+        'aamna',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aamna Irfan'), findsOneWidget);
+      expect(find.text('Babar Hussain'), findsNothing);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Search by name, code or department'),
+        'zzz',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No employees match "zzz".'), findsOneWidget);
+    });
+
+    testWidgets('shows an empty state when there are no active employees', (
+      tester,
+    ) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(
+        _app(role: 'HR/Manager', permissions: const ['leave.manage']),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No active employees yet.'), findsOneWidget);
+    });
+  });
+
+  testWidgets(
+    'a failed balance load in the Apply Leave dialog can be retried',
+    (tester) async {
+      await _useTallSurface(tester);
+      final leaveRepository = FakeLeaveRepository(
+        leaveTypes: [buildTestLeaveType(id: 'type-1', name: 'Casual Leave')],
+        myBalances: [
+          buildTestLeaveBalance(
+            leaveTypeName: 'Casual Leave',
+            allocated: 10,
+            used: 3,
+            remaining: 7,
+          ),
+        ],
+        employeeBalancesFailures: 1,
+      );
+      await tester.pumpWidget(
+        _app(
+          role: 'HR/Manager',
+          permissions: const ['leave.manage'],
+          leaveRepository: leaveRepository,
+          employeeRepository: FakeEmployeeRepository(
+            employees: [
+              buildTestEmployee(id: 'employee-1', fullName: 'Babar Hussain'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Apply Leave for Employee'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Babar Hussain').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not load their leave balances.'), findsOneWidget);
+      expect(find.text('Casual Leave: 7 left'), findsNothing);
+
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not load their leave balances.'), findsNothing);
+      expect(find.text('Casual Leave: 7 left'), findsOneWidget);
+    },
+  );
+
   testWidgets(
     'HR/Admin can apply already-approved leave directly for an employee, '
     'with no manager or HR approval step',

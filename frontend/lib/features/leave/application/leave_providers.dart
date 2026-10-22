@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../authentication/application/auth_providers.dart';
 import '../data/datasources/leave_remote_data_source.dart';
 import '../data/repositories/leave_repository_impl.dart';
+import '../domain/entities/employee_leave_overview.dart';
 import '../domain/entities/leave_balance.dart';
 import '../domain/entities/leave_calendar_entry.dart';
 import '../domain/entities/leave_request.dart';
@@ -42,6 +43,14 @@ final employeeLeaveBalancesProvider = FutureProvider.autoDispose
     .family<List<LeaveBalance>, String>((ref, employeeId) {
       ref.watch(authControllerProvider);
       return ref.watch(leaveRepositoryProvider).getEmployeeBalances(employeeId);
+    });
+
+/// Requires `leave.manage` — the HR/Admin "all employees' leave" table on the
+/// Leaves page. Gated by the caller, like [leaveResetStatusProvider].
+final allEmployeeLeaveOverviewProvider =
+    FutureProvider.autoDispose<List<EmployeeLeaveOverview>>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(leaveRepositoryProvider).getAllEmployeeBalances();
     });
 
 final myLeaveRequestsProvider = FutureProvider.autoDispose<List<LeaveRequest>>((

@@ -3,7 +3,8 @@ import '../../authentication/application/auth_providers.dart';
 import '../data/datasources/email_remote_data_source.dart';
 import '../data/repositories/email_repository_impl.dart';
 import '../domain/entities/email_account.dart';
-import '../domain/entities/inbox_message.dart' show EmailThread, EmailThreadDetail;
+import '../domain/entities/inbox_message.dart'
+    show EmailThread, EmailThreadDetail;
 import '../domain/repositories/email_repository.dart';
 
 final emailRemoteDataSourceProvider = Provider<EmailRemoteDataSource>(
@@ -36,6 +37,5 @@ final emailThreadsProvider = FutureProvider.autoDispose<List<EmailThread>>((
 
 final emailThreadDetailProvider = FutureProvider.autoDispose
     .family<EmailThreadDetail, String>(
-      (ref, threadId) =>
-          ref.watch(emailRepositoryProvider).getThread(threadId),
+      (ref, threadId) => ref.watch(emailRepositoryProvider).getThread(threadId),
     );

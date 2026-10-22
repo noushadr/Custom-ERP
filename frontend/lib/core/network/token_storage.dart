@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'browser_storage.dart';
 
 /// Holds the current session's tokens in memory for the lifetime of the app,
 /// and mirrors them to persistent secure storage only when the session
@@ -6,9 +7,25 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// session still works normally (API calls, silent refresh) until the app
 /// closes, but a fresh launch afterwards finds nothing to restore.
 class TokenStorage {
-  TokenStorage(this._storage);
+  TokenStorage(
+    this._storage, {
+    BrowserStorage? persistentFallback,
+    BrowserStorage? sessionFallback,
+  }) : _persistentFallback =
+           persistentFallback ?? createBrowserStorage(sessionOnly: false),
+       _sessionFallback =
+           sessionFallback ?? createBrowserStorage(sessionOnly: true);
 
   final FlutterSecureStorage _storage;
+
+  /// Used when secure storage is unavailable (plain-HTTP LAN address) so a
+  /// remembered login still survives a reload / closing the browser.
+  final BrowserStorage _persistentFallback;
+
+  /// Where a "don't remember me" login lives: survives a page reload (so
+  /// being signed in really does last the working day) but is gone when the
+  /// tab closes.
+  final BrowserStorage _sessionFallback;
 
   static const _accessTokenKey = 'auth_access_token';
   static const _refreshTokenKey = 'auth_refresh_token';
@@ -59,50 +76,82 @@ class TokenStorage {
 
     // Persisting is a nice-to-have (survives a page refresh/app restart) —
     // the in-memory copies above already make the session usable for the
-    // rest of this run, so a storage failure here (e.g. flutter_secure_
-    // storage's web backend needs a "secure context" — HTTPS or localhost —
-    // and throws when the app is reached over a plain-HTTP LAN address)
-    // must never block login or leave the caller waiting on a broken write.
-    try {
-      if (_rememberMe) {
+    // rest of this run, so a storage failure here must never block login or
+    // leave the caller waiting on a broken write.
+    //
+    //  - Remembered: secure storage; if that's unavailable (flutter_secure_
+    //    storage's web backend needs a "secure context" — HTTPS or localhost —
+    //    and throws over a plain-HTTP LAN address) plain localStorage instead.
+    //  - Not remembered: sessionStorage only, so a reload doesn't sign the
+    //    user out but closing the tab does.
+    if (_rememberMe) {
+      final secureOk = await _trySecure(() async {
         await _storage.write(key: _accessTokenKey, value: accessToken);
         await _storage.write(key: _refreshTokenKey, value: refreshToken);
+      });
+      if (secureOk) {
+        _deleteFrom(_persistentFallback);
       } else {
+        _persistentFallback.write(_accessTokenKey, accessToken);
+        _persistentFallback.write(_refreshTokenKey, refreshToken);
+      }
+      _deleteFrom(_sessionFallback);
+    } else {
+      await _trySecure(() async {
         await _storage.delete(key: _accessTokenKey);
         await _storage.delete(key: _refreshTokenKey);
-      }
-    } catch (_) {
-      // Session still works for this run via the in-memory tokens; it just
-      // won't be restored after a refresh/restart.
+      });
+      _deleteFrom(_persistentFallback);
+      _sessionFallback.write(_accessTokenKey, accessToken);
+      _sessionFallback.write(_refreshTokenKey, refreshToken);
     }
   }
 
   Future<String?> get accessToken async =>
-      _inMemoryAccessToken ?? await _readSafely(_accessTokenKey);
+      _inMemoryAccessToken ?? await _readPersisted(_accessTokenKey);
 
   Future<String?> get refreshToken async =>
-      _inMemoryRefreshToken ?? await _readSafely(_refreshTokenKey);
+      _inMemoryRefreshToken ?? await _readPersisted(_refreshTokenKey);
 
-  /// Same "storage is a nice-to-have" reasoning as [saveTokens]/[clear] — no
-  /// persisted token is indistinguishable from "storage isn't available
-  /// here" as far as the caller needs to know: both just mean start signed
-  /// out instead of leaving `restoreSession` hanging on a broken read.
-  Future<String?> _readSafely(String key) async {
+  /// Secure storage first, then the browser fallbacks — no persisted token
+  /// anywhere is indistinguishable from "storage isn't available here" as
+  /// far as the caller needs to know: both just mean start signed out
+  /// instead of leaving `restoreSession` hanging on a broken read.
+  Future<String?> _readPersisted(String key) async {
     try {
-      return await _storage.read(key: key);
+      final secure = await _storage.read(key: key);
+      if (secure != null) return secure;
     } catch (_) {
-      return null;
+      // Fall through to the browser fallbacks.
     }
+    return _persistentFallback.read(key) ?? _sessionFallback.read(key);
+  }
+
+  /// Runs a secure-storage operation, reporting whether it worked.
+  Future<bool> _trySecure(Future<void> Function() operation) async {
+    try {
+      await operation();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _deleteFrom(BrowserStorage storage) {
+    storage.delete(_accessTokenKey);
+    storage.delete(_refreshTokenKey);
   }
 
   Future<void> clear() async {
     _inMemoryAccessToken = null;
     _inMemoryRefreshToken = null;
-    try {
+    // Already cleared in memory, which is what actually gates auth state —
+    // a failure to wipe the persisted copies mustn't surface as an error.
+    await _trySecure(() async {
       await _storage.delete(key: _accessTokenKey);
       await _storage.delete(key: _refreshTokenKey);
-    } catch (_) {
-      // Already cleared in memory, which is what actually gates auth state.
-    }
+    });
+    _deleteFrom(_persistentFallback);
+    _deleteFrom(_sessionFallback);
   }
 }

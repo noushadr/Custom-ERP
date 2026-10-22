@@ -10,12 +10,26 @@ import { Department } from '../../departments/domain/entities/department.entity'
 import type { DepartmentRepository } from '../../departments/domain/repositories/department-repository.interface';
 import { Employee } from '../../employee/domain/entities/employee.entity';
 import type { EmployeeRepository } from '../../employee/domain/repositories/employee-repository.interface';
+import { existsSync } from 'fs';
+import { unlink } from 'fs/promises';
 import { KnowledgeBaseArticleVersion } from '../domain/entities/knowledge-base-article-version.entity';
 import { KnowledgeBaseArticle } from '../domain/entities/knowledge-base-article.entity';
+import { KnowledgeBaseContentKind } from '../domain/enums/knowledge-base-content-kind.enum';
 import { KnowledgeBaseVisibility } from '../domain/enums/knowledge-base-visibility.enum';
 import type { KnowledgeBaseArticleVersionRepository } from '../domain/repositories/knowledge-base-article-version-repository.interface';
 import type { KnowledgeBaseArticleRepository } from '../domain/repositories/knowledge-base-article-repository.interface';
 import { KnowledgeBaseService } from './knowledge-base.service';
+
+// `fs` namespaces are read-only under TS interop, so jest.spyOn can't patch
+// them — mock the two functions the service touches instead.
+jest.mock('fs', () => ({
+  ...jest.requireActual<typeof import('fs')>('fs'),
+  existsSync: jest.fn(),
+}));
+jest.mock('fs/promises', () => ({
+  ...jest.requireActual<typeof import('fs/promises')>('fs/promises'),
+  unlink: jest.fn(),
+}));
 
 function buildRole(overrides: Partial<Role> = {}): Role {
   return { id: 'role-1', name: 'Team Lead', ...overrides } as Role;
@@ -373,6 +387,254 @@ describe('KnowledgeBaseService', () => {
       );
 
       expect(result.content).toEqual({ ops: [{ insert: 'hello' }] });
+    });
+  });
+
+  describe('file articles', () => {
+    function buildUpload(
+      overrides: Partial<Express.Multer.File> = {},
+    ): Express.Multer.File {
+      return {
+        originalname: 'Leave Policy.pdf',
+        filename: 'stored-uuid.pdf',
+        path: '/storage/knowledge-base/stored-uuid.pdf',
+        mimetype: 'application/pdf',
+        size: 2048,
+        ...overrides,
+      } as Express.Multer.File;
+    }
+
+    function buildFileArticle(
+      overrides: Partial<KnowledgeBaseArticle> = {},
+    ): KnowledgeBaseArticle {
+      return buildArticle({
+        contentKind: KnowledgeBaseContentKind.FILE,
+        content: [],
+        fileName: 'Leave Policy.pdf',
+        storedFileName: 'stored-uuid.pdf',
+        fileMimeType: 'application/pdf',
+        fileSizeBytes: 2048,
+        ...overrides,
+      });
+    }
+
+    let unlinkSpy: jest.Mock;
+
+    beforeEach(() => {
+      unlinkSpy = unlink as unknown as jest.Mock;
+      unlinkSpy.mockReset().mockResolvedValue(undefined);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ firstName: 'Author', lastName: 'Person' }),
+      );
+    });
+
+    it('creates a file article with the file details and a first version pointing at it', async () => {
+      articleRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildFileArticle({ id })),
+      );
+
+      await service.createFileArticle(
+        { title: 'Leave Policy', visibilityType: KnowledgeBaseVisibility.EVERYONE },
+        buildUpload(),
+        'author-user-1',
+      );
+
+      const saved = articleRepository.save.mock.calls[0][0];
+      expect(saved.contentKind).toBe(KnowledgeBaseContentKind.FILE);
+      expect(saved.content).toEqual([]);
+      expect(saved.fileName).toBe('Leave Policy.pdf');
+      expect(saved.storedFileName).toBe('stored-uuid.pdf');
+      expect(saved.fileSizeBytes).toBe(2048);
+      const version = versionRepository.save.mock.calls[0][0];
+      expect(version.versionNumber).toBe(1);
+      expect(version.storedFileName).toBe('stored-uuid.pdf');
+      expect(unlinkSpy).not.toHaveBeenCalled();
+    });
+
+    it('serves the type implied by the extension, not the one the browser claimed', async () => {
+      articleRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildFileArticle({ id })),
+      );
+
+      await service.createFileArticle(
+        { title: 'Sneaky', visibilityType: KnowledgeBaseVisibility.EVERYONE },
+        buildUpload({ mimetype: 'text/html' }),
+        'author-user-1',
+      );
+
+      expect(articleRepository.save.mock.calls[0][0].fileMimeType).toBe(
+        'application/pdf',
+      );
+    });
+
+    it('rejects an unsupported extension and removes the uploaded file', async () => {
+      const upload = buildUpload({
+        originalname: 'page.html',
+        path: '/storage/knowledge-base/x.html',
+      });
+
+      await expect(
+        service.createFileArticle(
+          { title: 'Bad', visibilityType: KnowledgeBaseVisibility.EVERYONE },
+          upload,
+          'author-user-1',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(articleRepository.save).not.toHaveBeenCalled();
+      expect(unlinkSpy).toHaveBeenCalledWith(upload.path);
+    });
+
+    it('removes the uploaded file when the targeting is invalid', async () => {
+      const upload = buildUpload();
+
+      await expect(
+        service.createFileArticle(
+          { title: 'Roles only', visibilityType: KnowledgeBaseVisibility.ROLES },
+          upload,
+          'author-user-1',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(unlinkSpy).toHaveBeenCalledWith(upload.path);
+    });
+
+    it('refuses written content on an uploaded-file article', async () => {
+      articleRepository.findById.mockResolvedValue(buildFileArticle());
+
+      await expect(
+        service.updateArticle(
+          'article-1',
+          { content: { ops: [{ insert: 'x' }] } },
+          'editor-user-1',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(articleRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('keeps pointing a retitled file article at the same file in the new version', async () => {
+      articleRepository.findById.mockResolvedValue(buildFileArticle());
+
+      await service.updateArticle(
+        'article-1',
+        { title: 'Leave Policy 2026' },
+        'editor-user-1',
+      );
+
+      const version = versionRepository.save.mock.calls[0][0];
+      expect(version.versionNumber).toBe(2);
+      expect(version.title).toBe('Leave Policy 2026');
+      expect(version.storedFileName).toBe('stored-uuid.pdf');
+    });
+
+    it('replaces the file, bumps the version and keeps the old file on disk', async () => {
+      articleRepository.findById.mockResolvedValue(buildFileArticle());
+
+      await service.replaceFile(
+        'article-1',
+        buildUpload({
+          originalname: 'Leave Policy v2.docx',
+          filename: 'new-uuid.docx',
+          size: 4096,
+        }),
+        {},
+        'editor-user-1',
+      );
+
+      const saved = articleRepository.save.mock.calls[0][0];
+      expect(saved.versionNumber).toBe(2);
+      expect(saved.fileName).toBe('Leave Policy v2.docx');
+      expect(saved.storedFileName).toBe('new-uuid.docx');
+      expect(saved.fileMimeType).toBe(
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+      expect(versionRepository.save.mock.calls[0][0].storedFileName).toBe(
+        'new-uuid.docx',
+      );
+      // The previous file belongs to version 1 and must still exist.
+      expect(unlinkSpy).not.toHaveBeenCalled();
+    });
+
+    it('will not replace the file of a written article, and discards the upload', async () => {
+      articleRepository.findById.mockResolvedValue(buildArticle());
+      const upload = buildUpload();
+
+      await expect(
+        service.replaceFile('article-1', upload, {}, 'editor-user-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(unlinkSpy).toHaveBeenCalledWith(upload.path);
+    });
+
+    describe('downloads', () => {
+      beforeEach(() => {
+        (existsSync as jest.Mock).mockReturnValue(true);
+      });
+
+      it('returns the file for a viewer the article is visible to', async () => {
+        articleRepository.findById.mockResolvedValue(buildFileArticle());
+        employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+
+        const download = await service.getFileForActor('article-1', 'user-1', false);
+
+        expect(download.fileName).toBe('Leave Policy.pdf');
+        expect(download.mimeType).toBe('application/pdf');
+        expect(download.absolutePath).toContain('stored-uuid.pdf');
+      });
+
+      it('is forbidden for a viewer outside the targeted roles — knowing the id is not enough', async () => {
+        articleRepository.findById.mockResolvedValue(
+          buildFileArticle({
+            visibilityType: KnowledgeBaseVisibility.ROLES,
+            targetRoles: [buildRole({ id: 'r-hr', name: 'HR/Manager' })],
+          }),
+        );
+        employeeRepository.findByUserId.mockResolvedValue(
+          buildEmployee({ user: { role: buildRole({ name: 'Employee' }) } } as never),
+        );
+
+        await expect(
+          service.getFileForActor('article-1', 'user-1', false),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      it('404s for a written article, which has no file', async () => {
+        articleRepository.findById.mockResolvedValue(buildArticle());
+
+        await expect(
+          service.getFileForActor('article-1', 'user-1', true),
+        ).rejects.toBeInstanceOf(NotFoundException);
+      });
+
+      it('serves an old version its own file, not the current one', async () => {
+        articleRepository.findById.mockResolvedValue(buildFileArticle());
+        versionRepository.findById.mockResolvedValue(
+          buildVersion({
+            id: 'version-1',
+            fileName: 'Old.pdf',
+            storedFileName: 'old-uuid.pdf',
+            fileMimeType: 'application/pdf',
+          }),
+        );
+
+        const download = await service.getVersionFileForActor(
+          'article-1',
+          'version-1',
+          'user-1',
+          true,
+        );
+
+        expect(download.fileName).toBe('Old.pdf');
+        expect(download.absolutePath).toContain('old-uuid.pdf');
+      });
+
+      it('404s when the file has gone missing from disk', async () => {
+        (existsSync as jest.Mock).mockReturnValue(false);
+        articleRepository.findById.mockResolvedValue(buildFileArticle());
+
+        await expect(
+          service.getFileForActor('article-1', 'user-1', true),
+        ).rejects.toBeInstanceOf(NotFoundException);
+      });
     });
   });
 });

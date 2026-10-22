@@ -1,3 +1,4 @@
+import '../entities/employee_leave_overview.dart';
 import '../entities/leave_balance.dart';
 import '../entities/leave_calendar_entry.dart';
 import '../entities/leave_request.dart';
@@ -77,6 +78,10 @@ abstract interface class LeaveRepository {
 
   /// Requires `leave.manage`.
   Future<List<LeaveBalance>> getEmployeeBalances(String employeeId);
+
+  /// Every active employee's current-year balances (all leave types) plus
+  /// totals — requires `leave.manage`.
+  Future<List<EmployeeLeaveOverview>> getAllEmployeeBalances();
 
   /// Requires `leave.manage`.
   Future<LeaveBalance> adjustBalance(
