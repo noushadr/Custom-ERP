@@ -32,9 +32,7 @@ Widget _app({required bool withLinkedEmployee}) {
       ),
     ],
     child: MaterialApp(
-      home: Scaffold(
-        body: UserMenu(onSignOut: () {}),
-      ),
+      home: Scaffold(body: UserMenu(onSignOut: () {})),
     ),
   );
 }
@@ -77,6 +75,31 @@ void main() {
     expect(find.byType(EditMyProfilePage), findsNothing);
   });
 
+  testWidgets('Change password sits above Sign out and opens the dialog', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(withLinkedEmployee: false));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Account menu'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(find.text('Change password')).dy,
+      lessThan(tester.getTopLeft(find.text('Sign out')).dy),
+    );
+
+    await tester.tap(find.text('Change password'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.widgetWithText(TextFormField, 'Current password'),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Change password'));
+    await tester.pumpAndSettle();
+    expect(find.text('Required'), findsOneWidget);
+  });
+
   testWidgets('Sign out still works', (tester) async {
     var signedOut = false;
     final user = AuthUser(
@@ -97,9 +120,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
-          home: Scaffold(
-            body: UserMenu(onSignOut: () => signedOut = true),
-          ),
+          home: Scaffold(body: UserMenu(onSignOut: () => signedOut = true)),
         ),
       ),
     );

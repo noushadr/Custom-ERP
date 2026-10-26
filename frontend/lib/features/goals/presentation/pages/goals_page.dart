@@ -420,6 +420,7 @@ class _GoalCard extends ConsumerWidget {
                     child: LinearProgressIndicator(
                       value: goal.achievementPercentage / 100,
                       minHeight: 6,
+                      color: goalProgressColor(goal.achievementPercentage),
                       backgroundColor: AppColors.borderSubtle,
                     ),
                   ),
@@ -429,7 +430,7 @@ class _GoalCard extends ConsumerWidget {
                   '${goal.achievementPercentage}%',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: goalProgressColor(goal.achievementPercentage),
                   ),
                 ),
               ],
@@ -771,11 +772,13 @@ class _EditGoalDialogState extends ConsumerState<_EditGoalDialog> {
                     '$_achievementPercentage%',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
+                      color: goalProgressColor(_achievementPercentage),
                     ),
                   ),
                 ],
               ),
               Slider(
+                activeColor: goalProgressColor(_achievementPercentage),
                 value: _achievementPercentage.toDouble(),
                 min: 0,
                 max: 100,
@@ -860,15 +863,59 @@ class _EmployeePicker extends ConsumerWidget {
     ]);
   }
 
+  /// A type-to-search field (shows everyone on focus, narrows as you type)
+  /// rather than a dropdown — a company has too many people to scroll.
+  /// Editing the text after picking someone clears the selection, so a
+  /// half-edited name can never submit as the previous person.
   Widget _dropdown(List<(String, String)> items) {
-    return DropdownButtonFormField<String>(
-      initialValue: selectedEmployeeId,
-      decoration: const InputDecoration(labelText: 'Employee'),
-      items: [
-        for (final (id, name) in items)
-          DropdownMenuItem(value: id, child: Text(name)),
-      ],
-      onChanged: enabled ? onChanged : null,
+    return Autocomplete<(String, String)>(
+      displayStringForOption: (option) => option.$2,
+      optionsBuilder: (value) {
+        final query = value.text.trim().toLowerCase();
+        return items.where(
+          (item) => query.isEmpty || item.$2.toLowerCase().contains(query),
+        );
+      },
+      onSelected: (option) => onChanged(option.$1),
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        return TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          enabled: enabled,
+          decoration: const InputDecoration(
+            labelText: 'Employee',
+            hintText: 'Search by name',
+            suffixIcon: Icon(Icons.search, size: 18),
+          ),
+          onChanged: (_) {
+            if (selectedEmployeeId != null) onChanged(null);
+          },
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240, maxWidth: 380),
+              child: ListView(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                children: [
+                  for (final option in options)
+                    ListTile(
+                      dense: true,
+                      title: Text(option.$2),
+                      onTap: () => onSelected(option),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -905,4 +952,14 @@ class _DepartmentPicker extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// One colour per quarter of progress — 0-24 red, 25-49 amber, 50-74 blue,
+/// 75-100 green — so how far along a goal is reads at a glance.
+@visibleForTesting
+Color goalProgressColor(int percentage) {
+  if (percentage >= 75) return AppColors.success;
+  if (percentage >= 50) return AppColors.secondary;
+  if (percentage >= 25) return AppColors.warning;
+  return AppColors.error;
 }

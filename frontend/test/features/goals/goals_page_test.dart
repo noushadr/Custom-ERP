@@ -7,6 +7,7 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/department.dart';
 import 'package:zera_erp/features/goals/application/goal_providers.dart';
+import 'package:zera_erp/core/theme/app_colors.dart';
 import 'package:zera_erp/features/goals/presentation/pages/goals_page.dart';
 
 import '../../helpers/fake_auth.dart';
@@ -45,6 +46,17 @@ Widget _app({
 }
 
 void main() {
+  test('goal progress changes colour every 25%', () {
+    expect(goalProgressColor(0), AppColors.error);
+    expect(goalProgressColor(24), AppColors.error);
+    expect(goalProgressColor(25), AppColors.warning);
+    expect(goalProgressColor(49), AppColors.warning);
+    expect(goalProgressColor(50), AppColors.secondary);
+    expect(goalProgressColor(74), AppColors.secondary);
+    expect(goalProgressColor(75), AppColors.success);
+    expect(goalProgressColor(100), AppColors.success);
+  });
+
   testWidgets(
     'a plain employee sees My Goals and can add a goal for themselves with no approval',
     (tester) async {
@@ -104,6 +116,44 @@ void main() {
     },
   );
 
+  testWidgets('typing in the Employee field narrows the list to matches', (
+    tester,
+  ) async {
+    final goalRepository = FakeGoalRepository();
+    await tester.pumpWidget(
+      _app(
+        permissions: ['goals.manage'],
+        goalRepository: goalRepository,
+        employeeRepository: FakeEmployeeRepository(
+          employees: [
+            buildTestEmployee(id: 'employee-2', fullName: 'Aamna Irfan'),
+            buildTestEmployee(id: 'employee-3', fullName: 'Zahra Khan'),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add Goal'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Employee'),
+      'zah',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(ListTile, 'Zahra Khan'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, 'Aamna Irfan'), findsNothing);
+
+    await tester.tap(find.widgetWithText(ListTile, 'Zahra Khan'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Goal'), 'Learn');
+    await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+    await tester.pumpAndSettle();
+
+    expect(goalRepository.lastCreatedEmployeeId, 'employee-3');
+  });
+
   testWidgets(
     'an Admin/HR holder sees All Goals and can add a goal for one employee',
     (tester) async {
@@ -133,9 +183,7 @@ void main() {
       expect(find.text('Individual'), findsOneWidget);
       expect(find.text('Whole department'), findsOneWidget);
 
-      await tester.tap(
-        find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
-      );
+      await tester.tap(find.widgetWithText(TextFormField, 'Employee'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Aamna Irfan').last);
       await tester.pumpAndSettle();
@@ -259,9 +307,7 @@ void main() {
       await tester.tap(find.text('Add Goal'));
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
-      );
+      await tester.tap(find.widgetWithText(TextFormField, 'Employee'));
       await tester.pumpAndSettle();
       expect(find.text('Myself'), findsOneWidget);
       await tester.tap(find.text('Babar Hussain').last);
@@ -280,9 +326,7 @@ void main() {
       await tester.tap(find.text('Add Goal'));
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.widgetWithText(DropdownButtonFormField<String>, 'Employee'),
-      );
+      await tester.tap(find.widgetWithText(TextFormField, 'Employee'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Myself').last);
       await tester.pumpAndSettle();

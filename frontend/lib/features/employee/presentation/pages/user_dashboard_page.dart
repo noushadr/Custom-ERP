@@ -5,8 +5,7 @@ import '../../../../shared/models/named_ref.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/responsive_card_row.dart';
-import '../../../authentication/application/auth_providers.dart';
-import '../../../authentication/domain/exceptions/auth_exception.dart';
+import '../../../authentication/presentation/widgets/change_password_dialog.dart';
 import '../../../goals/application/goal_providers.dart';
 import '../../../leave/presentation/widgets/leave_balances_section.dart';
 import '../../../payroll/presentation/widgets/payslip_list_section.dart';
@@ -21,7 +20,6 @@ import '../widgets/company_notices_section.dart';
 import '../widgets/employee_avatar.dart';
 import '../widgets/employee_status_badges.dart';
 import 'employee_profile_page.dart';
-import '../../../../shared/widgets/app_dialog.dart';
 
 class UserDashboardPage extends ConsumerWidget {
   const UserDashboardPage({super.key});
@@ -126,7 +124,7 @@ class _ProfileSummaryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: () => _showChangePasswordDialog(context),
+                      onPressed: () => showChangePasswordDialog(context),
                       icon: const Icon(Icons.password, size: 16),
                       label: const Text('Change password'),
                     ),
@@ -272,130 +270,6 @@ class _ReportingManagerChip extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-void _showChangePasswordDialog(BuildContext context) {
-  showAppDialog<void>(
-    context: context,
-    builder: (_) => const _ChangePasswordDialog(),
-  );
-}
-
-class _ChangePasswordDialog extends ConsumerStatefulWidget {
-  const _ChangePasswordDialog();
-
-  @override
-  ConsumerState<_ChangePasswordDialog> createState() =>
-      _ChangePasswordDialogState();
-}
-
-class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _currentController = TextEditingController();
-  final _newController = TextEditingController();
-  final _confirmController = TextEditingController();
-  bool _submitting = false;
-  String? _errorMessage;
-
-  @override
-  void dispose() {
-    _currentController.dispose();
-    _newController.dispose();
-    _confirmController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _submitting = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await ref
-          .read(authControllerProvider.notifier)
-          .changePassword(_currentController.text, _newController.text);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Password changed.')));
-    } on AuthException catch (error) {
-      setState(() => _errorMessage = error.message);
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Change password'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_errorMessage != null) ...[
-              Text(
-                _errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-              const SizedBox(height: 12),
-            ],
-            TextFormField(
-              controller: _currentController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Current password'),
-              validator: (value) =>
-                  (value == null || value.isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _newController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'New password'),
-              validator: (value) {
-                if (value == null || value.length < 8) {
-                  return 'Must be at least 8 characters';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _confirmController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Confirm new password',
-              ),
-              validator: (value) =>
-                  value != _newController.text ? "Passwords don't match" : null,
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _submitting ? null : _submit,
-          child: _submitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Change password'),
-        ),
-      ],
     );
   }
 }

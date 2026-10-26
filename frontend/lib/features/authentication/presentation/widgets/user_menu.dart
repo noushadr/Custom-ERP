@@ -8,8 +8,9 @@ import '../../../employee/presentation/pages/edit_my_profile_page.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
+import 'change_password_dialog.dart';
 
-enum _UserMenuAction { editProfile, signOut }
+enum _UserMenuAction { editProfile, changePassword, signOut }
 
 /// Avatar + dropdown shown in the top bar of the authenticated shell.
 class UserMenu extends ConsumerWidget {
@@ -95,6 +96,7 @@ class _UserMenuButton extends StatelessWidget {
             builder: (_) => EditMyProfilePage(employee: employee!),
           ),
         ),
+        _UserMenuAction.changePassword => showChangePasswordDialog(context),
         _UserMenuAction.signOut => onSignOut(),
       },
       itemBuilder: (context) => [
@@ -123,6 +125,16 @@ class _UserMenuButton extends StatelessWidget {
               Icon(Icons.edit_outlined, size: 20),
               SizedBox(width: 12),
               Text('Edit profile'),
+            ],
+          ),
+        ),
+        const PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.changePassword,
+          child: Row(
+            children: [
+              Icon(Icons.lock_outline, size: 20),
+              SizedBox(width: 12),
+              Text('Change password'),
             ],
           ),
         ),
