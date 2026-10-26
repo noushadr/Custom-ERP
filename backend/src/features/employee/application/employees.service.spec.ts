@@ -1064,6 +1064,9 @@ describe('EmployeesService', () => {
 
   describe('getWorkAnniversarySpotlight', () => {
     it('includes every anniversary in the same month as the soonest one, excludes a later month', async () => {
+      // Pinned to early in a month: "+5" and "+8" days must land in the same
+      // calendar month, which they don't near a month's end.
+      jest.useFakeTimers({ now: new Date('2026-10-05T10:00:00Z') });
       const soon = buildEmployee({
         id: 'employee-soon',
         joiningDate: isoJoiningDateAnniversaryInDays(2, 5),
@@ -1088,6 +1091,7 @@ describe('EmployeesService', () => {
         'employee-soon',
         'employee-same-month',
       ]);
+      jest.useRealTimers();
     });
 
     it('returns an empty list when nobody has an upcoming anniversary', async () => {

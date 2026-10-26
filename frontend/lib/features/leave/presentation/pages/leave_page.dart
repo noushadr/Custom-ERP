@@ -13,6 +13,7 @@ import '../../domain/entities/leave_request.dart';
 import '../../domain/exceptions/leave_exception.dart';
 import '../utils/leave_format_utils.dart';
 import '../widgets/all_employees_leave_section.dart';
+import '../widgets/existing_leaves_notice.dart';
 import '../widgets/leave_balances_section.dart';
 import '../widgets/leave_calendar_view.dart';
 import '../../../../shared/widgets/app_dialog.dart';
@@ -411,6 +412,11 @@ class _ApplyLeaveForEmployeeDialogState
                   holidayDates: holidayDates,
                 ),
               ],
+              ExistingLeavesNotice(
+                employeeId: _employeeId,
+                startDate: _startDate,
+                endDate: _endDate,
+              ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _reasonController,
@@ -866,6 +872,11 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
                   holidayDates: holidayDates,
                 ),
               ],
+              ExistingLeavesNotice(
+                employeeId: ref.watch(myProfileProvider).valueOrNull?.id,
+                startDate: _startDate,
+                endDate: _endDate,
+              ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _reasonController,

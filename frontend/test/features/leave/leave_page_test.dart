@@ -288,7 +288,9 @@ void main() {
     testWidgets('is hidden from a viewer without leave.manage', (tester) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(
-        _app(leaveRepository: FakeLeaveRepository(employeeOverviews: overviews)),
+        _app(
+          leaveRepository: FakeLeaveRepository(employeeOverviews: overviews),
+        ),
       );
       await tester.pumpAndSettle();
 

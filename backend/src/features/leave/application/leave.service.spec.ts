@@ -712,6 +712,26 @@ describe('LeaveService', () => {
       expect(result).toHaveLength(2);
     });
 
+    it('asks for requests still awaiting approval too, and flags them pending', async () => {
+      leaveRequestRepository.findByStatuses.mockResolvedValue([
+        buildLeaveRequest({ id: 'r1', status: LeaveRequestStatus.SUBMITTED }),
+        buildLeaveRequest({ id: 'r2', status: LeaveRequestStatus.APPROVED }),
+      ]);
+
+      const result = await service.getLeaveCalendar(
+        'user-1',
+        'company',
+        3,
+        2026,
+        false,
+      );
+
+      expect(leaveRequestRepository.findByStatuses).toHaveBeenCalledWith(
+        expect.arrayContaining([LeaveRequestStatus.SUBMITTED]),
+      );
+      expect(result.map((entry) => entry.isPending)).toEqual([true, false]);
+    });
+
     it('excludes requests outside the queried month', async () => {
       leaveRequestRepository.findByStatuses.mockResolvedValue([
         buildLeaveRequest({ startDate: '2026-04-01', endDate: '2026-04-05' }),

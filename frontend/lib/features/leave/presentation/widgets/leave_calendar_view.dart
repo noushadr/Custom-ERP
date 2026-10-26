@@ -6,6 +6,7 @@ import '../../../employee/domain/entities/department.dart';
 import '../../application/leave_providers.dart';
 import '../../domain/entities/leave_calendar_entry.dart';
 import '../utils/leave_format_utils.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 
 const _monthNames = [
   'January',
@@ -22,7 +23,7 @@ const _monthNames = [
   'December',
 ];
 const _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const _maxEntriesPerCell = 3;
+const _maxEntriesPerCell = 2;
 
 /// A custom-built month grid (no calendar package) showing who's on leave
 /// each day, scoped to the viewer's department or the whole company — lets
@@ -196,6 +197,7 @@ class _MonthGrid extends StatelessWidget {
             children: [
               for (var col = 0; col < 7; col++)
                 _dayCellFor(
+                  month: month,
                   row: row,
                   col: col,
                   leadingBlanks: leadingBlanks,
@@ -210,6 +212,7 @@ class _MonthGrid extends StatelessWidget {
 }
 
 Widget _dayCellFor({
+  required DateTime month,
   required int row,
   required int col,
   required int leadingBlanks,
@@ -221,6 +224,7 @@ Widget _dayCellFor({
   return Expanded(
     child: _DayCell(
       day: validDay,
+      month: month,
       entries: validDay == null
           ? const <LeaveCalendarEntry>[]
           : (byDay[validDay] ?? const <LeaveCalendarEntry>[]),
@@ -229,9 +233,14 @@ Widget _dayCellFor({
 }
 
 class _DayCell extends StatelessWidget {
-  const _DayCell({required this.day, required this.entries});
+  const _DayCell({
+    required this.day,
+    required this.month,
+    required this.entries,
+  });
 
   final int? day;
+  final DateTime month;
   final List<LeaveCalendarEntry> entries;
 
   @override
@@ -244,35 +253,109 @@ class _DayCell extends StatelessWidget {
     return Container(
       height: 76,
       margin: const EdgeInsets.all(2),
-      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.borderSubtle),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('$day', style: Theme.of(context).textTheme.labelSmall),
-          const SizedBox(height: 2),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final entry in shown) _EntryChip(entry: entry),
-                  if (overflow > 0)
-                    Text(
-                      '+$overflow more',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                ],
+      child: InkWell(
+        key: Key('leave-day-$day'),
+        borderRadius: BorderRadius.circular(6),
+        onTap: entries.isEmpty
+            ? null
+            : () => showAppDialog<void>(
+                context: context,
+                builder: (_) => _DayLeavesDialog(
+                  date: DateTime(month.year, month.month, day!),
+                  entries: entries,
+                ),
               ),
-            ),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('$day', style: Theme.of(context).textTheme.labelSmall),
+              const SizedBox(height: 2),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final entry in shown) _EntryChip(entry: entry),
+                      if (overflow > 0)
+                        Text(
+                          '+$overflow more',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+/// Everyone on leave on one day — the cell itself only has room for a few
+/// chips, so this is where "+N more" is actually readable.
+class _DayLeavesDialog extends StatelessWidget {
+  const _DayLeavesDialog({required this.date, required this.entries});
+
+  final DateTime date;
+  final List<LeaveCalendarEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        'On leave · ${_monthNames[date.month - 1]} ${date.day}, ${date.year}',
+      ),
+      content: SizedBox(
+        width: 380,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final entry in entries)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color:
+                              parseLeaveColor(entry.colorHex) ??
+                              AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${entry.employeeName} — ${entry.leaveTypeName}'
+                          '${entry.isPending ? ' (awaiting approval)' : ''}',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
     );
   }
 }

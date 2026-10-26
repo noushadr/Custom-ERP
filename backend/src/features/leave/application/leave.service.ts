@@ -662,6 +662,9 @@ export class LeaveService {
     const requests = await this.leaveRequestRepository.findByStatuses([
       LeaveRequestStatus.APPROVED,
       LeaveRequestStatus.MANAGER_APPROVED,
+      // Still awaiting the manager: shown as pending so nobody applies for
+      // dates that already have a request in flight.
+      LeaveRequestStatus.SUBMITTED,
     ]);
 
     let scoped = requests;
@@ -706,7 +709,7 @@ export class LeaveService {
             : (request.leaveType.colorHex ?? null),
         startDate: request.startDate,
         endDate: request.endDate,
-        isPending: request.status === LeaveRequestStatus.MANAGER_APPROVED,
+        isPending: request.status !== LeaveRequestStatus.APPROVED,
       }));
   }
 
