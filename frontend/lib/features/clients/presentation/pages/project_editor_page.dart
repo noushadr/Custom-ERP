@@ -1,3 +1,4 @@
+import '../../../../shared/utils/date_format.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -461,7 +462,7 @@ class _DateField extends StatelessWidget {
       onTap: onTap,
       child: InputDecorator(
         decoration: InputDecoration(labelText: label),
-        child: Text(value == null ? '—' : _isoDate(value!)),
+        child: Text(value == null ? '—' : formatDisplayDate(_isoDate(value!))),
       ),
     );
   }

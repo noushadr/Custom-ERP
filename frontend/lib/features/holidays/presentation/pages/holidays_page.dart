@@ -259,7 +259,11 @@ class _HolidayFormDialogState extends ConsumerState<_HolidayFormDialog> {
               OutlinedButton.icon(
                 onPressed: _saving ? null : _pickDate,
                 icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                label: Text(_date == null ? 'Pick a date' : _isoDate(_date!)),
+                label: Text(
+                  _date == null
+                      ? 'Pick a date'
+                      : formatDisplayDate(_isoDate(_date!)),
+                ),
               ),
             ],
           ),

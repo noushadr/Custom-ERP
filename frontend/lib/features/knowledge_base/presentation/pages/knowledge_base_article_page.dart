@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/date_format.dart';
+import '../../../../shared/widgets/app_dialog.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/knowledge_base_providers.dart';
 import '../../domain/entities/knowledge_base_article.dart';
 import '../widgets/knowledge_base_content_view.dart';
 import '../widgets/knowledge_base_file_card.dart';
+import '../../domain/exceptions/knowledge_base_exception.dart';
 import 'knowledge_base_editor_page.dart';
 import 'knowledge_base_version_history_page.dart';
 
@@ -59,6 +61,20 @@ class KnowledgeBaseArticlePage extends ConsumerWidget {
               ),
               orElse: () => const SizedBox.shrink(),
             ),
+          if (canManage)
+            articleAsync.maybeWhen(
+              data: (article) => TextButton.icon(
+                onPressed: () => _toggleArchive(context, ref, article),
+                icon: Icon(
+                  article.isArchived
+                      ? Icons.unarchive_outlined
+                      : Icons.archive_outlined,
+                  size: 18,
+                ),
+                label: Text(article.isArchived ? 'Unarchive' : 'Archive'),
+              ),
+              orElse: () => const SizedBox.shrink(),
+            ),
         ],
       ),
       body: Center(
@@ -75,6 +91,57 @@ class KnowledgeBaseArticlePage extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// Archiving hides an article from everyone but managers (who can show
+/// archived ones on the list) without deleting it or its version history;
+/// unarchiving puts it straight back.
+Future<void> _toggleArchive(
+  BuildContext context,
+  WidgetRef ref,
+  KnowledgeBaseArticle article,
+) async {
+  final archiving = !article.isArchived;
+  final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context);
+  if (archiving) {
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Archive article?'),
+        content: Text(
+          '"${article.title}" will be hidden from everyone except people who '
+          'manage the knowledge base. You can unarchive it any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Archive'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+  }
+  try {
+    await ref
+        .read(knowledgeBaseRepositoryProvider)
+        .updateArticle(article.id, isArchived: archiving);
+    ref.invalidate(knowledgeBaseArticlesProvider);
+    ref.invalidate(knowledgeBaseArticleProvider(article.id));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(archiving ? 'Article archived.' : 'Article unarchived.'),
+      ),
+    );
+    if (archiving) navigator.pop();
+  } on KnowledgeBaseException catch (error) {
+    messenger.showSnackBar(SnackBar(content: Text(error.message)));
   }
 }
 

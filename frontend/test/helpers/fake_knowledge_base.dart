@@ -200,6 +200,7 @@ class FakeKnowledgeBaseRepository implements KnowledgeBaseRepository {
   String? lastReplacedId;
   String? lastReplacedFileName;
   String? lastReplacedTitle;
+  bool? lastIncludeArchived;
   String? lastDownloadedArticleId;
   String? lastDownloadedVersionArticleId;
   String? lastDownloadedVersionId;
@@ -210,7 +211,12 @@ class FakeKnowledgeBaseRepository implements KnowledgeBaseRepository {
   @override
   Future<List<KnowledgeBaseArticleSummary>> getArticles({
     bool includeArchived = false,
-  }) async => articles;
+  }) async {
+    lastIncludeArchived = includeArchived;
+    return includeArchived
+        ? articles
+        : articles.where((article) => !article.isArchived).toList();
+  }
 
   @override
   Future<KnowledgeBaseArticle> getArticle(String id) async {

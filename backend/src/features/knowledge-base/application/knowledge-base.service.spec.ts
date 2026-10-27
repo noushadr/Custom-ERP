@@ -269,6 +269,19 @@ describe('KnowledgeBaseService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
+    it('hides an archived article from a normal viewer but not from a manager', async () => {
+      articleRepository.findById.mockResolvedValue(
+        buildArticle({ isArchived: true }),
+      );
+
+      await expect(
+        service.getArticleForActor('article-1', 'user-1', false),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.getArticleForActor('article-1', 'user-1', true),
+      ).resolves.toBeDefined();
+    });
+
     it('is forbidden for a viewer the article is not targeted at', async () => {
       articleRepository.findById.mockResolvedValue(
         buildArticle({

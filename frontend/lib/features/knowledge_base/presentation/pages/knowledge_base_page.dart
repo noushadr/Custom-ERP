@@ -14,16 +14,27 @@ import 'knowledge_base_editor_page.dart';
 /// The company wiki's home page: a single flat list of every article
 /// (company-internal scale, same reasoning as the Employee Directory and
 /// Notices lists not paginating either).
-class KnowledgeBasePage extends ConsumerWidget {
+class KnowledgeBasePage extends ConsumerStatefulWidget {
   const KnowledgeBasePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final articlesAsync = ref.watch(knowledgeBaseArticlesProvider(false));
+  ConsumerState<KnowledgeBasePage> createState() => _KnowledgeBasePageState();
+}
+
+class _KnowledgeBasePageState extends ConsumerState<KnowledgeBasePage> {
+  bool _showArchived = false;
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final canManage =
         authState is AuthAuthenticated &&
         authState.user.hasPermission('knowledge_base.manage');
+    // Archived articles are only ever requested (and honoured by the
+    // backend) for a manager who switched the toggle on.
+    final articlesAsync = ref.watch(
+      knowledgeBaseArticlesProvider(canManage && _showArchived),
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -34,17 +45,32 @@ class KnowledgeBasePage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (canManage) ...[
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const KnowledgeBaseEditorPage(),
-                      ),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 16,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Show archived'),
+                        Switch(
+                          value: _showArchived,
+                          onChanged: (value) =>
+                              setState(() => _showArchived = value),
+                        ),
+                      ],
                     ),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('New Article'),
-                  ),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const KnowledgeBaseEditorPage(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('New Article'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
               ],
@@ -144,9 +170,18 @@ class _ArticleRow extends StatelessWidget {
                         child: Text(
                           article.title,
                           style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: article.isArchived
+                                    ? AppColors.textSecondary
+                                    : null,
+                              ),
                         ),
                       ),
+                      if (article.isArchived) ...[
+                        const SizedBox(width: 8),
+                        const _ArchivedBadge(),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -163,6 +198,29 @@ class _ArticleRow extends StatelessWidget {
             ),
             const Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ArchivedBadge extends StatelessWidget {
+  const _ArchivedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.fieldFill,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        'Archived',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

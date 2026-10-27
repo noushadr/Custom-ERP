@@ -128,6 +128,9 @@ export class KnowledgeBaseService {
   ): Promise<KnowledgeBaseArticle> {
     const article = await this.getArticleOr404(id);
     if (!actorHasOverride) {
+      // Archived means gone for everyone but managers — by id as well as in
+      // the list, so a saved link or file URL stops working too.
+      if (article.isArchived) throw new NotFoundException('Article not found');
       const viewer = await this.resolveViewer(actorUserId);
       if (!this.isVisibleTo(article, viewer)) {
         throw new ForbiddenException(

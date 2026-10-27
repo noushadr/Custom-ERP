@@ -1,3 +1,4 @@
+import '../../../../shared/utils/date_format.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -378,7 +379,9 @@ class _ApplyLeaveForEmployeeDialogState
                           labelText: 'Start date',
                         ),
                         child: Text(
-                          _startDate == null ? '—' : isoDate(_startDate!),
+                          _startDate == null
+                              ? '—'
+                              : formatDisplayDate(isoDate(_startDate!)),
                         ),
                       ),
                     ),
@@ -395,7 +398,9 @@ class _ApplyLeaveForEmployeeDialogState
                           labelText: 'End date',
                         ),
                         child: Text(
-                          _endDate == null ? '—' : isoDate(_endDate!),
+                          _endDate == null
+                              ? '—'
+                              : formatDisplayDate(isoDate(_endDate!)),
                         ),
                       ),
                     ),
@@ -636,7 +641,7 @@ class _MyLeaveRequestRowState extends ConsumerState<_MyLeaveRequestRow> {
                 children: [
                   Expanded(
                     child: Text(
-                      '${request.leaveTypeName} — ${request.startDate} to ${request.endDate}',
+                      '${request.leaveTypeName} — ${formatDisplayDate(request.startDate)} to ${formatDisplayDate(request.endDate)}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -838,7 +843,9 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
                           labelText: 'Start date',
                         ),
                         child: Text(
-                          _startDate == null ? '—' : isoDate(_startDate!),
+                          _startDate == null
+                              ? '—'
+                              : formatDisplayDate(isoDate(_startDate!)),
                         ),
                       ),
                     ),
@@ -855,7 +862,9 @@ class _ApplyLeaveDialogState extends ConsumerState<_ApplyLeaveDialog> {
                           labelText: 'End date',
                         ),
                         child: Text(
-                          _endDate == null ? '—' : isoDate(_endDate!),
+                          _endDate == null
+                              ? '—'
+                              : formatDisplayDate(isoDate(_endDate!)),
                         ),
                       ),
                     ),
@@ -1143,7 +1152,7 @@ class _PendingLeaveRequestRowState
               ),
               const SizedBox(height: 4),
               Text(
-                '${request.startDate} to ${request.endDate} · ${formatLeaveDays(request.numberOfDays)} day(s)',
+                '${formatDisplayDate(request.startDate)} to ${formatDisplayDate(request.endDate)} · ${formatLeaveDays(request.numberOfDays)} day(s)',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 4),

@@ -1,3 +1,4 @@
+import '../../../../shared/utils/date_format.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../authentication/application/auth_providers.dart';
@@ -553,7 +554,11 @@ class _RightColumn extends ConsumerWidget {
               children: [
                 const Icon(Icons.calendar_today_outlined, size: 16),
                 const SizedBox(width: 8),
-                Text(dueDate == null ? 'Select a date' : _isoDate(dueDate!)),
+                Text(
+                  dueDate == null
+                      ? 'Select a date'
+                      : formatDisplayDate(_isoDate(dueDate!)),
+                ),
               ],
             ),
           ),
@@ -918,7 +923,7 @@ Future<Project?> _showQuickAddProjectDialog(
                 },
                 child: InputDecorator(
                   decoration: const InputDecoration(labelText: 'Start date'),
-                  child: Text(_isoDate(startDate)),
+                  child: Text(formatDisplayDate(_isoDate(startDate))),
                 ),
               ),
             ],

@@ -1,3 +1,4 @@
+import '../../../../shared/utils/date_format.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/leads_providers.dart';
@@ -165,7 +166,9 @@ class _LeadEditorPageState extends ConsumerState<LeadEditorPage> {
                       child: InputDecorator(
                         decoration: const InputDecoration(labelText: 'Date'),
                         child: Text(
-                          _leadDate == null ? '—' : _isoDate(_leadDate!),
+                          _leadDate == null
+                              ? '—'
+                              : formatDisplayDate(_isoDate(_leadDate!)),
                         ),
                       ),
                     ),
