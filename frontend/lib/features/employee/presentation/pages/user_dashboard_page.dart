@@ -7,7 +7,6 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/responsive_card_row.dart';
 import '../../../authentication/presentation/widgets/change_password_dialog.dart';
 import '../../../goals/application/goal_providers.dart';
-import '../../../leave/presentation/widgets/leave_balances_section.dart';
 import '../../../payroll/presentation/widgets/payslip_list_section.dart';
 import '../../../performance_reviews/application/performance_review_providers.dart';
 import '../../../performance_reviews/domain/entities/performance_review_summary.dart';
@@ -62,11 +61,6 @@ class _UserDashboardBody extends StatelessWidget {
           _ProfileSummaryCard(employee: employee),
           const SizedBox(height: 16),
           const CompanyNoticesSection(),
-          const SizedBox(height: 16),
-          const FormSection(
-            title: 'Leave Balances',
-            child: LeaveBalancesSection(),
-          ),
           const SizedBox(height: 16),
           const MyPayslipsSection(),
           const SizedBox(height: 16),

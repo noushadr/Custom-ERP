@@ -211,35 +211,68 @@ describe('PerformanceReviewsService', () => {
   });
 
   describe('runDueCheck', () => {
-    function joinedYearsAgo(years: number, extraDays = 2): string {
-      const date = new Date();
-      date.setFullYear(date.getFullYear() - years);
-      date.setDate(date.getDate() - extraDays);
-      return date.toISOString().slice(0, 10);
+    const joinedLongAgo = '2020-03-10';
+
+    function setToday(iso: string) {
+      jest.useFakeTimers({ now: new Date(`${iso}T10:00:00Z`) });
     }
 
-    it('creates only the current (most recent) due year, never older ones', async () => {
-      const employee = buildEmployee({ joiningDate: joinedYearsAgo(3) });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('creates a review for the current calendar year for everyone in December', async () => {
+      setToday('2026-12-01');
+      const employee = buildEmployee({ joiningDate: joinedLongAgo });
       employeeRepository.findAll.mockResolvedValue([employee]);
       criterionRepository.findAll.mockResolvedValue([buildCriterion()]);
       reviewRepository.findById.mockImplementation((id) =>
-        Promise.resolve(buildReview({ id, reviewYear: 3 })),
+        Promise.resolve(buildReview({ id, reviewYear: 2026 })),
       );
 
       const result = await service.runDueCheck();
 
       expect(result.created).toBe(1);
-      expect(result.reviews[0].reviewYear).toBe(3);
-      expect(reviewRepository.save).toHaveBeenCalledTimes(1);
+      expect(result.reviews[0].reviewYear).toBe(2026);
+      expect(reviewRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewYear: 2026, dueDate: '2026-12-01' }),
+      );
       expect(responseRepository.saveMany).toHaveBeenCalledTimes(1);
     });
 
-    it('is idempotent — skips when the current due year already exists', async () => {
-      const employee = buildEmployee({ joiningDate: joinedYearsAgo(3) });
+    it('includes employees with under a year of service', async () => {
+      setToday('2026-12-01');
+      const employee = buildEmployee({ joiningDate: '2026-09-01' });
       employeeRepository.findAll.mockResolvedValue([employee]);
-      criterionRepository.findAll.mockResolvedValue([buildCriterion()]);
-      reviewRepository.findByEmployeeAndYear.mockImplementation((_id, year) =>
-        Promise.resolve(year === 3 ? buildReview({ reviewYear: 3 }) : null),
+      criterionRepository.findAll.mockResolvedValue([]);
+      reviewRepository.findById.mockResolvedValue(
+        buildReview({ reviewYear: 2026 }),
+      );
+
+      const result = await service.runDueCheck();
+
+      expect(result.created).toBe(1);
+    });
+
+    it('creates nothing outside December', async () => {
+      setToday('2026-11-30');
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ joiningDate: joinedLongAgo }),
+      ]);
+
+      const result = await service.runDueCheck();
+
+      expect(result.created).toBe(0);
+      expect(reviewRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent — skips when this year already has a review', async () => {
+      setToday('2026-12-15');
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ joiningDate: joinedLongAgo }),
+      ]);
+      reviewRepository.findByEmployeeAndYear.mockResolvedValue(
+        buildReview({ reviewYear: 2026 }),
       );
 
       const result = await service.runDueCheck();
@@ -249,11 +282,13 @@ describe('PerformanceReviewsService', () => {
     });
 
     it('skips employees who are not active or on leave', async () => {
-      const employee = buildEmployee({
-        joiningDate: joinedYearsAgo(3),
-        employmentStatus: EmploymentStatus.RESIGNED,
-      });
-      employeeRepository.findAll.mockResolvedValue([employee]);
+      setToday('2026-12-01');
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({
+          joiningDate: joinedLongAgo,
+          employmentStatus: EmploymentStatus.RESIGNED,
+        }),
+      ]);
 
       const result = await service.runDueCheck();
 
@@ -261,20 +296,12 @@ describe('PerformanceReviewsService', () => {
       expect(reviewRepository.save).not.toHaveBeenCalled();
     });
 
-    it('skips employees with less than a full year of service', async () => {
-      const employee = buildEmployee({ joiningDate: joinedYearsAgo(0) });
-      employeeRepository.findAll.mockResolvedValue([employee]);
-
-      const result = await service.runDueCheck();
-
-      expect(result.created).toBe(0);
-    });
-
     it('notifies the employee directly and their reporting manager when a review is created', async () => {
+      setToday('2026-12-01');
       const employee = buildEmployee({
         id: 'employee-1',
         userId: 'user-1',
-        joiningDate: joinedYearsAgo(3),
+        joiningDate: joinedLongAgo,
         reportingManagerId: 'manager-1',
         reportingManager: buildEmployee({
           id: 'manager-1',
@@ -285,7 +312,9 @@ describe('PerformanceReviewsService', () => {
       employeeRepository.findById.mockResolvedValue(employee);
       criterionRepository.findAll.mockResolvedValue([buildCriterion()]);
       reviewRepository.findById.mockImplementation((id) =>
-        Promise.resolve(buildReview({ id, employeeId: 'employee-1', reviewYear: 3 })),
+        Promise.resolve(
+          buildReview({ id, employeeId: 'employee-1', reviewYear: 2026 }),
+        ),
       );
 
       await service.runDueCheck();
@@ -300,10 +329,11 @@ describe('PerformanceReviewsService', () => {
     });
 
     it('falls back to notifying every performance.manage holder when the employee has no reporting manager', async () => {
+      setToday('2026-12-01');
       const employee = buildEmployee({
         id: 'employee-1',
         userId: 'user-1',
-        joiningDate: joinedYearsAgo(3),
+        joiningDate: joinedLongAgo,
         reportingManagerId: undefined,
         reportingManager: undefined,
       });
@@ -311,7 +341,9 @@ describe('PerformanceReviewsService', () => {
       employeeRepository.findById.mockResolvedValue(employee);
       criterionRepository.findAll.mockResolvedValue([buildCriterion()]);
       reviewRepository.findById.mockImplementation((id) =>
-        Promise.resolve(buildReview({ id, employeeId: 'employee-1', reviewYear: 3 })),
+        Promise.resolve(
+          buildReview({ id, employeeId: 'employee-1', reviewYear: 2026 }),
+        ),
       );
       rolesService.findUsersWithPermission.mockResolvedValue([
         { id: 'hr-admin-1' } as never,

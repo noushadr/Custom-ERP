@@ -464,7 +464,7 @@ void main() {
     expect((olderCard.decoration as BoxDecoration).color, AppColors.fieldFill);
   });
 
-  testWidgets('shows the same leave balances as the leave page', (
+  testWidgets('does not show a leave balances table', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -483,19 +483,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Leave Balances'), findsOneWidget);
-    expect(find.text('Annual Leave'), findsOneWidget);
-    expect(find.text('16'), findsOneWidget);
-    expect(find.text('remaining of 20'), findsOneWidget);
-  });
-
-  testWidgets('shows an empty state when there are no leave balances', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_app());
-    await tester.pumpAndSettle();
-
-    expect(find.text('No leave balances yet.'), findsOneWidget);
+    expect(find.text('Leave Balances'), findsNothing);
+    expect(find.text('Annual Leave'), findsNothing);
   });
 
   testWidgets('changing password calls the auth controller', (tester) async {

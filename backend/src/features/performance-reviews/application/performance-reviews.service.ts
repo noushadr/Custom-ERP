@@ -51,6 +51,9 @@ import {
 
 const FOREIGN_KEY_VIOLATION = '23503';
 
+/** December (JS months are zero-based). */
+const REVIEW_MONTH_INDEX = 11;
+
 export interface DueReviewItem {
   employeeId: string;
   employeeName: string;
@@ -180,7 +183,7 @@ export class PerformanceReviewsService {
 
     await this.notificationsService.create({
       recipientUserId: employee.userId,
-      message: `Your ${review.reviewYear}-year performance review has been created.`,
+      message: `Your ${review.reviewYear} performance review has been created.`,
       linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
       linkEntityId: review.id,
     });
@@ -191,14 +194,14 @@ export class PerformanceReviewsService {
     for (const recipient of actionRecipients) {
       await this.notificationsService.create({
         recipientUserId: recipient.id,
-        message: `A ${review.reviewYear}-year performance review for ${employee.firstName} ${employee.lastName} is ready to rate.`,
+        message: `A ${review.reviewYear} performance review for ${employee.firstName} ${employee.lastName} is ready to rate.`,
         linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
         linkEntityId: review.id,
       });
     }
   }
 
-  /** Real automatic creation, once daily — `runDueCheck` is idempotent, so a
+  /** Real automatic creation, checked daily (only acts in December) — `runDueCheck` is idempotent, so a
    * missed tick or a late deploy never duplicates anything. The
    * `POST /due-check/run` route calls the same method on demand, for
    * HR-triggered off-schedule runs and for testing without waiting on a
@@ -208,15 +211,19 @@ export class PerformanceReviewsService {
     await this.runDueCheck();
   }
 
-  /** Only ever considers each employee's *most recently elapsed* review
-   * year (their current whole years of service) — never backfills earlier
-   * years they never got a review for. A performance review is meant to be
-   * one current, in-flight cycle per employee, not a stack of every
-   * historical year created at once (e.g. a 10-year employee shouldn't
-   * suddenly get 10 pending reviews the day this feature ships). */
+  /** Reviews are an annual December exercise: from 1 December onward every
+   * active (or on-leave) employee who has joined gets exactly one review for
+   * the current calendar year, `reviewYear` being that calendar year. Any
+   * other month yields nothing, so the daily cron is a no-op until December
+   * and a missed 1 December tick (or a late deploy) still catches up on the
+   * next run — `findByEmployeeAndYear` keeps it idempotent. */
   private async computeDue(): Promise<DueReviewItem[]> {
-    const employees = await this.employeeRepository.findAll();
     const today = new Date();
+    if (today.getMonth() !== REVIEW_MONTH_INDEX) return [];
+
+    const reviewYear = today.getFullYear();
+    const dueDate = `${reviewYear}-12-01`;
+    const employees = await this.employeeRepository.findAll();
     const due: DueReviewItem[] = [];
 
     for (const employee of employees) {
@@ -226,10 +233,7 @@ export class PerformanceReviewsService {
       ) {
         continue;
       }
-
-      const joiningDate = new Date(employee.joiningDate);
-      const reviewYear = this.wholeYearsOfService(joiningDate, today);
-      if (reviewYear < 1) continue;
+      if (new Date(employee.joiningDate) > today) continue;
 
       const existing = await this.reviewRepository.findByEmployeeAndYear(
         employee.id,
@@ -237,28 +241,14 @@ export class PerformanceReviewsService {
       );
       if (existing) continue;
 
-      const anniversary = new Date(joiningDate);
-      anniversary.setFullYear(joiningDate.getFullYear() + reviewYear);
       due.push({
         employeeId: employee.id,
         employeeName: `${employee.firstName} ${employee.lastName}`,
         reviewYear,
-        dueDate: anniversary.toISOString().slice(0, 10),
+        dueDate,
       });
     }
     return due;
-  }
-
-  /** Whole years elapsed between [joiningDate] and [today]. Inherits the
-   * same Feb-29 rollover quirk as the existing anniversary-preview logic
-   * (JS Date rolls a non-leap-year Feb 29 to Mar 1) — acceptable, matches
-   * behavior already shipped elsewhere in this app. */
-  private wholeYearsOfService(joiningDate: Date, today: Date): number {
-    let years = today.getFullYear() - joiningDate.getFullYear();
-    const anniversaryThisYear = new Date(joiningDate);
-    anniversaryThisYear.setFullYear(joiningDate.getFullYear() + years);
-    if (anniversaryThisYear > today) years -= 1;
-    return years;
   }
 
   private async createReviewInstance(
