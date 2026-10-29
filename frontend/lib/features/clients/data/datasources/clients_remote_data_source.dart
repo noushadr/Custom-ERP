@@ -33,6 +33,7 @@ class ClientsRemoteDataSource {
     String? primaryContactPhone,
     String? leadSource,
     String? notes,
+    String? accountManagerId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/clients',
@@ -47,6 +48,7 @@ class ClientsRemoteDataSource {
         'primaryContactPhone': ?primaryContactPhone,
         'leadSource': ?leadSource,
         'notes': ?notes,
+        'accountManagerId': ?accountManagerId,
       },
     );
     return ClientModel.fromJson(response.data!);
@@ -64,6 +66,7 @@ class ClientsRemoteDataSource {
     String? primaryContactPhone,
     String? leadSource,
     String? notes,
+    String? accountManagerId,
     bool? isArchived,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
@@ -79,6 +82,7 @@ class ClientsRemoteDataSource {
         'primaryContactPhone': ?primaryContactPhone,
         'leadSource': ?leadSource,
         'notes': ?notes,
+        'accountManagerId': ?accountManagerId,
         'isArchived': ?isArchived,
       },
     );
@@ -193,8 +197,9 @@ class ClientsRemoteDataSource {
     required String startDate,
     String? renewalDate,
     String? notes,
-    String? packageName,
+    String? endDate,
     List<String>? assignedEmployeeIds,
+    String? accountManagerId,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
   }) async {
@@ -208,7 +213,8 @@ class ClientsRemoteDataSource {
         'startDate': startDate,
         'renewalDate': ?renewalDate,
         'notes': ?notes,
-        'packageName': ?packageName,
+        'accountManagerId': ?accountManagerId,
+        'endDate': ?endDate,
         'assignedEmployeeIds': ?assignedEmployeeIds,
         'targetDepartmentIds': ?targetDepartmentIds,
         'serviceIds': ?serviceIds,
@@ -226,8 +232,9 @@ class ClientsRemoteDataSource {
     String? startDate,
     String? renewalDate,
     String? notes,
-    String? packageName,
+    String? endDate,
     List<String>? assignedEmployeeIds,
+    String? accountManagerId,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
     bool? isArchived,
@@ -242,7 +249,8 @@ class ClientsRemoteDataSource {
         'startDate': ?startDate,
         'renewalDate': ?renewalDate,
         'notes': ?notes,
-        'packageName': ?packageName,
+        'accountManagerId': ?accountManagerId,
+        'endDate': ?endDate,
         'assignedEmployeeIds': ?assignedEmployeeIds,
         'targetDepartmentIds': ?targetDepartmentIds,
         'serviceIds': ?serviceIds,

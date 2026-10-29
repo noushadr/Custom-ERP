@@ -20,6 +20,7 @@ Client buildTestClient({
   String? primaryContactPhone,
   String? leadSource,
   String? notes,
+  ProjectEmployeeRef? accountManager,
   bool isArchived = false,
   String healthStatus = ClientHealthStatus.healthy,
   List<String> healthFactors = const [],
@@ -39,6 +40,7 @@ Client buildTestClient({
     primaryContactPhone: primaryContactPhone,
     leadSource: leadSource,
     notes: notes,
+    accountManager: accountManager,
     isArchived: isArchived,
     healthStatus: healthStatus,
     healthFactors: healthFactors,
@@ -108,9 +110,10 @@ Project buildTestProject({
   String type = 'one_time',
   String status = 'active',
   String startDate = '2026-01-01',
+  String? endDate,
   String? renewalDate,
   String? notes,
-  String? packageName,
+  ProjectEmployeeRef? accountManager,
   List<ProjectEmployeeRef> assignedEmployees = const [],
   List<ProjectDepartmentRef> targetDepartments = const [],
   List<ProjectServiceRef> services = const [],
@@ -126,9 +129,10 @@ Project buildTestProject({
     type: type,
     status: status,
     startDate: startDate,
+    endDate: endDate,
     renewalDate: renewalDate,
     notes: notes,
-    packageName: packageName,
+    accountManager: accountManager,
     assignedEmployees: assignedEmployees,
     targetDepartments: targetDepartments,
     services: services,
@@ -176,7 +180,12 @@ class FakeClientsRepository implements ClientsRepository {
   String? lastCreatedServiceName;
 
   /// The `name` passed to the most recent [createProject] call.
+  String? lastCreatedClientAccountManagerId;
   String? lastCreatedProjectName;
+  String? lastCreatedAccountManagerId;
+  String? lastCreatedType;
+  String? lastCreatedEndDate;
+  String? lastCreatedRenewalDate;
 
   /// The `isArchived` passed to the most recent [updateProject] call.
   bool? lastUpdateProjectIsArchived;
@@ -212,8 +221,10 @@ class FakeClientsRepository implements ClientsRepository {
     String? primaryContactPhone,
     String? leadSource,
     String? notes,
+    String? accountManagerId,
   }) async {
     lastCreatedCompanyName = companyName;
+    lastCreatedClientAccountManagerId = accountManagerId;
     return buildTestClient(companyName: companyName);
   }
 
@@ -230,6 +241,7 @@ class FakeClientsRepository implements ClientsRepository {
     String? primaryContactPhone,
     String? leadSource,
     String? notes,
+    String? accountManagerId,
     bool? isArchived,
   }) async => buildTestClient(id: id, isArchived: isArchived ?? false);
 
@@ -312,12 +324,17 @@ class FakeClientsRepository implements ClientsRepository {
     required String startDate,
     String? renewalDate,
     String? notes,
-    String? packageName,
+    String? endDate,
     List<String>? assignedEmployeeIds,
+    String? accountManagerId,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
   }) async {
     lastCreatedProjectName = name;
+    lastCreatedAccountManagerId = accountManagerId;
+    lastCreatedType = type;
+    lastCreatedEndDate = endDate;
+    lastCreatedRenewalDate = renewalDate;
     return buildTestProject(clientId: clientId, name: name, type: type);
   }
 
@@ -331,8 +348,9 @@ class FakeClientsRepository implements ClientsRepository {
     String? startDate,
     String? renewalDate,
     String? notes,
-    String? packageName,
+    String? endDate,
     List<String>? assignedEmployeeIds,
+    String? accountManagerId,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
     bool? isArchived,

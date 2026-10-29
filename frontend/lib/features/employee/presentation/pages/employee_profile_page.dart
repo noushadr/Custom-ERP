@@ -30,7 +30,7 @@ import '../widgets/employee_salary_history_section.dart';
 import '../widgets/employee_status_badges.dart';
 import '../widgets/employee_tags_section.dart';
 import 'edit_employee_page.dart';
-import 'edit_my_profile_page.dart';
+import 'edit_own_profile_route.dart';
 import '../../../../shared/widgets/app_dialog.dart';
 
 /// Shows an employee's profile. Pass null for [employeeId] to view the
@@ -159,10 +159,7 @@ class _ProfileBody extends ConsumerWidget {
                     if (isOwnProfile)
                       _ProfileActionButton(
                         onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                EditMyProfilePage(employee: employee),
-                          ),
+                          editOwnProfileRoute(employee, canManage: canManage),
                         ),
                         icon: Icons.edit_outlined,
                         label: 'Edit',
@@ -204,19 +201,28 @@ class _ProfileBody extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: employee.profileCompletionPercentage / 100,
-                minHeight: 6,
-                backgroundColor: AppColors.borderSubtle,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Profile ${employee.profileCompletionPercentage}% complete',
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: 10),
+            // One compact line: a thin bar with its label beside it.
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: employee.profileCompletionPercentage / 100,
+                      minHeight: 4,
+                      backgroundColor: AppColors.borderSubtle,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Profile ${employee.profileCompletionPercentage}% complete',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

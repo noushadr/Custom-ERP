@@ -11,9 +11,10 @@ class ProjectModel extends Project {
     required super.type,
     required super.status,
     required super.startDate,
+    super.endDate,
     required super.renewalDate,
     required super.notes,
-    required super.packageName,
+    super.accountManager,
     required super.assignedEmployees,
     required super.targetDepartments,
     required super.services,
@@ -30,9 +31,23 @@ class ProjectModel extends Project {
     type: json['type'] as String,
     status: json['status'] as String,
     startDate: json['startDate'] as String,
+    endDate: json['endDate'] as String?,
     renewalDate: json['renewalDate'] as String?,
     notes: json['notes'] as String?,
-    packageName: json['packageName'] as String?,
+    accountManager: json['accountManager'] == null
+        ? null
+        : ProjectEmployeeRef(
+            id:
+                (json['accountManager'] as Map<String, dynamic>)['id']
+                    as String,
+            fullName:
+                (json['accountManager'] as Map<String, dynamic>)['fullName']
+                    as String,
+            photoUrl: _resolvePhotoUrl(
+              (json['accountManager'] as Map<String, dynamic>)['photoUrl']
+                  as String?,
+            ),
+          ),
     assignedEmployees: (json['assignedEmployees'] as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(

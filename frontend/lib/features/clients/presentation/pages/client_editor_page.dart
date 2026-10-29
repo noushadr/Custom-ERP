@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../employee/application/employee_providers.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/client.dart';
 import '../../domain/exceptions/client_exception.dart';
@@ -27,6 +28,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
   late final TextEditingController _leadSourceController;
   late final TextEditingController _notesController;
 
+  String? _accountManagerId;
   bool _submitting = false;
   String? _errorMessage;
 
@@ -35,6 +37,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
   @override
   void initState() {
     super.initState();
+    _accountManagerId = widget.existingClient?.accountManager?.id;
     final existing = widget.existingClient;
     _companyNameController = TextEditingController(
       text: existing?.companyName ?? '',
@@ -96,6 +99,8 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
               primaryContactPhone: _contactPhoneController.text.trim(),
               leadSource: _leadSourceController.text.trim(),
               notes: _notesController.text.trim(),
+              // An empty id clears the account manager.
+              accountManagerId: _accountManagerId ?? '',
             )
           : await repository.createClient(
               companyName: _companyNameController.text.trim(),
@@ -108,6 +113,7 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
               primaryContactPhone: _emptyToNull(_contactPhoneController.text),
               leadSource: _emptyToNull(_leadSourceController.text),
               notes: _emptyToNull(_notesController.text),
+              accountManagerId: _accountManagerId,
             );
 
       ref.invalidate(clientsListProvider(false));
@@ -206,6 +212,38 @@ class _ClientEditorPageState extends ConsumerState<ClientEditorPage> {
                         labelText: 'Lead source',
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    ref
+                        .watch(employeeListProvider)
+                        .maybeWhen(
+                          data: (employees) => DropdownButtonFormField<String?>(
+                            key: const Key('client-account-manager'),
+                            initialValue: _accountManagerId,
+                            decoration: const InputDecoration(
+                              labelText: 'Account manager',
+                              helperText:
+                                  'The employee who owns this client — they '
+                                  'are notified about health changes and '
+                                  'renewals.',
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('None'),
+                              ),
+                              for (final e in employees)
+                                DropdownMenuItem<String?>(
+                                  value: e.id,
+                                  child: Text(e.fullName),
+                                ),
+                            ],
+                            onChanged: _submitting
+                                ? null
+                                : (value) =>
+                                      setState(() => _accountManagerId = value),
+                          ),
+                          orElse: () => const SizedBox.shrink(),
+                        ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _notesController,

@@ -48,6 +48,11 @@ export class UpdateClientDto {
   @IsString()
   notes?: string;
 
+  /** An employee id; an empty string clears it. */
+  @IsOptional()
+  @IsString()
+  accountManagerId?: string;
+
   @IsOptional()
   @IsBoolean()
   isArchived?: boolean;

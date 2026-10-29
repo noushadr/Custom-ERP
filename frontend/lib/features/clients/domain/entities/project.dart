@@ -9,9 +9,10 @@ class Project {
     required this.type,
     required this.status,
     required this.startDate,
+    this.endDate,
     required this.renewalDate,
     required this.notes,
-    required this.packageName,
+    this.accountManager,
     required this.assignedEmployees,
     required this.targetDepartments,
     required this.services,
@@ -33,11 +34,15 @@ class Project {
 
   /// ISO date (yyyy-MM-dd).
   final String startDate;
+
+  /// The project's deadline (ISO date). Every project has this or a
+  /// [renewalDate].
+  final String? endDate;
   final String? renewalDate;
   final String? notes;
 
-  /// Free-text tier label (e.g. "GROWTH +", "VALUE").
-  final String? packageName;
+  /// The project's owner — always one of [assignedEmployees].
+  final ProjectEmployeeRef? accountManager;
 
   final List<ProjectEmployeeRef> assignedEmployees;
   final List<ProjectDepartmentRef> targetDepartments;

@@ -31,6 +31,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
     String? primaryContactPhone,
     String? leadSource,
     String? notes,
+    String? accountManagerId,
   }) => _guard(
     () => _remoteDataSource.createClient(
       companyName: companyName,
@@ -43,6 +44,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
       primaryContactPhone: primaryContactPhone,
       leadSource: leadSource,
       notes: notes,
+      accountManagerId: accountManagerId,
     ),
   );
 
@@ -59,6 +61,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
     String? primaryContactPhone,
     String? leadSource,
     String? notes,
+    String? accountManagerId,
     bool? isArchived,
   }) => _guard(
     () => _remoteDataSource.updateClient(
@@ -73,6 +76,7 @@ class ClientsRepositoryImpl implements ClientsRepository {
       primaryContactPhone: primaryContactPhone,
       leadSource: leadSource,
       notes: notes,
+      accountManagerId: accountManagerId,
       isArchived: isArchived,
     ),
   );
@@ -159,8 +163,9 @@ class ClientsRepositoryImpl implements ClientsRepository {
     required String startDate,
     String? renewalDate,
     String? notes,
-    String? packageName,
+    String? endDate,
     List<String>? assignedEmployeeIds,
+    String? accountManagerId,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
   }) => _guard(
@@ -172,8 +177,9 @@ class ClientsRepositoryImpl implements ClientsRepository {
       startDate: startDate,
       renewalDate: renewalDate,
       notes: notes,
-      packageName: packageName,
+      endDate: endDate,
       assignedEmployeeIds: assignedEmployeeIds,
+      accountManagerId: accountManagerId,
       targetDepartmentIds: targetDepartmentIds,
       serviceIds: serviceIds,
     ),
@@ -189,8 +195,9 @@ class ClientsRepositoryImpl implements ClientsRepository {
     String? startDate,
     String? renewalDate,
     String? notes,
-    String? packageName,
+    String? endDate,
     List<String>? assignedEmployeeIds,
+    String? accountManagerId,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
     bool? isArchived,
@@ -204,8 +211,9 @@ class ClientsRepositoryImpl implements ClientsRepository {
       startDate: startDate,
       renewalDate: renewalDate,
       notes: notes,
-      packageName: packageName,
+      endDate: endDate,
       assignedEmployeeIds: assignedEmployeeIds,
+      accountManagerId: accountManagerId,
       targetDepartmentIds: targetDepartmentIds,
       serviceIds: serviceIds,
       isArchived: isArchived,

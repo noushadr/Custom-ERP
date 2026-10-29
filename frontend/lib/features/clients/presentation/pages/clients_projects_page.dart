@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/country_short_code.dart';
+import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/archived_toggle.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/permission_gate.dart';
 import '../../../../shared/widgets/top_breakdown_panel.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
+import '../../../employee/application/employee_providers.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/client.dart';
 import '../../domain/entities/client_health_status.dart';
@@ -21,40 +23,44 @@ import 'client_editor_page.dart';
 import 'project_detail_page.dart';
 import 'project_editor_page.dart';
 
-/// The Admin Business Management "Clients & Projects" module's root page —
-/// shared by Super Admin and HR/Manager: gated by nav visibility in
-/// main.dart, by `clients.manage` on every backend route this page calls,
-/// and by its own `hasPermission` check at the top of `build()` (see
-/// `AccessDeniedView`). A stats row up top, then Projects (default) /
-/// Clients tabs.
-class ClientsProjectsPage extends ConsumerWidget {
-  const ClientsProjectsPage({super.key});
+/// Clients and Projects are separate sections (own nav entry, own page) over
+/// the same `clients.manage` module and the same data: every project belongs
+/// to a client, a client's detail page lists and can start its projects, and
+/// a project links back to its client.
+///
+/// Shared by Super Admin and HR/Manager: gated by nav visibility in
+/// main.dart, by `clients.manage` on every backend route these pages call,
+/// and by their own `hasPermission` check (see `AccessDeniedView`).
+bool _canManageClients(WidgetRef ref) {
+  final authState = ref.watch(authControllerProvider);
+  return authState is AuthAuthenticated &&
+      authState.user.hasPermission('clients.manage');
+}
+
+/// The Clients section: client stats and breakdowns up top, then the
+/// Clients / Health tabs.
+class ClientsPage extends ConsumerWidget {
+  const ClientsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authControllerProvider);
-    if (authState is! AuthAuthenticated ||
-        !authState.user.hasPermission('clients.manage')) {
-      return const AccessDeniedView();
-    }
+    if (!_canManageClients(ref)) return const AccessDeniedView();
 
     return DefaultTabController(
-      length: 3,
+      length: 2,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Center(
+        child: Align(
+          alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1040),
-            // The breakdown panels added enough content above the tabs that
-            // it can no longer share a fixed-height `Expanded` region with
-            // the tab content on shorter windows — the whole page scrolls
-            // instead, with the tabs given their own generous fixed-height
+            // The whole page scrolls; the tabs get their own fixed-height
             // region (each tab already scrolls its own list internally).
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SummaryRow(),
+                  const _ClientsSummaryRow(),
                   const SizedBox(height: 20),
                   const _ClientsBreakdownRow(),
                   const SizedBox(height: 20),
@@ -68,21 +74,26 @@ class ClientsProjectsPage extends ConsumerWidget {
                           unselectedLabelColor: AppColors.textSecondary,
                           indicatorColor: AppColors.primary,
                           tabs: [
-                            Tab(text: 'Projects'),
                             Tab(text: 'Clients'),
                             Tab(text: 'Health'),
                           ],
                         ),
                       ),
-                      _NewButtons(),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ClientEditorPage(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('New Client'),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   const SizedBox(
                     height: 640,
-                    child: TabBarView(
-                      children: [_ProjectsTab(), _ClientsTab(), _HealthTab()],
-                    ),
+                    child: TabBarView(children: [_ClientsTab(), _HealthTab()]),
                   ),
                 ],
               ),
@@ -94,8 +105,59 @@ class ClientsProjectsPage extends ConsumerWidget {
   }
 }
 
-class _SummaryRow extends ConsumerWidget {
-  const _SummaryRow();
+/// The Projects section: project stats and the services breakdown up top,
+/// then the projects table.
+class ProjectsPage extends ConsumerWidget {
+  const ProjectsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!_canManageClients(ref)) return const AccessDeniedView();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1040),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _ProjectsSummaryRow(),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Projects',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProjectEditorPage(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('New Project'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const SizedBox(height: 640, child: _ProjectsTab()),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClientsSummaryRow extends ConsumerWidget {
+  const _ClientsSummaryRow();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -124,15 +186,66 @@ class _SummaryRow extends ConsumerWidget {
     final clients = clientsAsync.value ?? const [];
     final projects = projectsAsync.value ?? const [];
 
-    final activeProjectsCount = projects
-        .where((p) => p.status == ProjectStatus.active)
-        .length;
+    // A client counts as "active" when it has at least one active project —
+    // the one place the two sections' data meet in a stat.
     final activeClientIds = projects
         .where((p) => p.status == ProjectStatus.active)
         .map((p) => p.clientId)
         .toSet();
     final activeClientsCount = clients
         .where((c) => activeClientIds.contains(c.id))
+        .length;
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        MetricCard(
+          label: 'Total Clients',
+          value: '${clients.length}',
+          color: AppColors.primary,
+          icon: Icons.business_outlined,
+        ),
+        MetricCard(
+          label: 'Active Clients',
+          value: '$activeClientsCount',
+          color: AppColors.success,
+          icon: Icons.verified_outlined,
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectsSummaryRow extends ConsumerWidget {
+  const _ProjectsSummaryRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final projectsAsync = ref.watch(
+      projectsListProvider((
+        status: null,
+        clientId: null,
+        includeArchived: false,
+      )),
+    );
+
+    if (projectsAsync.isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: LinearProgressIndicator(),
+      );
+    }
+    if (projectsAsync.hasError) {
+      return Text(
+        'Could not load the summary.',
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      );
+    }
+
+    final projects = projectsAsync.value ?? const [];
+    final activeProjectsCount = projects
+        .where((p) => p.status == ProjectStatus.active)
         .length;
     final retainerCount = projects
         .where((p) => p.type == ProjectType.retainer)
@@ -145,25 +258,11 @@ class _SummaryRow extends ConsumerWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
-        // Moved here from the Dashboard, so "how many projects are active"
-        // lives on the page about projects, not the company-wide overview.
         MetricCard(
           label: 'Active Projects',
           value: '$activeProjectsCount',
           color: AppColors.primary,
           icon: Icons.work_outline,
-        ),
-        MetricCard(
-          label: 'Total Clients',
-          value: '${clients.length}',
-          color: AppColors.primary,
-          icon: Icons.business_outlined,
-        ),
-        MetricCard(
-          label: 'Active Clients',
-          value: '$activeClientsCount',
-          color: AppColors.success,
-          icon: Icons.verified_outlined,
         ),
         MetricCard(
           label: 'Monthly Retainers',
@@ -182,9 +281,8 @@ class _SummaryRow extends ConsumerWidget {
   }
 }
 
-/// Four "top N" categorical breakdowns for the whole module — countries,
-/// lead source, and industry come from `Client`, services from every
-/// `Project`'s assigned services — each its own panel with one
+/// Three "top N" categorical breakdowns for the Clients page — countries,
+/// lead source, and industry, all from `Client` — each its own panel with one
 /// representative hue (reused across panels freely, since each is an
 /// independent magnitude breakdown, not one shared categorical legend),
 /// mirroring the Leads page's identical breakdown row (shared widgets, see
@@ -195,74 +293,31 @@ class _ClientsBreakdownRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final clientsAsync = ref.watch(clientsListProvider(false));
-    final projectsAsync = ref.watch(
-      projectsListProvider((
-        status: null,
-        clientId: null,
-        includeArchived: false,
-      )),
-    );
-
-    if (!clientsAsync.hasValue || !projectsAsync.hasValue) {
-      return const SizedBox.shrink();
-    }
-
+    if (!clientsAsync.hasValue) return const SizedBox.shrink();
     final clients = clientsAsync.value!;
-    final projects = projectsAsync.value!;
-    final serviceNames = projects.expand((p) => p.services.map((s) => s.name));
 
-    final panels = [
-      TopBreakdownPanel(
-        title: 'Top Countries',
-        icon: Icons.public_outlined,
-        color: AppColors.primary,
-        counts: computeTopCounts(clients, (c) => formatCountryFlag(c.country)),
-      ),
-      TopBreakdownPanel(
-        title: 'Top Services',
-        icon: Icons.design_services_outlined,
-        color: AppColors.secondary,
-        counts: computeTopCounts(serviceNames.toList(), (name) => name),
-      ),
-      TopBreakdownPanel(
-        title: 'Top Lead Sources',
-        icon: Icons.campaign_outlined,
-        color: AppColors.accentTeal,
-        counts: computeTopCounts(clients, (c) => c.leadSource),
-      ),
-      TopBreakdownPanel(
-        title: 'Top Industries',
-        icon: Icons.category_outlined,
-        color: AppColors.primary,
-        counts: computeTopCounts(clients, (c) => c.industry),
-      ),
-    ];
-
-    return TopBreakdownRow(panels: panels);
-  }
-}
-
-class _NewButtons extends StatelessWidget {
-  const _NewButtons();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        OutlinedButton.icon(
-          onPressed: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const ClientEditorPage())),
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('New Client'),
+    return TopBreakdownRow(
+      panels: [
+        TopBreakdownPanel(
+          title: 'Top Countries',
+          icon: Icons.public_outlined,
+          color: AppColors.primary,
+          counts: computeTopCounts(
+            clients,
+            (c) => formatCountryFlag(c.country),
+          ),
         ),
-        const SizedBox(width: 8),
-        ElevatedButton.icon(
-          onPressed: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const ProjectEditorPage())),
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('New Project'),
+        TopBreakdownPanel(
+          title: 'Top Lead Sources',
+          icon: Icons.campaign_outlined,
+          color: AppColors.accentTeal,
+          counts: computeTopCounts(clients, (c) => c.leadSource),
+        ),
+        TopBreakdownPanel(
+          title: 'Top Industries',
+          icon: Icons.category_outlined,
+          color: AppColors.primary,
+          counts: computeTopCounts(clients, (c) => c.industry),
         ),
       ],
     );
@@ -281,9 +336,9 @@ const _kProjectColumns = [
   ('Type', 1),
   ('Status', 1),
   ('Start Date', 1),
-  ('Package', 1),
+  ('Deadline / Renewal', 1),
+  ('Account Manager', 1),
   ('Employees', 2),
-  ('Services', 2),
 ];
 
 const _kClientColumns = [
@@ -294,6 +349,7 @@ const _kClientColumns = [
   ('Country', 1),
   ('Industry', 1),
   ('Lead Source', 1),
+  ('Account Manager', 2),
 ];
 
 class _ProjectsTab extends ConsumerStatefulWidget {
@@ -390,18 +446,24 @@ class _ProjectTableRow extends StatelessWidget {
     final employeesText = project.assignedEmployees.isEmpty
         ? '—'
         : project.assignedEmployees.map((e) => e.fullName).join(', ');
-    final servicesText = project.services.isEmpty
-        ? '—'
-        : project.services.map((s) => s.name).join(', ');
     final cells = [
       project.clientName,
       project.name,
       formatProjectTypeLabel(project.type),
       formatProjectStatusLabel(project.status),
-      project.startDate,
-      project.packageName ?? '—',
+      formatDisplayDate(project.startDate),
+      // The date that fits the project's type: a one-time project's
+      // deadline, or a retainer's next renewal.
+      switch (project.type) {
+        ProjectType.retainer when project.renewalDate != null =>
+          'Renews ${formatDisplayDate(project.renewalDate!)}',
+        ProjectType.oneTime when project.endDate != null => formatDisplayDate(
+          project.endDate!,
+        ),
+        _ => '—',
+      },
+      project.accountManager?.fullName ?? '—',
       employeesText,
-      servicesText,
     ];
 
     return _TableRow(
@@ -433,6 +495,7 @@ class _ClientsTabState extends ConsumerState<_ClientsTab> {
   String? _industryFilter;
   String? _leadSourceFilter;
   String? _healthFilter;
+  bool _myClientsOnly = false;
 
   @override
   void dispose() {
@@ -445,10 +508,27 @@ class _ClientsTabState extends ConsumerState<_ClientsTab> {
       _countryFilter != null ||
       _industryFilter != null ||
       _leadSourceFilter != null ||
-      _healthFilter != null;
+      _healthFilter != null ||
+      _myClientsOnly;
 
-  List<Client> _applyFilters(List<Client> clients) {
+  /// "My clients": ones where I'm the account manager, or the owner of any of
+  /// the client's projects.
+  List<Client> _applyFilters(
+    List<Client> clients, {
+    required String? myEmployeeId,
+    required Set<String> clientIdsIOwnProjectsFor,
+  }) {
     var filtered = clients;
+    if (_myClientsOnly) {
+      filtered = filtered
+          .where(
+            (c) =>
+                myEmployeeId != null &&
+                (c.accountManager?.id == myEmployeeId ||
+                    clientIdsIOwnProjectsFor.contains(c.id)),
+          )
+          .toList();
+    }
     if (_countryFilter != null) {
       filtered = filtered
           .where((c) => formatCountryFlag(c.country) == _countryFilter)
@@ -484,6 +564,22 @@ class _ClientsTabState extends ConsumerState<_ClientsTab> {
   @override
   Widget build(BuildContext context) {
     final clientsAsync = ref.watch(clientsListProvider(false));
+    final myEmployeeId = ref.watch(myProfileProvider).valueOrNull?.id;
+    final myProjectClientIds = <String>{
+      for (final project
+          in ref
+                  .watch(
+                    projectsListProvider((
+                      status: null,
+                      clientId: null,
+                      includeArchived: false,
+                    )),
+                  )
+                  .valueOrNull ??
+              const <Project>[])
+        if (myEmployeeId != null && project.accountManager?.id == myEmployeeId)
+          project.clientId,
+    };
 
     return clientsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -498,7 +594,11 @@ class _ClientsTabState extends ConsumerState<_ClientsTab> {
           return const Center(child: Text('No clients yet.'));
         }
 
-        final filtered = _applyFilters(clients);
+        final filtered = _applyFilters(
+          clients,
+          myEmployeeId: myEmployeeId,
+          clientIdsIOwnProjectsFor: myProjectClientIds,
+        );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -510,6 +610,9 @@ class _ClientsTabState extends ConsumerState<_ClientsTab> {
               industryFilter: _industryFilter,
               leadSourceFilter: _leadSourceFilter,
               healthFilter: _healthFilter,
+              myClientsOnly: _myClientsOnly,
+              onMyClientsChanged: (value) =>
+                  setState(() => _myClientsOnly = value),
               onSearchChanged: (value) =>
                   setState(() => _searchQuery = value.trim()),
               onCountryChanged: (value) =>
@@ -527,6 +630,7 @@ class _ClientsTabState extends ConsumerState<_ClientsTab> {
                       _industryFilter = null;
                       _leadSourceFilter = null;
                       _healthFilter = null;
+                      _myClientsOnly = false;
                     })
                   : null,
             ),
@@ -567,6 +671,8 @@ class _ClientFilterRow extends StatelessWidget {
     required this.industryFilter,
     required this.leadSourceFilter,
     required this.healthFilter,
+    required this.myClientsOnly,
+    required this.onMyClientsChanged,
     required this.onSearchChanged,
     required this.onCountryChanged,
     required this.onIndustryChanged,
@@ -581,6 +687,8 @@ class _ClientFilterRow extends StatelessWidget {
   final String? industryFilter;
   final String? leadSourceFilter;
   final String? healthFilter;
+  final bool myClientsOnly;
+  final ValueChanged<bool> onMyClientsChanged;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String?> onCountryChanged;
   final ValueChanged<String?> onIndustryChanged;
@@ -639,6 +747,11 @@ class _ClientFilterRow extends StatelessWidget {
               isDense: true,
             ),
           ),
+        ),
+        FilterChip(
+          label: const Text('My clients'),
+          selected: myClientsOnly,
+          onSelected: onMyClientsChanged,
         ),
         _FilterDropdown(
           hint: 'Country',
@@ -760,6 +873,7 @@ class _ClientTableRow extends StatelessWidget {
       formatCountryFlag(client.country) ?? '—',
       client.industry ?? '—',
       client.leadSource ?? '—',
+      client.accountManager?.fullName ?? '—',
     ];
 
     return _TableRow(
@@ -945,7 +1059,12 @@ class _TableRow extends StatelessWidget {
                 width: 160,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: trailing,
+                  // Scales a long badge ("Attention Required") down to fit
+                  // the fixed-width cell rather than overflowing it.
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FittedBox(fit: BoxFit.scaleDown, child: trailing),
+                  ),
                 ),
               ),
           ],

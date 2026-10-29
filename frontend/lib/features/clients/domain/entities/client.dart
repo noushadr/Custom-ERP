@@ -1,3 +1,5 @@
+import 'project_refs.dart';
+
 class Client {
   const Client({
     required this.id,
@@ -11,6 +13,7 @@ class Client {
     required this.primaryContactPhone,
     required this.leadSource,
     required this.notes,
+    this.accountManager,
     required this.isArchived,
     required this.healthStatus,
     required this.healthFactors,
@@ -32,6 +35,9 @@ class Client {
   /// How this client first came in (e.g. "Whatsapp", "Call", "Form").
   final String? leadSource;
   final String? notes;
+
+  /// The employee who owns this client relationship.
+  final ProjectEmployeeRef? accountManager;
   final bool isArchived;
 
   /// One of ClientHealthStatus's values.

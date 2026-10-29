@@ -22,6 +22,13 @@ export function toClientResponse(client: Client): ClientResponseDto {
     primaryContactPhone: client.primaryContactPhone ?? null,
     leadSource: client.leadSource ?? null,
     notes: client.notes ?? null,
+    accountManager: client.accountManager
+      ? {
+          id: client.accountManager.id,
+          fullName: `${client.accountManager.firstName} ${client.accountManager.lastName}`,
+          photoUrl: client.accountManager.profilePhotoUrl ?? null,
+        }
+      : null,
     isArchived: client.isArchived,
     archivedAt: client.archivedAt ? client.archivedAt.toISOString() : null,
     healthStatus: client.healthStatus,
@@ -70,12 +77,18 @@ export function toProjectResponse(project: Project): ProjectResponseDto {
     endDate: project.endDate ?? null,
     renewalDate: project.renewalDate ?? null,
     notes: project.notes ?? null,
-    packageName: project.packageName ?? null,
     backlinksTarget: project.backlinksTarget ?? null,
     seoSheetName: project.seoSheetName ?? null,
     projectFolderName: project.projectFolderName ?? null,
     workingEmailAccount: project.workingEmailAccount ?? null,
     ahrefsAccount: project.ahrefsAccount ?? null,
+    accountManager: project.accountManager
+      ? {
+          id: project.accountManager.id,
+          fullName: `${project.accountManager.firstName} ${project.accountManager.lastName}`,
+          photoUrl: project.accountManager.profilePhotoUrl ?? null,
+        }
+      : null,
     assignedEmployees: project.assignedEmployees.map((employee) => ({
       id: employee.id,
       fullName: `${employee.firstName} ${employee.lastName}`,

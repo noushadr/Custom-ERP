@@ -20,6 +20,7 @@ abstract interface class ClientsRepository {
     String? primaryContactPhone,
     String? leadSource,
     String? notes,
+    String? accountManagerId,
   });
   Future<Client> updateClient(
     String id, {
@@ -33,6 +34,7 @@ abstract interface class ClientsRepository {
     String? primaryContactPhone,
     String? leadSource,
     String? notes,
+    String? accountManagerId,
     bool? isArchived,
   });
 
@@ -68,8 +70,9 @@ abstract interface class ClientsRepository {
     required String startDate,
     String? renewalDate,
     String? notes,
-    String? packageName,
+    String? endDate,
     List<String>? assignedEmployeeIds,
+    String? accountManagerId,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
   });
@@ -82,8 +85,9 @@ abstract interface class ClientsRepository {
     String? startDate,
     String? renewalDate,
     String? notes,
-    String? packageName,
+    String? endDate,
     List<String>? assignedEmployeeIds,
+    String? accountManagerId,
     List<String>? targetDepartmentIds,
     List<String>? serviceIds,
     bool? isArchived,

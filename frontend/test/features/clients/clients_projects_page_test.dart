@@ -45,23 +45,34 @@ Future<void> _useWideSurface(WidgetTester tester) async {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-Widget _app({FakeClientsRepository? repository, AuthUser? viewer}) {
+Widget _app({
+  FakeClientsRepository? repository,
+  AuthUser? viewer,
+  bool clientsPage = false,
+  FakeEmployeeRepository? employeeRepository,
+}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
         (ref) => PresetAuthController(AuthAuthenticated(viewer ?? _superAdmin)),
       ),
-      employeeRepositoryProvider.overrideWithValue(FakeEmployeeRepository()),
+      employeeRepositoryProvider.overrideWithValue(
+        employeeRepository ?? FakeEmployeeRepository(),
+      ),
       clientsRepositoryProvider.overrideWithValue(
         repository ?? FakeClientsRepository(),
       ),
     ],
-    child: const MaterialApp(home: Scaffold(body: ClientsProjectsPage())),
+    child: MaterialApp(
+      home: Scaffold(
+        body: clientsPage ? const ClientsPage() : const ProjectsPage(),
+      ),
+    ),
   );
 }
 
 void main() {
-  testWidgets('renders the summary stat tiles', (tester) async {
+  testWidgets('the Projects page renders its stat tiles', (tester) async {
     await tester.pumpWidget(
       _app(
         repository: FakeClientsRepository(
@@ -91,16 +102,50 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Active Projects'), findsOneWidget);
-    expect(find.text('Total Clients'), findsOneWidget);
-    expect(find.text('Active Clients'), findsOneWidget);
     expect(find.text('Monthly Retainers'), findsOneWidget);
     expect(find.text('One-Time Projects'), findsOneWidget);
-    // Active Projects: 1 (only p1 is active), Total Clients: 2, Active
-    // Clients: 1 (only Acme Co has an active project), Monthly Retainers: 1,
-    // One-Time Projects: 1. Scoped to the stat tiles' own Wrap — the "Top
-    // Industries" breakdown panel below also renders plain digit counts
-    // (both test clients default to the same "Retail" industry), so a bare
-    // `find.text` isn't unique anymore.
+    // Client stats live on the Clients page now.
+    expect(find.text('Total Clients'), findsNothing);
+    // Active Projects 1 (only p1), Monthly Retainers 1, One-Time Projects 1.
+    final statTiles = find.byType(Wrap).first;
+    expect(
+      find.descendant(of: statTiles, matching: find.text('1')),
+      findsNWidgets(3),
+    );
+  });
+
+  testWidgets('the Clients page renders its stat tiles', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        clientsPage: true,
+        repository: FakeClientsRepository(
+          clients: [
+            buildTestClient(id: 'c1', companyName: 'Acme Co'),
+            buildTestClient(id: 'c2', companyName: 'Beta LLC'),
+          ],
+          projects: [
+            buildTestProject(
+              id: 'p1',
+              clientId: 'c1',
+              clientName: 'Acme Co',
+              status: ProjectStatus.active,
+            ),
+            buildTestProject(
+              id: 'p2',
+              clientId: 'c2',
+              clientName: 'Beta LLC',
+              status: ProjectStatus.completed,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Total Clients'), findsOneWidget);
+    expect(find.text('Active Clients'), findsOneWidget);
+    expect(find.text('Active Projects'), findsNothing);
+    // Total Clients 2; Active Clients 1 (only Acme Co has an active project).
     final statTiles = find.byType(Wrap).first;
     expect(
       find.descendant(of: statTiles, matching: find.text('2')),
@@ -108,93 +153,62 @@ void main() {
     );
     expect(
       find.descendant(of: statTiles, matching: find.text('1')),
-      findsNWidgets(4),
+      findsOneWidget,
     );
   });
 
-  testWidgets(
-    'shows Top Countries, Top Services, and Top Lead Sources breakdown '
-    'panels — countries render as short codes, services are pulled from '
-    'each project\'s assigned services',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          repository: FakeClientsRepository(
-            clients: [
-              buildTestClient(
-                id: 'c1',
-                companyName: 'Acme Co',
-                country: 'Pakistan',
-                leadSource: 'Whatsapp',
-                industry: 'E-commerce',
-              ),
-              buildTestClient(
-                id: 'c2',
-                companyName: 'Beta LLC',
-                country: 'saudia',
-                leadSource: 'Referral',
-                industry: 'Healthcare',
-              ),
-              buildTestClient(
-                id: 'c3',
-                companyName: 'Gamma Inc',
-                country: 'Pakistan',
-                leadSource: 'Whatsapp',
-                industry: 'E-commerce',
-              ),
-            ],
-            projects: [
-              buildTestProject(
-                id: 'p1',
-                clientId: 'c1',
-                clientName: 'Acme Co',
-                services: const [ProjectServiceRef(id: 's1', name: 'SEO')],
-              ),
-              buildTestProject(
-                id: 'p2',
-                clientId: 'c2',
-                clientName: 'Beta LLC',
-                services: const [ProjectServiceRef(id: 's2', name: 'SMM')],
-              ),
-              buildTestProject(
-                id: 'p3',
-                clientId: 'c3',
-                clientName: 'Gamma Inc',
-                services: const [ProjectServiceRef(id: 's1', name: 'SEO')],
-              ),
-            ],
-          ),
+  testWidgets('the Clients page shows Top Countries, Top Lead Sources and Top '
+      'Industries panels — countries render as short codes', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        clientsPage: true,
+        repository: FakeClientsRepository(
+          clients: [
+            buildTestClient(
+              id: 'c1',
+              companyName: 'Acme Co',
+              country: 'Pakistan',
+              leadSource: 'Whatsapp',
+              industry: 'E-commerce',
+            ),
+            buildTestClient(
+              id: 'c2',
+              companyName: 'Beta LLC',
+              country: 'saudia',
+              leadSource: 'Referral',
+              industry: 'Healthcare',
+            ),
+            buildTestClient(
+              id: 'c3',
+              companyName: 'Gamma Inc',
+              country: 'Pakistan',
+              leadSource: 'Whatsapp',
+              industry: 'E-commerce',
+            ),
+          ],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Top Countries'), findsOneWidget);
-      expect(find.text('Top Services'), findsOneWidget);
-      expect(find.text('Top Lead Sources'), findsOneWidget);
-      expect(find.text('Top Industries'), findsOneWidget);
+    expect(find.text('Top Countries'), findsOneWidget);
+    expect(find.text('Top Lead Sources'), findsOneWidget);
+    expect(find.text('Top Industries'), findsOneWidget);
+    expect(find.text('Top Services'), findsNothing);
 
-      // Scoped to each panel specifically — the Projects/Clients tables
-      // below now also show countries/services/lead sources/industries as
-      // plain columns, so these values legitimately appear more than once
-      // on screen.
-      // 2 clients are in Pakistan (flag + short code), 1 in Saudi Arabia.
-      expect(_inPanel('Top Countries', '🇵🇰 PK'), findsOneWidget);
-      expect(_inPanel('Top Countries', '🇸🇦 KSA'), findsOneWidget);
-      // 2 projects use SEO, 1 uses SMM.
-      expect(_inPanel('Top Services', 'SEO'), findsOneWidget);
-      expect(_inPanel('Top Services', 'SMM'), findsOneWidget);
-      // 2 clients came via Whatsapp, 1 via Referral.
-      expect(_inPanel('Top Lead Sources', 'Whatsapp'), findsOneWidget);
-      expect(_inPanel('Top Lead Sources', 'Referral'), findsOneWidget);
-      // 2 clients are E-commerce, 1 is Healthcare.
-      expect(_inPanel('Top Industries', 'E-commerce'), findsOneWidget);
-      expect(_inPanel('Top Industries', 'Healthcare'), findsOneWidget);
-    },
-  );
+    // Scoped to each panel — the Clients table below also shows these
+    // values as plain columns.
+    expect(_inPanel('Top Countries', '🇵🇰 PK'), findsOneWidget);
+    expect(_inPanel('Top Countries', '🇸🇦 KSA'), findsOneWidget);
+    expect(_inPanel('Top Lead Sources', 'Whatsapp'), findsOneWidget);
+    expect(_inPanel('Top Lead Sources', 'Referral'), findsOneWidget);
+    expect(_inPanel('Top Industries', 'E-commerce'), findsOneWidget);
+    expect(_inPanel('Top Industries', 'Healthcare'), findsOneWidget);
+  });
 
   testWidgets(
     'the Projects tab renders as a detailed table — type, status, start '
-    'date, package, employees, and services all visible per row',
+    'date, deadline/renewal, owner, and employees all visible per row',
     (tester) async {
       await tester.pumpWidget(
         _app(
@@ -206,7 +220,13 @@ void main() {
                 type: ProjectType.retainer,
                 status: ProjectStatus.active,
                 startDate: '2026-02-15',
-                packageName: 'GROWTH +',
+                endDate: '2026-06-30',
+                renewalDate: '2026-07-15',
+                accountManager: const ProjectEmployeeRef(
+                  id: 'e1',
+                  fullName: 'Jane Employee',
+                  photoUrl: null,
+                ),
                 assignedEmployees: const [
                   ProjectEmployeeRef(
                     id: 'e1',
@@ -226,18 +246,17 @@ void main() {
       expect(find.text('SEO Retainer'), findsOneWidget);
       expect(find.text('Retainer'), findsOneWidget);
       expect(find.text('Active'), findsOneWidget);
-      expect(find.text('2026-02-15'), findsOneWidget);
-      expect(find.text('GROWTH +'), findsOneWidget);
-      expect(find.text('Jane Employee'), findsOneWidget);
-      // At least once — the "Top Services" breakdown panel above the
-      // table also derives from this same project's services, so "SEO"
-      // legitimately appears twice on screen.
-      expect(find.text('SEO'), findsWidgets);
+      expect(find.text('Feb 15, 2026'), findsOneWidget);
+      // A retainer shows its renewal date (not the deadline).
+      expect(find.text('Renews Jul 15, 2026'), findsOneWidget);
+      expect(find.text('Jun 30, 2026'), findsNothing);
+      // Owner and employee column both name her.
+      expect(find.text('Jane Employee'), findsNWidgets(2));
     },
   );
 
   testWidgets(
-    'a project with no package/employees/services shows an em dash for '
+    'a project with no deadline/renewal/employees shows an em dash for '
     'each',
     (tester) async {
       await tester.pumpWidget(
@@ -260,6 +279,7 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         _app(
+          clientsPage: true,
           repository: FakeClientsRepository(
             clients: [
               buildTestClient(
@@ -277,9 +297,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Clients'));
-      await tester.pumpAndSettle();
-
       expect(find.text('Acme Co'), findsOneWidget);
       expect(find.text('Jane Client'), findsOneWidget);
       expect(find.text('jane@acme.test'), findsOneWidget);
@@ -295,23 +312,42 @@ void main() {
     },
   );
 
-  testWidgets(
-    'shows the Projects tab by default with New Project/New Client buttons',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          repository: FakeClientsRepository(
-            projects: [buildTestProject(name: 'Website Revamp')],
-          ),
+  testWidgets('the Projects page lists projects with a New Project button', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        repository: FakeClientsRepository(
+          projects: [buildTestProject(name: 'Website Revamp')],
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Website Revamp'), findsOneWidget);
-      expect(find.text('New Project'), findsOneWidget);
-      expect(find.text('New Client'), findsOneWidget);
-    },
-  );
+    expect(find.text('Website Revamp'), findsOneWidget);
+    expect(find.text('New Project'), findsOneWidget);
+    expect(find.text('New Client'), findsNothing);
+  });
+
+  testWidgets('the Clients page lists clients with a New Client button', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        clientsPage: true,
+        repository: FakeClientsRepository(
+          projects: [buildTestProject(name: 'Website Revamp')],
+          clients: [buildTestClient(companyName: 'Beta LLC')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Beta LLC'), findsOneWidget);
+    expect(find.text('Website Revamp'), findsNothing);
+    expect(find.text('New Client'), findsOneWidget);
+    expect(find.text('New Project'), findsNothing);
+  });
 
   testWidgets(
     'the Projects tab shows only non-archived projects by default, and '
@@ -359,32 +395,6 @@ void main() {
     },
   );
 
-  testWidgets(
-    'switching to the Clients tab shows clients instead of projects',
-    (tester) async {
-      await tester.pumpWidget(
-        _app(
-          repository: FakeClientsRepository(
-            projects: [
-              buildTestProject(name: 'Website Revamp', clientName: 'Acme Co'),
-            ],
-            clients: [buildTestClient(companyName: 'Beta LLC')],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Website Revamp'), findsOneWidget);
-      expect(find.text('Beta LLC'), findsNothing);
-
-      await tester.tap(find.text('Clients'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Beta LLC'), findsOneWidget);
-      expect(find.text('Website Revamp'), findsNothing);
-    },
-  );
-
   testWidgets('shows an empty state when there are no projects', (
     tester,
   ) async {
@@ -400,6 +410,7 @@ void main() {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         _app(
+          clientsPage: true,
           repository: FakeClientsRepository(
             clients: [
               buildTestClient(
@@ -416,9 +427,6 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Clients'));
       await tester.pumpAndSettle();
 
       expect(find.text('Acme Co'), findsOneWidget);
@@ -441,6 +449,7 @@ void main() {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         _app(
+          clientsPage: true,
           repository: FakeClientsRepository(
             clients: [
               buildTestClient(companyName: 'Acme Co', country: 'Pakistan'),
@@ -448,9 +457,6 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Clients'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'nobody matches this');
@@ -471,6 +477,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _app(
+        clientsPage: true,
         repository: FakeClientsRepository(
           clients: [
             buildTestClient(
@@ -483,9 +490,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Clients'));
-    await tester.pumpAndSettle();
-
     expect(find.text('At Risk'), findsOneWidget);
   });
 
@@ -495,6 +499,7 @@ void main() {
     await _useWideSurface(tester);
     await tester.pumpWidget(
       _app(
+        clientsPage: true,
         repository: FakeClientsRepository(
           clients: [
             buildTestClient(
@@ -523,7 +528,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Health'));
+    await tester.tap(find.widgetWithText(Tab, 'Health'));
     await tester.pumpAndSettle();
 
     // "Attention Required"/"At Risk" each appear twice: once as a stat tile
@@ -547,6 +552,7 @@ void main() {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         _app(
+          clientsPage: true,
           repository: FakeClientsRepository(
             clients: [
               buildTestClient(
@@ -559,7 +565,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Health'));
+      await tester.tap(find.widgetWithText(Tab, 'Health'));
       await tester.pumpAndSettle();
 
       expect(find.text('No clients need attention right now.'), findsOneWidget);
@@ -599,4 +605,93 @@ void main() {
       expect(repository.getClientsCallCount, 0);
     },
   );
+
+  testWidgets('the Clients page is access-denied without clients.manage too', (
+    tester,
+  ) async {
+    final repository = FakeClientsRepository(
+      clients: [buildTestClient(companyName: 'Should Not Be Visible')],
+    );
+
+    await tester.pumpWidget(
+      _app(
+        clientsPage: true,
+        repository: repository,
+        viewer: const AuthUser(
+          id: 'employee-1',
+          email: 'employee@zeracreative.com',
+          role: 'Employee',
+          permissions: [],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text("You don't have permission to view this page."),
+      findsOneWidget,
+    );
+    expect(find.text('Should Not Be Visible'), findsNothing);
+    expect(repository.getClientsCallCount, 0);
+  });
+
+  testWidgets("shows each client's account manager and filters to My clients "
+      '(account manager, or owner of one of its projects)', (tester) async {
+    await _useWideSurface(tester);
+    const me = ProjectEmployeeRef(
+      id: 'me',
+      fullName: 'Me Myself',
+      photoUrl: null,
+    );
+    const other = ProjectEmployeeRef(
+      id: 'other',
+      fullName: 'Other Person',
+      photoUrl: null,
+    );
+    await tester.pumpWidget(
+      _app(
+        clientsPage: true,
+        employeeRepository: FakeEmployeeRepository(
+          me: buildTestEmployee(id: 'me'),
+        ),
+        repository: FakeClientsRepository(
+          clients: [
+            buildTestClient(
+              id: 'c1',
+              companyName: 'Mine Co',
+              accountManager: me,
+            ),
+            buildTestClient(
+              id: 'c2',
+              companyName: 'Theirs Co',
+              accountManager: other,
+            ),
+            buildTestClient(id: 'c3', companyName: 'Owned Project Co'),
+            buildTestClient(id: 'c4', companyName: 'Nobody Co'),
+          ],
+          projects: [
+            buildTestProject(
+              id: 'p1',
+              clientId: 'c3',
+              clientName: 'Owned Project Co',
+              accountManager: me,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Me Myself'), findsOneWidget);
+    expect(find.text('Other Person'), findsOneWidget);
+    expect(find.text('Theirs Co'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilterChip, 'My clients'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mine Co'), findsOneWidget);
+    expect(find.text('Owned Project Co'), findsOneWidget);
+    expect(find.text('Theirs Co'), findsNothing);
+    expect(find.text('Nobody Co'), findsNothing);
+  });
 }

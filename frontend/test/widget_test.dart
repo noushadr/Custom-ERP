@@ -706,7 +706,7 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
   });
 
-  testWidgets('shows Clients & Projects in the nav for a Super Admin', (
+  testWidgets('shows Clients and Projects in the nav for a Super Admin', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -721,10 +721,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Clients & Projects'), findsOneWidget);
+    expect(find.text('Clients'), findsOneWidget);
+    expect(find.text('Projects'), findsOneWidget);
   });
 
-  testWidgets('shows Clients & Projects in the nav for HR/Manager too', (
+  testWidgets('shows Clients and Projects in the nav for HR/Manager too', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -741,7 +742,8 @@ void main() {
 
     // HR/Manager shares Clients & Projects with Super Admin.
     expect(find.text('Employees'), findsOneWidget);
-    expect(find.text('Clients & Projects'), findsOneWidget);
+    expect(find.text('Clients'), findsOneWidget);
+    expect(find.text('Projects'), findsOneWidget);
   });
 
   testWidgets('hides Clients & Projects from the nav for a plain employee', (
@@ -750,7 +752,8 @@ void main() {
     await tester.pumpWidget(_authenticatedApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Clients & Projects'), findsNothing);
+    expect(find.text('Clients'), findsNothing);
+    expect(find.text('Projects'), findsNothing);
   });
 
   testWidgets('shows Payroll in the nav for a Super Admin', (

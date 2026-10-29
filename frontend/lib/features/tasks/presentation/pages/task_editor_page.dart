@@ -8,6 +8,7 @@ import '../../../clients/domain/entities/client.dart';
 import '../../../clients/domain/entities/project.dart';
 import '../../../clients/domain/entities/project_type.dart';
 import '../../../clients/domain/exceptions/client_exception.dart';
+import '../../../clients/presentation/widgets/quick_add_client_dialog.dart';
 import '../../../employee/application/employee_providers.dart';
 import '../../../employee/domain/entities/department.dart';
 import '../../../employee/domain/entities/employee.dart';
@@ -695,7 +696,7 @@ class _ClientProjectFieldState extends ConsumerState<_ClientProjectField> {
   Project? _selected;
 
   Future<void> _addNewClient() async {
-    final client = await _showQuickAddClientDialog(context, ref);
+    final client = await showQuickAddClientDialog(context, ref);
     if (client == null || !mounted) return;
     ref.invalidate(clientsListProvider(false));
 
@@ -765,93 +766,6 @@ class _ClientProjectFieldState extends ConsumerState<_ClientProjectField> {
   }
 }
 
-/// A minimal "new client" dialog — just the company/client name, which is
-/// the only field `createClient` actually requires; the full client form in
-/// Clients & Projects still covers everything else (industry, website,
-/// primary contact, ...) for later.
-Future<Client?> _showQuickAddClientDialog(BuildContext context, WidgetRef ref) {
-  final nameController = TextEditingController();
-  var submitting = false;
-  String? error;
-
-  return showAppDialog<Client>(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (dialogContext, setState) => AlertDialog(
-        title: const Text('New client'),
-        content: SizedBox(
-          width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (error != null) ...[
-                Text(
-                  error!,
-                  style: TextStyle(
-                    color: Theme.of(dialogContext).colorScheme.error,
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Client / Company name',
-                ),
-                autofocus: true,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: submitting
-                ? null
-                : () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: submitting
-                ? null
-                : () async {
-                    final name = nameController.text.trim();
-                    if (name.length < 2) {
-                      setState(() => error = 'Enter a client name.');
-                      return;
-                    }
-                    setState(() {
-                      submitting = true;
-                      error = null;
-                    });
-                    try {
-                      final client = await ref
-                          .read(clientsRepositoryProvider)
-                          .createClient(companyName: name);
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(client);
-                      }
-                    } on ClientException catch (e) {
-                      setState(() {
-                        submitting = false;
-                        error = e.message;
-                      });
-                    }
-                  },
-            child: submitting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Create'),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 /// A minimal "new project" dialog — just enough to link a brand-new client
 /// to a task (name/type/start date, matching `createProject`'s required
 /// fields); the full project form in Clients & Projects still covers
@@ -864,6 +778,7 @@ Future<Project?> _showQuickAddProjectDialog(
   final nameController = TextEditingController();
   var type = ProjectType.oneTime;
   var startDate = DateTime.now();
+  DateTime? endDate;
   var submitting = false;
   String? error;
 
@@ -926,6 +841,34 @@ Future<Project?> _showQuickAddProjectDialog(
                   child: Text(formatDisplayDate(_isoDate(startDate))),
                 ),
               ),
+              const SizedBox(height: 16),
+              // One-time projects have a deadline; monthly retainers a
+              // renewal date — the same field, labelled for the type.
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: dialogContext,
+                    initialDate: endDate ?? startDate,
+                    firstDate: DateTime.now().subtract(
+                      const Duration(days: 365),
+                    ),
+                    lastDate: DateTime.now().add(const Duration(days: 3650)),
+                  );
+                  if (picked != null) setState(() => endDate = picked);
+                },
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: type == ProjectType.retainer
+                        ? 'Renewal date'
+                        : 'Deadline',
+                  ),
+                  child: Text(
+                    endDate == null
+                        ? '—'
+                        : formatDisplayDate(_isoDate(endDate!)),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -945,6 +888,14 @@ Future<Project?> _showQuickAddProjectDialog(
                       setState(() => error = 'Enter a project name.');
                       return;
                     }
+                    if (endDate == null) {
+                      setState(
+                        () => error = type == ProjectType.retainer
+                            ? 'Set a renewal date.'
+                            : 'Set a deadline.',
+                      );
+                      return;
+                    }
                     setState(() {
                       submitting = true;
                       error = null;
@@ -957,6 +908,12 @@ Future<Project?> _showQuickAddProjectDialog(
                             name: name,
                             type: type,
                             startDate: _isoDate(startDate),
+                            endDate: type == ProjectType.oneTime
+                                ? _isoDate(endDate!)
+                                : null,
+                            renewalDate: type == ProjectType.retainer
+                                ? _isoDate(endDate!)
+                                : null,
                           );
                       if (dialogContext.mounted) {
                         Navigator.of(dialogContext).pop(project);

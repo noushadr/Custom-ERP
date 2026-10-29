@@ -4,7 +4,7 @@ import '../../../../core/layout/breakpoints.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../employee/application/employee_providers.dart';
 import '../../../employee/domain/entities/employee.dart';
-import '../../../employee/presentation/pages/edit_my_profile_page.dart';
+import '../../../employee/presentation/pages/edit_own_profile_route.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../application/auth_providers.dart';
 import '../../application/auth_state.dart';
@@ -57,6 +57,9 @@ class UserMenu extends ConsumerWidget {
           email: email,
           role: role,
           employee: profile,
+          canManageEmployees:
+              state is AuthAuthenticated &&
+              state.user.hasPermission('employees.manage'),
           onSignOut: onSignOut,
         ),
       ],
@@ -71,6 +74,7 @@ class _UserMenuButton extends StatelessWidget {
     required this.email,
     required this.role,
     required this.employee,
+    required this.canManageEmployees,
     required this.onSignOut,
   });
 
@@ -83,6 +87,7 @@ class _UserMenuButton extends StatelessWidget {
   // disabled rather than hidden in that case, same as the rest of this menu
   // never restructures itself while loading.
   final Employee? employee;
+  final bool canManageEmployees;
   final VoidCallback onSignOut;
 
   @override
@@ -91,11 +96,9 @@ class _UserMenuButton extends StatelessWidget {
       tooltip: 'Account menu',
       offset: const Offset(0, 44),
       onSelected: (action) => switch (action) {
-        _UserMenuAction.editProfile => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => EditMyProfilePage(employee: employee!),
-          ),
-        ),
+        _UserMenuAction.editProfile => Navigator.of(
+          context,
+        ).push(editOwnProfileRoute(employee!, canManage: canManageEmployees)),
         _UserMenuAction.changePassword => showChangePasswordDialog(context),
         _UserMenuAction.signOut => onSignOut(),
       },

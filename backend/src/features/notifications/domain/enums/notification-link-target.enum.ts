@@ -3,6 +3,7 @@
  * with the destinations the app's own persisted reminders link to. */
 export enum NotificationLinkTarget {
   CLIENTS_PROJECTS = 'clients_projects',
+  CLIENTS = 'clients',
   TASKS = 'tasks',
   LEAVE = 'leave',
   PERFORMANCE_REVIEWS = 'performance_reviews',

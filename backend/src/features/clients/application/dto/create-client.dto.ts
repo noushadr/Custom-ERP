@@ -40,4 +40,9 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  /** An employee id; an empty string clears it. */
+  @IsOptional()
+  @IsString()
+  accountManagerId?: string;
 }

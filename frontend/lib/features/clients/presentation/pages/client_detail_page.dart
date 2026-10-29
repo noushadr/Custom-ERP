@@ -15,6 +15,7 @@ import '../widgets/client_health_badges.dart';
 import '../widgets/project_badges.dart';
 import 'client_editor_page.dart';
 import 'project_detail_page.dart';
+import 'project_editor_page.dart';
 import '../../../../shared/widgets/app_dialog.dart';
 
 class ClientDetailPage extends ConsumerWidget {
@@ -106,6 +107,15 @@ class _ClientDetailBody extends ConsumerWidget {
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+          if (client.accountManager != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Account manager: ${client.accountManager!.fullName}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
           ],
           const SizedBox(height: 16),
@@ -227,6 +237,15 @@ class _ClientDetailBody extends ConsumerWidget {
           const SizedBox(height: 16),
           FormSection(
             title: 'Projects',
+            trailing: OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ProjectEditorPage(initialClientId: client.id),
+                ),
+              ),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('New Project'),
+            ),
             child: projectsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, _) => const Text('Could not load projects.'),

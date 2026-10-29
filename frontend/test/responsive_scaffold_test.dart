@@ -141,7 +141,7 @@ void main() {
             .dy;
 
         final adminOnlyItemY = topOf('Financial Reports');
-        final hrAdminItemY = topOf('Clients & Projects');
+        final hrAdminItemY = topOf('Clients');
         final generalItemY = topOf('Dashboard');
         expect(adminOnlyItemY, lessThan(hrAdminItemY));
         expect(hrAdminItemY, lessThan(generalItemY));

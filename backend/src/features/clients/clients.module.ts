@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthenticationModule } from '../authentication/authentication.module';
 import { DepartmentsModule } from '../departments/departments.module';
 import { EmployeeModule } from '../employee/employee.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ClientsService } from './application/clients.service';
 import { TypeOrmClientHealthHistoryRepository } from './data/repositories/client-health-history.repository';
 import { TypeOrmClientRepository } from './data/repositories/client.repository';
@@ -26,6 +27,7 @@ import { ServicesController } from './presentation/services.controller';
     AuthenticationModule,
     EmployeeModule,
     DepartmentsModule,
+    NotificationsModule,
   ],
   controllers: [ClientsController, ServicesController, ProjectsController],
   providers: [

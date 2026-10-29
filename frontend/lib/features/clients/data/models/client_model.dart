@@ -1,4 +1,6 @@
+import '../../../../shared/utils/photo_url.dart';
 import '../../domain/entities/client.dart';
+import '../../domain/entities/project_refs.dart';
 
 class ClientModel extends Client {
   const ClientModel({
@@ -13,6 +15,7 @@ class ClientModel extends Client {
     required super.primaryContactPhone,
     required super.leadSource,
     required super.notes,
+    super.accountManager,
     required super.isArchived,
     required super.healthStatus,
     required super.healthFactors,
@@ -33,6 +36,20 @@ class ClientModel extends Client {
     primaryContactPhone: json['primaryContactPhone'] as String?,
     leadSource: json['leadSource'] as String?,
     notes: json['notes'] as String?,
+    accountManager: json['accountManager'] == null
+        ? null
+        : ProjectEmployeeRef(
+            id:
+                (json['accountManager'] as Map<String, dynamic>)['id']
+                    as String,
+            fullName:
+                (json['accountManager'] as Map<String, dynamic>)['fullName']
+                    as String,
+            photoUrl: resolvePhotoUrl(
+              (json['accountManager'] as Map<String, dynamic>)['photoUrl']
+                  as String?,
+            ),
+          ),
     isArchived: json['isArchived'] as bool,
     healthStatus: json['healthStatus'] as String,
     healthFactors: (json['healthFactors'] as List<dynamic>).cast<String>(),

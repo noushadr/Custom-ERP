@@ -7,6 +7,8 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/checklists/application/checklist_providers.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/employee/domain/entities/audit_log_entry.dart';
+import 'package:zera_erp/features/employee/presentation/pages/edit_employee_page.dart';
+import 'package:zera_erp/features/employee/presentation/pages/edit_my_profile_page.dart';
 import 'package:zera_erp/features/employee/presentation/pages/employee_profile_page.dart';
 import 'package:zera_erp/features/goals/application/goal_providers.dart';
 import 'package:zera_erp/features/leave/application/leave_providers.dart';
@@ -101,6 +103,35 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Edit My Profile'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'an HR/Admin who can manage employees gets the FULL edit form on their '
+    'own profile, not the limited self-service one',
+    (tester) async {
+      final me = buildTestEmployee(email: 'hr@zeracreative.com');
+      final viewer = AuthUser(
+        id: 'hr-1',
+        email: 'hr@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: const ['employees.manage'],
+      );
+
+      await tester.pumpWidget(
+        _app(
+          viewer: viewer,
+          repository: FakeEmployeeRepository(me: me),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EditEmployeePage), findsOneWidget);
+      expect(find.byType(EditMyProfilePage), findsNothing);
+      expect(find.text('Organization'), findsOneWidget);
     },
   );
 

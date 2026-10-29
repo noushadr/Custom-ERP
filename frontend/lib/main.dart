@@ -172,9 +172,14 @@ const _allDestinations = [
     selectedIcon: Icons.settings_outlined,
   ),
   AppNavDestination(
-    label: 'Clients & Projects',
+    label: 'Clients',
     icon: Icons.business_center_outlined,
     selectedIcon: Icons.business_center_outlined,
+  ),
+  AppNavDestination(
+    label: 'Projects',
+    icon: Icons.work_outline,
+    selectedIcon: Icons.work_outline,
   ),
   AppNavDestination(
     label: 'Payroll',
@@ -211,7 +216,8 @@ const _adminOnlyLabels = {
   'Dashboard',
   'Employees',
   'Settings',
-  'Clients & Projects',
+  'Clients',
+  'Projects',
   'Payroll',
   'Leads',
   'Financial Reports',
@@ -254,7 +260,7 @@ const _superAdminOnlyLabels = {'Financial Reports', 'Leads'};
 // so it could sit in "General Features" instead, last after Settings (see
 // the comment above _adminOnlyLabels and Logs' own entry in
 // _allDestinations).
-const _hrAndAdminOnlyLabels = {'Clients & Projects', 'Payroll'};
+const _hrAndAdminOnlyLabels = {'Clients', 'Projects', 'Payroll'};
 
 bool _isAdminOrHr(WidgetRef ref) {
   final authState = ref.watch(authControllerProvider);
@@ -375,8 +381,10 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const KnowledgeBasePage();
       case 'Settings':
         return const SettingsPage();
-      case 'Clients & Projects':
-        return const ClientsProjectsPage();
+      case 'Clients':
+        return const ClientsPage();
+      case 'Projects':
+        return const ProjectsPage();
       case 'Payroll':
         return const PayrollPage();
       case 'Leads':
@@ -446,9 +454,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
   }
 
   void _openProject(String projectId) {
-    final index = _allDestinations.indexWhere(
-      (d) => d.label == 'Clients & Projects',
-    );
+    final index = _allDestinations.indexWhere((d) => d.label == 'Projects');
     if (index == -1) return;
     final navigatorState = _sectionNavigatorKeys[index].currentState;
     navigatorState?.popUntil((route) => route.isFirst);
@@ -461,9 +467,7 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
   }
 
   void _openClient(String clientId) {
-    final index = _allDestinations.indexWhere(
-      (d) => d.label == 'Clients & Projects',
-    );
+    final index = _allDestinations.indexWhere((d) => d.label == 'Clients');
     if (index == -1) return;
     final navigatorState = _sectionNavigatorKeys[index].currentState;
     navigatorState?.popUntil((route) => route.isFirst);
@@ -521,7 +525,13 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         if (linkEntityId != null) {
           _openProject(linkEntityId);
         } else {
-          _goToDestination('Clients & Projects');
+          _goToDestination('Projects');
+        }
+      case 'clients':
+        if (linkEntityId != null) {
+          _openClient(linkEntityId);
+        } else {
+          _goToDestination('Clients');
         }
       case 'tasks':
         if (linkEntityId != null) {

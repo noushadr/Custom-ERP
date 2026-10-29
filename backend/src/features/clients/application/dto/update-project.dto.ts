@@ -46,10 +46,6 @@ export class UpdateProjectDto {
 
   @IsOptional()
   @IsString()
-  packageName?: string;
-
-  @IsOptional()
-  @IsString()
   backlinksTarget?: string;
 
   @IsOptional()
@@ -72,6 +68,11 @@ export class UpdateProjectDto {
   @IsArray()
   @IsString({ each: true })
   assignedEmployeeIds?: string[];
+
+  /** Must be one of the assigned employees; an empty string clears it. */
+  @IsOptional()
+  @IsString()
+  accountManagerId?: string;
 
   @IsOptional()
   @IsArray()

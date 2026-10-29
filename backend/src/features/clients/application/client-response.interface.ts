@@ -10,6 +10,7 @@ export interface ClientResponseDto {
   primaryContactPhone: string | null;
   leadSource: string | null;
   notes: string | null;
+  accountManager: ProjectEmployeeRef | null;
   isArchived: boolean;
   archivedAt: string | null;
   healthStatus: string;
@@ -72,12 +73,12 @@ export interface ProjectResponseDto {
   endDate: string | null;
   renewalDate: string | null;
   notes: string | null;
-  packageName: string | null;
   backlinksTarget: string | null;
   seoSheetName: string | null;
   projectFolderName: string | null;
   workingEmailAccount: string | null;
   ahrefsAccount: string | null;
+  accountManager: ProjectEmployeeRef | null;
   assignedEmployees: ProjectEmployeeRef[];
   targetDepartments: ProjectDepartmentRef[];
   services: ProjectServiceRef[];

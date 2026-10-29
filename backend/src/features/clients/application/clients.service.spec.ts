@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { UserRepository } from '../../authentication/domain/repositories/user-repository.interface';
 import { Department } from '../../departments/domain/entities/department.entity';
 import type { DepartmentRepository } from '../../departments/domain/repositories/department-repository.interface';
@@ -83,6 +83,7 @@ describe('ClientsService', () => {
   let departmentRepository: jest.Mocked<DepartmentRepository>;
   let clientHealthHistoryRepository: jest.Mocked<ClientHealthHistoryRepository>;
   let userRepository: jest.Mocked<UserRepository>;
+  let notificationsService: { create: jest.Mock };
 
   beforeEach(() => {
     const stampTimestamps = (item: { createdAt?: Date; updatedAt?: Date }) => ({
@@ -137,6 +138,8 @@ describe('ClientsService', () => {
       save: jest.fn(),
     };
 
+    notificationsService = { create: jest.fn() };
+
     service = new ClientsService(
       clientRepository,
       serviceRepository,
@@ -145,6 +148,7 @@ describe('ClientsService', () => {
       departmentRepository,
       clientHealthHistoryRepository,
       userRepository,
+      notificationsService,
     );
   });
 
@@ -389,6 +393,7 @@ describe('ClientsService', () => {
         name: 'Website Revamp',
         type: ProjectType.ONE_TIME,
         startDate: '2026-01-01',
+        endDate: '2099-12-31',
         assignedEmployeeIds: ['employee-1'],
         targetDepartmentIds: ['dept-1'],
         serviceIds: ['service-1'],
@@ -402,12 +407,11 @@ describe('ClientsService', () => {
   });
 
   describe('projects — SEO fields', () => {
-    it('stores package/backlinks/sheet/folder/account fields on create', async () => {
+    it('stores backlinks/sheet/folder/account fields on create', async () => {
       projectRepository.findById.mockImplementation((id) =>
         Promise.resolve(
           buildProject({
             id,
-            packageName: 'GROWTH +',
             backlinksTarget: '10/90',
             seoSheetName: 'Acme - SEO Sheet',
             projectFolderName: 'Acme Inc',
@@ -422,7 +426,7 @@ describe('ClientsService', () => {
         name: 'SEO Retainer',
         type: ProjectType.RETAINER,
         startDate: '2026-01-01',
-        packageName: 'GROWTH +',
+        renewalDate: '2099-12-31',
         backlinksTarget: '10/90',
         seoSheetName: 'Acme - SEO Sheet',
         projectFolderName: 'Acme Inc',
@@ -430,7 +434,6 @@ describe('ClientsService', () => {
         ahrefsAccount: 'ahrefs@example.com',
       });
 
-      expect(result.packageName).toBe('GROWTH +');
       expect(result.backlinksTarget).toBe('10/90');
       expect(result.seoSheetName).toBe('Acme - SEO Sheet');
       expect(result.projectFolderName).toBe('Acme Inc');
@@ -438,16 +441,14 @@ describe('ClientsService', () => {
       expect(result.ahrefsAccount).toBe('ahrefs@example.com');
     });
 
-    it('updates package/backlinks/sheet/folder/account fields', async () => {
+    it('updates backlinks/sheet/folder/account fields', async () => {
       const project = buildProject();
       projectRepository.findById.mockResolvedValue(project);
 
       const result = await service.updateProject('project-1', {
-        packageName: 'VALUE',
         backlinksTarget: '20/40',
       });
 
-      expect(result.packageName).toBe('VALUE');
       expect(result.backlinksTarget).toBe('20/40');
     });
 
@@ -488,11 +489,255 @@ describe('ClientsService', () => {
         name: 'SEO Retainer',
         type: ProjectType.RETAINER,
         startDate: '2026-01-01',
+        renewalDate: '2099-12-31',
       });
 
-      expect(result.packageName).toBeNull();
       expect(result.workingEmailAccount).toBeNull();
       expect(result.ahrefsAccount).toBeNull();
+    });
+  });
+
+  describe('client account manager and notifications', () => {
+    it('stores an account manager on a client and returns them', async () => {
+      const manager = buildEmployee({ id: 'employee-1', userId: 'user-9' });
+      employeeRepository.findById.mockResolvedValue(manager);
+
+      const result = await service.createClient({
+        companyName: 'Acme Co',
+        accountManagerId: 'employee-1',
+      });
+
+      expect(result.accountManager?.id).toBe('employee-1');
+    });
+
+    it('rejects an account manager who does not exist', async () => {
+      employeeRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.createClient({
+          companyName: 'Acme Co',
+          accountManagerId: 'nobody',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('notifies the account manager when the health status changes', async () => {
+      const manager = buildEmployee({ id: 'employee-1', userId: 'user-9' });
+      clientRepository.findById.mockResolvedValue(
+        buildClient({ accountManager: manager }),
+      );
+
+      await service.updateClientHealth('client-1', 'someone-else', {
+        status: ClientHealthStatus.AT_RISK,
+      });
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientUserId: 'user-9',
+          linkEntityId: 'client-1',
+        }),
+      );
+    });
+
+    it('does not notify the account manager about their own change', async () => {
+      const manager = buildEmployee({ id: 'employee-1', userId: 'user-9' });
+      clientRepository.findById.mockResolvedValue(
+        buildClient({ accountManager: manager }),
+      );
+
+      await service.updateClientHealth('client-1', 'user-9', {
+        status: ClientHealthStatus.AT_RISK,
+      });
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('reminds the owners of a retainer 30/14/7 days before renewal, once each', async () => {
+      jest.useFakeTimers({ now: new Date('2026-12-01T05:00:00Z') });
+      const owner = buildEmployee({ id: 'employee-1', userId: 'user-1' });
+      const clientManager = buildEmployee({ id: 'employee-2', userId: 'user-2' });
+      projectRepository.findAll.mockResolvedValue([
+        buildProject({
+          id: 'due-in-14',
+          type: ProjectType.RETAINER,
+          renewalDate: '2026-12-15',
+          accountManager: owner,
+          client: buildClient({ accountManager: clientManager }),
+        }),
+        buildProject({
+          id: 'due-in-10',
+          type: ProjectType.RETAINER,
+          renewalDate: '2026-12-11',
+          accountManager: owner,
+        }),
+        buildProject({
+          id: 'one-time',
+          type: ProjectType.ONE_TIME,
+          renewalDate: '2026-12-15',
+          accountManager: owner,
+        }),
+      ]);
+
+      const sent = await service.notifyUpcomingRenewals();
+      jest.useRealTimers();
+
+      expect(sent).toBe(2);
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientUserId: 'user-1',
+          linkEntityId: 'due-in-14',
+        }),
+      );
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'user-2' }),
+      );
+    });
+  });
+
+  describe('projects — account manager', () => {
+    it('stores one of the assigned employees as the account manager', async () => {
+      const lead = buildEmployee({ id: 'employee-1' });
+      employeeRepository.findAll.mockResolvedValue([lead]);
+      projectRepository.findById.mockImplementation((id) =>
+        Promise.resolve(
+          buildProject({
+            id,
+            assignedEmployees: [lead],
+            accountManager: lead,
+            accountManagerId: lead.id,
+          }),
+        ),
+      );
+
+      const result = await service.createProject({
+        clientId: 'client-1',
+        name: 'Website Revamp',
+        type: ProjectType.ONE_TIME,
+        startDate: '2026-01-01',
+        endDate: '2099-12-31',
+        assignedEmployeeIds: ['employee-1'],
+        accountManagerId: 'employee-1',
+      });
+
+      expect(result.accountManager?.id).toBe('employee-1');
+    });
+
+    it('rejects an account manager who is not an assigned employee', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'employee-1' }),
+      ]);
+
+      await expect(
+        service.createProject({
+          clientId: 'client-1',
+          name: 'Website Revamp',
+          type: ProjectType.ONE_TIME,
+          startDate: '2026-01-01',
+          endDate: '2099-12-31',
+          assignedEmployeeIds: ['employee-1'],
+          accountManagerId: 'someone-else',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('clears the account manager when an empty id is sent', async () => {
+      const lead = buildEmployee({ id: 'employee-1' });
+      const project = buildProject({
+        assignedEmployees: [lead],
+        accountManager: lead,
+        accountManagerId: lead.id,
+      });
+      projectRepository.findById.mockResolvedValue(project);
+
+      await service.updateProject('project-1', { accountManagerId: '' });
+
+      expect(project.accountManager).toBeNull();
+    });
+  });
+
+  describe('projects — required dates', () => {
+    it('rejects a one-time project with no deadline', async () => {
+      await expect(
+        service.createProject({
+          clientId: 'client-1',
+          name: 'No deadline',
+          type: ProjectType.ONE_TIME,
+          startDate: '2026-01-01',
+          renewalDate: '2026-02-01',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects a monthly retainer with no renewal date', async () => {
+      await expect(
+        service.createProject({
+          clientId: 'client-1',
+          name: 'No renewal',
+          type: ProjectType.RETAINER,
+          startDate: '2026-01-01',
+          endDate: '2026-12-01',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('accepts a retainer with a renewal date', async () => {
+      projectRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildProject({ id })),
+      );
+
+      await expect(
+        service.createProject({
+          clientId: 'client-1',
+          name: 'Retainer',
+          type: ProjectType.RETAINER,
+          startDate: '2026-01-01',
+          renewalDate: '2026-02-01',
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('rejects a deadline before the start date', async () => {
+      await expect(
+        service.createProject({
+          clientId: 'client-1',
+          name: 'Backwards',
+          type: ProjectType.ONE_TIME,
+          startDate: '2026-03-01',
+          endDate: '2026-02-01',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('drops the date that does not belong to the type when saving', async () => {
+      projectRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildProject({ id })),
+      );
+
+      await service.createProject({
+        clientId: 'client-1',
+        name: 'One-time',
+        type: ProjectType.ONE_TIME,
+        startDate: '2026-01-01',
+        endDate: '2026-03-01',
+        renewalDate: '2026-02-01',
+      });
+
+      expect(projectRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ endDate: '2026-03-01', renewalDate: null }),
+      );
+    });
+
+    it('does not block updates that leave the dates and type alone', async () => {
+      const project = buildProject({
+        endDate: undefined,
+        renewalDate: undefined,
+        isArchived: false,
+      });
+      projectRepository.findById.mockResolvedValue(project);
+
+      await expect(
+        service.updateProject('project-1', { isArchived: true }),
+      ).resolves.toBeDefined();
     });
   });
 

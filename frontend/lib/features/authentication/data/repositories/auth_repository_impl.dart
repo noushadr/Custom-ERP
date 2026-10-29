@@ -6,10 +6,22 @@ import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
-  const AuthRepositoryImpl(this._remoteDataSource, this._tokenStorage);
+  const AuthRepositoryImpl(
+    this._remoteDataSource,
+    this._tokenStorage, {
+    this.restoreRetryDelays = const [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+      Duration(seconds: 4),
+    ],
+  });
 
   final AuthRemoteDataSource _remoteDataSource;
   final TokenStorage _tokenStorage;
+
+  /// Waits between attempts to confirm a saved session on startup when the
+  /// server can't be reached (e.g. it is restarting for a deploy).
+  final List<Duration> restoreRetryDelays;
 
   @override
   Future<AuthUser> login(
@@ -89,13 +101,27 @@ class AuthRepositoryImpl implements AuthRepository {
     final token = await _tokenStorage.accessToken;
     if (token == null) return null;
 
-    try {
-      return await _remoteDataSource.me();
-    } on DioException {
-      // The client already attempted a token refresh; a failure here means
-      // the session is no longer valid.
-      await _tokenStorage.clear();
-      return null;
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await _remoteDataSource.me();
+      } on DioException catch (error) {
+        // The client already attempted a token refresh. Only the server
+        // rejecting the credentials means the session is really over — a
+        // network blip, timeout, rate limit (429) or 5xx (e.g. the backend
+        // restarting during a deploy) says nothing about it, and wiping the
+        // saved login on one of those signed people out over a hiccup.
+        final status = error.response?.statusCode;
+        if (status == 401 || status == 403) {
+          await _tokenStorage.clear();
+          return null;
+        }
+        if (attempt >= restoreRetryDelays.length) {
+          // Still can't tell: keep the saved tokens so the next reload
+          // restores the session, and show the login screen for now.
+          return null;
+        }
+        await Future<void>.delayed(restoreRetryDelays[attempt]);
+      }
     }
   }
 

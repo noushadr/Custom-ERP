@@ -1,5 +1,6 @@
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
+import { Employee } from '../../../employee/domain/entities/employee.entity';
 import { ClientHealthStatus } from '../enums/client-health-status.enum';
 
 /** A single primary contact per client is enough for v1 — a separate
@@ -38,6 +39,19 @@ export class Client extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   notes?: string;
+
+  /** The employee who owns this client relationship. Health changes and
+   * upcoming renewals notify them. */
+  @Column({ type: 'uuid', nullable: true })
+  accountManagerId?: string | null;
+
+  @ManyToOne(() => Employee, {
+    eager: true,
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'accountManagerId' })
+  accountManager?: Employee | null;
 
   @Column({ default: false })
   isArchived: boolean;

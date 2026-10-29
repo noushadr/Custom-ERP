@@ -39,21 +39,18 @@ export class Project extends BaseEntity {
   @Column({ type: 'date' })
   startDate: string;
 
+  /** A one-time project's deadline (required for one-time, unused for
+   * retainers). */
   @Column({ type: 'date', nullable: true })
-  endDate?: string;
+  endDate?: string | null;
 
-  /** A retainer's next renewal/billing date. */
+  /** A monthly retainer's next renewal/billing date (required for
+   * retainers, unused for one-time projects). */
   @Column({ type: 'date', nullable: true })
-  renewalDate?: string;
+  renewalDate?: string | null;
 
   @Column({ type: 'text', nullable: true })
   notes?: string;
-
-  /** Free-text tier label (e.g. "GROWTH +", "VALUE", "INTERNAL BRAND -
-   * NO LIMIT") — deliberately not an enum, since real-world packages carry
-   * one-off customizations (e.g. "GROWTH + 130 backlinks + 6 GP DA 30-50"). */
-  @Column({ nullable: true })
-  packageName?: string;
 
   /** Free-text monthly backlink target — a plain number or a "min/max"
    * range, kept as text since the source data isn't consistently numeric. */
@@ -89,6 +86,15 @@ export class Project extends BaseEntity {
 
   @Column({ type: 'timestamptz', nullable: true })
   archivedAt: Date | null;
+
+  /** The project's owner / account manager — always one of the assigned
+   * employees (enforced in ClientsService). */
+  @Column({ type: 'uuid', nullable: true })
+  accountManagerId?: string | null;
+
+  @ManyToOne(() => Employee, { eager: true, nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'accountManagerId' })
+  accountManager?: Employee | null;
 
   @ManyToMany(() => Employee, { eager: true })
   @JoinTable({

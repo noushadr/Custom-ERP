@@ -152,6 +152,10 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
           .uploadPhoto(widget.employee.id, picked!.bytes!, picked.name);
       ref.invalidate(employeeListProvider);
       ref.invalidate(employeeDetailProvider(widget.employee.id));
+      // Editing your own record through this full form: refresh the top-bar
+      // name/photo and own-profile views too.
+      ref.invalidate(myProfileProvider);
+      ref.invalidate(myAuditLogProvider);
       if (!mounted) return;
       setState(() => _photoUrl = employee.profilePhotoUrl);
     } on EmployeeException catch (error) {

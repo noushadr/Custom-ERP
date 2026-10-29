@@ -6,17 +6,21 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/authentication/presentation/widgets/user_menu.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
+import 'package:zera_erp/features/employee/presentation/pages/edit_employee_page.dart';
 import 'package:zera_erp/features/employee/presentation/pages/edit_my_profile_page.dart';
 
 import '../../helpers/fake_auth.dart';
 import '../../helpers/fake_employee.dart';
 
-Widget _app({required bool withLinkedEmployee}) {
+Widget _app({
+  required bool withLinkedEmployee,
+  List<String> permissions = const [],
+}) {
   final user = AuthUser(
     id: 'user-1',
     email: 'jane.doe@zeracreative.com',
     role: 'Employee',
-    permissions: const [],
+    permissions: permissions,
   );
 
   return ProviderScope(
@@ -53,6 +57,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EditMyProfilePage), findsOneWidget);
+  });
+
+  testWidgets('Edit profile opens the full edit form for someone who can '
+      'manage employees', (tester) async {
+    await tester.pumpWidget(
+      _app(withLinkedEmployee: true, permissions: const ['employees.manage']),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Account menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EditEmployeePage), findsOneWidget);
+    expect(find.byType(EditMyProfilePage), findsNothing);
   });
 
   testWidgets('disables Edit profile when there is no linked employee', (

@@ -6,6 +6,7 @@ import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
 import 'package:zera_erp/features/clients/application/clients_providers.dart';
 import 'package:zera_erp/features/clients/domain/entities/project_refs.dart';
+import 'package:zera_erp/features/clients/domain/entities/project_type.dart';
 import 'package:zera_erp/features/clients/presentation/pages/project_detail_page.dart';
 import 'package:zera_erp/features/employee/application/employee_providers.dart';
 import 'package:zera_erp/features/tasks/application/task_providers.dart';
@@ -43,14 +44,13 @@ Widget _app({
 }
 
 void main() {
-  testWidgets('shows services, departments, and employees', (tester) async {
+  testWidgets('shows departments and employees', (tester) async {
     await tester.pumpWidget(
       _app(
         repository: FakeClientsRepository(
           projects: [
             buildTestProject(
               name: 'Website Revamp',
-              services: const [ProjectServiceRef(id: 's1', name: 'SEO')],
               targetDepartments: const [
                 ProjectDepartmentRef(id: 'd1', name: 'Engineering'),
               ],
@@ -69,21 +69,27 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Website Revamp'), findsOneWidget);
-    expect(find.text('SEO'), findsOneWidget);
     expect(find.text('Engineering'), findsOneWidget);
     expect(find.text('Jane Doe'), findsOneWidget);
   });
 
-  testWidgets('shows only a plain "Package" section — never "SEO Details" — '
-      'regardless of the project\'s actual service', (tester) async {
+  testWidgets('a one-time project shows its deadline and owner, not a renewal '
+      'date, and no Package/Services sections', (tester) async {
     await tester.pumpWidget(
       _app(
         repository: FakeClientsRepository(
           projects: [
             buildTestProject(
-              name: 'SMM Retainer',
-              services: const [ProjectServiceRef(id: 's1', name: 'SMM')],
-              packageName: 'GROWTH +',
+              name: 'Site Build',
+              type: ProjectType.oneTime,
+              startDate: '2026-02-15',
+              endDate: '2026-06-30',
+              renewalDate: '2026-07-15',
+              accountManager: const ProjectEmployeeRef(
+                id: 'e1',
+                fullName: 'Jane Owner',
+                photoUrl: null,
+              ),
             ),
           ],
         ),
@@ -91,28 +97,34 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('SEO Details'), findsNothing);
-    expect(find.text('Package'), findsOneWidget);
-    expect(find.text('GROWTH +'), findsOneWidget);
-    expect(
-      find.textContaining('kept in the team password manager'),
-      findsNothing,
-    );
+    expect(find.text('Deadline Jun 30, 2026'), findsOneWidget);
+    expect(find.textContaining('Renews'), findsNothing);
+    expect(find.text('Owner Jane Owner'), findsOneWidget);
+    expect(find.text('Package'), findsNothing);
+    expect(find.text('Services'), findsNothing);
   });
 
-  testWidgets('shows no Package section when the project has none set', (
+  testWidgets('a retainer shows its renewal date, not a deadline', (
     tester,
   ) async {
     await tester.pumpWidget(
       _app(
         repository: FakeClientsRepository(
-          projects: [buildTestProject(packageName: null)],
+          projects: [
+            buildTestProject(
+              name: 'SEO Retainer',
+              type: ProjectType.retainer,
+              endDate: '2026-06-30',
+              renewalDate: '2026-07-15',
+            ),
+          ],
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Package'), findsNothing);
+    expect(find.text('Renews Jul 15, 2026'), findsOneWidget);
+    expect(find.textContaining('Deadline'), findsNothing);
   });
 
   testWidgets(
@@ -197,9 +209,7 @@ void main() {
       await tester.pumpWidget(
         _app(
           repository: FakeClientsRepository(
-            projects: [
-              buildTestProject(name: 'Old Project', isArchived: true),
-            ],
+            projects: [buildTestProject(name: 'Old Project', isArchived: true)],
           ),
         ),
       );

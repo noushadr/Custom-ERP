@@ -11,26 +11,50 @@ import '../../domain/entities/client.dart';
 import '../../domain/entities/project.dart';
 import '../../domain/entities/project_status.dart';
 import '../../domain/entities/project_type.dart';
-import '../../domain/entities/service.dart';
 import '../../domain/exceptions/client_exception.dart';
 import '../widgets/project_badges.dart';
+import '../widgets/quick_add_client_dialog.dart';
+
+/// Admin Staff (admin and cleaning staff) never work on client projects, so
+/// that department and its employees aren't offered when assigning a project
+/// — unless one is already on the project being edited, so nothing is
+/// silently dropped.
+bool _isAdminStaff(String? departmentName) =>
+    departmentName?.trim().toLowerCase() == 'admin staff';
+
+/// Only people still working for the company can be assigned (active, on
+/// leave, or serving their notice) — not resigned or terminated ones.
+bool _isStillWorking(String employmentStatus) =>
+    employmentStatus == 'active' ||
+    employmentStatus == 'on_leave' ||
+    employmentStatus == 'notice_period';
 
 String _isoDate(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-'
     '${date.month.toString().padLeft(2, '0')}-'
     '${date.day.toString().padLeft(2, '0')}';
 
-/// Create or edit a project: client, type/status, start/renewal dates,
-/// package, and employee/department/service assignment. Departments are
-/// picked directly rather than derived from the assigned employees — a
-/// project regularly involves people from a department who aren't
-/// individually assigned to it yet, or spans several teams working
-/// together (a "Hybrid" project, shown once more than one is picked).
+/// Create or edit a project: client (searchable, with a quick "add new"),
+/// type/status, a start date plus the date that fits the type (a one-time
+/// project's deadline, or a monthly retainer's renewal date), department and
+/// employee assignment, and the account manager / project owner.
+/// Departments are picked first and directly rather than derived from the
+/// assigned employees — a project regularly involves people from a
+/// department who aren't individually assigned to it yet, or spans several
+/// teams working together (a "Hybrid" project, shown once more than one is
+/// picked). Employees are then found with a search box.
 class ProjectEditorPage extends ConsumerStatefulWidget {
-  const ProjectEditorPage({super.key, this.existingProject});
+  const ProjectEditorPage({
+    super.key,
+    this.existingProject,
+    this.initialClientId,
+  });
 
   /// Null when creating a new project; the current project when editing.
   final Project? existingProject;
+
+  /// Pre-selects the client when starting a project from that client's page.
+  final String? initialClientId;
 
   @override
   ConsumerState<ProjectEditorPage> createState() => _ProjectEditorPageState();
@@ -40,16 +64,16 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _notesController;
-  late final TextEditingController _packageNameController;
 
   String? _clientId;
   late String _type;
   late String _status;
   DateTime? _startDate;
+  DateTime? _endDate;
   DateTime? _renewalDate;
   late Set<String> _selectedEmployeeIds;
   late Set<String> _selectedDepartmentIds;
-  late Set<String> _selectedServiceIds;
+  String? _accountManagerId;
 
   bool _submitting = false;
   String? _errorMessage;
@@ -62,24 +86,22 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
     final existing = widget.existingProject;
     _nameController = TextEditingController(text: existing?.name ?? '');
     _notesController = TextEditingController(text: existing?.notes ?? '');
-    _packageNameController = TextEditingController(
-      text: existing?.packageName ?? '',
-    );
-    _clientId = existing?.clientId;
+    _clientId = existing?.clientId ?? widget.initialClientId;
     _type = existing?.type ?? ProjectType.oneTime;
     _status = existing?.status ?? ProjectStatus.active;
     _startDate = existing != null ? DateTime.parse(existing.startDate) : null;
+    _endDate = existing?.endDate != null
+        ? DateTime.parse(existing!.endDate!)
+        : null;
     _renewalDate = existing?.renewalDate != null
         ? DateTime.parse(existing!.renewalDate!)
         : null;
     _selectedEmployeeIds = {
       ...(existing?.assignedEmployees.map((e) => e.id) ?? const []),
     };
+    _accountManagerId = existing?.accountManager?.id;
     _selectedDepartmentIds = {
       ...(existing?.targetDepartments.map((d) => d.id) ?? const []),
-    };
-    _selectedServiceIds = {
-      ...(existing?.services.map((s) => s.id) ?? const []),
     };
   }
 
@@ -87,7 +109,6 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
   void dispose() {
     _nameController.dispose();
     _notesController.dispose();
-    _packageNameController.dispose();
     super.dispose();
   }
 
@@ -115,6 +136,21 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
       setState(() => _errorMessage = 'Select a start date.');
       return;
     }
+    final isRetainer = _type == ProjectType.retainer;
+    if (isRetainer && _renewalDate == null) {
+      setState(() => _errorMessage = 'Set a renewal date.');
+      return;
+    }
+    if (!isRetainer && _endDate == null) {
+      setState(() => _errorMessage = 'Set a deadline.');
+      return;
+    }
+    if (!isRetainer && _endDate!.isBefore(_startDate!)) {
+      setState(
+        () => _errorMessage = 'The deadline can\'t be before the start date.',
+      );
+      return;
+    }
 
     setState(() {
       _submitting = true;
@@ -133,14 +169,13 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               type: _type,
               status: _status,
               startDate: _isoDate(_startDate!),
-              renewalDate: _renewalDate != null
-                  ? _isoDate(_renewalDate!)
-                  : null,
+              endDate: !isRetainer ? _isoDate(_endDate!) : null,
+              renewalDate: isRetainer ? _isoDate(_renewalDate!) : null,
               notes: _notesController.text.trim(),
-              packageName: _packageNameController.text.trim(),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
+              // An empty id clears the manager.
+              accountManagerId: _accountManagerId ?? '',
               targetDepartmentIds: departmentIds,
-              serviceIds: _selectedServiceIds.toList(),
             )
           : await repository.createProject(
               clientId: _clientId!,
@@ -148,16 +183,14 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
               type: _type,
               status: _status,
               startDate: _isoDate(_startDate!),
-              renewalDate: _renewalDate != null
-                  ? _isoDate(_renewalDate!)
-                  : null,
+              endDate: !isRetainer ? _isoDate(_endDate!) : null,
+              renewalDate: isRetainer ? _isoDate(_renewalDate!) : null,
               notes: _notesController.text.trim().isEmpty
                   ? null
                   : _notesController.text.trim(),
-              packageName: _emptyToNull(_packageNameController.text),
               assignedEmployeeIds: _selectedEmployeeIds.toList(),
+              accountManagerId: _accountManagerId,
               targetDepartmentIds: departmentIds,
-              serviceIds: _selectedServiceIds.toList(),
             );
 
       for (final includeArchived in [false, true]) {
@@ -187,15 +220,11 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
     }
   }
 
-  String? _emptyToNull(String value) =>
-      value.trim().isEmpty ? null : value.trim();
-
   @override
   Widget build(BuildContext context) {
     final clientsAsync = ref.watch(clientsListProvider(false));
     final employeesAsync = ref.watch(employeeListProvider);
     final departmentsAsync = ref.watch(departmentsProvider);
-    final servicesAsync = ref.watch(servicesListProvider(false));
 
     return Scaffold(
       appBar: AppBar(title: Text(_isEditing ? 'Edit Project' : 'New Project')),
@@ -221,20 +250,23 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                     clientsAsync.when(
                       loading: () => const LinearProgressIndicator(),
                       error: (_, _) => const Text('Could not load clients.'),
-                      data: (clients) => DropdownButtonFormField<String>(
-                        initialValue: _clientId,
-                        decoration: const InputDecoration(labelText: 'Client'),
-                        items: [
-                          for (final Client client in clients)
-                            DropdownMenuItem(
-                              value: client.id,
-                              child: Text(client.companyName),
-                            ),
-                        ],
-                        onChanged: _submitting
-                            ? null
-                            : (value) => setState(() => _clientId = value),
-                        validator: (value) => value == null ? 'Required' : null,
+                      data: (clients) => _ClientSearchField(
+                        clients: clients,
+                        selectedClientId: _clientId,
+                        enabled: !_submitting,
+                        onSelected: (client) =>
+                            setState(() => _clientId = client.id),
+                        onAddNew: (query) async {
+                          final created = await showQuickAddClientDialog(
+                            context,
+                            ref,
+                            initialName: query,
+                          );
+                          if (created == null) return null;
+                          ref.invalidate(clientsListProvider(false));
+                          setState(() => _clientId = created.id);
+                          return created;
+                        },
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -309,49 +341,37 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _DateField(
-                      label: 'Renewal date',
-                      value: _renewalDate,
-                      onTap: () => _pickDate(
-                        current: _renewalDate,
-                        onPicked: (d) => setState(() => _renewalDate = d),
+                    // A one-time project has a deadline; a monthly retainer
+                    // has a renewal date — only the one that fits is shown.
+                    if (_type == ProjectType.retainer)
+                      _DateField(
+                        key: const Key('project-renewal-date'),
+                        label: 'Renewal date',
+                        value: _renewalDate,
+                        onTap: () => _pickDate(
+                          current: _renewalDate,
+                          onPicked: (d) => setState(() => _renewalDate = d),
+                        ),
+                      )
+                    else
+                      _DateField(
+                        key: const Key('project-deadline'),
+                        label: 'Deadline',
+                        value: _endDate,
+                        onTap: () => _pickDate(
+                          current: _endDate,
+                          onPicked: (d) => setState(() => _endDate = d),
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _notesController,
-                      decoration: const InputDecoration(labelText: 'Notes'),
+                      decoration: const InputDecoration(
+                        labelText: 'Project details',
+                      ),
                       maxLines: 3,
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _packageNameController,
-                      decoration: const InputDecoration(labelText: 'Package'),
-                    ),
                     const SizedBox(height: 20),
-                    Text(
-                      'Assigned employees',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    employeesAsync.when(
-                      loading: () => const LinearProgressIndicator(),
-                      error: (_, _) => const Text('Could not load employees.'),
-                      data: (employees) => _ChipMultiSelect<Employee>(
-                        items: employees,
-                        idOf: (e) => e.id,
-                        labelOf: (e) => e.fullName,
-                        selectedIds: _selectedEmployeeIds,
-                        onToggled: (id, selected) => setState(() {
-                          if (selected) {
-                            _selectedEmployeeIds.add(id);
-                          } else {
-                            _selectedEmployeeIds.remove(id);
-                          }
-                        }),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Text(
@@ -378,7 +398,12 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                       error: (_, _) =>
                           const Text('Could not load departments.'),
                       data: (departments) => _ChipMultiSelect<Department>(
-                        items: departments,
+                        items: [
+                          for (final d in departments)
+                            if (!_isAdminStaff(d.name) ||
+                                _selectedDepartmentIds.contains(d.id))
+                              d,
+                        ],
                         idOf: (d) => d.id,
                         labelOf: (d) => d.name,
                         selectedIds: _selectedDepartmentIds,
@@ -391,28 +416,65 @@ class _ProjectEditorPageState extends ConsumerState<ProjectEditorPage> {
                         }),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     Text(
-                      'Services',
+                      'Assigned employees',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const SizedBox(height: 8),
-                    servicesAsync.when(
+                    employeesAsync.when(
                       loading: () => const LinearProgressIndicator(),
-                      error: (_, _) => const Text('Could not load services.'),
-                      data: (services) => _ChipMultiSelect<Service>(
-                        items: services,
-                        idOf: (s) => s.id,
-                        labelOf: (s) => s.name,
-                        selectedIds: _selectedServiceIds,
-                        onToggled: (id, selected) => setState(() {
-                          if (selected) {
-                            _selectedServiceIds.add(id);
-                          } else {
-                            _selectedServiceIds.remove(id);
-                          }
+                      error: (_, _) => const Text('Could not load employees.'),
+                      data: (employees) => _EmployeeSearchPicker(
+                        employees: [
+                          for (final e in employees)
+                            if (_selectedEmployeeIds.contains(e.id) ||
+                                (!_isAdminStaff(e.department?.name) &&
+                                    _isStillWorking(e.employmentStatus)))
+                              e,
+                        ],
+                        selectedIds: _selectedEmployeeIds,
+                        enabled: !_submitting,
+                        onAdded: (id) =>
+                            setState(() => _selectedEmployeeIds.add(id)),
+                        onRemoved: (id) => setState(() {
+                          _selectedEmployeeIds.remove(id);
+                          if (_accountManagerId == id) _accountManagerId = null;
                         }),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    // The owner is picked from the people assigned above.
+                    employeesAsync.maybeWhen(
+                      data: (employees) {
+                        final assigned = [
+                          for (final e in employees)
+                            if (_selectedEmployeeIds.contains(e.id)) e,
+                        ];
+                        return DropdownButtonFormField<String>(
+                          key: const Key('project-account-manager'),
+                          initialValue: _accountManagerId,
+                          decoration: InputDecoration(
+                            labelText: 'Account manager / project owner',
+                            helperText: assigned.isEmpty
+                                ? 'Assign employees first, then pick the owner '
+                                      'from them.'
+                                : null,
+                          ),
+                          items: [
+                            for (final e in assigned)
+                              DropdownMenuItem(
+                                value: e.id,
+                                child: Text(e.fullName),
+                              ),
+                          ],
+                          onChanged: _submitting || assigned.isEmpty
+                              ? null
+                              : (value) =>
+                                    setState(() => _accountManagerId = value),
+                        );
+                      },
+                      orElse: () => const SizedBox.shrink(),
                     ),
                   ],
                 ),
@@ -496,6 +558,247 @@ class _ChipMultiSelect<T> extends StatelessWidget {
             selected: selectedIds.contains(idOf(item)),
             onSelected: (selected) => onToggled(idOf(item), selected),
           ),
+      ],
+    );
+  }
+}
+
+/// Search-as-you-type multi-select for employees: type to find someone, tap
+/// a match to add them, and the chosen people show as removable chips.
+class _EmployeeSearchPicker extends StatelessWidget {
+  const _EmployeeSearchPicker({
+    required this.employees,
+    required this.selectedIds,
+    required this.enabled,
+    required this.onAdded,
+    required this.onRemoved,
+  });
+
+  final List<Employee> employees;
+  final Set<String> selectedIds;
+  final bool enabled;
+  final ValueChanged<String> onAdded;
+  final ValueChanged<String> onRemoved;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = [
+      for (final e in employees)
+        if (selectedIds.contains(e.id)) e,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Autocomplete<Employee>(
+          displayStringForOption: (e) => e.fullName,
+          optionsBuilder: (value) {
+            final query = value.text.trim().toLowerCase();
+            if (query.isEmpty) return const Iterable<Employee>.empty();
+            return employees.where(
+              (e) =>
+                  !selectedIds.contains(e.id) &&
+                  e.fullName.toLowerCase().contains(query),
+            );
+          },
+          onSelected: (e) => onAdded(e.id),
+          fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+            return TextField(
+              controller: controller,
+              focusNode: focusNode,
+              enabled: enabled,
+              decoration: const InputDecoration(
+                hintText: 'Search employees by name',
+                prefixIcon: Icon(Icons.search, size: 20),
+              ),
+              onSubmitted: (_) => onSubmitted(),
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) => Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: 240,
+                  maxWidth: 420,
+                ),
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  children: [
+                    for (final e in options)
+                      ListTile(
+                        dense: true,
+                        title: Text(e.fullName),
+                        onTap: () => onSelected(e),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (selected.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final e in selected)
+                InputChip(
+                  label: Text(e.fullName),
+                  onDeleted: enabled ? () => onRemoved(e.id) : null,
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// One row in the client picker: a client, or (null) the "+ Add new" row.
+class _ClientOption {
+  const _ClientOption(this.client);
+
+  final Client? client;
+}
+
+/// Type-ahead client picker. Matches show as you type; when nothing matches,
+/// a "+ Add" row offers to create the client on the spot (and a button below
+/// is always there too).
+class _ClientSearchField extends StatefulWidget {
+  const _ClientSearchField({
+    required this.clients,
+    required this.selectedClientId,
+    required this.enabled,
+    required this.onSelected,
+    required this.onAddNew,
+  });
+
+  final List<Client> clients;
+  final String? selectedClientId;
+  final bool enabled;
+  final ValueChanged<Client> onSelected;
+
+  /// Opens the "new client" flow pre-filled with [query]; returns the created
+  /// client, or null if cancelled.
+  final Future<Client?> Function(String query) onAddNew;
+
+  @override
+  State<_ClientSearchField> createState() => _ClientSearchFieldState();
+}
+
+class _ClientSearchFieldState extends State<_ClientSearchField> {
+  TextEditingController? _controller;
+  String _lastQuery = '';
+
+  String get _selectedName {
+    for (final client in widget.clients) {
+      if (client.id == widget.selectedClientId) return client.companyName;
+    }
+    return '';
+  }
+
+  Future<void> _addNew([String? query]) async {
+    final created = await widget.onAddNew((query ?? _lastQuery).trim());
+    if (created != null) _controller?.text = created.companyName;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Autocomplete<_ClientOption>(
+          initialValue: TextEditingValue(text: _selectedName),
+          displayStringForOption: (option) => option.client?.companyName ?? '',
+          optionsBuilder: (value) {
+            final query = value.text.trim().toLowerCase();
+            _lastQuery = value.text;
+            if (!widget.enabled) return const Iterable<_ClientOption>.empty();
+            final matches = query.isEmpty
+                ? widget.clients
+                : widget.clients.where(
+                    (c) => c.companyName.toLowerCase().contains(query),
+                  );
+            return [
+              for (final client in matches) _ClientOption(client),
+              if (query.isNotEmpty && matches.isEmpty)
+                const _ClientOption(null),
+            ];
+          },
+          onSelected: (option) {
+            final client = option.client;
+            if (client == null) {
+              _addNew();
+            } else {
+              widget.onSelected(client);
+            }
+          },
+          fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+            _controller = controller;
+            return TextFormField(
+              controller: controller,
+              focusNode: focusNode,
+              enabled: widget.enabled,
+              decoration: const InputDecoration(
+                labelText: 'Client',
+                hintText: 'Search clients',
+                prefixIcon: Icon(Icons.search, size: 20),
+              ),
+              validator: (_) =>
+                  widget.selectedClientId == null ? 'Required' : null,
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) => Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: 240,
+                  maxWidth: 420,
+                ),
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  children: [
+                    for (final option in options)
+                      if (option.client == null)
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.add, size: 18),
+                          title: Text(
+                            _lastQuery.trim().isEmpty
+                                ? 'Add a new client'
+                                : 'Add "${_lastQuery.trim()}" as a new client',
+                          ),
+                          onTap: () => onSelected(option),
+                        )
+                      else
+                        ListTile(
+                          dense: true,
+                          title: Text(option.client!.companyName),
+                          onTap: () => onSelected(option),
+                        ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: widget.enabled ? () => _addNew() : null,
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text("Can't find your client? Add new"),
+          ),
+        ),
       ],
     );
   }

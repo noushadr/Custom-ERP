@@ -13,8 +13,10 @@ import '../../../tasks/presentation/pages/task_editor_page.dart';
 import '../../../tasks/presentation/widgets/task_badges.dart';
 import '../../application/clients_providers.dart';
 import '../../domain/entities/project.dart';
+import '../../domain/entities/project_type.dart';
 import '../../domain/exceptions/client_exception.dart';
 import '../widgets/project_badges.dart';
+import 'client_detail_page.dart';
 import 'project_editor_page.dart';
 
 class ProjectDetailPage extends ConsumerStatefulWidget {
@@ -143,11 +145,19 @@ class _ProjectDetailBody extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            project.clientName,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          InkWell(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ClientDetailPage(clientId: project.clientId),
+              ),
+            ),
+            child: Text(
+              project.clientName,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.primary,
+                decoration: TextDecoration.underline,
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -160,7 +170,23 @@ class _ProjectDetailBody extends ConsumerWidget {
                   context,
                 ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
-              if (project.renewalDate != null)
+              if (project.type == ProjectType.oneTime &&
+                  project.endDate != null)
+                Text(
+                  'Deadline ${formatDisplayDate(project.endDate!)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              if (project.accountManager != null)
+                Text(
+                  'Owner ${project.accountManager!.fullName}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              if (project.type == ProjectType.retainer &&
+                  project.renewalDate != null)
                 Text(
                   'Renews ${formatDisplayDate(project.renewalDate!)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -171,38 +197,8 @@ class _ProjectDetailBody extends ConsumerWidget {
           ),
           if (project.notes != null && project.notes!.isNotEmpty) ...[
             const SizedBox(height: 16),
-            FormSection(title: 'Notes', child: Text(project.notes!)),
+            FormSection(title: 'Project details', child: Text(project.notes!)),
           ],
-          if (project.packageName != null) ...[
-            const SizedBox(height: 16),
-            FormSection(
-              title: 'Package',
-              child: Text(
-                project.packageName!,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          FormSection(
-            title: 'Services',
-            child: project.services.isEmpty
-                ? Text(
-                    'No services assigned yet.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  )
-                : Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final service in project.services)
-                        Chip(label: Text(service.name)),
-                    ],
-                  ),
-          ),
-          const SizedBox(height: 16),
           FormSection(
             title: 'Teams (Departments)',
             trailing: project.targetDepartments.length > 1

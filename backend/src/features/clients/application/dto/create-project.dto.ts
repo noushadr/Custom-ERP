@@ -41,10 +41,6 @@ export class CreateProjectDto {
 
   @IsOptional()
   @IsString()
-  packageName?: string;
-
-  @IsOptional()
-  @IsString()
   backlinksTarget?: string;
 
   @IsOptional()
@@ -67,6 +63,11 @@ export class CreateProjectDto {
   @IsArray()
   @IsString({ each: true })
   assignedEmployeeIds?: string[];
+
+  /** Must be one of [assignedEmployeeIds]. */
+  @IsOptional()
+  @IsString()
+  accountManagerId?: string;
 
   @IsOptional()
   @IsArray()

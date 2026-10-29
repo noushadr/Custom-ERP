@@ -1,4 +1,9 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Inject,
+  NotFoundException,
+} from '@nestjs/common';
 import { definedFieldsOnly } from '../../../core/utils/defined-fields-only.util';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import {
@@ -28,6 +33,10 @@ import { Project } from '../domain/entities/project.entity';
 import { Service } from '../domain/entities/service.entity';
 import { ClientHealthStatus } from '../domain/enums/client-health-status.enum';
 import { ProjectStatus } from '../domain/enums/project-status.enum';
+import { ProjectType } from '../domain/enums/project-type.enum';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { NotificationsService } from '../../notifications/application/notifications.service';
+import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import {
   CLIENT_REPOSITORY,
   type ClientRepository,
@@ -59,6 +68,33 @@ import {
   toServiceResponse,
 } from './client.mapper';
 
+/** Days before a retainer's renewal on which its owners get a reminder. */
+const RENEWAL_REMINDER_DAYS = [30, 14, 7];
+
+const HEALTH_LABELS: Record<string, string> = {
+  healthy: 'Healthy',
+  attention_required: 'Attention Required',
+  at_risk: 'At Risk',
+};
+
+function formatHealth(status: string): string {
+  return HEALTH_LABELS[status] ?? status;
+}
+
+/** Today's date (YYYY-MM-DD) in Pakistan time, UTC+5, like the rest of the
+ * app's date handling. */
+function pakistanToday(): string {
+  return new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function daysBetween(from: string, to: string): number {
+  return Math.round(
+    (new Date(`${to}T00:00:00Z`).getTime() -
+      new Date(`${from}T00:00:00Z`).getTime()) /
+      86_400_000,
+  );
+}
+
 @Injectable()
 export class ClientsService {
   constructor(
@@ -76,6 +112,7 @@ export class ClientsService {
     private readonly clientHealthHistoryRepository: ClientHealthHistoryRepository,
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // ---- Clients ----
@@ -101,6 +138,7 @@ export class ClientsService {
     client.primaryContactPhone = dto.primaryContactPhone;
     client.leadSource = dto.leadSource;
     client.notes = dto.notes;
+    await this.applyClientAccountManager(client, dto.accountManagerId);
     client.isArchived = false;
     client.archivedAt = null;
     client.healthStatus = ClientHealthStatus.HEALTHY;
@@ -122,9 +160,32 @@ export class ClientsService {
     ) {
       client.archivedAt = changes.isArchived ? new Date() : null;
     }
-    Object.assign(client, changes);
+    const { accountManagerId, ...rest } = changes;
+    Object.assign(client, rest);
+    if (accountManagerId !== undefined) {
+      await this.applyClientAccountManager(client, accountManagerId);
+    }
     const saved = await this.clientRepository.save(client);
     return toClientResponse(saved);
+  }
+
+  /** Sets the client's account manager (an employee); an empty/undefined id
+   * clears it. */
+  private async applyClientAccountManager(
+    client: Client,
+    accountManagerId: string | undefined,
+  ): Promise<void> {
+    if (!accountManagerId) {
+      client.accountManager = null;
+      client.accountManagerId = null;
+      return;
+    }
+    const manager = await this.employeeRepository.findById(accountManagerId);
+    if (!manager) {
+      throw new BadRequestException('Account manager not found');
+    }
+    client.accountManager = manager;
+    client.accountManagerId = manager.id;
   }
 
   private async getClientOrThrow(id: string): Promise<Client> {
@@ -163,7 +224,60 @@ export class ClientsService {
     history.actorName = actorName;
     await this.clientHealthHistoryRepository.save(history);
 
+    // Tell the client's account manager, unless they made the change.
+    const manager = client.accountManager;
+    if (
+      manager &&
+      manager.userId !== actorUserId &&
+      previousStatus !== dto.status
+    ) {
+      await this.notificationsService.create({
+        recipientUserId: manager.userId,
+        message: `${client.companyName}'s health changed from ${formatHealth(previousStatus)} to ${formatHealth(dto.status)}.`,
+        linkTarget: NotificationLinkTarget.CLIENTS,
+        linkEntityId: client.id,
+      });
+    }
+
     return toClientResponse(saved);
+  }
+
+  /** Daily heads-up for active monthly retainers about to renew: 30, 14 and 7
+   * days out, to the project's owner and the client's account manager. Each
+   * threshold is hit on exactly one day, so nobody is notified twice. */
+  @Cron(CronExpression.EVERY_DAY_AT_8AM)
+  async notifyUpcomingRenewals(): Promise<number> {
+    const today = pakistanToday();
+    const projects = await this.projectRepository.findAll();
+    let sent = 0;
+    for (const project of projects) {
+      if (
+        project.isArchived ||
+        project.status !== ProjectStatus.ACTIVE ||
+        project.type !== ProjectType.RETAINER ||
+        !project.renewalDate
+      ) {
+        continue;
+      }
+      const days = daysBetween(today, project.renewalDate);
+      if (!RENEWAL_REMINDER_DAYS.includes(days)) continue;
+
+      const recipients = new Set<string>();
+      if (project.accountManager) recipients.add(project.accountManager.userId);
+      if (project.client.accountManager) {
+        recipients.add(project.client.accountManager.userId);
+      }
+      for (const recipientUserId of recipients) {
+        await this.notificationsService.create({
+          recipientUserId,
+          message: `${project.name} (${project.client.companyName}) renews in ${days} days, on ${project.renewalDate}.`,
+          linkTarget: NotificationLinkTarget.CLIENTS_PROJECTS,
+          linkEntityId: project.id,
+        });
+        sent += 1;
+      }
+    }
+    return sent;
   }
 
   async getClientHealthHistory(
@@ -245,17 +359,76 @@ export class ClientsService {
     return toProjectResponse(await this.getProjectOrThrow(id));
   }
 
+  /** Sets the project's owner / account manager, who must be one of its
+   * assigned employees. An empty/undefined id clears it. */
+  private applyAccountManager(
+    project: Project,
+    accountManagerId: string | undefined,
+  ): void {
+    if (!accountManagerId) {
+      project.accountManager = null;
+      project.accountManagerId = null;
+      return;
+    }
+    const manager = project.assignedEmployees.find(
+      (employee) => employee.id === accountManagerId,
+    );
+    if (!manager) {
+      throw new BadRequestException(
+        'The account manager must be one of the assigned employees',
+      );
+    }
+    project.accountManager = manager;
+    project.accountManagerId = manager.id;
+  }
+
+  /** Every project needs a start date, plus the date that matches its type:
+   * a one-time project needs a deadline, a monthly retainer a renewal date.
+   * The deadline can't fall before the start. */
+  private assertProjectDates(
+    type: ProjectType,
+    startDate: string | undefined,
+    endDate: string | null | undefined,
+    renewalDate: string | null | undefined,
+  ): void {
+    if (!startDate) {
+      throw new BadRequestException('A project needs a start date');
+    }
+    if (type === ProjectType.RETAINER) {
+      if (!renewalDate) {
+        throw new BadRequestException('A monthly retainer needs a renewal date');
+      }
+      return;
+    }
+    if (!endDate) {
+      throw new BadRequestException('A one-time project needs a deadline');
+    }
+    if (endDate < startDate) {
+      throw new BadRequestException(
+        'The deadline cannot be before the start date',
+      );
+    }
+  }
+
   async createProject(dto: CreateProjectDto): Promise<ProjectResponseDto> {
+    this.assertProjectDates(
+      dto.type,
+      dto.startDate,
+      dto.endDate,
+      dto.renewalDate,
+    );
     const project = new Project();
     project.clientId = dto.clientId;
     project.name = dto.name;
     project.type = dto.type;
     project.status = dto.status ?? ProjectStatus.ACTIVE;
     project.startDate = dto.startDate;
-    project.endDate = dto.endDate;
-    project.renewalDate = dto.renewalDate;
+    // Only the date that belongs to the project's type is kept.
+    project.endDate =
+      dto.type === ProjectType.ONE_TIME ? dto.endDate : null;
+    project.renewalDate =
+      dto.type === ProjectType.RETAINER ? dto.renewalDate : null;
     project.notes = dto.notes;
-    project.packageName = dto.packageName;
     project.backlinksTarget = dto.backlinksTarget;
     project.seoSheetName = dto.seoSheetName;
     project.projectFolderName = dto.projectFolderName;
@@ -268,6 +441,7 @@ export class ClientsService {
       dto.targetDepartmentIds,
     );
     project.services = await this.resolveServices(dto.serviceIds);
+    this.applyAccountManager(project, dto.accountManagerId);
 
     const saved = await this.projectRepository.save(project);
     return toProjectResponse(await this.getProjectOrThrow(saved.id));
@@ -304,6 +478,18 @@ export class ClientsService {
       project.services = await this.resolveServices(changes.serviceIds);
     }
 
+    if (
+      changes.accountManagerId !== undefined ||
+      changes.assignedEmployeeIds !== undefined
+    ) {
+      this.applyAccountManager(
+        project,
+        changes.accountManagerId !== undefined
+          ? changes.accountManagerId
+          : (project.accountManagerId ?? ''),
+      );
+    }
+
     project.clientId = changes.clientId ?? project.clientId;
     project.name = changes.name ?? project.name;
     project.type = changes.type ?? project.type;
@@ -314,8 +500,22 @@ export class ClientsService {
       project.renewalDate = changes.renewalDate;
     }
     if (changes.notes !== undefined) project.notes = changes.notes;
-    if (changes.packageName !== undefined) {
-      project.packageName = changes.packageName;
+    // Re-check only when a date is being edited, so unrelated updates (e.g.
+    // archiving an older project with no deadline) are never blocked.
+    if (
+      changes.type !== undefined ||
+      changes.startDate !== undefined ||
+      changes.endDate !== undefined ||
+      changes.renewalDate !== undefined
+    ) {
+      this.assertProjectDates(
+        project.type,
+        project.startDate,
+        project.endDate,
+        project.renewalDate,
+      );
+      if (project.type === ProjectType.RETAINER) project.endDate = null;
+      else project.renewalDate = null;
     }
     if (changes.backlinksTarget !== undefined) {
       project.backlinksTarget = changes.backlinksTarget;
