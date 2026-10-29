@@ -342,6 +342,12 @@ class FakeEmployeeRepository implements EmployeeRepository {
   }
 
   @override
+  Future<Employee> approveEmployee(String id) async => throw UnimplementedError();
+
+  @override
+  Future<Employee> rejectEmployee(String id) async => throw UnimplementedError();
+
+  @override
   Future<Employee> addEmployee(AddEmployeeInput input) async {
     if (addEmployeeError != null) throw addEmployeeError!;
     return addEmployeeResult!;

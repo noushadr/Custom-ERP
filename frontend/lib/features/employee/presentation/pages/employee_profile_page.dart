@@ -106,12 +106,21 @@ class _ProfileBody extends ConsumerWidget {
         authState is AuthAuthenticated &&
         authState.user.hasPermission('payroll.manage');
 
+    final awaitingApproval = employee.accountStatus == 'pending_approval';
+    final canApprove =
+        authState is AuthAuthenticated &&
+        authState.user.hasPermission('users.approve');
+
     final headerCard = Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (awaitingApproval) ...[
+              _ApprovalBanner(employee: employee, canApprove: canApprove),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 EmployeeAvatar(
@@ -1457,6 +1466,66 @@ class _EditEmployeeGoalDialogState
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Shown on an employee HR added who still needs a Super Admin's sign-off.
+class _ApprovalBanner extends ConsumerWidget {
+  const _ApprovalBanner({required this.employee, required this.canApprove});
+
+  final Employee employee;
+  final bool canApprove;
+
+  Future<void> _decide(BuildContext context, WidgetRef ref, bool approve) async {
+    final repository = ref.read(employeeRepositoryProvider);
+    try {
+      if (approve) {
+        await repository.approveEmployee(employee.id);
+      } else {
+        await repository.rejectEmployee(employee.id);
+      }
+      ref.invalidate(employeeDetailProvider(employee.id));
+      ref.invalidate(employeeListProvider);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save that decision.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.hourglass_top, color: AppColors.warning, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              canApprove
+                  ? 'Added by HR — awaiting your approval. They cannot sign in until you approve.'
+                  : 'Awaiting admin approval. They cannot sign in until a Super Admin approves.',
+            ),
+          ),
+          if (canApprove) ...[
+            TextButton(
+              onPressed: () => _decide(context, ref, false),
+              child: const Text('Reject'),
+            ),
+            FilledButton(
+              onPressed: () => _decide(context, ref, true),
+              child: const Text('Approve'),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

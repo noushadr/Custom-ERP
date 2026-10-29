@@ -5,7 +5,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
 } from 'class-validator';
 import { EmploymentStatus } from '../../domain/enums/employment-status.enum';
 import { EmploymentType } from '../../domain/enums/employment-type.enum';
@@ -16,9 +15,6 @@ import { UpdateMyProfileDto } from './update-my-profile.dto';
 export class UpdateEmployeeDto extends UpdateMyProfileDto {
   @IsOptional()
   @IsEmail()
-  @Matches(/^[^\s@]+@zeracreative\.com$/i, {
-    message: 'Company email must be a @zeracreative.com address',
-  })
   companyEmail?: string;
 
   @IsOptional()

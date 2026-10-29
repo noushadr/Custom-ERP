@@ -40,8 +40,20 @@ export class EmployeesController {
   // returned once so it can be shared with the new employee directly.
   @Post()
   @Permissions('employees.manage')
-  addEmployee(@Body() dto: AddEmployeeDto) {
-    return this.employeesService.addEmployee(dto);
+  addEmployee(@Body() dto: AddEmployeeDto, @CurrentUser() user: JwtPayload) {
+    return this.employeesService.addEmployee(dto, user);
+  }
+
+  @Post(':id/approve')
+  @Permissions('users.approve')
+  approve(@Param('id') id: string) {
+    return this.employeesService.approveEmployee(id);
+  }
+
+  @Post(':id/reject')
+  @Permissions('users.approve')
+  reject(@Param('id') id: string) {
+    return this.employeesService.rejectEmployee(id);
   }
 
   @Get()

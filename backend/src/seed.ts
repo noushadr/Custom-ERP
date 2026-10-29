@@ -19,6 +19,7 @@ import { CriterionResponseType } from './features/performance-reviews/domain/enu
 const DEFAULT_PERMISSIONS = [
   'users.manage',
   'users.impersonate',
+  'users.approve',
   'employees.read',
   'employees.manage',
   'departments.manage',

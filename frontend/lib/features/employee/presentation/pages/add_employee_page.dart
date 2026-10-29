@@ -5,7 +5,7 @@ import '../../application/add_employee_controller.dart';
 import '../../application/add_employee_state.dart';
 import '../../domain/entities/add_employee_input.dart';
 
-final _companyEmailRegExp = RegExp(r'^[^@\s]+@zeracreative\.com$');
+final _companyEmailRegExp = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
 const _companyEmailDomain = '@zeracreative.com';
 
@@ -118,7 +118,7 @@ class _AddEmployeePageState extends ConsumerState<AddEmployeePage> {
                             return 'Company email is required';
                           }
                           if (!_companyEmailRegExp.hasMatch(trimmed)) {
-                            return 'Must be a @zeracreative.com address';
+                            return 'Enter a valid email address';
                           }
                           return null;
                         },

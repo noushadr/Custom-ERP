@@ -46,6 +46,11 @@ export class AuthService {
     if (!user || user.status === UserStatus.DISABLED) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    if (user.status === UserStatus.PENDING_APPROVAL) {
+      throw new UnauthorizedException(
+        'This account is awaiting admin approval',
+      );
+    }
 
     const passwordMatches = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatches) {
@@ -91,7 +96,10 @@ export class AuthService {
   ): Promise<AuthTokens & { user: AuthenticatedUser }> {
     const target = await this.userRepository.findById(targetUserId);
     if (!target) throw new NotFoundException('User not found');
-    if (target.status === UserStatus.DISABLED) {
+    if (
+      target.status === UserStatus.DISABLED ||
+      target.status === UserStatus.PENDING_APPROVAL
+    ) {
       throw new BadRequestException('This account is disabled');
     }
 

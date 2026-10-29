@@ -77,6 +77,12 @@ abstract interface class EmployeeRepository {
   /// on the form. Requires `employees.manage`.
   Future<Employee> addEmployee(AddEmployeeInput input);
 
+  /// Super Admin sign-off on an employee HR added (`users.approve`).
+  Future<Employee> approveEmployee(String id);
+
+  /// Declines an employee HR added; their account is disabled.
+  Future<Employee> rejectEmployee(String id);
+
   Future<List<Department>> getDepartments({bool includeArchived = false});
 
   /// Requires `departments.manage`.

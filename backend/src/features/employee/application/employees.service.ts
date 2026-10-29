@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
@@ -161,7 +162,10 @@ export class EmployeesService {
    * self-signup and no email invite; the admin sets the account's initial
    * password directly on this form, rather than the system generating one
    * to hand over separately. */
-  async addEmployee(dto: AddEmployeeDto): Promise<EmployeeResponse> {
+  async addEmployee(
+    dto: AddEmployeeDto,
+    actor?: JwtPayload,
+  ): Promise<EmployeeResponse> {
     const existingUser = await this.userRepository.findByEmail(
       dto.companyEmail,
     );
@@ -185,7 +189,11 @@ export class EmployeesService {
     user.passwordHash = passwordHash;
     user.roleId = employeeRole.id;
     user.role = employeeRole;
-    user.status = UserStatus.PENDING_INVITE;
+    // HR-added accounts wait for a Super Admin (`users.approve`) before they
+    // can sign in; an admin adding someone needs no second approval.
+    user.status = actor?.permissions.includes('users.approve')
+      ? UserStatus.PENDING_INVITE
+      : UserStatus.PENDING_APPROVAL;
     const savedUser = await this.userRepository.save(user);
 
     const employee = new Employee();
@@ -216,6 +224,31 @@ export class EmployeesService {
     );
 
     return toEmployeeResponse(reloaded!);
+  }
+
+  /** Final admin sign-off on an employee HR added. */
+  async approveEmployee(id: string): Promise<EmployeeResponse> {
+    const employee = await this.requirePendingApproval(id);
+    employee.user.status = UserStatus.PENDING_INVITE;
+    await this.userRepository.save(employee.user);
+    return toEmployeeResponse((await this.employeeRepository.findById(id))!);
+  }
+
+  /** Declines a pending addition: the account stays but is disabled. */
+  async rejectEmployee(id: string): Promise<EmployeeResponse> {
+    const employee = await this.requirePendingApproval(id);
+    employee.user.status = UserStatus.DISABLED;
+    await this.userRepository.save(employee.user);
+    return toEmployeeResponse((await this.employeeRepository.findById(id))!);
+  }
+
+  private async requirePendingApproval(id: string): Promise<Employee> {
+    const employee = await this.employeeRepository.findById(id);
+    if (!employee) throw new NotFoundException('Employee not found');
+    if (employee.user.status !== UserStatus.PENDING_APPROVAL) {
+      throw new BadRequestException('This employee is not awaiting approval');
+    }
+    return employee;
   }
 
   /** `employees.read` (e.g. Team Lead) only grants a directory-style view —

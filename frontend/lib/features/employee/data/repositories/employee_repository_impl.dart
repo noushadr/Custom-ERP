@@ -96,6 +96,14 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       _guard(() => _remoteDataSource.addEmployee(input));
 
   @override
+  Future<Employee> approveEmployee(String id) =>
+      _guard(() => _remoteDataSource.decideEmployee(id, 'approve'));
+
+  @override
+  Future<Employee> rejectEmployee(String id) =>
+      _guard(() => _remoteDataSource.decideEmployee(id, 'reject'));
+
+  @override
   Future<List<Department>> getDepartments({bool includeArchived = false}) =>
       _guard(
         () =>

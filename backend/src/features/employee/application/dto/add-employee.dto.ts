@@ -12,9 +12,6 @@ import { WorkMode } from '../../domain/enums/work-mode.enum';
 
 export class AddEmployeeDto {
   @IsEmail()
-  @Matches(/@zeracreative\.com$/i, {
-    message: 'Company email must be a @zeracreative.com address',
-  })
   companyEmail: string;
 
   /** Set directly by the HR/Admin adding this employee — there is no

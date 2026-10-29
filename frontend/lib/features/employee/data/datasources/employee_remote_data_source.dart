@@ -169,6 +169,13 @@ class EmployeeRemoteDataSource {
     return EmployeeModel.fromJson(response.data!);
   }
 
+  Future<EmployeeModel> decideEmployee(String id, String decision) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/employees/$id/$decision',
+    );
+    return EmployeeModel.fromJson(response.data!);
+  }
+
   Future<List<DepartmentModel>> getDepartments({
     bool includeArchived = false,
   }) async {

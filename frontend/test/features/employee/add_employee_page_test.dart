@@ -109,7 +109,7 @@ void main() {
     },
   );
 
-  testWidgets('rejects an email whose domain is not @zeracreative.com', (
+  testWidgets('rejects a malformed email but accepts any domain', (
     tester,
   ) async {
     await _useTallSurface(tester);
@@ -118,12 +118,12 @@ void main() {
 
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Company email'),
-      'someone@example.com',
+      'not-an-email',
     );
     await tester.tap(find.text('Add'));
     await tester.pump();
 
-    expect(find.text('Must be a @zeracreative.com address'), findsOneWidget);
+    expect(find.text('Enter a valid email address'), findsOneWidget);
   });
 
   testWidgets(

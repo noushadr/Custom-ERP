@@ -245,6 +245,32 @@ describe('EmployeesService', () => {
       );
     });
 
+    it('holds an HR-added account as pending approval', async () => {
+      userRepository.findByEmail.mockResolvedValue(null);
+      roleRepository.findByName.mockResolvedValue(buildRole());
+      userRepository.save.mockImplementation(
+        (user) =>
+          Promise.resolve({ ...user, id: 'new-user-id' }) as Promise<User>,
+      );
+      employeeRepository.count.mockResolvedValue(4);
+      employeeRepository.save.mockImplementation((employee) =>
+        Promise.resolve({ ...employee, id: 'new-employee-id' }),
+      );
+      employeeRepository.findById.mockResolvedValue(
+        buildEmployee({ id: 'new-employee-id' }),
+      );
+
+      await service.addEmployee(dto, {
+        sub: 'hr',
+        email: 'hr@zeracreative.com',
+        role: 'HR/Manager',
+        permissions: ['employees.manage'],
+      });
+      expect(userRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: UserStatus.PENDING_APPROVAL }),
+      );
+    });
+
     it('creates a pending user and employee, hashing the given password', async () => {
       userRepository.findByEmail.mockResolvedValue(null);
       roleRepository.findByName.mockResolvedValue(buildRole());
@@ -260,7 +286,12 @@ describe('EmployeesService', () => {
         buildEmployee({ id: 'new-employee-id', employeeCode: 'ZC-00005' }),
       );
 
-      const result = await service.addEmployee(dto);
+      const result = await service.addEmployee(dto, {
+        sub: 'admin',
+        email: 'admin@zeracreative.com',
+        role: 'Super Admin',
+        permissions: ['users.approve'],
+      });
 
       expect(userRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
