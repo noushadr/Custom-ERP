@@ -32,7 +32,8 @@ class PerformanceReviewsPage extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      child: Center(
+      child: Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1040),
           child: SingleChildScrollView(
@@ -90,12 +91,17 @@ class _MyReviewsSection extends ConsumerWidget {
             );
           }
           final sorted = [...reviews]
-            ..sort((a, b) => b.reviewYear.compareTo(a.reviewYear));
+            ..sort((a, b) {
+              final byYear = b.reviewYear.compareTo(a.reviewYear);
+              return byYear != 0
+                  ? byYear
+                  : b.reviewPeriod.compareTo(a.reviewPeriod);
+            });
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var i = 0; i < sorted.length; i++) ...[
-                PerformanceReviewSummaryRow(review: sorted[i]),
+                PerformanceReviewSummaryRow(review: sorted[i], selfView: true),
                 if (i < sorted.length - 1)
                   const Divider(height: 20, color: AppColors.borderSubtle),
               ],

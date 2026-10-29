@@ -1,4 +1,5 @@
 import 'performance_review_response.dart';
+import 'performance_review_title.dart';
 
 class PerformanceReview {
   const PerformanceReview({
@@ -6,10 +7,15 @@ class PerformanceReview {
     required this.employeeId,
     required this.employeeName,
     this.employeePhotoUrl,
+    this.designation,
+    this.department,
+    this.reportingManagerName,
     required this.reviewYear,
+    this.reviewPeriod = 2,
     required this.dueDate,
     required this.status,
     required this.responses,
+    this.overallRating,
     this.employeeComments,
     this.completedByName,
     this.completedAt,
@@ -23,9 +29,18 @@ class PerformanceReview {
   final String employeeId;
   final String employeeName;
   final String? employeePhotoUrl;
+  final String? designation;
+  final String? department;
+  final String? reportingManagerName;
 
-  /// Years of service this review covers, e.g. 1 for "Year 1 Review".
+  /// Calendar year of the review cycle.
   final int reviewYear;
+
+  /// 1 = June cycle, 2 = December cycle.
+  final int reviewPeriod;
+
+  /// e.g. "June 2026 Review".
+  String get title => performanceReviewTitle(reviewYear, reviewPeriod);
 
   /// ISO 'YYYY-MM-DD' — pass to formatDisplayDate/formatMonthDay.
   final String dueDate;
@@ -33,6 +48,9 @@ class PerformanceReview {
   /// 'pending', 'completed', or 'finalized'.
   final String status;
   final List<PerformanceReviewResponse> responses;
+
+  /// Key of [overallRatingLabels], set by the evaluator.
+  final String? overallRating;
 
   /// Optional self-assessment the employee may add themselves.
   final String? employeeComments;

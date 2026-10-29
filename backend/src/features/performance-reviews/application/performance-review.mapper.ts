@@ -13,7 +13,13 @@ export function toPerformanceReviewResponse(
     employeeId: review.employeeId,
     employeeName: `${review.employee.firstName} ${review.employee.lastName}`,
     employeePhotoUrl: review.employee.profilePhotoUrl ?? null,
+    designation: review.employee.designation ?? null,
+    department: review.employee.department?.name ?? null,
+    reportingManagerName: review.employee.reportingManager
+      ? `${review.employee.reportingManager.firstName} ${review.employee.reportingManager.lastName}`
+      : null,
     reviewYear: review.reviewYear,
+    reviewPeriod: review.reviewPeriod,
     dueDate: review.dueDate,
     status: review.status,
     responses: [...review.responses]
@@ -24,9 +30,13 @@ export function toPerformanceReviewResponse(
         criterionName: response.criterionName,
         responseType: response.responseType,
         sortOrder: response.sortOrder,
+        section: response.section ?? null,
+        hasComment: response.hasComment,
         ratingValue: response.ratingValue ?? null,
         textValue: response.textValue ?? null,
+        commentValue: response.commentValue ?? null,
       })),
+    overallRating: review.overallRating ?? null,
     employeeComments: review.employeeComments ?? null,
     completedByName: review.completedByName ?? null,
     completedAt: review.completedAt?.toISOString() ?? null,

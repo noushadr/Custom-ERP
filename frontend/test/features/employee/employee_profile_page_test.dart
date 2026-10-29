@@ -1004,7 +1004,7 @@ void main() {
             employeeReviews: [
               buildTestPerformanceReview(
                 employeeId: 'employee-2',
-                reviewYear: 1,
+                reviewYear: 2026,
               ),
             ],
           ),
@@ -1013,7 +1013,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Performance Reviews'), findsOneWidget);
-      expect(find.text('Year 1 Review'), findsOneWidget);
+      expect(find.text('December 2026 Review'), findsOneWidget);
     },
   );
 
@@ -1063,14 +1063,16 @@ void main() {
           viewer: viewer,
           repository: FakeEmployeeRepository(me: me),
           performanceReviewRepository: FakePerformanceReviewRepository(
-            myReviews: [buildTestPerformanceReview(reviewYear: 2)],
+            myReviews: [
+              buildTestPerformanceReview(reviewYear: 2026, reviewPeriod: 1),
+            ],
           ),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('Performance Reviews'), findsOneWidget);
-      expect(find.text('Year 2 Review'), findsOneWidget);
+      expect(find.text('June 2026 Review'), findsOneWidget);
     },
   );
 

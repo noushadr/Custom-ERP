@@ -182,7 +182,7 @@ class NotificationBell extends ConsumerWidget {
     final reviewsNeedingSelfAssessment = myReviews
         .where(
           (r) =>
-              r.status != 'finalized' &&
+              r.status == 'completed' &&
               (r.employeeComments == null || r.employeeComments!.isEmpty),
         )
         .toList();
@@ -430,15 +430,15 @@ class NotificationBell extends ConsumerWidget {
             ),
         ]);
 
-        addSection('Reviews awaiting your self-assessment', [
+        addSection('Reviews awaiting your feedback', [
           for (final review in reviewsNeedingSelfAssessment)
             PopupMenuItem<Object>(
               value: _OpenPerformanceReview(review.id),
               child: _NotificationTile(
                 icon: Icons.rate_review_outlined,
                 iconColor: AppColors.secondary,
-                title: 'Year ${review.reviewYear} Review',
-                caption: 'Add your self-assessment',
+                title: review.title,
+                caption: 'Management has filled this in — add your feedback',
                 trailing: formatDisplayDate(review.dueDate),
               ),
             ),
@@ -451,8 +451,7 @@ class NotificationBell extends ConsumerWidget {
               child: _NotificationTile(
                 icon: Icons.rate_review_outlined,
                 iconColor: AppColors.warning,
-                title:
-                    'Year ${review.reviewYear} Review — ${review.employeeName}',
+                title: '${review.title} — ${review.employeeName}',
                 caption: 'Awaiting your review',
                 trailing: formatDisplayDate(review.dueDate),
               ),
@@ -463,8 +462,7 @@ class NotificationBell extends ConsumerWidget {
               child: _NotificationTile(
                 icon: Icons.rate_review_outlined,
                 iconColor: AppColors.warning,
-                title:
-                    'Year ${review.reviewYear} Review — ${review.employeeName}',
+                title: '${review.title} — ${review.employeeName}',
                 caption: 'Awaiting finalization',
                 trailing: formatDisplayDate(review.dueDate),
               ),

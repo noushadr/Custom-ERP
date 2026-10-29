@@ -232,6 +232,10 @@ class _CriterionCard extends ConsumerWidget {
                       item.responseType,
                   color: AppColors.secondary,
                 ),
+                if (item.section != null && item.section!.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  _Chip(label: item.section!, color: AppColors.primary),
+                ],
                 if (item.isArchived) ...[
                   const SizedBox(width: 8),
                   const _Chip(
@@ -304,7 +308,9 @@ class _CriterionFormDialog extends ConsumerStatefulWidget {
 class _CriterionFormDialogState extends ConsumerState<_CriterionFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
+  late final TextEditingController _sectionController;
   String _responseType = 'rating';
+  bool _hasComment = false;
   bool _saving = false;
   String? _errorMessage;
 
@@ -314,12 +320,15 @@ class _CriterionFormDialogState extends ConsumerState<_CriterionFormDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.item?.name);
+    _sectionController = TextEditingController(text: widget.item?.section);
     _responseType = widget.item?.responseType ?? 'rating';
+    _hasComment = widget.item?.hasComment ?? false;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _sectionController.dispose();
     super.dispose();
   }
 
@@ -333,17 +342,23 @@ class _CriterionFormDialogState extends ConsumerState<_CriterionFormDialog> {
     try {
       final repository = ref.read(performanceReviewRepositoryProvider);
       final name = _nameController.text.trim();
+      final section = _sectionController.text.trim();
+      final hasComment = _responseType == 'rating' && _hasComment;
 
       if (_isEditing) {
         await repository.updateCriterion(
           widget.item!.id,
           name: name,
           responseType: _responseType,
+          section: section,
+          hasComment: hasComment,
         );
       } else {
         await repository.createCriterion(
           name: name,
           responseType: _responseType,
+          section: section.isEmpty ? null : section,
+          hasComment: hasComment,
         );
       }
       ref.invalidate(performanceReviewCriteriaProvider);
@@ -397,6 +412,25 @@ class _CriterionFormDialogState extends ConsumerState<_CriterionFormDialog> {
                     ? null
                     : (value) => setState(() => _responseType = value!),
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _sectionController,
+                enabled: !_saving,
+                decoration: const InputDecoration(
+                  labelText: 'Section (optional)',
+                  helperText:
+                      'Criteria with the same section are grouped together',
+                ),
+              ),
+              if (_responseType == 'rating')
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Also collect a comment'),
+                  value: _hasComment,
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _hasComment = value),
+                ),
             ],
           ),
         ),

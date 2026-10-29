@@ -545,45 +545,6 @@ void main() {
     expect(find.text('Already Happened'), findsNothing);
   });
 
-  testWidgets(
-    'admin dashboard shows the all-employees leave table for a leave.manage '
-    'holder',
-    (WidgetTester tester) async {
-      const hr = AuthUser(
-        id: 'hr-1',
-        email: 'hr@zeracreative.com',
-        role: 'HR/Manager',
-        permissions: ['leave.manage'],
-      );
-
-      await tester.pumpWidget(
-        _authenticatedApp(
-          user: hr,
-          leaveRepository: FakeLeaveRepository(
-            employeeOverviews: [
-              buildTestEmployeeLeaveOverview(
-                employeeName: 'Babar Hussain',
-                balances: [
-                  buildTestLeaveBalance(
-                    leaveTypeName: 'Casual Leave',
-                    allocated: 10,
-                    used: 3,
-                    remaining: 7,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text("All Employees' Leave"), findsOneWidget);
-      expect(find.text('Babar Hussain'), findsOneWidget);
-      expect(find.text('7 / 10'), findsOneWidget);
-    },
-  );
-
   testWidgets('admin dashboard shows the company leave calendar', (
     WidgetTester tester,
   ) async {
@@ -605,16 +566,17 @@ void main() {
     expect(leaveRepository.lastCalendarScope, 'company');
   });
 
-  testWidgets('admin dashboard hides the all-employees leave table without '
-      'leave.manage', (WidgetTester tester) async {
-    const admin = AuthUser(
-      id: 'admin-1',
-      email: 'admin@zeracreative.com',
-      role: 'Super Admin',
-      permissions: [],
+  testWidgets('admin dashboard does not show the all-employees leave table', (
+    WidgetTester tester,
+  ) async {
+    const hr = AuthUser(
+      id: 'hr-1',
+      email: 'hr@zeracreative.com',
+      role: 'HR/Manager',
+      permissions: ['leave.manage'],
     );
 
-    await tester.pumpWidget(_authenticatedApp(user: admin));
+    await tester.pumpWidget(_authenticatedApp(user: hr));
     await tester.pumpAndSettle();
 
     expect(find.text("All Employees' Leave"), findsNothing);

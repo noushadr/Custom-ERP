@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/shared/widgets/app_dialog.dart';
 
-Future<void> _pumpApp(WidgetTester tester, {bool barrierDismissible = true}) async {
+Future<void> _pumpApp(
+  WidgetTester tester, {
+  bool barrierDismissible = true,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(

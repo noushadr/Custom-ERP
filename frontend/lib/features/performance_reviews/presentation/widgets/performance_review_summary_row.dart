@@ -14,24 +14,44 @@ class PerformanceReviewSummaryRow extends StatelessWidget {
     super.key,
     required this.review,
     this.showEmployeeName = false,
+    this.selfView = false,
   });
 
   final PerformanceReview review;
   final bool showEmployeeName;
 
+  /// True when the reviewed employee is the one looking: a pending review is
+  /// shown but locked until management has filled it in.
+  final bool selfView;
+
   @override
   Widget build(BuildContext context) {
     final title = showEmployeeName
-        ? 'Year ${review.reviewYear} Review — ${review.employeeName}'
-        : 'Year ${review.reviewYear} Review';
+        ? '${review.title} — ${review.employeeName}'
+        : review.title;
+
+    final locked = selfView && review.status == 'pending';
+    final needsFeedback =
+        selfView &&
+        review.status == 'completed' &&
+        (review.employeeComments == null || review.employeeComments!.isEmpty);
+    final caption = locked
+        ? 'Management is filling in your review — it opens for your '
+              'feedback once they are done.'
+        : needsFeedback
+        ? 'Management has filled this in — add your feedback.'
+        : null;
 
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => PerformanceReviewDetailPage(reviewId: review.id),
-        ),
-      ),
+      onTap: locked
+          ? null
+          : () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    PerformanceReviewDetailPage(reviewId: review.id),
+              ),
+            ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
@@ -53,12 +73,26 @@ class PerformanceReviewSummaryRow extends StatelessWidget {
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  if (caption != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      caption,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: locked
+                            ? AppColors.textSecondary
+                            : AppColors.primary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
             PerformanceReviewStatusBadge(status: review.status),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            if (!locked) ...[
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            ],
           ],
         ),
       ),

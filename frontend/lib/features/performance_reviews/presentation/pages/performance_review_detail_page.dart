@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
+import '../../../employee/presentation/pages/employee_profile_page.dart';
+import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../employee/application/employee_providers.dart';
 import '../../application/performance_review_providers.dart';
 import '../../domain/entities/performance_review.dart';
+import '../../domain/entities/performance_review_form_fields.dart';
 import '../../domain/entities/performance_review_response.dart';
 import '../../domain/entities/performance_review_response_input.dart';
 import '../../domain/exceptions/performance_review_exception.dart';
@@ -85,7 +88,9 @@ class _ReviewForm extends ConsumerStatefulWidget {
 class _ReviewFormState extends ConsumerState<_ReviewForm> {
   late Map<String, int?> _ratings;
   late Map<String, TextEditingController> _textControllers;
+  late Map<String, TextEditingController> _commentControllers;
   late TextEditingController _selfAssessmentController;
+  String? _overallRating;
   bool _saving = false;
   String? _errorMessage;
 
@@ -100,14 +105,22 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
       for (final response in widget.review.responses)
         response.id: TextEditingController(text: response.textValue),
     };
+    _commentControllers = {
+      for (final response in widget.review.responses)
+        response.id: TextEditingController(text: response.commentValue),
+    };
     _selfAssessmentController = TextEditingController(
       text: widget.review.employeeComments,
     );
+    _overallRating = widget.review.overallRating;
   }
 
   @override
   void dispose() {
     for (final controller in _textControllers.values) {
+      controller.dispose();
+    }
+    for (final controller in _commentControllers.values) {
       controller.dispose();
     }
     _selfAssessmentController.dispose();
@@ -132,8 +145,40 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
           textValue: response.responseType == 'text'
               ? _textControllers[response.id]!.text.trim()
               : null,
+          commentValue: response.hasComment
+              ? _commentControllers[response.id]!.text.trim()
+              : null,
         ),
     ];
+  }
+
+  PerformanceReviewFormFields _collectFields() =>
+      PerformanceReviewFormFields(overallRating: _overallRating);
+
+  Future<void> _saveDraft() async {
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+    try {
+      await ref
+          .read(performanceReviewRepositoryProvider)
+          .saveDraft(
+            widget.review.id,
+            responses: _collectResponses(),
+            fields: _collectFields(),
+          );
+      _invalidate();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Draft saved')));
+      }
+    } on PerformanceReviewException catch (error) {
+      setState(() => _errorMessage = error.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _saveResponses() async {
@@ -147,11 +192,13 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
         await repository.completeReview(
           widget.review.id,
           responses: _collectResponses(),
+          fields: _collectFields(),
         );
       } else {
         await repository.adminUpdateReview(
           widget.review.id,
           responses: _collectResponses(),
+          fields: _collectFields(),
         );
       }
       _invalidate();
@@ -163,6 +210,10 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
   }
 
   Future<void> _saveSelfAssessment() async {
+    if (_selfAssessmentController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Your feedback is required.');
+      return;
+    }
     setState(() {
       _saving = true;
       _errorMessage = null;
@@ -230,9 +281,13 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
     final canEditResponses =
         !isFinalized &&
         (widget.hasOverride || (review.status == 'pending' && !widget.isSelf));
-    final canFinalize = widget.hasOverride && review.status == 'completed';
+    final feedbackGiven = _selfAssessmentController.text.trim().isNotEmpty;
+    final canFinalize =
+        widget.hasOverride && review.status == 'completed' && feedbackGiven;
     final canUnfinalize = widget.hasOverride && isFinalized;
-    final canEditSelfAssessment = widget.isSelf && !isFinalized;
+    // The employee writes their feedback only after management has submitted
+    // the evaluation, and only until HR finalizes it.
+    final canEditSelfAssessment = widget.isSelf && review.status == 'completed';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -243,17 +298,36 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                EmployeeAvatar(
+                  fullName: review.employeeName,
+                  photoUrl: review.employeePhotoUrl,
+                  radius: 28,
+                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        review.employeeName,
-                        style: Theme.of(context).textTheme.titleLarge,
+                      InkWell(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => EmployeeProfilePage(
+                              employeeId: review.employeeId,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          review.employeeName,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: AppColors.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Year ${review.reviewYear} Review · Due ${formatDisplayDate(review.dueDate)}',
+                        '${review.title} · Due ${formatDisplayDate(review.dueDate)}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -266,6 +340,10 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
             ),
           ),
           const SizedBox(height: 16),
+          if (widget.isSelf && review.status != 'pending') ...[
+            _ManagementFilledBanner(review: review),
+            const SizedBox(height: 16),
+          ],
           if (_errorMessage != null) ...[
             Text(
               _errorMessage!,
@@ -274,41 +352,120 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
             const SizedBox(height: 12),
           ],
           FormSection(
-            title: 'Review Areas',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < review.responses.length; i++) ...[
-                  _ResponseField(
-                    response: review.responses[i],
-                    editable: canEditResponses,
-                    rating: _ratings[review.responses[i].id],
-                    onRatingChanged: (value) => setState(
-                      () => _ratings[review.responses[i].id] = value,
+            title: 'Employee Information',
+            child: _EmployeeInformation(review: review),
+          ),
+          const SizedBox(height: 16),
+          for (final group in _groupBySection(review.responses)) ...[
+            FormSection(
+              title: group.title,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (group.responses.any((r) => r.responseType == 'rating'))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        _ratingScale,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ),
-                    textController: _textControllers[review.responses[i].id]!,
-                  ),
-                  if (i < review.responses.length - 1)
-                    const Divider(height: 24, color: AppColors.borderSubtle),
+                  for (var i = 0; i < group.responses.length; i++) ...[
+                    _ResponseField(
+                      response: group.responses[i],
+                      editable: canEditResponses,
+                      rating: _ratings[group.responses[i].id],
+                      onRatingChanged: (value) => setState(
+                        () => _ratings[group.responses[i].id] = value,
+                      ),
+                      textController: _textControllers[group.responses[i].id]!,
+                      commentController:
+                          _commentControllers[group.responses[i].id]!,
+                    ),
+                    if (i < group.responses.length - 1)
+                      const Divider(height: 24, color: AppColors.borderSubtle),
+                  ],
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          FormSection(
+            title: 'Overall Performance Rating',
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final option in overallRatingLabels.entries)
+                  ChoiceChip(
+                    label: Text(option.value),
+                    selected: _overallRating == option.key,
+                    onSelected: canEditResponses
+                        ? (selected) => setState(
+                            () => _overallRating = selected ? option.key : null,
+                          )
+                        : null,
+                  ),
+                if (!canEditResponses && _overallRating == null)
+                  Text(
+                    'Not rated',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
               ],
             ),
           ),
           const SizedBox(height: 16),
           FormSection(
-            title: 'Employee Self-Assessment',
-            child: TextField(
-              controller: _selfAssessmentController,
-              enabled: canEditSelfAssessment && !_saving,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: canEditSelfAssessment
-                    ? 'Optional — add your own comments about this review period'
-                    : null,
-                border: canEditSelfAssessment
-                    ? const OutlineInputBorder()
-                    : InputBorder.none,
-              ),
+            title: canEditSelfAssessment
+                ? 'Employee Feedback (required)'
+                : 'Employee Feedback',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _selfAssessmentController,
+                  enabled: canEditSelfAssessment && !_saving,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: canEditSelfAssessment
+                        ? 'Required — write your own feedback on this review'
+                        : null,
+                    border: canEditSelfAssessment
+                        ? const OutlineInputBorder()
+                        : InputBorder.none,
+                  ),
+                ),
+                if (!canEditSelfAssessment)
+                  Text(
+                    isFinalized
+                        ? 'Not editable: this review has been finalized, so '
+                              'feedback can no longer be changed.'
+                        : widget.isSelf
+                        ? 'Not editable yet: management is still filling in '
+                              'your review. You can add your feedback once '
+                              'they submit it.'
+                        : review.status == 'pending'
+                        ? 'Not editable: only ${review.employeeName} can write '
+                              'their own feedback, from their own account. '
+                              'They can see this review and add their '
+                              'feedback only after you complete it, and '
+                              'their feedback is required before it can be '
+                              'finalized.'
+                        : 'Not editable: only ${review.employeeName} can write '
+                              'their own feedback, from their own account. '
+                              'This review is now open to them, and their '
+                              'feedback is required before it can be '
+                              'finalized.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+              ],
             ),
           ),
           if (review.completedByName != null) ...[
@@ -332,13 +489,32 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
             ),
           ],
           const SizedBox(height: 20),
+          if (canEditResponses && review.status == 'pending') ...[
+            Text(
+              'Save Draft keeps your answers and leaves this review open. '
+              'Complete Review submits it and records today as the date of '
+              'evaluation.',
+              textAlign: TextAlign.end,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (canEditSelfAssessment) ...[
                 OutlinedButton(
                   onPressed: _saving ? null : _saveSelfAssessment,
-                  child: const Text('Save Comments'),
+                  child: const Text('Submit Feedback'),
+                ),
+                const SizedBox(width: 12),
+              ],
+              if (canEditResponses && review.status == 'pending') ...[
+                OutlinedButton(
+                  onPressed: _saving ? null : _saveDraft,
+                  child: const Text('Save Draft'),
                 ),
                 const SizedBox(width: 12),
               ],
@@ -387,6 +563,96 @@ class _ReviewFormState extends ConsumerState<_ReviewForm> {
   }
 }
 
+const _ratingScale =
+    '1 = Needs Improvement | 2 = Fair | 3 = Good | 4 = Very Good | 5 = Excellent';
+
+class _SectionGroup {
+  _SectionGroup(this.title) : responses = [];
+
+  final String? title;
+  final List<PerformanceReviewResponse> responses;
+}
+
+/// Consecutive responses that share a section render together under that
+/// section's heading; ungrouped ones (no section) share one untitled card.
+List<_SectionGroup> _groupBySection(List<PerformanceReviewResponse> all) {
+  final groups = <_SectionGroup>[];
+  for (final response in all) {
+    final section = (response.section?.isNotEmpty ?? false)
+        ? response.section
+        : null;
+    if (groups.isEmpty || groups.last.title != section) {
+      groups.add(_SectionGroup(section));
+    }
+    groups.last.responses.add(response);
+  }
+  return groups;
+}
+
+class _EmployeeInformation extends StatelessWidget {
+  const _EmployeeInformation({required this.review});
+
+  final PerformanceReview review;
+
+  @override
+  Widget build(BuildContext context) {
+    String orDash(String? value) =>
+        (value == null || value.isEmpty) ? '—' : value;
+    final evaluated = review.completedAt;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _InfoRow(label: 'Name', value: review.employeeName),
+        _InfoRow(label: 'Designation', value: orDash(review.designation)),
+        _InfoRow(label: 'Department', value: orDash(review.department)),
+        _InfoRow(
+          label: 'Reporting Manager',
+          value: orDash(review.reportingManagerName),
+        ),
+        _InfoRow(
+          label: 'Review Period',
+          value: review.title.replaceFirst(' Review', ''),
+        ),
+        // Set automatically when the review is submitted — nothing to type.
+        if (evaluated != null)
+          _InfoRow(
+            label: 'Date of Evaluation',
+            value: formatDisplayDate(evaluated.toIso8601String()),
+          ),
+      ],
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 160,
+            child: Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+}
+
 class _ResponseField extends StatelessWidget {
   const _ResponseField({
     required this.response,
@@ -394,6 +660,7 @@ class _ResponseField extends StatelessWidget {
     required this.rating,
     required this.onRatingChanged,
     required this.textController,
+    required this.commentController,
   });
 
   final PerformanceReviewResponse response;
@@ -401,6 +668,7 @@ class _ResponseField extends StatelessWidget {
   final int? rating;
   final ValueChanged<int?> onRatingChanged;
   final TextEditingController textController;
+  final TextEditingController commentController;
 
   @override
   Widget build(BuildContext context) {
@@ -414,7 +682,7 @@ class _ResponseField extends StatelessWidget {
           ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        if (response.responseType == 'rating')
+        if (response.responseType == 'rating') ...[
           Row(
             children: [
               for (var star = 1; star <= 5; star++)
@@ -442,8 +710,23 @@ class _ResponseField extends StatelessWidget {
                   ),
                 ),
             ],
-          )
-        else
+          ),
+          if (response.hasComment) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: commentController,
+              enabled: editable,
+              maxLines: 2,
+              decoration: InputDecoration(
+                border: editable
+                    ? const OutlineInputBorder()
+                    : InputBorder.none,
+                hintText: editable ? 'Comments' : null,
+                isDense: true,
+              ),
+            ),
+          ],
+        ] else
           TextField(
             controller: textController,
             enabled: editable,
@@ -455,6 +738,42 @@ class _ResponseField extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Shown to the reviewed employee: everything above their own feedback box
+/// was filled in by management.
+class _ManagementFilledBanner extends StatelessWidget {
+  const _ManagementFilledBanner({required this.review});
+
+  final PerformanceReview review;
+
+  @override
+  Widget build(BuildContext context) {
+    final by = review.completedByName;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, size: 18, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Everything below was filled in by management'
+              '${by != null ? ' ($by)' : ''}. You can\'t change it — your '
+              'feedback is required in the Employee Feedback section at the '
+              'bottom.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

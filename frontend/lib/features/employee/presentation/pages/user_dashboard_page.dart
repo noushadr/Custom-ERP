@@ -470,6 +470,7 @@ class _TeamMembersList extends ConsumerWidget {
         minItemWidth: _teamTileWidth,
         spacing: 16,
         runSpacing: 16,
+        maxWidthFraction: 0.3,
         children: [
           for (final report in reports)
             _TeamMemberTile(

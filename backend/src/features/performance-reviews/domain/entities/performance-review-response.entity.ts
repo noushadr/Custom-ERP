@@ -33,9 +33,19 @@ export class PerformanceReviewResponse extends BaseEntity {
   @Column({ type: 'int' })
   sortOrder: number;
 
+  @Column({ type: 'varchar', nullable: true })
+  section?: string | null;
+
+  @Column({ default: false })
+  hasComment: boolean;
+
   @Column({ type: 'int', nullable: true })
   ratingValue?: number;
 
   @Column({ type: 'text', nullable: true })
   textValue?: string;
+
+  /** Free-text comment beside a rating, when [hasComment]. */
+  @Column({ type: 'text', nullable: true })
+  commentValue?: string;
 }

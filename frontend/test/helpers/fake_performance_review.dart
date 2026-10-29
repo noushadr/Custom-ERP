@@ -1,5 +1,6 @@
 import 'package:zera_erp/features/performance_reviews/domain/entities/performance_review.dart';
 import 'package:zera_erp/features/performance_reviews/domain/entities/performance_review_criterion.dart';
+import 'package:zera_erp/features/performance_reviews/domain/entities/performance_review_form_fields.dart';
 import 'package:zera_erp/features/performance_reviews/domain/entities/performance_review_response.dart';
 import 'package:zera_erp/features/performance_reviews/domain/entities/performance_review_response_input.dart';
 import 'package:zera_erp/features/performance_reviews/domain/entities/performance_review_summary.dart';
@@ -8,6 +9,7 @@ import 'package:zera_erp/features/performance_reviews/domain/repositories/perfor
 PerformanceReviewSummary buildTestPerformanceReviewSummary({
   String employeeId = 'employee-1',
   int reviewYear = 1,
+  int reviewPeriod = 2,
   String dueDate = '2026-01-01',
   String status = 'pending',
   DateTime? completedAt,
@@ -16,6 +18,7 @@ PerformanceReviewSummary buildTestPerformanceReviewSummary({
   return PerformanceReviewSummary(
     employeeId: employeeId,
     reviewYear: reviewYear,
+    reviewPeriod: reviewPeriod,
     dueDate: dueDate,
     status: status,
     completedAt: completedAt,
@@ -45,8 +48,11 @@ PerformanceReviewResponse buildTestPerformanceReviewResponse({
   String criterionName = 'Overall Performance',
   String responseType = 'rating',
   int sortOrder = 0,
+  String? section,
+  bool hasComment = false,
   int? ratingValue,
   String? textValue,
+  String? commentValue,
 }) {
   return PerformanceReviewResponse(
     id: id,
@@ -54,8 +60,11 @@ PerformanceReviewResponse buildTestPerformanceReviewResponse({
     criterionName: criterionName,
     responseType: responseType,
     sortOrder: sortOrder,
+    section: section,
+    hasComment: hasComment,
     ratingValue: ratingValue,
     textValue: textValue,
+    commentValue: commentValue,
   );
 }
 
@@ -65,6 +74,7 @@ PerformanceReview buildTestPerformanceReview({
   String employeeName = 'Jane Doe',
   String? employeePhotoUrl,
   int reviewYear = 1,
+  int reviewPeriod = 2,
   String dueDate = '2026-01-01',
   String status = 'pending',
   List<PerformanceReviewResponse>? responses,
@@ -82,6 +92,7 @@ PerformanceReview buildTestPerformanceReview({
     employeeName: employeeName,
     employeePhotoUrl: employeePhotoUrl,
     reviewYear: reviewYear,
+    reviewPeriod: reviewPeriod,
     dueDate: dueDate,
     status: status,
     responses: responses ?? [buildTestPerformanceReviewResponse()],
@@ -116,6 +127,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
     this.deleteCriterionError,
     this.createManualReviewError,
     this.completeReviewError,
+    this.saveDraftError,
     this.setSelfAssessmentError,
     this.finalizeReviewError,
     this.unfinalizeReviewError,
@@ -142,6 +154,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   final Object? deleteCriterionError;
   final Object? createManualReviewError;
   final Object? completeReviewError;
+  final Object? saveDraftError;
   final Object? setSelfAssessmentError;
   final Object? finalizeReviewError;
   final Object? unfinalizeReviewError;
@@ -151,6 +164,10 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   String? lastDeletedCriterionId;
   String? lastCompletedReviewId;
   List<PerformanceReviewResponseInput>? lastCompletedResponses;
+  PerformanceReviewFormFields? lastCompletedFields;
+  String? lastDraftReviewId;
+  List<PerformanceReviewResponseInput>? lastDraftResponses;
+  PerformanceReviewFormFields? lastDraftFields;
   String? lastSelfAssessmentReviewId;
   String? lastSelfAssessmentComments;
   String? lastFinalizedReviewId;
@@ -165,6 +182,8 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   Future<PerformanceReviewCriterion> createCriterion({
     required String name,
     required String responseType,
+    String? section,
+    bool? hasComment,
   }) async {
     if (createCriterionError != null) throw createCriterionError!;
     return buildTestPerformanceReviewCriterion(
@@ -178,6 +197,8 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
     String id, {
     String? name,
     String? responseType,
+    String? section,
+    bool? hasComment,
     bool? isArchived,
   }) async {
     if (updateCriterionError != null) throw updateCriterionError!;
@@ -262,12 +283,27 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
   }
 
   @override
+  Future<PerformanceReview> saveDraft(
+    String id, {
+    required List<PerformanceReviewResponseInput> responses,
+    PerformanceReviewFormFields? fields,
+  }) async {
+    lastDraftReviewId = id;
+    lastDraftResponses = responses;
+    lastDraftFields = fields;
+    if (saveDraftError != null) throw saveDraftError!;
+    return reviewById ?? buildTestPerformanceReview(id: id);
+  }
+
+  @override
   Future<PerformanceReview> completeReview(
     String id, {
     required List<PerformanceReviewResponseInput> responses,
+    PerformanceReviewFormFields? fields,
   }) async {
     lastCompletedReviewId = id;
     lastCompletedResponses = responses;
+    lastCompletedFields = fields;
     if (completeReviewError != null) throw completeReviewError!;
     return reviewById ??
         buildTestPerformanceReview(id: id, status: 'completed');
@@ -306,6 +342,7 @@ class FakePerformanceReviewRepository implements PerformanceReviewRepository {
     String id, {
     String? employeeComments,
     List<PerformanceReviewResponseInput>? responses,
+    PerformanceReviewFormFields? fields,
   }) async {
     if (adminUpdateReviewError != null) throw adminUpdateReviewError!;
     return reviewById ?? buildTestPerformanceReview(id: id);

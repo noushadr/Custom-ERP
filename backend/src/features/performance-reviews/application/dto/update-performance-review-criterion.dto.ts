@@ -12,6 +12,14 @@ export class UpdatePerformanceReviewCriterionDto {
   responseType?: CriterionResponseType;
 
   @IsOptional()
+  @IsString()
+  section?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  hasComment?: boolean;
+
+  @IsOptional()
   @IsBoolean()
   isArchived?: boolean;
 }

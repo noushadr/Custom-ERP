@@ -6,15 +6,18 @@ class PerformanceReviewResponseInput {
     required this.responseId,
     this.ratingValue,
     this.textValue,
+    this.commentValue,
   });
 
   final String responseId;
   final int? ratingValue;
   final String? textValue;
+  final String? commentValue;
 
   Map<String, dynamic> toJson() => {
     'responseId': responseId,
     if (ratingValue != null) 'ratingValue': ratingValue,
     if (textValue != null) 'textValue': textValue,
+    if (commentValue != null) 'commentValue': commentValue,
   };
 }

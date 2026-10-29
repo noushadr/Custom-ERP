@@ -59,12 +59,20 @@ class EmployeePerformanceReviewsSection extends ConsumerWidget {
           }
 
           final sorted = [...reviews]
-            ..sort((a, b) => b.reviewYear.compareTo(a.reviewYear));
+            ..sort((a, b) {
+              final byYear = b.reviewYear.compareTo(a.reviewYear);
+              return byYear != 0
+                  ? byYear
+                  : b.reviewPeriod.compareTo(a.reviewPeriod);
+            });
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var i = 0; i < sorted.length; i++) ...[
-                PerformanceReviewSummaryRow(review: sorted[i]),
+                PerformanceReviewSummaryRow(
+                  review: sorted[i],
+                  selfView: isSelf,
+                ),
                 if (i < sorted.length - 1)
                   const Divider(height: 16, color: AppColors.borderSubtle),
               ],

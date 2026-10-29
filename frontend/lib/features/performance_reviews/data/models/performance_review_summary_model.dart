@@ -4,6 +4,7 @@ class PerformanceReviewSummaryModel extends PerformanceReviewSummary {
   const PerformanceReviewSummaryModel({
     required super.employeeId,
     required super.reviewYear,
+    super.reviewPeriod,
     required super.dueDate,
     required super.status,
     super.completedAt,
@@ -14,6 +15,7 @@ class PerformanceReviewSummaryModel extends PerformanceReviewSummary {
       PerformanceReviewSummaryModel(
         employeeId: json['employeeId'] as String,
         reviewYear: json['reviewYear'] as int,
+        reviewPeriod: json['reviewPeriod'] as int? ?? 2,
         dueDate: json['dueDate'] as String,
         status: json['status'] as String,
         completedAt: json['completedAt'] == null

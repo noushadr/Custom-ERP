@@ -14,6 +14,7 @@ import { PerformanceReviewCriterion } from '../domain/entities/performance-revie
 import { PerformanceReviewResponse } from '../domain/entities/performance-review-response.entity';
 import { PerformanceReview } from '../domain/entities/performance-review.entity';
 import { CriterionResponseType } from '../domain/enums/criterion-response-type.enum';
+import { OverallRating } from '../domain/enums/overall-rating.enum';
 import { PerformanceReviewStatus } from '../domain/enums/performance-review-status.enum';
 import type { PerformanceReviewCriterionRepository } from '../domain/repositories/performance-review-criterion-repository.interface';
 import type { PerformanceReviewRepository } from '../domain/repositories/performance-review-repository.interface';
@@ -56,6 +57,8 @@ function buildResponse(
     criterionName: 'Overall Performance',
     responseType: CriterionResponseType.RATING,
     sortOrder: 0,
+    section: null,
+    hasComment: false,
     ...overrides,
   } as PerformanceReviewResponse;
 }
@@ -66,6 +69,7 @@ function buildReview(overrides: Partial<PerformanceReview> = {}): PerformanceRev
     employeeId: 'employee-1',
     employee: buildEmployee(),
     reviewYear: 1,
+    reviewPeriod: 2,
     dueDate: '2021-01-01',
     status: PerformanceReviewStatus.PENDING,
     responses: [buildResponse()],
@@ -221,7 +225,7 @@ describe('PerformanceReviewsService', () => {
       jest.useRealTimers();
     });
 
-    it('creates a review for the current calendar year for everyone in December', async () => {
+    it('creates a December-cycle review for everyone on 1 December', async () => {
       setToday('2026-12-01');
       const employee = buildEmployee({ joiningDate: joinedLongAgo });
       employeeRepository.findAll.mockResolvedValue([employee]);
@@ -235,9 +239,39 @@ describe('PerformanceReviewsService', () => {
       expect(result.created).toBe(1);
       expect(result.reviews[0].reviewYear).toBe(2026);
       expect(reviewRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ reviewYear: 2026, dueDate: '2026-12-01' }),
+        expect.objectContaining({
+          reviewYear: 2026,
+          reviewPeriod: 2,
+          dueDate: '2026-12-01',
+        }),
       );
       expect(responseRepository.saveMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates a June-cycle review on 1 June', async () => {
+      setToday('2026-06-01');
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ joiningDate: joinedLongAgo }),
+      ]);
+      criterionRepository.findAll.mockResolvedValue([]);
+      reviewRepository.findById.mockResolvedValue(
+        buildReview({ reviewYear: 2026, reviewPeriod: 1 }),
+      );
+
+      await service.runDueCheck();
+
+      expect(reviewRepository.findByEmployeeAndYear).toHaveBeenCalledWith(
+        expect.anything(),
+        2026,
+        1,
+      );
+      expect(reviewRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reviewYear: 2026,
+          reviewPeriod: 1,
+          dueDate: '2026-06-01',
+        }),
+      );
     });
 
     it('includes employees with under a year of service', async () => {
@@ -254,8 +288,8 @@ describe('PerformanceReviewsService', () => {
       expect(result.created).toBe(1);
     });
 
-    it('creates nothing outside December', async () => {
-      setToday('2026-11-30');
+    it('creates nothing outside June and December', async () => {
+      setToday('2026-07-01');
       employeeRepository.findAll.mockResolvedValue([
         buildEmployee({ joiningDate: joinedLongAgo }),
       ]);
@@ -360,7 +394,79 @@ describe('PerformanceReviewsService', () => {
     });
   });
 
+  describe('saveDraft', () => {
+    it('saves answers but leaves the review pending', async () => {
+      const review = buildReview({
+        responses: [buildResponse({ id: 'response-1', hasComment: true })],
+      });
+      reviewRepository.findById.mockResolvedValue(review);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'manager-1' }),
+      );
+
+      const result = await service.saveDraft(
+        review.id,
+        {
+          responses: [
+            { responseId: 'response-1', ratingValue: 3, commentValue: 'WIP' },
+          ],
+          overallRating: OverallRating.MEETS_EXPECTATIONS,
+        },
+        'manager-user-1',
+        false,
+      );
+
+      expect(result.status).toBe(PerformanceReviewStatus.PENDING);
+      expect(result.completedAt).toBeNull();
+      expect(result.overallRating).toBe('meets_expectations');
+      expect(responseRepository.saveMany).toHaveBeenCalled();
+    });
+
+    it('is forbidden for someone who is neither the manager nor an HR/Admin', async () => {
+      const review = buildReview();
+      reviewRepository.findById.mockResolvedValue(review);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'someone-else' }),
+      );
+
+      await expect(
+        service.saveDraft(review.id, { responses: [] }, 'user-x', false),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
   describe('completeReview', () => {
+    it('stores comments (only where allowed) plus the overall rating', async () => {
+      const review = buildReview({
+        responses: [
+          buildResponse({ id: 'response-1', hasComment: true }),
+          buildResponse({ id: 'response-2', hasComment: false }),
+        ],
+      });
+      reviewRepository.findById.mockResolvedValue(review);
+      employeeRepository.findByUserId.mockResolvedValue(
+        buildEmployee({ id: 'manager-1', firstName: 'Manager', lastName: 'Person' }),
+      );
+
+      const result = await service.completeReview(
+        review.id,
+        {
+          responses: [
+            { responseId: 'response-1', ratingValue: 4, commentValue: 'Solid' },
+            { responseId: 'response-2', ratingValue: 3, commentValue: 'ignored' },
+          ],
+          overallRating: OverallRating.EXCEEDS_EXPECTATIONS,
+        },
+        'manager-user-1',
+        false,
+      );
+
+      expect(result.overallRating).toBe('exceeds_expectations');
+      const saved = responseRepository.saveMany.mock.calls[0][0];
+      expect(saved.find((r) => r.id === 'response-1')?.commentValue).toBe('Solid');
+      expect(saved.find((r) => r.id === 'response-2')?.commentValue).toBeUndefined();
+    });
+
     it('succeeds for the review employee\'s actual reporting manager', async () => {
       const review = buildReview();
       reviewRepository.findById.mockResolvedValue(review);
@@ -425,8 +531,8 @@ describe('PerformanceReviewsService', () => {
   });
 
   describe('setSelfAssessment', () => {
-    it("lets the review's own employee add comments", async () => {
-      const review = buildReview();
+    it("lets the review's own employee add feedback once management has completed it", async () => {
+      const review = buildReview({ status: PerformanceReviewStatus.COMPLETED });
       reviewRepository.findById.mockResolvedValue(review);
       employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
 
@@ -437,6 +543,26 @@ describe('PerformanceReviewsService', () => {
       );
 
       expect(result.employeeComments).toBe('Great year overall');
+    });
+
+    it('is rejected while management has not completed the review', async () => {
+      const review = buildReview({ status: PerformanceReviewStatus.PENDING });
+      reviewRepository.findById.mockResolvedValue(review);
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+
+      await expect(
+        service.setSelfAssessment(review.id, 'Too early', 'user-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects empty feedback', async () => {
+      const review = buildReview({ status: PerformanceReviewStatus.COMPLETED });
+      reviewRepository.findById.mockResolvedValue(review);
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+
+      await expect(
+        service.setSelfAssessment(review.id, '   ', 'user-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('is forbidden for someone other than the review\'s own employee', async () => {
@@ -453,14 +579,24 @@ describe('PerformanceReviewsService', () => {
   });
 
   describe('getReviewByIdForActor', () => {
-    it("allows the review's own employee", async () => {
-      const review = buildReview();
+    it("allows the review's own employee once management has completed it", async () => {
+      const review = buildReview({ status: PerformanceReviewStatus.COMPLETED });
       reviewRepository.findById.mockResolvedValue(review);
       employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
 
       await expect(
         service.getReviewByIdForActor(review.id, 'user-1', false),
       ).resolves.toMatchObject({ id: review.id });
+    });
+
+    it("hides a pending review from its own employee until management completes it", async () => {
+      const review = buildReview({ status: PerformanceReviewStatus.PENDING });
+      reviewRepository.findById.mockResolvedValue(review);
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+
+      await expect(
+        service.getReviewByIdForActor(review.id, 'user-1', false),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('allows the reporting manager', async () => {
@@ -498,6 +634,23 @@ describe('PerformanceReviewsService', () => {
     });
   });
 
+  describe('getMyReviews', () => {
+    it('hides draft ratings of a pending review from the employee', async () => {
+      employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
+      reviewRepository.findByEmployeeId.mockResolvedValue([
+        buildReview({
+          status: PerformanceReviewStatus.PENDING,
+          responses: [buildResponse({ ratingValue: 2 })],
+        }),
+      ]);
+
+      const [review] = await service.getMyReviews('user-1');
+
+      expect(review.responses).toEqual([]);
+      expect(review.overallRating).toBeNull();
+    });
+  });
+
   describe('getLatestReviewSummaries', () => {
     it("maps each employee's latest review to a lightweight summary", async () => {
       reviewRepository.findLatestPerEmployee.mockResolvedValue([
@@ -522,6 +675,7 @@ describe('PerformanceReviewsService', () => {
         {
           employeeId: 'employee-1',
           reviewYear: 2,
+          reviewPeriod: 2,
           dueDate: '2021-01-01',
           status: PerformanceReviewStatus.PENDING,
           completedAt: null,
@@ -530,6 +684,7 @@ describe('PerformanceReviewsService', () => {
         {
           employeeId: 'employee-2',
           reviewYear: 3,
+          reviewPeriod: 2,
           dueDate: '2021-01-01',
           status: PerformanceReviewStatus.FINALIZED,
           completedAt: null,
@@ -623,8 +778,20 @@ describe('PerformanceReviewsService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('finalizes a completed review', async () => {
+    it('refuses to finalize until the employee has given feedback', async () => {
       const review = buildReview({ status: PerformanceReviewStatus.COMPLETED });
+      reviewRepository.findById.mockResolvedValue(review);
+
+      await expect(
+        service.finalizeReview(review.id, 'hr-user-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('finalizes a completed review', async () => {
+      const review = buildReview({
+        status: PerformanceReviewStatus.COMPLETED,
+        employeeComments: 'Thanks for the feedback',
+      });
       reviewRepository.findById.mockResolvedValue(review);
       employeeRepository.findByUserId.mockResolvedValue(
         buildEmployee({ id: 'hr-1', firstName: 'HR', lastName: 'Person' }),

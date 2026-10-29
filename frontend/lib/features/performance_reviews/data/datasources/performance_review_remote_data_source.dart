@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../domain/entities/performance_review_form_fields.dart';
 import '../../domain/entities/performance_review_response_input.dart';
 import '../models/performance_review_criterion_model.dart';
 import '../models/performance_review_model.dart';
@@ -25,10 +26,17 @@ class PerformanceReviewRemoteDataSource {
   Future<PerformanceReviewCriterionModel> createCriterion({
     required String name,
     required String responseType,
+    String? section,
+    bool? hasComment,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/performance-reviews/criteria',
-      data: {'name': name, 'responseType': responseType},
+      data: {
+        'name': name,
+        'responseType': responseType,
+        'section': ?section,
+        'hasComment': ?hasComment,
+      },
     );
     return PerformanceReviewCriterionModel.fromJson(response.data!);
   }
@@ -37,6 +45,8 @@ class PerformanceReviewRemoteDataSource {
     String id, {
     String? name,
     String? responseType,
+    String? section,
+    bool? hasComment,
     bool? isArchived,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
@@ -44,6 +54,8 @@ class PerformanceReviewRemoteDataSource {
       data: {
         'name': ?name,
         'responseType': ?responseType,
+        'section': ?section,
+        'hasComment': ?hasComment,
         'isArchived': ?isArchived,
       },
     );
@@ -187,13 +199,32 @@ class PerformanceReviewRemoteDataSource {
     return PerformanceReviewModel.fromJson(response.data!);
   }
 
+  Future<PerformanceReviewModel> saveDraft(
+    String id, {
+    required List<PerformanceReviewResponseInput> responses,
+    PerformanceReviewFormFields? fields,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/performance-reviews/$id/draft',
+      data: {
+        'responses': responses.map((r) => r.toJson()).toList(),
+        ...?fields?.toJson(),
+      },
+    );
+    return PerformanceReviewModel.fromJson(response.data!);
+  }
+
   Future<PerformanceReviewModel> completeReview(
     String id, {
     required List<PerformanceReviewResponseInput> responses,
+    PerformanceReviewFormFields? fields,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/performance-reviews/$id/complete',
-      data: {'responses': responses.map((r) => r.toJson()).toList()},
+      data: {
+        'responses': responses.map((r) => r.toJson()).toList(),
+        ...?fields?.toJson(),
+      },
     );
     return PerformanceReviewModel.fromJson(response.data!);
   }
@@ -227,12 +258,14 @@ class PerformanceReviewRemoteDataSource {
     String id, {
     String? employeeComments,
     List<PerformanceReviewResponseInput>? responses,
+    PerformanceReviewFormFields? fields,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/performance-reviews/$id',
       data: {
         'employeeComments': ?employeeComments,
         'responses': ?responses?.map((r) => r.toJson()).toList(),
+        ...?fields?.toJson(),
       },
     );
     return PerformanceReviewModel.fromJson(response.data!);

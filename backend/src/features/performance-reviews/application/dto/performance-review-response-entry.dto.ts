@@ -13,4 +13,8 @@ export class PerformanceReviewResponseEntryDto {
   @IsOptional()
   @IsString()
   textValue?: string;
+
+  @IsOptional()
+  @IsString()
+  commentValue?: string;
 }

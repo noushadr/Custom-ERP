@@ -1,12 +1,13 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { Employee } from '../../../employee/domain/entities/employee.entity';
+import { OverallRating } from '../enums/overall-rating.enum';
 import { PerformanceReviewStatus } from '../enums/performance-review-status.enum';
 import { PerformanceReviewResponse } from './performance-review-response.entity';
 
-/** One review instance for one employee for one year of service (e.g. "Year
- * 2 Review"). Unique per (employeeId, reviewYear) — the year-by-year history
- * is simply every row for an employeeId, ordered by reviewYear. */
+/** One review instance for one employee for one half-year cycle (June or
+ * December). Unique per (employeeId, reviewYear, reviewPeriod) — the history
+ * is simply every row for an employeeId, ordered by year then period. */
 @Entity('performance_reviews')
 export class PerformanceReview extends BaseEntity {
   @Column()
@@ -19,6 +20,10 @@ export class PerformanceReview extends BaseEntity {
   @Column({ type: 'int' })
   reviewYear: number;
 
+  /** 1 = June cycle, 2 = December cycle. */
+  @Column({ type: 'smallint', default: 2 })
+  reviewPeriod: number;
+
   @Column({ type: 'date' })
   dueDate: string;
 
@@ -28,6 +33,10 @@ export class PerformanceReview extends BaseEntity {
     default: PerformanceReviewStatus.PENDING,
   })
   status: PerformanceReviewStatus;
+
+  /** Evaluator-supplied overall verdict. */
+  @Column({ type: 'enum', enum: OverallRating, nullable: true })
+  overallRating?: OverallRating | null;
 
   @OneToMany(() => PerformanceReviewResponse, (r) => r.performanceReview)
   responses: PerformanceReviewResponse[];

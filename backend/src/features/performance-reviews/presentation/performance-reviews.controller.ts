@@ -155,6 +155,21 @@ export class PerformanceReviewsController {
     return this.performanceReviewsService.createManualReview(dto);
   }
 
+  @Patch(':id/draft')
+  saveDraft(
+    @Param('id') id: string,
+    @Body() dto: CompletePerformanceReviewDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const actorHasOverride = user.permissions.includes(PERMISSION);
+    return this.performanceReviewsService.saveDraft(
+      id,
+      dto,
+      user.sub,
+      actorHasOverride,
+    );
+  }
+
   @Patch(':id/complete')
   completeReview(
     @Param('id') id: string,

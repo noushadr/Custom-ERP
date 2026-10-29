@@ -1,5 +1,6 @@
 import '../entities/performance_review.dart';
 import '../entities/performance_review_criterion.dart';
+import '../entities/performance_review_form_fields.dart';
 import '../entities/performance_review_response_input.dart';
 import '../entities/performance_review_summary.dart';
 
@@ -12,6 +13,8 @@ abstract interface class PerformanceReviewRepository {
   Future<PerformanceReviewCriterion> createCriterion({
     required String name,
     required String responseType,
+    String? section,
+    bool? hasComment,
   });
 
   /// Requires `performance.manage`.
@@ -19,6 +22,8 @@ abstract interface class PerformanceReviewRepository {
     String id, {
     String? name,
     String? responseType,
+    String? section,
+    bool? hasComment,
     bool? isArchived,
   });
 
@@ -80,11 +85,20 @@ abstract interface class PerformanceReviewRepository {
     required int reviewYear,
   });
 
+  /// Saves in-progress answers without completing the review — it stays
+  /// pending. Same access as [completeReview].
+  Future<PerformanceReview> saveDraft(
+    String id, {
+    required List<PerformanceReviewResponseInput> responses,
+    PerformanceReviewFormFields? fields,
+  });
+
   /// Allowed for the review employee's reporting manager, or anyone holding
   /// `performance.manage`.
   Future<PerformanceReview> completeReview(
     String id, {
     required List<PerformanceReviewResponseInput> responses,
+    PerformanceReviewFormFields? fields,
   });
 
   /// Allowed only for the review's own employee.
@@ -103,5 +117,6 @@ abstract interface class PerformanceReviewRepository {
     String id, {
     String? employeeComments,
     List<PerformanceReviewResponseInput>? responses,
+    PerformanceReviewFormFields? fields,
   });
 }

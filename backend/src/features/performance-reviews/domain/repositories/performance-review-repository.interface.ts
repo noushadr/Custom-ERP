@@ -10,6 +10,7 @@ export interface PerformanceReviewRepository {
   findByEmployeeAndYear(
     employeeId: string,
     reviewYear: number,
+    reviewPeriod: number,
   ): Promise<PerformanceReview | null>;
   findById(id: string): Promise<PerformanceReview | null>;
   findByStatus(status: PerformanceReviewStatus): Promise<PerformanceReview[]>;

@@ -4,8 +4,11 @@ export interface PerformanceReviewResponseItemDto {
   criterionName: string;
   responseType: string;
   sortOrder: number;
+  section: string | null;
+  hasComment: boolean;
   ratingValue: number | null;
   textValue: string | null;
+  commentValue: string | null;
 }
 
 export interface PerformanceReviewResponseDto {
@@ -13,10 +16,15 @@ export interface PerformanceReviewResponseDto {
   employeeId: string;
   employeeName: string;
   employeePhotoUrl: string | null;
+  designation: string | null;
+  department: string | null;
+  reportingManagerName: string | null;
   reviewYear: number;
+  reviewPeriod: number;
   dueDate: string;
   status: string;
   responses: PerformanceReviewResponseItemDto[];
+  overallRating: string | null;
   employeeComments: string | null;
   completedByName: string | null;
   completedAt: string | null;
@@ -32,6 +40,7 @@ export interface PerformanceReviewResponseDto {
 export interface PerformanceReviewSummaryDto {
   employeeId: string;
   reviewYear: number;
+  reviewPeriod: number;
   dueDate: string;
   status: string;
   completedAt: string | null;

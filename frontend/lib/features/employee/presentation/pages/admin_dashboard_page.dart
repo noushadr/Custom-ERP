@@ -5,11 +5,8 @@ import '../../../../shared/utils/date_format.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../../shared/widgets/responsive_card_row.dart';
 import '../../../announcements/application/announcement_providers.dart';
-import '../../../authentication/application/auth_providers.dart';
-import '../../../authentication/application/auth_state.dart';
 import '../../../holidays/application/holiday_providers.dart';
 import '../../../holidays/domain/entities/holiday.dart';
-import '../../../leave/presentation/widgets/all_employees_leave_section.dart';
 import '../../../leave/presentation/widgets/leave_calendar_view.dart';
 import '../../../notices/application/notice_providers.dart';
 import '../../../notices/domain/entities/notice_display_duration.dart';
@@ -49,13 +46,6 @@ class _DashboardStats extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authControllerProvider);
-    // The same all-employees leave table as on the Leaves page — gated by the
-    // same permission the backend endpoint requires.
-    final canSeeLeaveTable =
-        authState is AuthAuthenticated &&
-        authState.user.hasPermission('leave.manage');
-
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,14 +61,6 @@ class _DashboardStats extends ConsumerWidget {
               _TasksSummaryCard(),
             ],
           ),
-          if (canSeeLeaveTable) ...[
-            const SizedBox(height: 18),
-            const AllEmployeesLeaveSection(),
-          ],
-          const SizedBox(height: 18),
-          // Whole-company leave calendar (the same widget as on the Leaves
-          // page, opened on the Company scope even for a department head).
-          const LeaveCalendarView(initialScope: 'company'),
           const SizedBox(height: 18),
           CompanyNoticesSection(
             trailing: FilledButton.icon(
@@ -90,6 +72,10 @@ class _DashboardStats extends ConsumerWidget {
               label: const Text('Post notice'),
             ),
           ),
+          const SizedBox(height: 18),
+          // Whole-company leave calendar (the same widget as on the Leaves
+          // page, opened on the Company scope even for a department head).
+          const LeaveCalendarView(initialScope: 'company'),
         ],
       ),
     );

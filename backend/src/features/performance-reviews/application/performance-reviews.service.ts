@@ -22,6 +22,9 @@ import {
 import { NotificationsService } from '../../notifications/application/notifications.service';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { CreatePerformanceReviewCriterionDto } from './dto/create-performance-review-criterion.dto';
+import { PerformanceReviewResponseEntryDto } from './dto/performance-review-response-entry.dto';
+import { ReviewFormFieldsDto } from './dto/review-form-fields.dto';
+import { CriterionResponseType } from '../domain/enums/criterion-response-type.enum';
 import { CreatePerformanceReviewDto } from './dto/create-performance-review.dto';
 import { ReorderPerformanceReviewCriteriaDto } from './dto/reorder-performance-review-criteria.dto';
 import { CompletePerformanceReviewDto } from './dto/complete-performance-review.dto';
@@ -51,13 +54,24 @@ import {
 
 const FOREIGN_KEY_VIOLATION = '23503';
 
-/** December (JS months are zero-based). */
-const REVIEW_MONTH_INDEX = 11;
+/** The two review cycles, keyed by JS month index (zero-based): a review is
+ * created on 1 June (period 1) and 1 December (period 2). */
+const REVIEW_CYCLES: Record<number, { period: number }> = {
+  5: { period: 1 },
+  11: { period: 2 },
+};
+
+const PERIOD_LABELS: Record<number, string> = { 1: 'June', 2: 'December' };
+
+function reviewLabel(year: number, period: number): string {
+  return `${PERIOD_LABELS[period] ?? 'December'} ${year}`;
+}
 
 export interface DueReviewItem {
   employeeId: string;
   employeeName: string;
   reviewYear: number;
+  reviewPeriod: number;
   dueDate: string;
 }
 
@@ -93,6 +107,10 @@ export class PerformanceReviewsService {
     item.name = dto.name;
     item.responseType = dto.responseType;
     item.sortOrder = existing.length;
+    item.section = dto.section?.trim() || null;
+    item.hasComment =
+      dto.responseType === CriterionResponseType.RATING &&
+      (dto.hasComment ?? false);
     item.isArchived = false;
     return this.criterionRepository.save(item);
   }
@@ -161,6 +179,7 @@ export class PerformanceReviewsService {
       const review = await this.createReviewInstance(
         item.employeeId,
         item.reviewYear,
+        item.reviewPeriod,
         item.dueDate,
       );
       if (review) {
@@ -183,7 +202,7 @@ export class PerformanceReviewsService {
 
     await this.notificationsService.create({
       recipientUserId: employee.userId,
-      message: `Your ${review.reviewYear} performance review has been created.`,
+      message: `Your ${reviewLabel(review.reviewYear, review.reviewPeriod)} performance review has been created. It opens for your feedback once management has filled it in.`,
       linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
       linkEntityId: review.id,
     });
@@ -194,7 +213,7 @@ export class PerformanceReviewsService {
     for (const recipient of actionRecipients) {
       await this.notificationsService.create({
         recipientUserId: recipient.id,
-        message: `A ${review.reviewYear} performance review for ${employee.firstName} ${employee.lastName} is ready to rate.`,
+        message: `A ${reviewLabel(review.reviewYear, review.reviewPeriod)} performance review for ${employee.firstName} ${employee.lastName} is ready to rate.`,
         linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
         linkEntityId: review.id,
       });
@@ -211,18 +230,19 @@ export class PerformanceReviewsService {
     await this.runDueCheck();
   }
 
-  /** Reviews are an annual December exercise: from 1 December onward every
-   * active (or on-leave) employee who has joined gets exactly one review for
-   * the current calendar year, `reviewYear` being that calendar year. Any
-   * other month yields nothing, so the daily cron is a no-op until December
-   * and a missed 1 December tick (or a late deploy) still catches up on the
-   * next run — `findByEmployeeAndYear` keeps it idempotent. */
+  /** Reviews run twice a year: throughout June and December every active (or
+   * on-leave) employee who has joined gets exactly one review for that
+   * cycle (`reviewYear` = calendar year, `reviewPeriod` 1 = June, 2 =
+   * December, due on the 1st). Other months yield nothing, so the daily cron
+   * is a no-op between cycles, and a missed 1st (or a late deploy) catches up
+   * on the next run — `findByEmployeeAndYear` keeps it idempotent. */
   private async computeDue(): Promise<DueReviewItem[]> {
     const today = new Date();
-    if (today.getMonth() !== REVIEW_MONTH_INDEX) return [];
+    const cycle = REVIEW_CYCLES[today.getMonth()];
+    if (!cycle) return [];
 
     const reviewYear = today.getFullYear();
-    const dueDate = `${reviewYear}-12-01`;
+    const dueDate = `${reviewYear}-${cycle.period === 1 ? '06' : '12'}-01`;
     const employees = await this.employeeRepository.findAll();
     const due: DueReviewItem[] = [];
 
@@ -238,6 +258,7 @@ export class PerformanceReviewsService {
       const existing = await this.reviewRepository.findByEmployeeAndYear(
         employee.id,
         reviewYear,
+        cycle.period,
       );
       if (existing) continue;
 
@@ -245,6 +266,7 @@ export class PerformanceReviewsService {
         employeeId: employee.id,
         employeeName: `${employee.firstName} ${employee.lastName}`,
         reviewYear,
+        reviewPeriod: cycle.period,
         dueDate,
       });
     }
@@ -254,17 +276,20 @@ export class PerformanceReviewsService {
   private async createReviewInstance(
     employeeId: string,
     reviewYear: number,
+    reviewPeriod: number,
     dueDate: string,
   ): Promise<PerformanceReview | null> {
     const existing = await this.reviewRepository.findByEmployeeAndYear(
       employeeId,
       reviewYear,
+      reviewPeriod,
     );
     if (existing) return null;
 
     const review = new PerformanceReview();
     review.employeeId = employeeId;
     review.reviewYear = reviewYear;
+    review.reviewPeriod = reviewPeriod;
     review.dueDate = dueDate;
     review.status = PerformanceReviewStatus.PENDING;
     const saved = await this.reviewRepository.save(review);
@@ -278,6 +303,8 @@ export class PerformanceReviewsService {
         response.criterionName = criterion.name;
         response.responseType = criterion.responseType;
         response.sortOrder = criterion.sortOrder;
+        response.section = criterion.section ?? null;
+        response.hasComment = criterion.hasComment;
         return response;
       });
       await this.responseRepository.saveMany(responses);
@@ -289,13 +316,16 @@ export class PerformanceReviewsService {
   async createManualReview(
     dto: CreatePerformanceReviewDto,
   ): Promise<PerformanceReviewResponseDto> {
+    const reviewPeriod =
+      dto.reviewPeriod ?? (new Date().getMonth() < 6 ? 1 : 2);
     const existing = await this.reviewRepository.findByEmployeeAndYear(
       dto.employeeId,
       dto.reviewYear,
+      reviewPeriod,
     );
     if (existing) {
       throw new ConflictException(
-        `A review for year ${dto.reviewYear} already exists for this employee`,
+        `A ${reviewLabel(dto.reviewYear, reviewPeriod)} review already exists for this employee`,
       );
     }
 
@@ -303,6 +333,7 @@ export class PerformanceReviewsService {
     const review = await this.createReviewInstance(
       dto.employeeId,
       dto.reviewYear,
+      reviewPeriod,
       dueDate,
     );
     return toPerformanceReviewResponse(review!);
@@ -316,7 +347,14 @@ export class PerformanceReviewsService {
     const employee = await this.employeeRepository.findByUserId(actorUserId);
     if (!employee) throw new NotFoundException('Employee profile not found');
     const reviews = await this.reviewRepository.findByEmployeeId(employee.id);
-    return reviews.map(toPerformanceReviewResponse);
+    // Until management submits the evaluation the employee only learns that a
+    // review exists — any draft ratings/comments stay hidden.
+    return reviews.map((review) => {
+      const dto = toPerformanceReviewResponse(review);
+      return review.status === PerformanceReviewStatus.PENDING
+        ? { ...dto, responses: [], overallRating: null }
+        : dto;
+    });
   }
 
   async getEmployeeReviews(
@@ -355,6 +393,11 @@ export class PerformanceReviewsService {
       actor != null && review.employee.reportingManagerId === actor.id;
     if (!isSelf && !isManager) {
       throw new ForbiddenException('You do not have access to this review');
+    }
+    if (!isManager && review.status === PerformanceReviewStatus.PENDING) {
+      throw new ForbiddenException(
+        'Your review is still being prepared by management',
+      );
     }
     return toPerformanceReviewResponse(review);
   }
@@ -455,6 +498,7 @@ export class PerformanceReviewsService {
     return {
       employeeId: review.employeeId,
       reviewYear: review.reviewYear,
+      reviewPeriod: review.reviewPeriod,
       dueDate: review.dueDate,
       status: review.status,
       completedAt: review.completedAt?.toISOString() ?? null,
@@ -468,17 +512,36 @@ export class PerformanceReviewsService {
    * resolved from the JWT at the controller, since a review's own reporting
    * manager (checked here by identity) isn't necessarily the only one
    * allowed to complete it: HR/Admin can step in too. */
-  async completeReview(
+  /** Saves the evaluator's in-progress answers without completing the review
+   * — it stays pending and can be reopened and edited. Same access rule as
+   * completing: the employee's reporting manager, or a `performance.manage`
+   * holder. */
+  async saveDraft(
     id: string,
     dto: CompletePerformanceReviewDto,
     actorUserId: string,
     actorHasOverride: boolean,
   ): Promise<PerformanceReviewResponseDto> {
+    const review = await this.getEditablePendingReview(
+      id,
+      actorUserId,
+      actorHasOverride,
+    );
+    await this.applyEvaluation(review, dto);
+    await this.reviewRepository.save(review);
+    return toPerformanceReviewResponse(await this.getReviewById(id));
+  }
+
+  /** Loads a pending review and checks the actor may evaluate it. */
+  private async getEditablePendingReview(
+    id: string,
+    actorUserId: string,
+    actorHasOverride: boolean,
+  ): Promise<PerformanceReview> {
     const review = await this.getReviewById(id);
     if (review.status !== PerformanceReviewStatus.PENDING) {
       throw new BadRequestException('This review has already been completed');
     }
-
     const actor = await this.employeeRepository.findByUserId(actorUserId);
     const isManager =
       actor != null && review.employee.reportingManagerId === actor.id;
@@ -487,18 +550,36 @@ export class PerformanceReviewsService {
         "You aren't the reporting manager for this review",
       );
     }
+    return review;
+  }
 
+  private async applyEvaluation(
+    review: PerformanceReview,
+    dto: CompletePerformanceReviewDto,
+  ): Promise<void> {
     const responsesById = new Map(
       review.responses.map((response) => [response.id, response]),
     );
-    for (const entry of dto.responses) {
-      const response = responsesById.get(entry.responseId);
-      if (!response) continue;
-      if (entry.ratingValue !== undefined)
-        response.ratingValue = entry.ratingValue;
-      if (entry.textValue !== undefined) response.textValue = entry.textValue;
-    }
+    this.applyResponseEntries(responsesById, dto.responses);
     await this.responseRepository.saveMany([...responsesById.values()]);
+    this.applyFormFields(review, dto);
+  }
+
+  async completeReview(
+    id: string,
+    dto: CompletePerformanceReviewDto,
+    actorUserId: string,
+    actorHasOverride: boolean,
+  ): Promise<PerformanceReviewResponseDto> {
+    const review = await this.getEditablePendingReview(
+      id,
+      actorUserId,
+      actorHasOverride,
+    );
+    const actor = await this.employeeRepository.findByUserId(actorUserId);
+    const isManager =
+      actor != null && review.employee.reportingManagerId === actor.id;
+    await this.applyEvaluation(review, dto);
 
     review.status = PerformanceReviewStatus.COMPLETED;
     review.completedByUserId = actorUserId;
@@ -510,6 +591,12 @@ export class PerformanceReviewsService {
     review.completedAt = new Date();
     review.completedAsManager = isManager;
     await this.reviewRepository.save(review);
+    await this.notificationsService.create({
+      recipientUserId: review.employee.userId,
+      message: `Management has completed your ${reviewLabel(review.reviewYear, review.reviewPeriod)} performance review. Please add your feedback.`,
+      linkTarget: NotificationLinkTarget.PERFORMANCE_REVIEWS,
+      linkEntityId: review.id,
+    });
     return toPerformanceReviewResponse(await this.getReviewById(id));
   }
 
@@ -529,8 +616,16 @@ export class PerformanceReviewsService {
         'You can only add comments to your own review',
       );
     }
+    if (review.status === PerformanceReviewStatus.PENDING) {
+      throw new BadRequestException(
+        'Management has not completed your review yet',
+      );
+    }
+    if (!comments.trim()) {
+      throw new BadRequestException('Your feedback is required');
+    }
 
-    review.employeeComments = comments;
+    review.employeeComments = comments.trim();
     await this.reviewRepository.save(review);
     return toPerformanceReviewResponse(await this.getReviewById(id));
   }
@@ -542,6 +637,11 @@ export class PerformanceReviewsService {
     const review = await this.getReviewById(id);
     if (review.status !== PerformanceReviewStatus.COMPLETED) {
       throw new BadRequestException('Only a completed review can be finalized');
+    }
+    if (!review.employeeComments?.trim()) {
+      throw new BadRequestException(
+        'The employee must add their feedback before this review can be finalized',
+      );
     }
 
     review.status = PerformanceReviewStatus.FINALIZED;
@@ -590,18 +690,36 @@ export class PerformanceReviewsService {
       const responsesById = new Map(
         review.responses.map((response) => [response.id, response]),
       );
-      for (const entry of dto.responses) {
-        const response = responsesById.get(entry.responseId);
-        if (!response) continue;
-        if (entry.ratingValue !== undefined)
-          response.ratingValue = entry.ratingValue;
-        if (entry.textValue !== undefined) response.textValue = entry.textValue;
-      }
+      this.applyResponseEntries(responsesById, dto.responses);
       await this.responseRepository.saveMany([...responsesById.values()]);
     }
+    this.applyFormFields(review, dto);
 
     await this.reviewRepository.save(review);
     return toPerformanceReviewResponse(await this.getReviewById(id));
+  }
+
+  private applyResponseEntries(
+    responsesById: Map<string, PerformanceReviewResponse>,
+    entries: PerformanceReviewResponseEntryDto[],
+  ): void {
+    for (const entry of entries) {
+      const response = responsesById.get(entry.responseId);
+      if (!response) continue;
+      if (entry.ratingValue !== undefined)
+        response.ratingValue = entry.ratingValue;
+      if (entry.textValue !== undefined) response.textValue = entry.textValue;
+      if (entry.commentValue !== undefined && response.hasComment)
+        response.commentValue = entry.commentValue;
+    }
+  }
+
+  private applyFormFields(
+    review: PerformanceReview,
+    fields: ReviewFormFieldsDto,
+  ): void {
+    if (fields.overallRating !== undefined)
+      review.overallRating = fields.overallRating;
   }
 
   private isForeignKeyViolation(error: unknown): boolean {

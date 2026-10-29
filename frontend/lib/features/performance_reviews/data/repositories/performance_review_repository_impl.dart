@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../domain/entities/performance_review.dart';
 import '../../domain/entities/performance_review_criterion.dart';
+import '../../domain/entities/performance_review_form_fields.dart';
 import '../../domain/entities/performance_review_response_input.dart';
 import '../../domain/entities/performance_review_summary.dart';
 import '../../domain/exceptions/performance_review_exception.dart';
@@ -23,10 +24,14 @@ class PerformanceReviewRepositoryImpl implements PerformanceReviewRepository {
   Future<PerformanceReviewCriterion> createCriterion({
     required String name,
     required String responseType,
+    String? section,
+    bool? hasComment,
   }) => _guard(
     () => _remoteDataSource.createCriterion(
       name: name,
       responseType: responseType,
+      section: section,
+      hasComment: hasComment,
     ),
   );
 
@@ -35,12 +40,16 @@ class PerformanceReviewRepositoryImpl implements PerformanceReviewRepository {
     String id, {
     String? name,
     String? responseType,
+    String? section,
+    bool? hasComment,
     bool? isArchived,
   }) => _guard(
     () => _remoteDataSource.updateCriterion(
       id,
       name: name,
       responseType: responseType,
+      section: section,
+      hasComment: hasComment,
       isArchived: isArchived,
     ),
   );
@@ -113,11 +122,26 @@ class PerformanceReviewRepositoryImpl implements PerformanceReviewRepository {
   );
 
   @override
+  Future<PerformanceReview> saveDraft(
+    String id, {
+    required List<PerformanceReviewResponseInput> responses,
+    PerformanceReviewFormFields? fields,
+  }) => _guard(
+    () => _remoteDataSource.saveDraft(id, responses: responses, fields: fields),
+  );
+
+  @override
   Future<PerformanceReview> completeReview(
     String id, {
     required List<PerformanceReviewResponseInput> responses,
-  }) =>
-      _guard(() => _remoteDataSource.completeReview(id, responses: responses));
+    PerformanceReviewFormFields? fields,
+  }) => _guard(
+    () => _remoteDataSource.completeReview(
+      id,
+      responses: responses,
+      fields: fields,
+    ),
+  );
 
   @override
   Future<PerformanceReview> setSelfAssessment(String id, String comments) =>
@@ -136,11 +160,13 @@ class PerformanceReviewRepositoryImpl implements PerformanceReviewRepository {
     String id, {
     String? employeeComments,
     List<PerformanceReviewResponseInput>? responses,
+    PerformanceReviewFormFields? fields,
   }) => _guard(
     () => _remoteDataSource.adminUpdateReview(
       id,
       employeeComments: employeeComments,
       responses: responses,
+      fields: fields,
     ),
   );
 

@@ -54,7 +54,7 @@ void main() {
             buildTestPerformanceReview(
               id: 'review-1',
               employeeName: 'Jane Doe',
-              reviewYear: 2,
+              reviewYear: 2026,
               status: 'finalized',
             ),
           ],
@@ -64,7 +64,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Finalized Reviews'), findsOneWidget);
-    expect(find.text('Year 2 Review — Jane Doe'), findsOneWidget);
+    expect(find.text('December 2026 Review — Jane Doe'), findsOneWidget);
   });
 
   testWidgets(
@@ -79,7 +79,7 @@ void main() {
               buildTestPerformanceReview(
                 id: 'review-1',
                 employeeName: 'Ravi Report',
-                reviewYear: 1,
+                reviewYear: 2026,
                 status: 'pending',
               ),
             ],
@@ -89,7 +89,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Pending Reviews'), findsOneWidget);
-      expect(find.text('Year 1 Review — Ravi Report'), findsOneWidget);
+      expect(find.text('December 2026 Review — Ravi Report'), findsOneWidget);
     },
   );
 
@@ -136,4 +136,51 @@ void main() {
       expect(find.text('Finalized Reviews'), findsNothing);
     },
   );
+
+  testWidgets('a pending review is shown to the employee but locked until '
+      'management completes it', (tester) async {
+    final repository = FakePerformanceReviewRepository(
+      myReviews: [
+        buildTestPerformanceReview(
+          id: 'pending-1',
+          reviewYear: 2026,
+          status: 'pending',
+        ),
+        buildTestPerformanceReview(
+          id: 'done-1',
+          reviewYear: 2026,
+          reviewPeriod: 1,
+          status: 'completed',
+        ),
+      ],
+    );
+
+    await _useTallSurface(tester);
+    await tester.pumpWidget(_app(performanceReviewRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Management is filling in your review'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Management has filled this in'),
+      findsOneWidget,
+    );
+
+    final pendingRow = find
+        .ancestor(
+          of: find.text('December 2026 Review'),
+          matching: find.byType(InkWell),
+        )
+        .first;
+    expect(tester.widget<InkWell>(pendingRow).onTap, isNull);
+    final doneRow = find
+        .ancestor(
+          of: find.text('June 2026 Review'),
+          matching: find.byType(InkWell),
+        )
+        .first;
+    expect(tester.widget<InkWell>(doneRow).onTap, isNotNull);
+  });
 }

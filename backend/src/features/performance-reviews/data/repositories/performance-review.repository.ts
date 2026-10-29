@@ -17,31 +17,32 @@ export class TypeOrmPerformanceReviewRepository
   findByEmployeeId(employeeId: string): Promise<PerformanceReview[]> {
     return this.repository.find({
       where: { employeeId },
-      relations: { employee: true, responses: true },
-      order: { reviewYear: 'ASC' },
+      relations: { employee: { reportingManager: true }, responses: true },
+      order: { reviewYear: 'ASC', reviewPeriod: 'ASC' },
     });
   }
 
   findByEmployeeAndYear(
     employeeId: string,
     reviewYear: number,
+    reviewPeriod: number,
   ): Promise<PerformanceReview | null> {
     return this.repository.findOne({
-      where: { employeeId, reviewYear },
+      where: { employeeId, reviewYear, reviewPeriod },
     });
   }
 
   findById(id: string): Promise<PerformanceReview | null> {
     return this.repository.findOne({
       where: { id },
-      relations: { employee: true, responses: true },
+      relations: { employee: { reportingManager: true }, responses: true },
     });
   }
 
   findByStatus(status: PerformanceReviewStatus): Promise<PerformanceReview[]> {
     return this.repository.find({
       where: { status },
-      relations: { employee: true, responses: true },
+      relations: { employee: { reportingManager: true }, responses: true },
       order: { dueDate: 'ASC' },
     });
   }
@@ -52,6 +53,7 @@ export class TypeOrmPerformanceReviewRepository
       .distinctOn(['review.employeeId'])
       .orderBy('review.employeeId', 'ASC')
       .addOrderBy('review.reviewYear', 'DESC')
+      .addOrderBy('review.reviewPeriod', 'DESC')
       .getMany();
   }
 
