@@ -545,6 +545,12 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         _goToDestination('Performance Reviews');
       case 'requests':
         _goToDestination('Requests');
+      case 'employees':
+        if (linkEntityId != null) {
+          _openEmployeeProfile(linkEntityId);
+        } else {
+          _goToDestination('Employees');
+        }
     }
   }
 

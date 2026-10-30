@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthenticationModule } from '../authentication/authentication.module';
 import { ChecklistsModule } from '../checklists/checklists.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { EmployeesService } from './application/employees.service';
 import { TypeOrmAssetRepository } from './data/repositories/asset.repository';
 import { TypeOrmAuditLogRepository } from './data/repositories/audit-log.repository';
@@ -35,6 +36,7 @@ import { EmployeesController } from './presentation/employees.controller';
     ]),
     AuthenticationModule,
     ChecklistsModule,
+    NotificationsModule,
   ],
   controllers: [EmployeesController],
   providers: [

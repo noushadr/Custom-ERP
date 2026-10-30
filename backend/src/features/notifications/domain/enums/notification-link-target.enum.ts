@@ -8,4 +8,5 @@ export enum NotificationLinkTarget {
   LEAVE = 'leave',
   PERFORMANCE_REVIEWS = 'performance_reviews',
   REQUESTS = 'requests',
+  EMPLOYEES = 'employees',
 }

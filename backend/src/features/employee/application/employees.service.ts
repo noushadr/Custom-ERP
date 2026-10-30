@@ -9,6 +9,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { RolesService } from '../../authentication/application/roles.service';
+import { NotificationsService } from '../../notifications/application/notifications.service';
+import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
 import { ChecklistsService } from '../../checklists/application/checklists.service';
 import { SetChecklistItemCompletedDto } from '../../checklists/application/dto/set-checklist-item-completed.dto';
 import { EmployeeChecklistItem } from '../../checklists/domain/entities/employee-checklist-item.entity';
@@ -156,6 +159,8 @@ export class EmployeesService {
     @Inject(ASSET_REPOSITORY)
     private readonly assetRepository: AssetRepository,
     private readonly checklistsService: ChecklistsService,
+    private readonly rolesService: RolesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /** HR/Admin add an employee directly from the admin panel — there is no
@@ -223,7 +228,32 @@ export class EmployeesService {
       reloaded!.workMode,
     );
 
+    if (user.status === UserStatus.PENDING_APPROVAL) {
+      await this.notifyApprovers(reloaded!);
+    }
+
     return toEmployeeResponse(reloaded!);
+  }
+
+  /** Tells every `users.approve` holder (Super Admin) a new hire is waiting.
+   * Best-effort: a notification failure must never undo adding the person. */
+  private async notifyApprovers(employee: Employee): Promise<void> {
+    try {
+      const approvers =
+        await this.rolesService.findUsersWithPermission('users.approve');
+      await Promise.all(
+        approvers.map((approver) =>
+          this.notificationsService.create({
+            recipientUserId: approver.id,
+            message: `HR added ${employee.firstName} ${employee.lastName} — awaiting your approval`,
+            linkTarget: NotificationLinkTarget.EMPLOYEES,
+            linkEntityId: employee.id,
+          }),
+        ),
+      );
+    } catch {
+      // Approvers can still find them via the employee's profile banner.
+    }
   }
 
   /** Final admin sign-off on an employee HR added. */

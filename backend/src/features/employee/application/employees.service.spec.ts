@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { RolesService } from '../../authentication/application/roles.service';
+import { NotificationsService } from '../../notifications/application/notifications.service';
 import { ChecklistsService } from '../../checklists/application/checklists.service';
 import { ChecklistType } from '../../checklists/domain/enums/checklist-type.enum';
 import { Role } from '../../authentication/domain/entities/role.entity';
@@ -146,6 +148,8 @@ describe('EmployeesService', () => {
   let educationRecordRepository: jest.Mocked<EducationRecordRepository>;
   let assetRepository: jest.Mocked<AssetRepository>;
   let checklistsService: jest.Mocked<ChecklistsService>;
+  let rolesService: jest.Mocked<RolesService>;
+  let notificationsService: jest.Mocked<NotificationsService>;
 
   beforeEach(() => {
     employeeRepository = {
@@ -201,6 +205,13 @@ describe('EmployeesService', () => {
       setItemCompleted: jest.fn(),
     } as unknown as jest.Mocked<ChecklistsService>;
 
+    rolesService = {
+      findUsersWithPermission: jest.fn().mockResolvedValue([{ id: 'admin-1' }]),
+    } as unknown as jest.Mocked<RolesService>;
+    notificationsService = {
+      create: jest.fn(),
+    } as unknown as jest.Mocked<NotificationsService>;
+
     service = new EmployeesService(
       employeeRepository,
       userRepository,
@@ -211,6 +222,8 @@ describe('EmployeesService', () => {
       educationRecordRepository,
       assetRepository,
       checklistsService,
+      rolesService,
+      notificationsService,
     );
 
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-temp-password');
@@ -268,6 +281,12 @@ describe('EmployeesService', () => {
       });
       expect(userRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ status: UserStatus.PENDING_APPROVAL }),
+      );
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientUserId: 'admin-1',
+          linkEntityId: 'new-employee-id',
+        }),
       );
     });
 
