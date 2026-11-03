@@ -24,6 +24,16 @@ export default () => ({
   // Shared PIN gating the Leads and Financial Reports pages (on top of
   // their existing Super-Admin-only permission gates).
   moduleLockPin: process.env.MODULE_LOCK_PIN ?? '2803',
+  // The attendance machine (ZKTeco, TCP port 4370). Unset = attendance sync
+  // is off. Reading only — nothing is ever written to or cleared on it.
+  attendance: {
+    deviceHost: process.env.ATTENDANCE_DEVICE_HOST,
+    devicePort: parseInt(process.env.ATTENDANCE_DEVICE_PORT ?? '4370', 10),
+    deviceTimeoutMs: parseInt(
+      process.env.ATTENDANCE_DEVICE_TIMEOUT_MS ?? '10000',
+      10,
+    ),
+  },
   // Comma-separated list of allowed frontend origins. Falls back to the
   // local Flutter-web dev server when unset — never wide open by default.
   corsOrigin: process.env.CORS_ORIGIN,

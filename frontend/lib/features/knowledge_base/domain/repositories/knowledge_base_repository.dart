@@ -1,3 +1,4 @@
+import '../entities/knowledge_base_upload_file.dart';
 import 'dart:typed_data';
 import '../entities/knowledge_base_article.dart';
 import '../entities/knowledge_base_article_summary.dart';
@@ -34,33 +35,37 @@ abstract interface class KnowledgeBaseRepository {
     List<String>? targetDepartmentIds,
   });
 
-  /// Requires `knowledge_base.manage`. Creates an article whose body is the
-  /// uploaded file instead of written text; the same title/visibility
+  /// Requires `knowledge_base.manage`. Creates an article whose body is 1-3
+  /// uploaded files instead of written text; the same title/visibility
   /// targeting rules apply.
   Future<KnowledgeBaseArticle> createFileArticle({
     required String title,
-    required Uint8List bytes,
-    required String fileName,
+    required List<KnowledgeBaseUploadFile> files,
     required String visibilityType,
     List<String>? targetRoleIds,
     List<String>? targetDepartmentIds,
   });
 
-  /// Requires `knowledge_base.manage`. Swaps a file article's file for a new
-  /// one, recording a new version (the old file stays openable from history).
-  Future<KnowledgeBaseArticle> replaceArticleFile(
+  /// Requires `knowledge_base.manage`. Swaps a file article's files for a new
+  /// set of 1-3, recording a new version (the old files stay openable from
+  /// history).
+  Future<KnowledgeBaseArticle> replaceArticleFiles(
     String id, {
-    required Uint8List bytes,
-    required String fileName,
+    required List<KnowledgeBaseUploadFile> files,
     String? title,
   });
 
-  /// The article's current uploaded file, fetched through the authenticated
-  /// API (uploaded files are never reachable by URL alone).
-  Future<Uint8List> downloadArticleFile(String articleId);
+  /// One of the article's current uploaded files (by position), fetched
+  /// through the authenticated API (uploaded files are never reachable by URL
+  /// alone).
+  Future<Uint8List> downloadArticleFile(String articleId, int index);
 
-  /// A past version's own file.
-  Future<Uint8List> downloadVersionFile(String articleId, String versionId);
+  /// One file of a past version.
+  Future<Uint8List> downloadVersionFile(
+    String articleId,
+    String versionId,
+    int index,
+  );
 
   /// Requires `knowledge_base.manage`.
   Future<KnowledgeBaseArticle> updateArticle(

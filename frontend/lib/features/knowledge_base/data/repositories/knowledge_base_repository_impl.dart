@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import '../../domain/entities/knowledge_base_upload_file.dart';
 import '../../domain/entities/knowledge_base_article.dart';
 import '../../domain/entities/knowledge_base_article_summary.dart';
 import '../../domain/entities/knowledge_base_article_version.dart';
@@ -55,16 +56,14 @@ class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
   @override
   Future<KnowledgeBaseArticle> createFileArticle({
     required String title,
-    required Uint8List bytes,
-    required String fileName,
+    required List<KnowledgeBaseUploadFile> files,
     required String visibilityType,
     List<String>? targetRoleIds,
     List<String>? targetDepartmentIds,
   }) => _guard(
     () => _remoteDataSource.createFileArticle(
       title: title,
-      bytes: bytes,
-      fileName: fileName,
+      files: files,
       visibilityType: visibilityType,
       targetRoleIds: targetRoleIds,
       targetDepartmentIds: targetDepartmentIds,
@@ -72,27 +71,26 @@ class KnowledgeBaseRepositoryImpl implements KnowledgeBaseRepository {
   );
 
   @override
-  Future<KnowledgeBaseArticle> replaceArticleFile(
+  Future<KnowledgeBaseArticle> replaceArticleFiles(
     String id, {
-    required Uint8List bytes,
-    required String fileName,
+    required List<KnowledgeBaseUploadFile> files,
     String? title,
   }) => _guard(
-    () => _remoteDataSource.replaceArticleFile(
-      id,
-      bytes: bytes,
-      fileName: fileName,
-      title: title,
-    ),
+    () => _remoteDataSource.replaceArticleFiles(id, files: files, title: title),
   );
 
   @override
-  Future<Uint8List> downloadArticleFile(String articleId) =>
-      _guard(() => _remoteDataSource.downloadArticleFile(articleId));
+  Future<Uint8List> downloadArticleFile(String articleId, int index) =>
+      _guard(() => _remoteDataSource.downloadArticleFile(articleId, index));
 
   @override
-  Future<Uint8List> downloadVersionFile(String articleId, String versionId) =>
-      _guard(() => _remoteDataSource.downloadVersionFile(articleId, versionId));
+  Future<Uint8List> downloadVersionFile(
+    String articleId,
+    String versionId,
+    int index,
+  ) => _guard(
+    () => _remoteDataSource.downloadVersionFile(articleId, versionId, index),
+  );
 
   @override
   Future<KnowledgeBaseArticle> updateArticle(

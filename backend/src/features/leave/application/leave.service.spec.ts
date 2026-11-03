@@ -1,3 +1,4 @@
+import { WorkMode } from '../../employee/domain/enums/work-mode.enum';
 import {
   BadRequestException,
   ForbiddenException,
@@ -636,6 +637,19 @@ describe('LeaveService', () => {
     });
   });
 
+  describe('getAllEmployeeBalancesPdf', () => {
+    it('builds a PDF of every active employee leave balance', async () => {
+      employeeRepository.findAll.mockResolvedValue([]);
+      leaveTypeRepository.findAll.mockResolvedValue([]);
+      leaveBalanceRepository.findByYear.mockResolvedValue([]);
+
+      const { buffer, filename } = await service.getAllEmployeeBalancesPdf();
+
+      expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
+      expect(filename).toMatch(/^employees-leave-\d{4}\.pdf$/);
+    });
+  });
+
   describe('getLeaveCalendar', () => {
     it('only includes members of departments the viewer heads, for team scope', async () => {
       const teamRequest = buildLeaveRequest({
@@ -929,6 +943,25 @@ describe('LeaveService', () => {
         expect.objectContaining({ employeeId: 'employee-b', leaveTypeId: 'type-1' }),
       ]);
       expect(result.balancesCreated).toBe(1);
+    });
+
+    it('gives a remote employee no leave allowance', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'remote-1', workMode: WorkMode.REMOTE }),
+        buildEmployee({ id: 'onsite-1', workMode: WorkMode.ON_SITE }),
+      ]);
+      leaveTypeRepository.findAll.mockResolvedValue([
+        buildLeaveType({ id: 'type-1', annualAllowanceDays: '10.0' }),
+      ]);
+      leaveBalanceRepository.findByYear.mockResolvedValue([]);
+      leaveBalanceRepository.saveMany.mockImplementation((b) => Promise.resolve(b));
+
+      await service.runAnnualReset();
+
+      expect(leaveBalanceRepository.saveMany).toHaveBeenCalledWith([
+        expect.objectContaining({ employeeId: 'remote-1', allocated: '0.0' }),
+        expect.objectContaining({ employeeId: 'onsite-1', allocated: '10.0' }),
+      ]);
     });
 
     it('is a no-op when every combination already has a balance this year', async () => {

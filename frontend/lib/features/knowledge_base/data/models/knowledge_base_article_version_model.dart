@@ -1,3 +1,4 @@
+import '../../domain/entities/knowledge_base_file_info.dart';
 import '../../domain/entities/knowledge_base_article_version.dart';
 
 class KnowledgeBaseArticleVersionModel extends KnowledgeBaseArticleVersion {
@@ -7,9 +8,7 @@ class KnowledgeBaseArticleVersionModel extends KnowledgeBaseArticleVersion {
     required super.title,
     required super.editorName,
     required super.createdAt,
-    super.fileName,
-    super.fileMimeType,
-    super.fileSizeBytes,
+    super.files,
     required super.content,
   });
 
@@ -21,9 +20,7 @@ class KnowledgeBaseArticleVersionModel extends KnowledgeBaseArticleVersion {
     title: json['title'] as String,
     editorName: json['editorName'] as String,
     createdAt: DateTime.parse(json['createdAt'] as String),
-    fileName: json['fileName'] as String?,
-    fileMimeType: json['fileMimeType'] as String?,
-    fileSizeBytes: json['fileSizeBytes'] as int?,
+    files: knowledgeBaseFilesFromJson(json['files']),
     content: json['content'],
   );
 }

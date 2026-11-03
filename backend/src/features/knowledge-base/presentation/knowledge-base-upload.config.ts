@@ -39,6 +39,9 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 
+/** One SOP can carry up to this many files, uploaded together. */
+export const KNOWLEDGE_BASE_MAX_FILES = 3;
+
 export const KNOWLEDGE_BASE_ALLOWED_EXTENSIONS = Object.keys(MIME_BY_EXTENSION);
 
 export function mimeTypeForExtension(fileName: string): string | null {

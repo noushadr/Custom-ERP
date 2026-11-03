@@ -5,6 +5,7 @@ import 'package:flutter_quill/flutter_quill.dart'
     show FlutterQuillLocalizations, QuillEditor;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zera_erp/features/knowledge_base/domain/entities/knowledge_base_file_info.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/application/role_providers.dart';
@@ -54,7 +55,7 @@ Widget _app({
   required Widget home,
   required FakeKnowledgeBaseRepository repository,
   _FileActionsRecorder? recorder,
-  PickedKnowledgeBaseFile? pickedFile,
+  List<PickedKnowledgeBaseFile> pickedFiles = const [],
 }) {
   return ProviderScope(
     overrides: [
@@ -65,7 +66,9 @@ Widget _app({
       knowledgeBaseFileActionsProvider.overrideWithValue(
         (recorder ?? _FileActionsRecorder()).actions,
       ),
-      knowledgeBaseFilePickerProvider.overrideWithValue(() async => pickedFile),
+      knowledgeBaseFilePickerProvider.overrideWithValue(
+        () async => pickedFiles,
+      ),
       rolesProvider.overrideWith((ref) async => const []),
       departmentsProvider.overrideWith((ref) async => const []),
     ],
@@ -90,6 +93,47 @@ PickedKnowledgeBaseFile _pdf([String name = 'Policy.pdf']) =>
 
 void main() {
   group('reading a file article', () {
+    testWidgets('an SOP with two files shows a card for each and downloads the right one', (
+      tester,
+    ) async {
+      await _useTallSurface(tester);
+      final recorder = _FileActionsRecorder();
+      final repository = FakeKnowledgeBaseRepository(
+        articleById: buildTestKnowledgeBaseFileArticle(
+          files: const [
+            KnowledgeBaseFileInfo(
+              fileName: 'Setup.pdf',
+              mimeType: 'application/pdf',
+              sizeBytes: 1024,
+            ),
+            KnowledgeBaseFileInfo(
+              fileName: 'Checklist.xlsx',
+              mimeType: 'application/vnd.ms-excel',
+              sizeBytes: 2048,
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        _app(
+          home: const KnowledgeBaseArticlePage(articleId: 'article-1'),
+          repository: repository,
+          recorder: recorder,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Setup.pdf'), findsOneWidget);
+      expect(find.text('Checklist.xlsx'), findsOneWidget);
+
+      await tester.tap(find.text('Download').last);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastDownloadedFileIndex, 1);
+      expect(recorder.downloads.single.fileName, 'Checklist.xlsx');
+    });
+
     testWidgets('shows the file card instead of written content', (
       tester,
     ) async {
@@ -343,13 +387,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(QuillEditor), findsOneWidget);
-      expect(find.text('Choose file'), findsNothing);
+      expect(find.text('Choose files'), findsNothing);
 
       await tester.tap(find.text('Upload file'));
       await tester.pumpAndSettle();
 
       expect(find.byType(QuillEditor), findsNothing);
-      expect(find.text('Choose file'), findsOneWidget);
+      expect(find.text('Choose files'), findsOneWidget);
     });
 
     testWidgets('publishing an upload with no file chosen is refused', (
@@ -368,7 +412,7 @@ void main() {
       await tester.tap(find.text('Publish'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Choose a file to upload.'), findsOneWidget);
+      expect(find.text('Choose at least one file to upload.'), findsOneWidget);
       expect(repository.lastFileCreatedTitle, isNull);
     });
 
@@ -381,7 +425,7 @@ void main() {
         _app(
           home: const KnowledgeBaseEditorPage(),
           repository: repository,
-          pickedFile: _pdf('Policy.pdf'),
+          pickedFiles: [_pdf('Policy.pdf')],
         ),
       );
       await tester.pumpAndSettle();
@@ -389,11 +433,11 @@ void main() {
       await tester.tap(find.text('Upload file'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField).first, 'Leave Policy');
-      await tester.tap(find.text('Choose file'));
+      await tester.tap(find.text('Choose files'));
       await tester.pumpAndSettle();
 
       expect(find.text('Policy.pdf (1.5 KB)'), findsOneWidget);
-      expect(find.text('Choose a different file'), findsOneWidget);
+      expect(find.text('Add more files'), findsOneWidget);
 
       await tester.tap(find.text('Publish'));
       await tester.pumpAndSettle();
@@ -404,6 +448,102 @@ void main() {
       expect(repository.lastFileCreatedVisibilityType, 'everyone');
       // The written-article endpoint is never touched for an upload.
       expect(repository.lastCreatedTitle, isNull);
+    });
+
+    testWidgets('several files chosen together go up as one SOP, in order', (
+      tester,
+    ) async {
+      await _useTallSurface(tester);
+      final repository = FakeKnowledgeBaseRepository();
+      await tester.pumpWidget(
+        _app(
+          home: const KnowledgeBaseEditorPage(),
+          repository: repository,
+          pickedFiles: [_pdf('Setup.pdf'), _pdf('Checklist.pdf'), _pdf('Template.pdf')],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Upload file'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'SEO SOP');
+      await tester.tap(find.text('Choose files'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Setup.pdf (1.5 KB)'), findsOneWidget);
+      expect(find.text('Checklist.pdf (1.5 KB)'), findsOneWidget);
+      expect(find.text('Template.pdf (1.5 KB)'), findsOneWidget);
+      // Three is the limit, so adding more is switched off.
+      final addMore = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Add more files'),
+      );
+      expect(addMore.onPressed, isNull);
+
+      await tester.tap(find.text('Publish'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastFileCreatedFileNames, [
+        'Setup.pdf',
+        'Checklist.pdf',
+        'Template.pdf',
+      ]);
+    });
+
+    testWidgets('only the first three files are kept when more are chosen', (
+      tester,
+    ) async {
+      await _useTallSurface(tester);
+      final repository = FakeKnowledgeBaseRepository();
+      await tester.pumpWidget(
+        _app(
+          home: const KnowledgeBaseEditorPage(),
+          repository: repository,
+          pickedFiles: [
+            _pdf('One.pdf'),
+            _pdf('Two.pdf'),
+            _pdf('Three.pdf'),
+            _pdf('Four.pdf'),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Upload file'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Choose files'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Three.pdf (1.5 KB)'), findsOneWidget);
+      expect(find.text('Four.pdf (1.5 KB)'), findsNothing);
+      expect(find.textContaining('up to 3 files'), findsWidgets);
+    });
+
+    testWidgets('a chosen file can be removed before publishing', (
+      tester,
+    ) async {
+      await _useTallSurface(tester);
+      final repository = FakeKnowledgeBaseRepository();
+      await tester.pumpWidget(
+        _app(
+          home: const KnowledgeBaseEditorPage(),
+          repository: repository,
+          pickedFiles: [_pdf('Keep.pdf'), _pdf('Drop.pdf')],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Upload file'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'Two files');
+      await tester.tap(find.text('Choose files'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('remove-picked-file-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Drop.pdf (1.5 KB)'), findsNothing);
+
+      await tester.tap(find.text('Publish'));
+      await tester.pumpAndSettle();
+      expect(repository.lastFileCreatedFileNames, ['Keep.pdf']);
     });
 
     testWidgets('a written article has no write/upload switch when editing', (
@@ -442,7 +582,7 @@ void main() {
 
         expect(find.byType(QuillEditor), findsNothing);
         expect(find.text('Leave Policy.pdf'), findsOneWidget);
-        expect(find.text('Replace file'), findsOneWidget);
+        expect(find.text('Replace files'), findsOneWidget);
 
         await tester.enterText(
           find.byType(TextFormField).first,
@@ -471,12 +611,12 @@ void main() {
               existingArticle: buildTestKnowledgeBaseFileArticle(),
             ),
             repository: repository,
-            pickedFile: _pdf('Leave Policy v2.pdf'),
+            pickedFiles: [_pdf('Leave Policy v2.pdf')],
           ),
         );
         await tester.pumpAndSettle();
 
-        await tester.tap(find.text('Replace file'));
+        await tester.tap(find.text('Replace files'));
         await tester.pumpAndSettle();
         expect(find.text('Leave Policy v2.pdf (1.5 KB)'), findsOneWidget);
 

@@ -1,3 +1,4 @@
+import { generateLeaveBalancesPdf } from './leave-balances.pdf';
 import {
   BadRequestException,
   ConflictException,
@@ -18,6 +19,8 @@ import {
   type DepartmentRepository,
 } from '../../departments/domain/repositories/department-repository.interface';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
+import { WorkMode } from '../../employee/domain/enums/work-mode.enum';
+import { Employee } from '../../employee/domain/entities/employee.entity';
 import {
   EMPLOYEE_REPOSITORY,
   type EmployeeRepository,
@@ -58,6 +61,11 @@ import { LeaveRequestResponse } from './leave-request-response.interface';
 import { toLeaveRequestResponse } from './leave-request.mapper';
 
 const FOREIGN_KEY_VIOLATION = '23503';
+
+/** Remote employees are not entitled to leave. */
+function isRemoteEmployee(employee: Employee | null | undefined): boolean {
+  return employee?.workMode === WorkMode.REMOTE;
+}
 
 @Injectable()
 export class LeaveService {
@@ -468,6 +476,18 @@ export class LeaveService {
    * leave type, in three queries total (not one per employee) — a leave type
    * with no balance row yet falls back to its annual allowance, same as
    * [buildCurrentYearBalances]. */
+  async getAllEmployeeBalancesPdf(): Promise<{
+    buffer: Buffer;
+    filename: string;
+  }> {
+    const year = new Date().getUTCFullYear();
+    const employees = await this.getAllEmployeeBalances();
+    return {
+      buffer: await generateLeaveBalancesPdf(employees, year),
+      filename: `employees-leave-${year}.pdf`,
+    };
+  }
+
   async getAllEmployeeBalances(): Promise<EmployeeLeaveOverviewResponse[]> {
     const year = new Date().getUTCFullYear();
     const [employees, leaveTypes, yearBalances] = await Promise.all([
@@ -485,7 +505,7 @@ export class LeaveService {
         const balances: LeaveBalanceResponse[] = leaveTypes.map((type) => {
           const balance = balanceByKey.get(`${employee.id}:${type.id}`);
           const allocated = Number(
-            balance?.allocated ?? type.annualAllowanceDays,
+            balance?.allocated ?? this.startingAllowance(employee, type),
           );
           const used = Number(balance?.used ?? 0);
           return {
@@ -588,17 +608,18 @@ export class LeaveService {
       for (const leaveType of leaveTypes) {
         if (existingKeys.has(`${employee.id}:${leaveType.id}`)) continue;
 
-        const carryForward = leaveType.carryForwardLimitDays
-          ? await this.resolveCarryForward(employee.id, leaveType, year - 1)
+        const carryForward =
+          leaveType.carryForwardLimitDays && !isRemoteEmployee(employee)
+            ? await this.resolveCarryForward(employee.id, leaveType, year - 1)
           : 0;
 
         const balance = new LeaveBalance();
         balance.employeeId = employee.id;
         balance.leaveTypeId = leaveType.id;
         balance.year = year;
-        balance.allocated = (
-          Number(leaveType.annualAllowanceDays) + carryForward
-        ).toFixed(1);
+        balance.allocated = isRemoteEmployee(employee)
+          ? '0.0'
+          : (Number(leaveType.annualAllowanceDays) + carryForward).toFixed(1);
         balance.used = '0.0';
         toCreate.push(balance);
       }
@@ -741,6 +762,22 @@ export class LeaveService {
     return count;
   }
 
+  /** Remote employees get no leave: their starting allowance is 0. */
+  private startingAllowance(
+    employee: Employee | null | undefined,
+    leaveType: LeaveType,
+  ): string {
+    return isRemoteEmployee(employee) ? '0.0' : leaveType.annualAllowanceDays;
+  }
+
+  private async startingAllowanceFor(
+    employeeId: string,
+    leaveType: LeaveType,
+  ): Promise<string> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    return this.startingAllowance(employee, leaveType);
+  }
+
   /** A read-only view of an employee's balance for a leave type/year,
    * without persisting anything — used wherever we only need to check
    * remaining balance, not mutate it. */
@@ -754,9 +791,11 @@ export class LeaveService {
       leaveType.id,
       year,
     );
-    return (
-      existing ?? { allocated: leaveType.annualAllowanceDays, used: '0.0' }
-    );
+    if (existing) return existing;
+    return {
+      allocated: await this.startingAllowanceFor(employeeId, leaveType),
+      used: '0.0',
+    };
   }
 
   /** Same lookup as [resolveBalanceSnapshot], but returns a real (possibly
@@ -779,7 +818,7 @@ export class LeaveService {
     balance.employeeId = employeeId;
     balance.leaveTypeId = leaveType.id;
     balance.year = year;
-    balance.allocated = leaveType.annualAllowanceDays;
+    balance.allocated = await this.startingAllowanceFor(employeeId, leaveType);
     balance.used = '0.0';
     return balance;
   }
@@ -829,9 +868,10 @@ export class LeaveService {
     employeeId: string,
   ): Promise<LeaveBalanceResponse[]> {
     const year = new Date().getUTCFullYear();
-    const [leaveTypes, existing] = await Promise.all([
+    const [leaveTypes, existing, employee] = await Promise.all([
       this.leaveTypeRepository.findAll(false),
       this.leaveBalanceRepository.findByEmployeeId(employeeId),
+      this.employeeRepository.findById(employeeId),
     ]);
     const existingByType = new Map(
       existing.filter((b) => b.year === year).map((b) => [b.leaveTypeId, b]),
@@ -839,7 +879,9 @@ export class LeaveService {
 
     return leaveTypes.map((type) => {
       const balance = existingByType.get(type.id);
-      const allocated = Number(balance?.allocated ?? type.annualAllowanceDays);
+      const allocated = Number(
+        balance?.allocated ?? this.startingAllowance(employee, type),
+      );
       const used = Number(balance?.used ?? 0);
       return {
         leaveTypeId: type.id,

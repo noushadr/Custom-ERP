@@ -6,6 +6,7 @@ import '../../../../shared/widgets/form_section.dart';
 import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../application/knowledge_base_providers.dart';
+import '../../domain/entities/knowledge_base_visibility.dart';
 import '../../domain/entities/knowledge_base_article_summary.dart';
 import '../../domain/exceptions/knowledge_base_exception.dart';
 import 'knowledge_base_article_page.dart';
@@ -182,6 +183,34 @@ class _ArticleRow extends StatelessWidget {
                         const SizedBox(width: 8),
                         const _ArchivedBadge(),
                       ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(
+                        article.visibilityType ==
+                                KnowledgeBaseVisibility.everyone
+                            ? Icons.public
+                            : Icons.lock_person_outlined,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Tooltip(
+                          message: article.audienceLabel,
+                          child: Text(
+                            'Visible to: ${article.audienceLabel}',
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 2),

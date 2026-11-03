@@ -7,6 +7,7 @@ import 'core/layout/app_nav_destination.dart';
 import 'core/layout/responsive_scaffold.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'features/attendance/presentation/pages/attendance_page.dart';
 import 'features/authentication/application/auth_providers.dart';
 import 'features/authentication/application/auth_state.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
@@ -140,6 +141,11 @@ const _allDestinations = [
     label: 'Goals',
     icon: Icons.flag_outlined,
     selectedIcon: Icons.flag_outlined,
+  ),
+  AppNavDestination(
+    label: 'Attendance',
+    icon: Icons.fingerprint,
+    selectedIcon: Icons.fingerprint,
   ),
   AppNavDestination(
     label: 'Leaves',
@@ -371,6 +377,8 @@ class _HomeShellState extends ConsumerState<_HomeShell> {
         return const GoalsPage();
       case 'Email':
         return const EmailPage();
+      case 'Attendance':
+        return const AttendancePage();
       case 'Leaves':
         return const LeavePage();
       case 'Tasks':

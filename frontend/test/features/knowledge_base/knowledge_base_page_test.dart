@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/knowledge_base/application/knowledge_base_providers.dart';
+import 'package:zera_erp/features/knowledge_base/domain/entities/knowledge_base_visibility.dart';
 import 'package:zera_erp/features/knowledge_base/presentation/pages/knowledge_base_page.dart';
 
 import '../../helpers/fake_auth.dart';
@@ -57,6 +58,43 @@ void main() {
       find.text(
         'Posted by HR Team · Created Jan 01, 2026 · Updated Apr 01, 2026',
       ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('each row says who the article is visible to', (tester) async {
+    final repository = FakeKnowledgeBaseRepository(
+      articles: [
+        buildTestKnowledgeBaseArticleSummary(id: 'a1', title: 'For all'),
+        buildTestKnowledgeBaseArticleSummary(
+          id: 'a2',
+          title: 'SEO only',
+          visibilityType: KnowledgeBaseVisibility.departments,
+          targetDepartmentNames: const ['SEO', 'Design'],
+        ),
+        buildTestKnowledgeBaseArticleSummary(
+          id: 'a3',
+          title: 'Leads only',
+          visibilityType: KnowledgeBaseVisibility.roles,
+          targetRoleNames: const ['Team Lead'],
+        ),
+        buildTestKnowledgeBaseArticleSummary(
+          id: 'a4',
+          title: 'Mixed',
+          visibilityType: KnowledgeBaseVisibility.rolesAndDepartments,
+          targetRoleNames: const ['HR/Manager'],
+          targetDepartmentNames: const ['SEO'],
+        ),
+      ],
+    );
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Visible to: Everyone'), findsOneWidget);
+    expect(find.text('Visible to: Departments: SEO, Design'), findsOneWidget);
+    expect(find.text('Visible to: Roles: Team Lead'), findsOneWidget);
+    expect(
+      find.text('Visible to: Hybrid — Roles: HR/Manager + Departments: SEO'),
       findsOneWidget,
     );
   });

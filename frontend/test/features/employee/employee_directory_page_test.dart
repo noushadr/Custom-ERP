@@ -234,7 +234,8 @@ void main() {
       // "Full-time" appears for both Full Timer and No Probation (the
       // default employmentType) — assert at least one, not uniqueness.
       expect(find.text('Full-time'), findsWidgets);
-      expect(find.text('Probation Complete'), findsOneWidget);
+      // A finished probation isn't worth a badge on the card.
+      expect(find.text('Probation Complete'), findsNothing);
     },
   );
 
@@ -687,7 +688,7 @@ void main() {
     );
   });
 
-  testWidgets('shows "No review yet" for an employee with no reviews at all', (
+  testWidgets('hides the review chip for an employee with no reviews at all', (
     tester,
   ) async {
     final repository = FakeEmployeeRepository(
@@ -706,7 +707,32 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('No review yet'), findsOneWidget);
+    expect(find.text('No review yet'), findsNothing);
+    expect(find.textContaining('Last Review'), findsNothing);
+  });
+
+  testWidgets('filters the list by work mode', (tester) async {
+    await _useTallSurface(tester);
+    final repository = FakeEmployeeRepository(
+      employees: [
+        buildTestEmployee(id: 'e1', fullName: 'Remote Rita', workMode: 'remote'),
+        buildTestEmployee(id: 'e2', fullName: 'Onsite Omar', workMode: 'on_site'),
+      ],
+    );
+    await tester.pumpWidget(
+      _app(permissions: ['employees.read'], repository: repository),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Remote Rita'), findsOneWidget);
+    expect(find.text('Onsite Omar'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('work-mode-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remote').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remote Rita'), findsOneWidget);
+    expect(find.text('Onsite Omar'), findsNothing);
   });
 
   testWidgets("shows the Total Employees tile's active count and 30-day delta "

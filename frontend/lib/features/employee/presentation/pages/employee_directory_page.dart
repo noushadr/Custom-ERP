@@ -49,6 +49,7 @@ class _EmployeeDirectoryPageState extends ConsumerState<EmployeeDirectoryPage> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String? _statusFilter;
+  String? _workModeFilter;
   bool _showArchived = false;
 
   @override
@@ -138,6 +139,12 @@ class _EmployeeDirectoryPageState extends ConsumerState<EmployeeDirectoryPage> {
                         onChanged: (value) =>
                             setState(() => _statusFilter = value),
                       ),
+                    if (canRead && _viewMode == _DirectoryViewMode.list)
+                      _WorkModeFilterRow(
+                        value: _workModeFilter,
+                        onChanged: (value) =>
+                            setState(() => _workModeFilter = value),
+                      ),
                     if (canRead)
                       ArchivedToggle(
                         showArchived: _showArchived,
@@ -164,6 +171,7 @@ class _EmployeeDirectoryPageState extends ConsumerState<EmployeeDirectoryPage> {
                         viewMode: _viewMode,
                         searchQuery: _searchQuery,
                         statusFilter: _statusFilter,
+                        workModeFilter: _workModeFilter,
                         showArchived: _showArchived,
                       )
                     : const _NoDirectoryAccess(),
@@ -181,12 +189,14 @@ class _DirectoryBody extends ConsumerWidget {
     required this.viewMode,
     required this.searchQuery,
     required this.statusFilter,
+    required this.workModeFilter,
     required this.showArchived,
   });
 
   final _DirectoryViewMode viewMode;
   final String searchQuery;
   final String? statusFilter;
+  final String? workModeFilter;
   final bool showArchived;
 
   @override
@@ -232,7 +242,12 @@ class _DirectoryBody extends ConsumerWidget {
           return EmployeeHierarchyView(employees: scoped);
         }
 
-        final filtered = _filterEmployees(scoped, searchQuery, statusFilter);
+        final filtered = _filterEmployees(
+          scoped,
+          searchQuery,
+          statusFilter,
+          workModeFilter,
+        );
         return filtered.isEmpty
             ? const Center(child: Text('No employees match your search.'))
             : _EmployeeList(
@@ -248,8 +263,14 @@ class _DirectoryBody extends ConsumerWidget {
     List<Employee> employees,
     String query,
     String? statusFilter,
+    String? workModeFilter,
   ) {
     var filtered = employees;
+    if (workModeFilter != null) {
+      filtered = filtered
+          .where((employee) => employee.workMode == workModeFilter)
+          .toList();
+    }
     if (statusFilter != null) {
       filtered = filtered
           .where(
@@ -397,6 +418,48 @@ class _StatusFilterRow extends StatelessWidget {
         items: [
           const DropdownMenuItem(value: null, child: Text('All statuses')),
           for (final entry in _statuses.entries)
+            DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+/// A dropdown to narrow the list to one work mode (on-site/remote/hybrid).
+class _WorkModeFilterRow extends StatelessWidget {
+  const _WorkModeFilterRow({required this.value, required this.onChanged});
+
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  static const _modes = <String, String>{
+    'on_site': 'On-site',
+    'remote': 'Remote',
+    'hybrid': 'Hybrid',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 200,
+      child: DropdownButtonFormField<String?>(
+        key: const Key('work-mode-filter'),
+        initialValue: value,
+        isExpanded: true,
+        decoration: InputDecoration(
+          isDense: true,
+          suffixIcon: value == null
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Clear filter',
+                  onPressed: () => onChanged(null),
+                ),
+        ),
+        items: [
+          const DropdownMenuItem(value: null, child: Text('All work modes')),
+          for (final entry in _modes.entries)
             DropdownMenuItem(value: entry.key, child: Text(entry.value)),
         ],
         onChanged: onChanged,
@@ -859,7 +922,7 @@ class _EmployeeCard extends StatelessWidget {
                     employmentType: employee.employmentType,
                     dense: true,
                   ),
-                  if (employee.probationStatus != null)
+                  if (employee.probationStatus == 'on_probation')
                     ProbationBadge(
                       status: employee.probationStatus!,
                       dense: true,
@@ -892,10 +955,10 @@ class _EmployeeCard extends StatelessWidget {
                         : formatDisplayDate(employee.dateOfBirth!),
                     maxWidth: contentWidth,
                   ),
-                  if (canViewPerformance)
+                  if (canViewPerformance && reviewSummary != null)
                     InfoChip(
                       icon: Icons.fact_check_outlined,
-                      label: _reviewLabel(reviewSummary),
+                      label: _reviewLabel(reviewSummary!),
                       maxWidth: contentWidth,
                     ),
                 ],
@@ -908,10 +971,9 @@ class _EmployeeCard extends StatelessWidget {
   }
 
   /// "Last Review: Pending" while awaiting completion/finalization, the
-  /// finalized (or, failing that, completed) date once done, or "No review
-  /// yet" for someone who hasn't hit their first work anniversary.
-  String _reviewLabel(PerformanceReviewSummary? summary) {
-    if (summary == null) return 'No review yet';
+  /// finalized (or, failing that, completed) date once done. The chip isn't
+  /// shown at all for someone with no review yet.
+  String _reviewLabel(PerformanceReviewSummary summary) {
     if (summary.status == 'pending') return 'Last Review: Pending';
     final doneAt = summary.finalizedAt ?? summary.completedAt;
     if (doneAt == null) return 'Last Review: Pending';

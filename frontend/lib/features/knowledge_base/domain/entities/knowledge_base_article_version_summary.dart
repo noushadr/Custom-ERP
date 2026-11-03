@@ -1,3 +1,5 @@
+import 'knowledge_base_file_info.dart';
+
 /// One row of an article's version history — who changed it and when, not
 /// the content itself.
 class KnowledgeBaseArticleVersionSummary {
@@ -7,9 +9,7 @@ class KnowledgeBaseArticleVersionSummary {
     required this.title,
     required this.editorName,
     required this.createdAt,
-    this.fileName,
-    this.fileMimeType,
-    this.fileSizeBytes,
+    this.files = const [],
   });
 
   final String id;
@@ -18,11 +18,9 @@ class KnowledgeBaseArticleVersionSummary {
   final String editorName;
   final DateTime createdAt;
 
-  /// The file this version pointed at — null for a version of a written
+  /// The files this version pointed at — empty for a version of a written
   /// article.
-  final String? fileName;
-  final String? fileMimeType;
-  final int? fileSizeBytes;
+  final List<KnowledgeBaseFileInfo> files;
 
-  bool get hasFile => fileName != null;
+  bool get hasFile => files.isNotEmpty;
 }

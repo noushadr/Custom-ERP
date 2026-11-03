@@ -106,12 +106,89 @@ void main() {
     expect(find.text('One-Time Projects'), findsOneWidget);
     // Client stats live on the Clients page now.
     expect(find.text('Total Clients'), findsNothing);
-    // Active Projects 1 (only p1), Monthly Retainers 1, One-Time Projects 1.
+    // Active 1 (p1), Retainers 1, One-Time 1, Completed 1 (p2) and No Date
+    // Set 1 (p1 is open with no renewal date).
     final statTiles = find.byType(Wrap).first;
     expect(
       find.descendant(of: statTiles, matching: find.text('1')),
-      findsNWidgets(3),
+      findsNWidgets(5),
     );
+  });
+
+  testWidgets('filters projects by department, type and deadline', (
+    tester,
+  ) async {
+    await _useWideSurface(tester);
+    String iso(int days) => DateTime.now()
+        .add(Duration(days: days))
+        .toIso8601String()
+        .substring(0, 10);
+    await tester.pumpWidget(
+      _app(
+        repository: FakeClientsRepository(
+          projects: [
+            buildTestProject(
+              id: 'p1',
+              name: 'Site Alpha',
+              type: ProjectType.oneTime,
+              endDate: iso(5),
+              targetDepartments: const [
+                ProjectDepartmentRef(id: 'd1', name: 'Web'),
+              ],
+            ),
+            buildTestProject(
+              id: 'p2',
+              name: 'SEO Beta',
+              type: ProjectType.retainer,
+              renewalDate: iso(60),
+              targetDepartments: const [
+                ProjectDepartmentRef(id: 'd2', name: 'SEO'),
+              ],
+            ),
+            buildTestProject(
+              id: 'p3',
+              name: 'Late Gamma',
+              type: ProjectType.oneTime,
+              endDate: iso(-3),
+              targetDepartments: const [
+                ProjectDepartmentRef(id: 'd1', name: 'Web'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Site Alpha'), findsOneWidget);
+    expect(find.text('SEO Beta'), findsOneWidget);
+    expect(find.text('Late Gamma'), findsOneWidget);
+
+    // Department.
+    await tester.tap(find.text('All departments'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SEO').last);
+    await tester.pumpAndSettle();
+    expect(find.text('SEO Beta'), findsOneWidget);
+    expect(find.text('Site Alpha'), findsNothing);
+    await tester.tap(find.text('Clear filters'));
+    await tester.pumpAndSettle();
+
+    // Type.
+    await tester.tap(find.text('All types'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Retainer').last);
+    await tester.pumpAndSettle();
+    expect(find.text('SEO Beta'), findsOneWidget);
+    expect(find.text('Late Gamma'), findsNothing);
+    await tester.tap(find.text('Clear filters'));
+    await tester.pumpAndSettle();
+
+    // The Deadline Passed stat tile filters the table too.
+    await tester.tap(find.text('Deadline Passed'));
+    await tester.pumpAndSettle();
+    expect(find.text('Late Gamma'), findsOneWidget);
+    expect(find.text('Site Alpha'), findsNothing);
+    expect(find.text('SEO Beta'), findsNothing);
   });
 
   testWidgets('the Clients page renders its stat tiles', (tester) async {

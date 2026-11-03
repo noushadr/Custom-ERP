@@ -333,6 +333,14 @@ class FakeLeaveRepository implements LeaveRepository {
     resetTriggered = true;
   }
 
+  bool balancesPdfDownloaded = false;
+
+  @override
+  Future<List<int>> downloadEmployeeBalancesPdf() async {
+    balancesPdfDownloaded = true;
+    return [37, 80, 68, 70];
+  }
+
   @override
   Future<List<LeaveCalendarEntry>> getLeaveCalendar({
     required String scope,

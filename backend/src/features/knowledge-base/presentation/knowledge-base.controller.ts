@@ -5,15 +5,16 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Put,
   Query,
   StreamableFile,
-  UploadedFile,
+  UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
@@ -25,7 +26,10 @@ import {
   type KnowledgeBaseFileDownload,
   KnowledgeBaseService,
 } from '../application/knowledge-base.service';
-import { knowledgeBaseUploadOptions } from './knowledge-base-upload.config';
+import {
+  KNOWLEDGE_BASE_MAX_FILES,
+  knowledgeBaseUploadOptions,
+} from './knowledge-base-upload.config';
 
 /** Streams an uploaded file back as a download. The type comes from the
  * server-side extension map, and `attachment` plus the global `nosniff`
@@ -66,52 +70,72 @@ export class KnowledgeBaseController {
     return this.knowledgeBaseService.createArticle(dto, user.sub);
   }
 
-  /** Creates an article whose body is an uploaded file (multipart: `file`
+  /** Creates an article whose body is 1-3 uploaded files (multipart: `files`
    * plus the same title/visibility fields as a written article). */
   @Post('file-article')
   @Permissions(PERMISSION)
-  @UseInterceptors(FileInterceptor('file', knowledgeBaseUploadOptions))
+  @UseInterceptors(
+    FilesInterceptor(
+      'files',
+      KNOWLEDGE_BASE_MAX_FILES,
+      knowledgeBaseUploadOptions,
+    ),
+  )
   createFileArticle(
     @Body() dto: CreateKnowledgeBaseFileArticleDto,
     @CurrentUser() user: JwtPayload,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    if (!file) throw new BadRequestException('No file uploaded');
-    return this.knowledgeBaseService.createFileArticle(dto, file, user.sub);
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No file uploaded');
+    }
+    return this.knowledgeBaseService.createFileArticle(dto, files, user.sub);
   }
 
-  @Put(':id/file')
+  /** Replaces the article's whole set of files with the newly uploaded one(s). */
+  @Put(':id/files')
   @Permissions(PERMISSION)
-  @UseInterceptors(FileInterceptor('file', knowledgeBaseUploadOptions))
-  replaceFile(
+  @UseInterceptors(
+    FilesInterceptor(
+      'files',
+      KNOWLEDGE_BASE_MAX_FILES,
+      knowledgeBaseUploadOptions,
+    ),
+  )
+  replaceFiles(
     @Param('id') id: string,
     @Body() dto: ReplaceKnowledgeBaseFileDto,
     @CurrentUser() user: JwtPayload,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    if (!file) throw new BadRequestException('No file uploaded');
-    return this.knowledgeBaseService.replaceFile(id, file, dto, user.sub);
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No file uploaded');
+    }
+    return this.knowledgeBaseService.replaceFiles(id, files, dto, user.sub);
   }
 
-  @Get(':id/file')
+  @Get(':id/files/:index')
   async downloadFile(
     @Param('id') id: string,
+    @Param('index', ParseIntPipe) index: number,
     @CurrentUser() user: JwtPayload,
   ) {
     const actorHasOverride = user.permissions.includes(PERMISSION);
     return toStreamableFile(
       await this.knowledgeBaseService.getFileForActor(
         id,
+        index,
         user.sub,
         actorHasOverride,
       ),
     );
   }
 
-  @Get(':id/versions/:versionId/file')
+  @Get(':id/versions/:versionId/files/:index')
   async downloadVersionFile(
     @Param('id') id: string,
     @Param('versionId') versionId: string,
+    @Param('index', ParseIntPipe) index: number,
     @CurrentUser() user: JwtPayload,
   ) {
     const actorHasOverride = user.permissions.includes(PERMISSION);
@@ -119,6 +143,7 @@ export class KnowledgeBaseController {
       await this.knowledgeBaseService.getVersionFileForActor(
         id,
         versionId,
+        index,
         user.sub,
         actorHasOverride,
       ),

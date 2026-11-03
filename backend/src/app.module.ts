@@ -15,6 +15,7 @@ import { EmailModule } from './features/email/email.module';
 import { EmployeeModule } from './features/employee/employee.module';
 import { FinancialReportsModule } from './features/financial-reports/financial-reports.module';
 import { FreelancersModule } from './features/freelancers/freelancers.module';
+import { AttendanceModule } from './features/attendance/attendance.module';
 import { GoalsModule } from './features/goals/goals.module';
 import { HolidaysModule } from './features/holidays/holidays.module';
 import { KnowledgeBaseModule } from './features/knowledge-base/knowledge-base.module';
@@ -57,6 +58,7 @@ import { TasksModule } from './features/tasks/tasks.module';
     FinancialReportsModule,
     FreelancersModule,
     GoalsModule,
+    AttendanceModule,
     EmailModule,
     ModuleLockModule,
     SearchModule,

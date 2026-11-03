@@ -8,7 +8,9 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { CurrentUser } from '../../authentication/presentation/decorators/current-user.decorator';
 import { Permissions } from '../../authentication/presentation/decorators/permissions.decorator';
 import type { JwtPayload } from '../../authentication/presentation/strategies/jwt.strategy';
@@ -166,6 +168,18 @@ export class LeaveController {
       Number(year),
       user.permissions.includes('leave.manage'),
     );
+  }
+
+  @Get('balances/pdf')
+  @Permissions('leave.manage')
+  async downloadAllEmployeeBalancesPdf(@Res() res: Response) {
+    const { buffer, filename } =
+      await this.leaveService.getAllEmployeeBalancesPdf();
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+    res.send(buffer);
   }
 
   @Get('balances')

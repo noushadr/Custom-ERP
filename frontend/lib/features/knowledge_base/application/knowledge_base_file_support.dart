@@ -1,15 +1,15 @@
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../domain/entities/knowledge_base_upload_file.dart';
 import '../../../shared/utils/file_download/file_download.dart';
 
 /// A file the user chose to upload.
-class PickedKnowledgeBaseFile {
-  const PickedKnowledgeBaseFile({required this.fileName, required this.bytes});
+typedef PickedKnowledgeBaseFile = KnowledgeBaseUploadFile;
 
-  final String fileName;
-  final Uint8List bytes;
-}
+/// One SOP can carry up to this many files (kept in step with the backend's
+/// `KNOWLEDGE_BASE_MAX_FILES`).
+const knowledgeBaseMaxFiles = 3;
 
 /// The extensions the backend accepts (kept in step with
 /// `knowledge-base-upload.config.ts`) — the picker only offers these.
@@ -29,22 +29,27 @@ const knowledgeBaseAllowedExtensions = [
   'webp',
 ];
 
-/// Asks the user to choose a file; null when they cancel. A provider so
-/// widget tests can supply a file without a real browser file dialog.
+/// Asks the user to choose one or more files (empty when they cancel). A
+/// provider so widget tests can supply files without a real browser file
+/// dialog.
 final knowledgeBaseFilePickerProvider =
-    Provider<Future<PickedKnowledgeBaseFile?> Function()>((ref) {
+    Provider<Future<List<PickedKnowledgeBaseFile>> Function()>((ref) {
       return () async {
         final result = await FilePicker.platform.pickFiles(
           withData: true,
+          allowMultiple: true,
           type: FileType.custom,
           allowedExtensions: knowledgeBaseAllowedExtensions,
         );
-        final picked = result?.files.single;
-        if (picked == null || picked.bytes == null) return null;
-        return PickedKnowledgeBaseFile(
-          fileName: picked.name,
-          bytes: picked.bytes!,
-        );
+        if (result == null) return const [];
+        return [
+          for (final picked in result.files)
+            if (picked.bytes != null)
+              PickedKnowledgeBaseFile(
+                fileName: picked.name,
+                bytes: picked.bytes!,
+              ),
+        ];
       };
     });
 

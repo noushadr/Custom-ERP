@@ -16,6 +16,7 @@ import '../../domain/entities/client_health_status.dart';
 import '../../domain/entities/project.dart';
 import '../../domain/entities/project_status.dart';
 import '../../domain/entities/project_type.dart';
+import '../utils/project_due_utils.dart';
 import '../widgets/client_health_badges.dart';
 import '../widgets/project_badges.dart';
 import 'client_detail_page.dart';
@@ -107,11 +108,20 @@ class ClientsPage extends ConsumerWidget {
 
 /// The Projects section: project stats and the services breakdown up top,
 /// then the projects table.
-class ProjectsPage extends ConsumerWidget {
+class ProjectsPage extends ConsumerStatefulWidget {
   const ProjectsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProjectsPage> createState() => _ProjectsPageState();
+}
+
+class _ProjectsPageState extends ConsumerState<ProjectsPage> {
+  /// One of [ProjectDueFilter]'s values, or null. Lives here so the stat
+  /// tiles above the table and the filters in it stay in sync.
+  String? _dueFilter;
+
+  @override
+  Widget build(BuildContext context) {
     if (!_canManageClients(ref)) return const AccessDeniedView();
 
     return Padding(
@@ -124,7 +134,11 @@ class ProjectsPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _ProjectsSummaryRow(),
+                _ProjectsSummaryRow(
+                  dueFilter: _dueFilter,
+                  onDueFilterChanged: (value) =>
+                      setState(() => _dueFilter = value),
+                ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -146,7 +160,14 @@ class ProjectsPage extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                const SizedBox(height: 640, child: _ProjectsTab()),
+                SizedBox(
+                  height: 640,
+                  child: _ProjectsTab(
+                    dueFilter: _dueFilter,
+                    onDueFilterChanged: (value) =>
+                        setState(() => _dueFilter = value),
+                  ),
+                ),
               ],
             ),
           ),
@@ -218,7 +239,13 @@ class _ClientsSummaryRow extends ConsumerWidget {
 }
 
 class _ProjectsSummaryRow extends ConsumerWidget {
-  const _ProjectsSummaryRow();
+  const _ProjectsSummaryRow({
+    required this.dueFilter,
+    required this.onDueFilterChanged,
+  });
+
+  final String? dueFilter;
+  final ValueChanged<String?> onDueFilterChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -253,6 +280,20 @@ class _ProjectsSummaryRow extends ConsumerWidget {
     final oneTimeCount = projects
         .where((p) => p.type == ProjectType.oneTime)
         .length;
+    final onHoldCount = projects
+        .where((p) => p.status == ProjectStatus.onHold)
+        .length;
+    final completedCount = projects
+        .where((p) => p.status == ProjectStatus.completed)
+        .length;
+    final today = DateTime.now();
+    int countDue(String filter) =>
+        projects.where((p) => matchesDueFilter(p, filter, today)).length;
+
+    // Tapping a due-related tile filters the table below to those projects;
+    // tapping it again clears the filter.
+    VoidCallback toggleDue(String filter) =>
+        () => onDueFilterChanged(dueFilter == filter ? null : filter);
 
     return Wrap(
       spacing: 10,
@@ -275,6 +316,39 @@ class _ProjectsSummaryRow extends ConsumerWidget {
           value: '$oneTimeCount',
           color: AppColors.accentTeal,
           icon: Icons.flash_on_outlined,
+        ),
+        MetricCard(
+          label: 'On Hold',
+          value: '$onHoldCount',
+          color: AppColors.warning,
+          icon: Icons.pause_circle_outline,
+        ),
+        MetricCard(
+          label: 'Completed',
+          value: '$completedCount',
+          color: AppColors.textSecondary,
+          icon: Icons.task_alt_outlined,
+        ),
+        MetricCard(
+          label: 'Near Deadline',
+          value: '${countDue(ProjectDueFilter.dueSoon)}',
+          color: AppColors.warning,
+          icon: Icons.hourglass_bottom_outlined,
+          onTap: toggleDue(ProjectDueFilter.dueSoon),
+        ),
+        MetricCard(
+          label: 'Deadline Passed',
+          value: '${countDue(ProjectDueFilter.overdue)}',
+          color: AppColors.error,
+          icon: Icons.event_busy_outlined,
+          onTap: toggleDue(ProjectDueFilter.overdue),
+        ),
+        MetricCard(
+          label: 'No Date Set',
+          value: '${countDue(ProjectDueFilter.noDate)}',
+          color: AppColors.textSecondary,
+          icon: Icons.help_outline,
+          onTap: toggleDue(ProjectDueFilter.noDate),
         ),
       ],
     );
@@ -353,7 +427,13 @@ const _kClientColumns = [
 ];
 
 class _ProjectsTab extends ConsumerStatefulWidget {
-  const _ProjectsTab();
+  const _ProjectsTab({
+    required this.dueFilter,
+    required this.onDueFilterChanged,
+  });
+
+  final String? dueFilter;
+  final ValueChanged<String?> onDueFilterChanged;
 
   @override
   ConsumerState<_ProjectsTab> createState() => _ProjectsTabState();
@@ -361,6 +441,56 @@ class _ProjectsTab extends ConsumerStatefulWidget {
 
 class _ProjectsTabState extends ConsumerState<_ProjectsTab> {
   bool _showArchived = false;
+  final _searchController = TextEditingController();
+  String _query = '';
+  String? _departmentFilter;
+  String? _typeFilter;
+  String? _statusFilter;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool get _hasFilters =>
+      _query.isNotEmpty ||
+      _departmentFilter != null ||
+      _typeFilter != null ||
+      _statusFilter != null ||
+      widget.dueFilter != null;
+
+  void _clearFilters() {
+    _searchController.clear();
+    setState(() {
+      _query = '';
+      _departmentFilter = null;
+      _typeFilter = null;
+      _statusFilter = null;
+    });
+    widget.onDueFilterChanged(null);
+  }
+
+  List<Project> _applyFilters(List<Project> projects) {
+    final needle = _query.toLowerCase();
+    final today = DateTime.now();
+    return projects.where((p) {
+      if (needle.isNotEmpty &&
+          !p.name.toLowerCase().contains(needle) &&
+          !p.clientName.toLowerCase().contains(needle)) {
+        return false;
+      }
+      if (_departmentFilter != null &&
+          !p.targetDepartments.any((d) => d.name == _departmentFilter)) {
+        return false;
+      }
+      if (_typeFilter != null && p.type != _typeFilter) return false;
+      if (_statusFilter != null && p.status != _statusFilter) return false;
+      final due = widget.dueFilter;
+      if (due != null && !matchesDueFilter(p, due, today)) return false;
+      return true;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -391,23 +521,91 @@ class _ProjectsTabState extends ConsumerState<_ProjectsTab> {
         // proxy) hide behind the Archived toggle by default, same
         // "hide inactive by default" convention as the Employees
         // directory's own Archived toggle.
-        final scoped =
+        final inScope =
             projects.where((p) => p.isArchived == _showArchived).toList()
               ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        final scoped = _applyFilters(inScope);
+        final departments =
+            inScope
+                .expand((p) => p.targetDepartments.map((d) => d.name))
+                .toSet()
+                .toList()
+              ..sort();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ArchivedToggle(
-              showArchived: _showArchived,
-              onChanged: (value) => setState(() => _showArchived = value),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 220,
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) =>
+                        setState(() => _query = value.trim()),
+                    decoration: const InputDecoration(
+                      hintText: 'Search projects or clients',
+                      prefixIcon: Icon(Icons.search, size: 20),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                _FilterDropdown(
+                  hint: 'Department',
+                  allLabel: 'All departments',
+                  value: _departmentFilter,
+                  options: departments,
+                  onChanged: (value) =>
+                      setState(() => _departmentFilter = value),
+                ),
+                _FilterDropdown(
+                  hint: 'Type',
+                  allLabel: 'All types',
+                  value: _typeFilter,
+                  options: const [ProjectType.oneTime, ProjectType.retainer],
+                  labelFor: formatProjectTypeLabel,
+                  onChanged: (value) => setState(() => _typeFilter = value),
+                ),
+                _FilterDropdown(
+                  hint: 'Status',
+                  allLabel: 'All statuses',
+                  value: _statusFilter,
+                  options: ProjectStatus.values,
+                  labelFor: formatProjectStatusLabel,
+                  onChanged: (value) => setState(() => _statusFilter = value),
+                ),
+                _FilterDropdown(
+                  hint: 'Deadline',
+                  allLabel: 'Any deadline',
+                  value: widget.dueFilter,
+                  options: ProjectDueFilter.values,
+                  labelFor: ProjectDueFilter.label,
+                  onChanged: widget.onDueFilterChanged,
+                  width: 260,
+                ),
+                if (_hasFilters)
+                  TextButton.icon(
+                    onPressed: _clearFilters,
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Clear filters'),
+                  ),
+                ArchivedToggle(
+                  showArchived: _showArchived,
+                  onChanged: (value) => setState(() => _showArchived = value),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Expanded(
               child: scoped.isEmpty
                   ? Center(
                       child: Text(
-                        _showArchived
+                        _hasFilters
+                            ? 'No projects match your filters.'
+                            : _showArchived
                             ? 'No archived projects.'
                             : 'No active projects.',
                       ),
@@ -805,8 +1003,10 @@ class _FilterDropdown extends StatelessWidget {
     required this.options,
     required this.onChanged,
     this.labelFor,
+    this.width = 180,
   });
 
+  final double width;
   final String hint;
 
   /// The "no filter" option's label, e.g. "All countries" — spelled out
@@ -825,7 +1025,7 @@ class _FilterDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 180,
+      width: width,
       child: DropdownButtonFormField<String?>(
         initialValue: value,
         isExpanded: true,

@@ -39,9 +39,14 @@ Widget _app({
   FakeLeaveRepository? leaveRepository,
   FakeHolidayRepository? holidayRepository,
   FakeEmployeeRepository? employeeRepository,
+  List<List<int>>? savedPdfs,
 }) {
   return ProviderScope(
     overrides: [
+      if (savedPdfs != null)
+        leavePdfSaverProvider.overrideWithValue(
+          (bytes, fileName) => savedPdfs.add(bytes),
+        ),
       authControllerProvider.overrideWith(
         (ref) => PresetAuthController(
           AuthAuthenticated(_viewer(role: role, permissions: permissions)),
@@ -296,6 +301,29 @@ void main() {
 
       expect(find.text("All Employees' Leave"), findsNothing);
       expect(find.text('Babar Hussain'), findsNothing);
+    });
+
+    testWidgets('Export PDF downloads the employees leave table', (
+      tester,
+    ) async {
+      await _useTallSurface(tester);
+      final saved = <List<int>>[];
+      final repository = FakeLeaveRepository(employeeOverviews: overviews);
+      await tester.pumpWidget(
+        _app(
+          role: 'HR/Manager',
+          permissions: const ['leave.manage'],
+          leaveRepository: repository,
+          savedPdfs: saved,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('export-leave-balances-pdf')));
+      await tester.pumpAndSettle();
+
+      expect(repository.balancesPdfDownloaded, isTrue);
+      expect(saved, hasLength(1));
     });
 
     testWidgets('search narrows the table by name', (tester) async {

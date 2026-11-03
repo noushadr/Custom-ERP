@@ -179,6 +179,10 @@ class LeaveRepositoryImpl implements LeaveRepository {
     ),
   );
 
+  @override
+  Future<List<int>> downloadEmployeeBalancesPdf() =>
+      _guard(() => _remoteDataSource.downloadEmployeeBalancesPdf());
+
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
       return await action();

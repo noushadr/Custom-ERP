@@ -36,6 +36,7 @@ const DEFAULT_PERMISSIONS = [
   'finances.manage',
   'goals.manage',
   'email.manage',
+  'attendance.manage',
 ];
 
 // 'roles.manage' (Roles & Permissions) was granted to HR/Manager 2026-09-11
@@ -95,6 +96,7 @@ const DEFAULT_ROLES: { name: string; permissions: string[] }[] = [
       'payroll.manage',
       'goals.manage',
       'email.manage',
+      'attendance.manage',
     ],
   },
   { name: 'Team Lead', permissions: ['employees.read', 'knowledge_base.manage'] },

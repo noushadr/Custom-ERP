@@ -11,6 +11,11 @@ export class Employee extends BaseEntity {
   @Column({ unique: true })
   employeeCode: string;
 
+  /** The attendance machine's own id for this person ("AC-No."), linking
+   * their scans to them. Null until HR links them. */
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  attendanceId?: string | null;
+
   @Column()
   userId: string;
 

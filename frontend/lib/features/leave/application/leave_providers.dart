@@ -1,3 +1,4 @@
+import '../../../shared/utils/file_download/file_download.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../authentication/application/auth_providers.dart';
 import '../data/datasources/leave_remote_data_source.dart';
@@ -12,6 +13,15 @@ import '../domain/repositories/leave_repository.dart';
 final leaveRemoteDataSourceProvider = Provider<LeaveRemoteDataSource>(
   (ref) => LeaveRemoteDataSource(ref.watch(dioClientProvider).dio),
 );
+
+/// Saves an exported PDF to the user's device — a provider so widget tests
+/// (which have no browser to download into) can observe it instead.
+final leavePdfSaverProvider =
+    Provider<void Function(List<int> bytes, String fileName)>(
+      (ref) =>
+          (bytes, fileName) =>
+              downloadBytes(bytes, fileName, mimeType: 'application/pdf'),
+    );
 
 final leaveRepositoryProvider = Provider<LeaveRepository>(
   (ref) => LeaveRepositoryImpl(ref.watch(leaveRemoteDataSourceProvider)),

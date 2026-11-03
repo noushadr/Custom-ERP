@@ -186,15 +186,18 @@ class _ArticleBody extends ConsumerWidget {
           const SizedBox(height: 20),
           const Divider(color: AppColors.borderSubtle),
           const SizedBox(height: 20),
-          if (article.isFile && article.fileName != null)
-            KnowledgeBaseFileCard(
-              fileName: article.fileName!,
-              mimeType: article.fileMimeType,
-              sizeBytes: article.fileSizeBytes,
-              load: () => ref
-                  .read(knowledgeBaseRepositoryProvider)
-                  .downloadArticleFile(article.id),
-            )
+          if (article.isFile && article.files.isNotEmpty)
+            for (var i = 0; i < article.files.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              KnowledgeBaseFileCard(
+                fileName: article.files[i].fileName,
+                mimeType: article.files[i].mimeType,
+                sizeBytes: article.files[i].sizeBytes,
+                load: () => ref
+                    .read(knowledgeBaseRepositoryProvider)
+                    .downloadArticleFile(article.id, i),
+              ),
+            ]
           else
             KnowledgeBaseContentView(content: article.content),
         ],

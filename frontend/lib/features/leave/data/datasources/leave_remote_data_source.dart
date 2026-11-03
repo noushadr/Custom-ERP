@@ -252,6 +252,14 @@ class LeaveRemoteDataSource {
     await _dio.post<void>('/leave/reset');
   }
 
+  Future<List<int>> downloadEmployeeBalancesPdf() async {
+    final response = await _dio.get<List<int>>(
+      '/leave/balances/pdf',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return response.data!;
+  }
+
   Future<List<LeaveCalendarEntryModel>> getLeaveCalendar({
     required String scope,
     required int month,

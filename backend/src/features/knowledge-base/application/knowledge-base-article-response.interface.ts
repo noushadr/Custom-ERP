@@ -1,16 +1,22 @@
-/** Describes an uploaded file; all null for a written (rich-text) article. */
+/** Describes one uploaded file. */
 export interface KnowledgeBaseFileInfoDto {
-  fileName: string | null;
-  fileMimeType: string | null;
-  fileSizeBytes: number | null;
+  fileName: string;
+  fileMimeType: string;
+  fileSizeBytes: number;
 }
 
-export interface KnowledgeBaseArticleSummaryDto extends KnowledgeBaseFileInfoDto {
+export interface KnowledgeBaseArticleSummaryDto {
   id: string;
   title: string;
   /** 'rich_text' (written in the editor) or 'file' (uploaded). */
   contentKind: string;
+  /** The uploaded files, in order; empty for a written article. */
+  files: KnowledgeBaseFileInfoDto[];
   visibilityType: string;
+  /** Who can read it, by name — empty arrays mean "everyone" or that kind
+   * of targeting isn't used. */
+  targetRoleNames: string[];
+  targetDepartmentNames: string[];
   authorName: string;
   lastEditedByName: string;
   versionNumber: number;
@@ -26,9 +32,9 @@ export interface KnowledgeBaseArticleResponseDto
   targetDepartmentIds: string[];
 }
 
-export interface KnowledgeBaseArticleVersionSummaryDto
-  extends KnowledgeBaseFileInfoDto {
+export interface KnowledgeBaseArticleVersionSummaryDto {
   id: string;
+  files: KnowledgeBaseFileInfoDto[];
   versionNumber: number;
   title: string;
   editorName: string;

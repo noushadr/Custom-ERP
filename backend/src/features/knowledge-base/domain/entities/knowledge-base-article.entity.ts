@@ -1,3 +1,4 @@
+import type { KnowledgeBaseStoredFile } from './knowledge-base-stored-file';
 import { Column, Entity, JoinTable, ManyToMany } from 'typeorm';
 import { BaseEntity } from '../../../../core/database/base.entity';
 import { Department } from '../../../departments/domain/entities/department.entity';
@@ -31,21 +32,9 @@ export class KnowledgeBaseArticle extends BaseEntity {
   })
   contentKind: KnowledgeBaseContentKind;
 
-  /** The name the uploaded file had (shown to readers and used for the
-   * download). Null for written articles. */
-  @Column({ type: 'varchar', nullable: true })
-  fileName: string | null;
-
-  /** Server-generated UUID file name under the private KB storage folder —
-   * never a user-supplied path. */
-  @Column({ type: 'varchar', nullable: true })
-  storedFileName: string | null;
-
-  @Column({ type: 'varchar', nullable: true })
-  fileMimeType: string | null;
-
-  @Column({ type: 'int', nullable: true })
-  fileSizeBytes: number | null;
+  /** The uploaded files (1-3) of a FILE article; empty for a written one. */
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  files: KnowledgeBaseStoredFile[];
 
   @Column({ type: 'enum', enum: KnowledgeBaseVisibility })
   visibilityType: KnowledgeBaseVisibility;

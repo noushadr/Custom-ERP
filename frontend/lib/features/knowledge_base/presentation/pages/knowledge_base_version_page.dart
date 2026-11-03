@@ -61,14 +61,17 @@ class KnowledgeBaseVersionPage extends ConsumerWidget {
                   const Divider(color: AppColors.borderSubtle),
                   const SizedBox(height: 20),
                   if (version.hasFile)
-                    KnowledgeBaseFileCard(
-                      fileName: version.fileName!,
-                      mimeType: version.fileMimeType,
-                      sizeBytes: version.fileSizeBytes,
-                      load: () => ref
-                          .read(knowledgeBaseRepositoryProvider)
-                          .downloadVersionFile(articleId, versionId),
-                    )
+                    for (var i = 0; i < version.files.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 10),
+                      KnowledgeBaseFileCard(
+                        fileName: version.files[i].fileName,
+                        mimeType: version.files[i].mimeType,
+                        sizeBytes: version.files[i].sizeBytes,
+                        load: () => ref
+                            .read(knowledgeBaseRepositoryProvider)
+                            .downloadVersionFile(articleId, versionId, i),
+                      ),
+                    ]
                   else
                     KnowledgeBaseContentView(content: version.content),
                 ],

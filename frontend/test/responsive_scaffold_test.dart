@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zera_erp/features/attendance/application/attendance_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_providers.dart';
 import 'package:zera_erp/features/authentication/application/auth_state.dart';
 import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart';
@@ -26,6 +27,7 @@ import 'helpers/fake_email.dart';
 import 'helpers/fake_employee.dart';
 import 'helpers/fake_freelancers.dart';
 import 'helpers/fake_goal.dart';
+import 'helpers/fake_attendance.dart';
 import 'helpers/fake_knowledge_base.dart';
 import 'helpers/fake_leads.dart';
 import 'helpers/fake_leave.dart';
@@ -69,6 +71,7 @@ Widget _authenticatedApp({AuthUser? user}) {
         FakeFreelancersRepository(),
       ),
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
+      attendanceRepositoryProvider.overrideWithValue(FakeAttendanceRepository()),
       goalRepositoryProvider.overrideWithValue(FakeGoalRepository()),
       emailRepositoryProvider.overrideWithValue(FakeEmailRepository()),
     ],

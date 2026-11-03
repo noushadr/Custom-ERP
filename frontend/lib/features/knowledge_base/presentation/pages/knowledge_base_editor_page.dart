@@ -42,7 +42,7 @@ class _KnowledgeBaseEditorPageState
   final _editorScrollController = ScrollController();
 
   late String _contentKind;
-  PickedKnowledgeBaseFile? _pickedFile;
+  final List<PickedKnowledgeBaseFile> _pickedFiles = [];
   late String _visibilityType;
   late Set<String> _selectedRoleIds;
   late Set<String> _selectedDepartmentIds;
@@ -106,8 +106,8 @@ class _KnowledgeBaseEditorPageState
       return;
     }
 
-    if (_isFileMode && !_isEditing && _pickedFile == null) {
-      setState(() => _errorMessage = 'Choose a file to upload.');
+    if (_isFileMode && !_isEditing && _pickedFiles.isEmpty) {
+      setState(() => _errorMessage = 'Choose at least one file to upload.');
       return;
     }
 
@@ -156,14 +156,21 @@ class _KnowledgeBaseEditorPageState
     }
   }
 
-  Future<void> _pickFile() async {
+  Future<void> _pickFiles() async {
     final picked = await ref.read(knowledgeBaseFilePickerProvider)();
-    if (picked == null) return;
+    if (picked.isEmpty) return;
     setState(() {
-      _pickedFile = picked;
-      _errorMessage = null;
+      final room = knowledgeBaseMaxFiles - _pickedFiles.length;
+      _pickedFiles.addAll(picked.take(room));
+      _errorMessage = picked.length > room
+          ? 'An SOP can have up to $knowledgeBaseMaxFiles files — the extra '
+                'ones were not added.'
+          : null;
     });
   }
+
+  void _removePickedFile(int index) =>
+      setState(() => _pickedFiles.removeAt(index));
 
   /// Saving an uploaded-file article. A newly chosen file goes through the
   /// replace/create-with-file endpoints (which carry the title); targeting
@@ -177,13 +184,12 @@ class _KnowledgeBaseEditorPageState
     final departmentIds = _needsDepartments
         ? _selectedDepartmentIds.toList()
         : <String>[];
-    final file = _pickedFile;
+    final files = List<PickedKnowledgeBaseFile>.of(_pickedFiles);
 
     if (!_isEditing) {
       return repository.createFileArticle(
         title: title,
-        bytes: file!.bytes,
-        fileName: file.fileName,
+        files: files,
         visibilityType: _visibilityType,
         targetRoleIds: roleIds,
         targetDepartmentIds: departmentIds,
@@ -191,7 +197,7 @@ class _KnowledgeBaseEditorPageState
     }
 
     final id = widget.existingArticle!.id;
-    if (file == null) {
+    if (files.isEmpty) {
       return repository.updateArticle(
         id,
         title: title,
@@ -200,12 +206,7 @@ class _KnowledgeBaseEditorPageState
         targetDepartmentIds: departmentIds,
       );
     }
-    await repository.replaceArticleFile(
-      id,
-      bytes: file.bytes,
-      fileName: file.fileName,
-      title: title,
-    );
+    await repository.replaceArticleFiles(id, files: files, title: title);
     return repository.updateArticle(
       id,
       visibilityType: _visibilityType,
@@ -295,8 +296,9 @@ class _KnowledgeBaseEditorPageState
                     if (_isFileMode)
                       _FileSection(
                         existingArticle: widget.existingArticle,
-                        pickedFile: _pickedFile,
-                        onPick: _submitting ? null : _pickFile,
+                        pickedFiles: _pickedFiles,
+                        onPick: _submitting ? null : _pickFiles,
+                        onRemove: _submitting ? null : _removePickedFile,
                       )
                     else
                       Container(
@@ -393,38 +395,44 @@ class _KnowledgeBaseEditorPageState
 class _FileSection extends ConsumerWidget {
   const _FileSection({
     required this.existingArticle,
-    required this.pickedFile,
+    required this.pickedFiles,
     required this.onPick,
+    required this.onRemove,
   });
 
   final KnowledgeBaseArticle? existingArticle;
-  final PickedKnowledgeBaseFile? pickedFile;
+  final List<PickedKnowledgeBaseFile> pickedFiles;
   final VoidCallback? onPick;
+  final void Function(int index)? onRemove;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final existing = existingArticle;
-    final picked = pickedFile;
     final isReplacing = existing != null;
     final textTheme = Theme.of(context).textTheme;
+    final full = pickedFiles.length >= knowledgeBaseMaxFiles;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('File', style: textTheme.titleSmall),
+        Text('Files', style: textTheme.titleSmall),
         const SizedBox(height: 8),
-        if (existing != null && existing.fileName != null && picked == null)
-          KnowledgeBaseFileCard(
-            fileName: existing.fileName!,
-            mimeType: existing.fileMimeType,
-            sizeBytes: existing.fileSizeBytes,
-            load: () => ref
-                .read(knowledgeBaseRepositoryProvider)
-                .downloadArticleFile(existing.id),
-          ),
-        if (picked != null)
+        if (existing != null && existing.files.isNotEmpty && pickedFiles.isEmpty)
+          for (var i = 0; i < existing.files.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            KnowledgeBaseFileCard(
+              fileName: existing.files[i].fileName,
+              mimeType: existing.files[i].mimeType,
+              sizeBytes: existing.files[i].sizeBytes,
+              load: () => ref
+                  .read(knowledgeBaseRepositoryProvider)
+                  .downloadArticleFile(existing.id, i),
+            ),
+          ],
+        for (var i = 0; i < pickedFiles.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.primary),
               borderRadius: BorderRadius.circular(12),
@@ -435,33 +443,43 @@ class _FileSection extends ConsumerWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '${picked.fileName} (${formatFileSize(picked.bytes.length)})',
+                    '${pickedFiles[i].fileName} '
+                    '(${formatFileSize(pickedFiles[i].bytes.length)})',
                     overflow: TextOverflow.ellipsis,
                   ),
+                ),
+                IconButton(
+                  key: Key('remove-picked-file-$i'),
+                  tooltip: 'Remove',
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: onRemove == null ? null : () => onRemove!(i),
                 ),
               ],
             ),
           ),
+        ],
         const SizedBox(height: 10),
         OutlinedButton.icon(
-          onPressed: onPick,
+          onPressed: full ? null : onPick,
           icon: const Icon(Icons.upload_file_outlined, size: 18),
           label: Text(
-            picked != null
-                ? 'Choose a different file'
+            pickedFiles.isNotEmpty
+                ? 'Add more files'
                 : isReplacing
-                ? 'Replace file'
-                : 'Choose file',
+                ? 'Replace files'
+                : 'Choose files',
           ),
         ),
         const SizedBox(height: 6),
         Text(
-          'PDF, Word, Excel, PowerPoint, CSV, text or image (PNG, JPEG, WEBP) - up to 25 MB.',
+          'Up to $knowledgeBaseMaxFiles files per SOP - PDF, Word, Excel, '
+          'PowerPoint, CSV, text or image (PNG, JPEG, WEBP), up to 25 MB each.',
           style: textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
         ),
         if (isReplacing)
           Text(
-            'Replacing the file saves a new version; the old file stays in the version history.',
+            'Choosing new files replaces all the current ones and saves a new '
+            'version; the old files stay in the version history.',
             style: textTheme.bodySmall?.copyWith(
               color: AppColors.textSecondary,
             ),

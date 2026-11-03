@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/form_section.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../application/leave_providers.dart';
+import '../../domain/exceptions/leave_exception.dart';
 import '../../domain/entities/employee_leave_overview.dart';
 import '../utils/leave_format_utils.dart';
 
@@ -22,12 +23,35 @@ class _AllEmployeesLeaveSectionState
     extends ConsumerState<AllEmployeesLeaveSection> {
   String _query = '';
 
+  Future<void> _exportPdf() async {
+    try {
+      final bytes = await ref
+          .read(leaveRepositoryProvider)
+          .downloadEmployeeBalancesPdf();
+      ref.read(leavePdfSaverProvider)(
+        bytes,
+        'Employees-Leave-${DateTime.now().year}.pdf',
+      );
+    } on LeaveException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final overviewAsync = ref.watch(allEmployeeLeaveOverviewProvider);
 
     return FormSection(
       title: "All Employees' Leave",
+      trailing: OutlinedButton.icon(
+        key: const Key('export-leave-balances-pdf'),
+        onPressed: _exportPdf,
+        icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+        label: const Text('Export PDF'),
+      ),
       child: overviewAsync.when(
         loading: () => const Padding(
           padding: EdgeInsets.symmetric(vertical: 24),

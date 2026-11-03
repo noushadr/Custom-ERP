@@ -423,10 +423,14 @@ describe('KnowledgeBaseService', () => {
       return buildArticle({
         contentKind: KnowledgeBaseContentKind.FILE,
         content: [],
-        fileName: 'Leave Policy.pdf',
-        storedFileName: 'stored-uuid.pdf',
-        fileMimeType: 'application/pdf',
-        fileSizeBytes: 2048,
+        files: [
+          {
+            fileName: 'Leave Policy.pdf',
+            storedFileName: 'stored-uuid.pdf',
+            mimeType: 'application/pdf',
+            sizeBytes: 2048,
+          },
+        ],
         ...overrides,
       });
     }
@@ -448,20 +452,67 @@ describe('KnowledgeBaseService', () => {
 
       await service.createFileArticle(
         { title: 'Leave Policy', visibilityType: KnowledgeBaseVisibility.EVERYONE },
-        buildUpload(),
+        [buildUpload()],
         'author-user-1',
       );
 
       const saved = articleRepository.save.mock.calls[0][0];
       expect(saved.contentKind).toBe(KnowledgeBaseContentKind.FILE);
       expect(saved.content).toEqual([]);
-      expect(saved.fileName).toBe('Leave Policy.pdf');
-      expect(saved.storedFileName).toBe('stored-uuid.pdf');
-      expect(saved.fileSizeBytes).toBe(2048);
+      expect(saved.files).toEqual([
+        {
+          fileName: 'Leave Policy.pdf',
+          storedFileName: 'stored-uuid.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 2048,
+        },
+      ]);
       const version = versionRepository.save.mock.calls[0][0];
       expect(version.versionNumber).toBe(1);
-      expect(version.storedFileName).toBe('stored-uuid.pdf');
+      expect(version.files[0].storedFileName).toBe('stored-uuid.pdf');
       expect(unlinkSpy).not.toHaveBeenCalled();
+    });
+
+    it('creates one article from several files uploaded together, in order', async () => {
+      articleRepository.findById.mockImplementation((id) =>
+        Promise.resolve(buildFileArticle({ id })),
+      );
+
+      await service.createFileArticle(
+        { title: 'SEO SOP', visibilityType: KnowledgeBaseVisibility.EVERYONE },
+        [
+          buildUpload({ originalname: 'Setup.pdf', filename: 'a.pdf' }),
+          buildUpload({ originalname: 'Checklist.xlsx', filename: 'b.xlsx' }),
+          buildUpload({ originalname: 'Template.docx', filename: 'c.docx' }),
+        ],
+        'author-user-1',
+      );
+
+      const saved = articleRepository.save.mock.calls[0][0];
+      expect(saved.files.map((f: { fileName: string }) => f.fileName)).toEqual([
+        'Setup.pdf',
+        'Checklist.xlsx',
+        'Template.docx',
+      ]);
+      expect(versionRepository.save.mock.calls[0][0].files).toHaveLength(3);
+      expect(articleRepository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses more than three files and removes every upload', async () => {
+      const uploads = [1, 2, 3, 4].map((n) =>
+        buildUpload({ filename: `f${n}.pdf`, path: `/storage/f${n}.pdf` }),
+      );
+
+      await expect(
+        service.createFileArticle(
+          { title: 'Too many', visibilityType: KnowledgeBaseVisibility.EVERYONE },
+          uploads,
+          'author-user-1',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(articleRepository.save).not.toHaveBeenCalled();
+      expect(unlinkSpy).toHaveBeenCalledTimes(4);
     });
 
     it('serves the type implied by the extension, not the one the browser claimed', async () => {
@@ -471,11 +522,11 @@ describe('KnowledgeBaseService', () => {
 
       await service.createFileArticle(
         { title: 'Sneaky', visibilityType: KnowledgeBaseVisibility.EVERYONE },
-        buildUpload({ mimetype: 'text/html' }),
+        [buildUpload({ mimetype: 'text/html' })],
         'author-user-1',
       );
 
-      expect(articleRepository.save.mock.calls[0][0].fileMimeType).toBe(
+      expect(articleRepository.save.mock.calls[0][0].files[0].mimeType).toBe(
         'application/pdf',
       );
     });
@@ -489,7 +540,7 @@ describe('KnowledgeBaseService', () => {
       await expect(
         service.createFileArticle(
           { title: 'Bad', visibilityType: KnowledgeBaseVisibility.EVERYONE },
-          upload,
+          [upload],
           'author-user-1',
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -504,7 +555,7 @@ describe('KnowledgeBaseService', () => {
       await expect(
         service.createFileArticle(
           { title: 'Roles only', visibilityType: KnowledgeBaseVisibility.ROLES },
-          upload,
+          [upload],
           'author-user-1',
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -537,33 +588,35 @@ describe('KnowledgeBaseService', () => {
       const version = versionRepository.save.mock.calls[0][0];
       expect(version.versionNumber).toBe(2);
       expect(version.title).toBe('Leave Policy 2026');
-      expect(version.storedFileName).toBe('stored-uuid.pdf');
+      expect(version.files[0].storedFileName).toBe('stored-uuid.pdf');
     });
 
-    it('replaces the file, bumps the version and keeps the old file on disk', async () => {
+    it('replaces the files, bumps the version and keeps the old files on disk', async () => {
       articleRepository.findById.mockResolvedValue(buildFileArticle());
 
-      await service.replaceFile(
+      await service.replaceFiles(
         'article-1',
-        buildUpload({
-          originalname: 'Leave Policy v2.docx',
-          filename: 'new-uuid.docx',
-          size: 4096,
-        }),
+        [
+          buildUpload({
+            originalname: 'Leave Policy v2.docx',
+            filename: 'new-uuid.docx',
+            size: 4096,
+          }),
+          buildUpload({ originalname: 'Annex.pdf', filename: 'annex.pdf' }),
+        ],
         {},
         'editor-user-1',
       );
 
       const saved = articleRepository.save.mock.calls[0][0];
       expect(saved.versionNumber).toBe(2);
-      expect(saved.fileName).toBe('Leave Policy v2.docx');
-      expect(saved.storedFileName).toBe('new-uuid.docx');
-      expect(saved.fileMimeType).toBe(
+      expect(saved.files).toHaveLength(2);
+      expect(saved.files[0].fileName).toBe('Leave Policy v2.docx');
+      expect(saved.files[0].storedFileName).toBe('new-uuid.docx');
+      expect(saved.files[0].mimeType).toBe(
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       );
-      expect(versionRepository.save.mock.calls[0][0].storedFileName).toBe(
-        'new-uuid.docx',
-      );
+      expect(versionRepository.save.mock.calls[0][0].files).toHaveLength(2);
       // The previous file belongs to version 1 and must still exist.
       expect(unlinkSpy).not.toHaveBeenCalled();
     });
@@ -573,7 +626,7 @@ describe('KnowledgeBaseService', () => {
       const upload = buildUpload();
 
       await expect(
-        service.replaceFile('article-1', upload, {}, 'editor-user-1'),
+        service.replaceFiles('article-1', [upload], {}, 'editor-user-1'),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(unlinkSpy).toHaveBeenCalledWith(upload.path);
     });
@@ -587,7 +640,12 @@ describe('KnowledgeBaseService', () => {
         articleRepository.findById.mockResolvedValue(buildFileArticle());
         employeeRepository.findByUserId.mockResolvedValue(buildEmployee());
 
-        const download = await service.getFileForActor('article-1', 'user-1', false);
+        const download = await service.getFileForActor(
+          'article-1',
+          0,
+          'user-1',
+          false,
+        );
 
         expect(download.fileName).toBe('Leave Policy.pdf');
         expect(download.mimeType).toBe('application/pdf');
@@ -606,7 +664,7 @@ describe('KnowledgeBaseService', () => {
         );
 
         await expect(
-          service.getFileForActor('article-1', 'user-1', false),
+          service.getFileForActor('article-1', 0, 'user-1', false),
         ).rejects.toBeInstanceOf(ForbiddenException);
       });
 
@@ -614,7 +672,7 @@ describe('KnowledgeBaseService', () => {
         articleRepository.findById.mockResolvedValue(buildArticle());
 
         await expect(
-          service.getFileForActor('article-1', 'user-1', true),
+          service.getFileForActor('article-1', 0, 'user-1', true),
         ).rejects.toBeInstanceOf(NotFoundException);
       });
 
@@ -623,15 +681,21 @@ describe('KnowledgeBaseService', () => {
         versionRepository.findById.mockResolvedValue(
           buildVersion({
             id: 'version-1',
-            fileName: 'Old.pdf',
-            storedFileName: 'old-uuid.pdf',
-            fileMimeType: 'application/pdf',
+            files: [
+              {
+                fileName: 'Old.pdf',
+                storedFileName: 'old-uuid.pdf',
+                mimeType: 'application/pdf',
+                sizeBytes: 10,
+              },
+            ],
           }),
         );
 
         const download = await service.getVersionFileForActor(
           'article-1',
           'version-1',
+          0,
           'user-1',
           true,
         );
@@ -640,12 +704,46 @@ describe('KnowledgeBaseService', () => {
         expect(download.absolutePath).toContain('old-uuid.pdf');
       });
 
+      it('serves the second file of an article by index, and 404s past the last', async () => {
+        articleRepository.findById.mockResolvedValue(
+          buildFileArticle({
+            files: [
+              {
+                fileName: 'One.pdf',
+                storedFileName: 'one.pdf',
+                mimeType: 'application/pdf',
+                sizeBytes: 1,
+              },
+              {
+                fileName: 'Two.xlsx',
+                storedFileName: 'two.xlsx',
+                mimeType: 'application/vnd.ms-excel',
+                sizeBytes: 2,
+              },
+            ],
+          }),
+        );
+
+        const second = await service.getFileForActor(
+          'article-1',
+          1,
+          'user-1',
+          true,
+        );
+        expect(second.fileName).toBe('Two.xlsx');
+        expect(second.absolutePath).toContain('two.xlsx');
+
+        await expect(
+          service.getFileForActor('article-1', 2, 'user-1', true),
+        ).rejects.toBeInstanceOf(NotFoundException);
+      });
+
       it('404s when the file has gone missing from disk', async () => {
         (existsSync as jest.Mock).mockReturnValue(false);
         articleRepository.findById.mockResolvedValue(buildFileArticle());
 
         await expect(
-          service.getFileForActor('article-1', 'user-1', true),
+          service.getFileForActor('article-1', 0, 'user-1', true),
         ).rejects.toBeInstanceOf(NotFoundException);
       });
     });

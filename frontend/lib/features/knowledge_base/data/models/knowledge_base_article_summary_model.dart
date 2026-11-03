@@ -1,3 +1,4 @@
+import '../../domain/entities/knowledge_base_file_info.dart';
 import '../../domain/entities/knowledge_base_article_summary.dart';
 import '../../domain/entities/knowledge_base_content_kind.dart';
 
@@ -13,9 +14,9 @@ class KnowledgeBaseArticleSummaryModel extends KnowledgeBaseArticleSummary {
     required super.createdAt,
     required super.updatedAt,
     super.contentKind,
-    super.fileName,
-    super.fileMimeType,
-    super.fileSizeBytes,
+    super.files,
+    super.targetRoleNames,
+    super.targetDepartmentNames,
   });
 
   factory KnowledgeBaseArticleSummaryModel.fromJson(
@@ -32,8 +33,10 @@ class KnowledgeBaseArticleSummaryModel extends KnowledgeBaseArticleSummary {
     updatedAt: DateTime.parse(json['updatedAt'] as String),
     contentKind:
         json['contentKind'] as String? ?? KnowledgeBaseContentKind.richText,
-    fileName: json['fileName'] as String?,
-    fileMimeType: json['fileMimeType'] as String?,
-    fileSizeBytes: json['fileSizeBytes'] as int?,
+    files: knowledgeBaseFilesFromJson(json['files']),
+    targetRoleNames: (json['targetRoleNames'] as List<dynamic>? ?? [])
+        .cast<String>(),
+    targetDepartmentNames:
+        (json['targetDepartmentNames'] as List<dynamic>? ?? []).cast<String>(),
   );
 }
