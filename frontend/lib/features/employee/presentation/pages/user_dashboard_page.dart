@@ -1,3 +1,4 @@
+import '../../../../shared/widgets/work_from_home_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -58,6 +59,7 @@ class _UserDashboardBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const WorkFromHomeNotice(),
           _ProfileSummaryCard(employee: employee),
           const SizedBox(height: 16),
           const CompanyNoticesSection(),

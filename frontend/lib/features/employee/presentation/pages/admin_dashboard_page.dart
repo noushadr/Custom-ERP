@@ -1,3 +1,4 @@
+import '../../../../shared/widgets/work_from_home_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -50,6 +51,7 @@ class _DashboardStats extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const WorkFromHomeNotice(),
           const ResponsiveCardRow(
             minItemWidth: 240,
             spacing: 12,

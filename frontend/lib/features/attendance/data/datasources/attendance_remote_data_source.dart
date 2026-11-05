@@ -72,6 +72,8 @@ class AttendanceRemoteDataSource {
   Future<AttendanceSettings> updateSettings({
     required String shiftStart,
     required String shiftEnd,
+    required String hoursCutAfter,
+    required String hoursCutFrom,
     required int graceMinutes,
   }) async {
     final response = await _dio.put<Map<String, dynamic>>(
@@ -79,15 +81,21 @@ class AttendanceRemoteDataSource {
       data: {
         'shiftStart': shiftStart,
         'shiftEnd': shiftEnd,
+        'hoursCutAfter': hoursCutAfter,
+        'hoursCutFrom': hoursCutFrom,
         'graceMinutes': graceMinutes,
       },
     );
     return attendanceSettingsFromJson(response.data!);
   }
 
-  Future<AttendanceSyncResult> sync() async {
+  Future<AttendanceSyncResult> sync() => _post('/attendance/sync');
+
+  Future<AttendanceSyncResult> refresh() => _post('/attendance/refresh');
+
+  Future<AttendanceSyncResult> _post(String path) async {
     final response = await _dio.post<Map<String, dynamic>>(
-      '/attendance/sync',
+      path,
       options: Options(receiveTimeout: const Duration(seconds: 90)),
     );
     final data = response.data!;
@@ -95,6 +103,7 @@ class AttendanceRemoteDataSource {
       fetched: data['fetched'] as int,
       inserted: data['inserted'] as int,
       users: data['users'] as int,
+      skipped: data['skipped'] as bool? ?? false,
     );
   }
 
@@ -132,6 +141,75 @@ class AttendanceRemoteDataSource {
         .cast<Map<String, dynamic>>()
         .map(attendanceMappingFromJson)
         .toList();
+  }
+
+  Future<List<({String date, String? note})>> getWfhCalendar() async {
+    final response = await _dio.get<List<dynamic>>('/attendance/wfh-calendar');
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map((j) => (date: j['date'] as String, note: j['note'] as String?))
+        .toList();
+  }
+
+  Future<List<WfhDay>> getWfhDays() async {
+    final response = await _dio.get<List<dynamic>>('/attendance/wfh-days');
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(wfhDayFromJson)
+        .toList();
+  }
+
+  Future<WfhDay> addWfhDay({required String date, String? note}) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/attendance/wfh-days',
+      data: {'date': date, 'note': ?note},
+    );
+    return wfhDayFromJson(response.data!);
+  }
+
+  Future<void> removeWfhDay(String date) async {
+    await _dio.delete<void>('/attendance/wfh-days/$date');
+  }
+
+  Future<List<WfhDayEmployee>> getWfhDayAttendance(String date) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/attendance/wfh-days/$date/attendance',
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(wfhDayEmployeeFromJson)
+        .toList();
+  }
+
+  Future<List<WfhDayEmployee>> setWfhDayAttendance({
+    required String date,
+    required List<String> employeeIds,
+  }) async {
+    final response = await _dio.put<List<dynamic>>(
+      '/attendance/wfh-days/$date/attendance',
+      data: {'employeeIds': employeeIds},
+    );
+    return response.data!
+        .cast<Map<String, dynamic>>()
+        .map(wfhDayEmployeeFromJson)
+        .toList();
+  }
+
+  Future<void> markEmployeeWfh({
+    required String employeeId,
+    required String date,
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/attendance/employees/$employeeId/wfh-days',
+      data: {'date': date},
+    );
+  }
+
+  Future<void> unmarkEmployeeWfh({
+    required String employeeId,
+    required String date,
+  }) async {
+    await _dio.delete<void>('/attendance/employees/$employeeId/wfh-days/$date');
   }
 
   Future<int> autoMap() async {

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../domain/entities/payroll_line_item.dart';
 import '../models/payroll_run_detail_model.dart';
 import '../models/payroll_run_summary_model.dart';
 import '../models/payslip_list_item_model.dart';
@@ -36,22 +37,37 @@ class PayrollRemoteDataSource {
     String runId,
     String lineItemId, {
     double? baseSalary,
-    int? quantity,
-    double? perUnitRate,
-    double? additions,
-    double? deductions,
+    int? absentDays,
+    double? advanceSalary,
+    List<PayrollEntry>? fines,
+    List<PayrollEntry>? freelanceTasks,
     String? notes,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/payroll/runs/$runId/line-items/$lineItemId',
       data: {
         'baseSalary': ?baseSalary,
-        'quantity': ?quantity,
-        'perUnitRate': ?perUnitRate,
-        'additions': ?additions,
-        'deductions': ?deductions,
+        'absentDays': ?absentDays,
+        'advanceSalary': ?advanceSalary,
+        if (fines != null)
+          'fines': [
+            for (final fine in fines)
+              {'description': fine.description, 'amount': fine.amount},
+          ],
+        if (freelanceTasks != null)
+          'freelanceTasks': [
+            for (final task in freelanceTasks)
+              {'description': task.description, 'amount': task.amount},
+          ],
         'notes': ?notes,
       },
+    );
+    return PayrollRunDetailModel.fromJson(response.data!);
+  }
+
+  Future<PayrollRunDetailModel> syncRun(String id) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/payroll/runs/$id/sync',
     );
     return PayrollRunDetailModel.fromJson(response.data!);
   }

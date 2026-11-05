@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   NotFoundException,
@@ -17,7 +18,9 @@ import type { JwtPayload } from '../../authentication/presentation/strategies/jw
 import { generateAttendancePdf } from '../application/attendance-report.pdf';
 import { AttendanceService } from '../application/attendance.service';
 import {
+  AddWfhDayDto,
   IgnoreDeviceUserDto,
+  SetWfhAttendanceDto,
   SetAttendanceMappingDto,
   UpdateAttendanceSettingsDto,
 } from '../application/dto/attendance.dto';
@@ -108,6 +111,72 @@ export class AttendanceController {
   @Permissions('attendance.manage')
   sync() {
     return this.attendanceService.syncFromDevice();
+  }
+
+  /** Any signed-in employee can refresh the data — it only reads the machine
+   * and is skipped when a sync just happened. */
+  @Post('refresh')
+  refresh() {
+    return this.attendanceService.refreshIfStale();
+  }
+
+  /** Company work-from-home days for the calendar — visible to everyone. */
+  @Get('wfh-calendar')
+  listWfhCalendar() {
+    return this.attendanceService.listWfhCalendar();
+  }
+
+  @Get('wfh-days')
+  @Permissions('attendance.manage')
+  listWfhDays() {
+    return this.attendanceService.listWfhDays();
+  }
+
+  @Post('wfh-days')
+  @Permissions('attendance.manage')
+  addWfhDay(@Body() dto: AddWfhDayDto) {
+    return this.attendanceService.addWfhDay(dto);
+  }
+
+  @Delete('wfh-days/:date')
+  @Permissions('attendance.manage')
+  removeWfhDay(@Param('date') date: string) {
+    return this.attendanceService.removeWfhDay(date);
+  }
+
+  @Get('wfh-days/:date/attendance')
+  @Permissions('attendance.manage')
+  getWfhDayAttendance(@Param('date') date: string) {
+    return this.attendanceService.getWfhDayAttendance(date);
+  }
+
+  @Put('wfh-days/:date/attendance')
+  @Permissions('attendance.manage')
+  setWfhDayAttendance(
+    @Param('date') date: string,
+    @Body() dto: SetWfhAttendanceDto,
+  ) {
+    return this.attendanceService.setWfhDayAttendance(date, dto.employeeIds);
+  }
+
+  /** Mark one person's own day as work from home (no machine attendance). */
+  @Post('employees/:employeeId/wfh-days')
+  @Permissions('attendance.manage')
+  async markEmployeeWfh(
+    @Param('employeeId') employeeId: string,
+    @Body() dto: AddWfhDayDto,
+  ) {
+    await this.attendanceService.markEmployeeWfh(employeeId, dto.date);
+    return { employeeId, date: dto.date };
+  }
+
+  @Delete('employees/:employeeId/wfh-days/:date')
+  @Permissions('attendance.manage')
+  async unmarkEmployeeWfh(
+    @Param('employeeId') employeeId: string,
+    @Param('date') date: string,
+  ) {
+    await this.attendanceService.unmarkEmployeeWfh(employeeId, date);
   }
 
   @Get('mapping')

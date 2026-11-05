@@ -8,13 +8,27 @@ class TodayAnnouncementsModel extends TodayAnnouncements {
     required super.holiday,
     required super.notices,
     required super.employeeOfTheMonth,
+    super.workFromHome,
   });
 
   factory TodayAnnouncementsModel.fromJson(Map<String, dynamic> json) {
     final holidayJson = json['holiday'] as Map<String, dynamic>?;
     final employeeOfTheMonthJson =
         json['employeeOfTheMonth'] as Map<String, dynamic>?;
+    final wfhJson = json['workFromHome'] as Map<String, dynamic>?;
+    TodayWfhNotice? notice(dynamic raw) => raw == null
+        ? null
+        : TodayWfhNotice(
+            personal: (raw as Map<String, dynamic>)['personal'] as bool,
+            note: raw['note'] as String?,
+          );
     return TodayAnnouncementsModel(
+      workFromHome: wfhJson == null
+          ? null
+          : TodayWorkFromHome(
+              today: notice(wfhJson['today']),
+              tomorrow: notice(wfhJson['tomorrow']),
+            ),
       birthdays: (json['birthdays'] as List<dynamic>)
           .cast<Map<String, dynamic>>()
           .map(

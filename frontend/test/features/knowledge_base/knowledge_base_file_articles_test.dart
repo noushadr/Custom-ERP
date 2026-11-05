@@ -93,46 +93,47 @@ PickedKnowledgeBaseFile _pdf([String name = 'Policy.pdf']) =>
 
 void main() {
   group('reading a file article', () {
-    testWidgets('an SOP with two files shows a card for each and downloads the right one', (
-      tester,
-    ) async {
-      await _useTallSurface(tester);
-      final recorder = _FileActionsRecorder();
-      final repository = FakeKnowledgeBaseRepository(
-        articleById: buildTestKnowledgeBaseFileArticle(
-          files: const [
-            KnowledgeBaseFileInfo(
-              fileName: 'Setup.pdf',
-              mimeType: 'application/pdf',
-              sizeBytes: 1024,
-            ),
-            KnowledgeBaseFileInfo(
-              fileName: 'Checklist.xlsx',
-              mimeType: 'application/vnd.ms-excel',
-              sizeBytes: 2048,
-            ),
-          ],
-        ),
-      );
+    testWidgets(
+      'an SOP with two files shows a card for each and downloads the right one',
+      (tester) async {
+        await _useTallSurface(tester);
+        final recorder = _FileActionsRecorder();
+        final repository = FakeKnowledgeBaseRepository(
+          articleById: buildTestKnowledgeBaseFileArticle(
+            files: const [
+              KnowledgeBaseFileInfo(
+                fileName: 'Setup.pdf',
+                mimeType: 'application/pdf',
+                sizeBytes: 1024,
+              ),
+              KnowledgeBaseFileInfo(
+                fileName: 'Checklist.xlsx',
+                mimeType: 'application/vnd.ms-excel',
+                sizeBytes: 2048,
+              ),
+            ],
+          ),
+        );
 
-      await tester.pumpWidget(
-        _app(
-          home: const KnowledgeBaseArticlePage(articleId: 'article-1'),
-          repository: repository,
-          recorder: recorder,
-        ),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          _app(
+            home: const KnowledgeBaseArticlePage(articleId: 'article-1'),
+            repository: repository,
+            recorder: recorder,
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('Setup.pdf'), findsOneWidget);
-      expect(find.text('Checklist.xlsx'), findsOneWidget);
+        expect(find.text('Setup.pdf'), findsOneWidget);
+        expect(find.text('Checklist.xlsx'), findsOneWidget);
 
-      await tester.tap(find.text('Download').last);
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Download').last);
+        await tester.pumpAndSettle();
 
-      expect(repository.lastDownloadedFileIndex, 1);
-      expect(recorder.downloads.single.fileName, 'Checklist.xlsx');
-    });
+        expect(repository.lastDownloadedFileIndex, 1);
+        expect(recorder.downloads.single.fileName, 'Checklist.xlsx');
+      },
+    );
 
     testWidgets('shows the file card instead of written content', (
       tester,
@@ -459,7 +460,11 @@ void main() {
         _app(
           home: const KnowledgeBaseEditorPage(),
           repository: repository,
-          pickedFiles: [_pdf('Setup.pdf'), _pdf('Checklist.pdf'), _pdf('Template.pdf')],
+          pickedFiles: [
+            _pdf('Setup.pdf'),
+            _pdf('Checklist.pdf'),
+            _pdf('Template.pdf'),
+          ],
         ),
       );
       await tester.pumpAndSettle();

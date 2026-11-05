@@ -1,7 +1,6 @@
 import PdfPrinter from 'pdfmake';
 import { ZERA_LOGO_BASE64 } from '../../payroll/application/zera-logo.base64';
 import { EmployeeAttendanceResponse } from './attendance-response.interface';
-import { formatMinutes } from './attendance.calculator';
 
 const MONTH_NAMES = [
   'January',
@@ -37,6 +36,9 @@ const STATUS_LABEL: Record<string, string> = {
   present: 'Present',
   late: 'Late',
   incomplete: 'No check-out',
+  missing_checkin: 'Missing check-in',
+  hours_cut: 'Hours cut',
+  wfh: 'Work from home',
   absent: 'Absent',
   leave: 'Leave',
   holiday: 'Holiday',
@@ -47,7 +49,15 @@ const STATUS_LABEL: Record<string, string> = {
 
 const dash = (value: string | null): string => value ?? '';
 const minutes = (value: number): string =>
-  value > 0 ? formatMinutes(value) : '';
+  value > 0 ? duration(value) : '';
+
+/** "7hr 30m", "8hr" or "45m" — a length of time in words. */
+function duration(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}hr` : `${h}hr ${m}m`;
+}
 
 function formatDate(iso: string): string {
   const [y, m, d] = iso.split('-');
@@ -106,22 +116,25 @@ export function generateAttendancePdf(
     content.push({
       text:
         `Present ${s.present}   Late ${s.late}   Absent ${s.absent}   ` +
-        `Leave ${s.leave}   Late time ${formatMinutes(s.lateMinutes)}   ` +
-        `Worked ${formatMinutes(s.workMinutes)}`,
+        `Leave ${s.leave}   Late time ${duration(s.lateMinutes)}   ` +
+        `Late deduction ${s.lateDeductionDays} day(s)   ` +
+        `Hours cut ${duration(s.hoursCutMinutes)} over ${s.hoursCutDays} day(s)   ` +
+        `WFH ${s.wfhDays} day(s)   ` +
+        `Worked ${duration(s.workMinutes)}`,
       color: BRAND_TEXT_SECONDARY,
       margin: [0, 0, 0, 6],
     });
     content.push({
       table: {
         headerRows: 1,
-        widths: ['auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', '*'],
+        widths: ['auto', 'auto', 'auto', 'auto', 'auto', '*'],
         body: [
-          ['Date', 'Day', 'Clock In', 'Clock Out', 'Late', 'Early', 'Work', 'Status'].map(
+          ['Date', 'Day', 'Clock In', 'Clock Out', 'Work', 'Status'].map(
             (text) => ({ text, bold: true, color: BRAND_PRIMARY }),
           ),
           ...employee.days.map((d) => {
             const color =
-              d.status === 'absent'
+              d.status === 'absent' || d.status === 'hours_cut'
                 ? DANGER
                 : d.status === 'late' || d.status === 'incomplete'
                   ? WARNING
@@ -129,12 +142,26 @@ export function generateAttendancePdf(
             return [
               formatDate(d.date),
               d.weekday,
-              dash(d.clockIn),
-              dash(d.clockOut),
-              minutes(d.lateMinutes),
-              minutes(d.earlyMinutes),
+              d.clockIn && d.arrivalLateMinutes > 0
+                ? {
+                    text: `${d.clockIn}  ${duration(d.arrivalLateMinutes)} late`,
+                    color: d.status === 'hours_cut' ? DANGER : WARNING,
+                  }
+                : dash(d.clockIn),
+              d.clockOut && d.extraMinutes > 0
+                ? {
+                    text: `${d.clockOut}  +${duration(d.extraMinutes)}`,
+                    color: '#16A34A',
+                  }
+                : dash(d.clockOut),
               minutes(d.workMinutes),
-              { text: STATUS_LABEL[d.status] ?? '', color },
+              {
+                text:
+                  d.status === 'leave' && d.leaveType
+                    ? d.leaveType
+                    : (STATUS_LABEL[d.status] ?? ''),
+                color,
+              },
             ];
           }),
         ],

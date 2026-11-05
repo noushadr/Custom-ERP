@@ -417,7 +417,9 @@ class _FileSection extends ConsumerWidget {
       children: [
         Text('Files', style: textTheme.titleSmall),
         const SizedBox(height: 8),
-        if (existing != null && existing.files.isNotEmpty && pickedFiles.isEmpty)
+        if (existing != null &&
+            existing.files.isNotEmpty &&
+            pickedFiles.isEmpty)
           for (var i = 0; i < existing.files.length; i++) ...[
             if (i > 0) const SizedBox(height: 8),
             KnowledgeBaseFileCard(

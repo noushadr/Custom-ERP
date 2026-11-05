@@ -18,11 +18,21 @@ class DepartmentBreakdownRow {
   final int count;
 }
 
-/// A titled list of [DepartmentBreakdownRow]s, each showing its percentage
-/// of [totalAmount] as the prominent figure and the PKR amount/count as a
-/// secondary line — used both by the HR/Admin Dashboard's company-wide
-/// payroll breakdown and a single Payroll Run's own breakdown, so the two
-/// stay visually and behaviorally identical.
+const _segmentColors = [
+  AppColors.primary,
+  AppColors.secondary,
+  AppColors.accentTeal,
+  AppColors.success,
+  AppColors.warning,
+  AppColors.error,
+  AppColors.navActive,
+];
+
+/// A compact breakdown of [totalAmount] by department: one stacked bar split
+/// into each department's share, with a wrapped legend underneath (name,
+/// percentage, and PKR amount/count) — used by both the Payroll page's
+/// company-wide breakdown and a single Payroll Run's own, so the two stay
+/// visually identical while taking a fraction of a row-per-department list.
 class DepartmentBreakdownSection extends StatelessWidget {
   const DepartmentBreakdownSection({
     super.key,
@@ -44,67 +54,117 @@ class DepartmentBreakdownSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (rows.isEmpty) return const SizedBox.shrink();
 
+    double percentageOf(DepartmentBreakdownRow row) =>
+        totalAmount == 0 ? 0.0 : row.amount / totalAmount * 100;
+
     return FormSection(
       title: title,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            _DepartmentBreakdownRowTile(
-              row: rows[i],
-              totalAmount: totalAmount,
-              countLabel: countLabel,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              height: 14,
+              child: Row(
+                children: [
+                  for (var i = 0; i < rows.length; i++)
+                    // A zero-share department still needs a non-zero flex
+                    // to be a valid Expanded, but is effectively invisible.
+                    Expanded(
+                      flex: (percentageOf(rows[i]) * 100).round().clamp(
+                        1,
+                        10000,
+                      ),
+                      child: Tooltip(
+                        message:
+                            '${rows[i].name}: '
+                            '${percentageOf(rows[i]).toStringAsFixed(1)}%',
+                        child: ColoredBox(
+                          color: _segmentColors[i % _segmentColors.length],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-            if (i < rows.length - 1)
-              const Divider(height: 16, color: AppColors.borderSubtle),
-          ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 24,
+            runSpacing: 8,
+            children: [
+              for (var i = 0; i < rows.length; i++)
+                _LegendItem(
+                  color: _segmentColors[i % _segmentColors.length],
+                  row: rows[i],
+                  percentage: percentageOf(rows[i]),
+                  countLabel: countLabel,
+                ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _DepartmentBreakdownRowTile extends StatelessWidget {
-  const _DepartmentBreakdownRowTile({
+class _LegendItem extends StatelessWidget {
+  const _LegendItem({
+    required this.color,
     required this.row,
-    required this.totalAmount,
+    required this.percentage,
     required this.countLabel,
   });
 
+  final Color color;
   final DepartmentBreakdownRow row;
-  final double totalAmount;
+  final double percentage;
   final String Function(int count) countLabel;
 
   @override
   Widget build(BuildContext context) {
-    final percentage = totalAmount == 0 ? 0.0 : row.amount / totalAmount * 100;
-
+    final theme = Theme.of(context);
     return Row(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(
-            row.name,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
         ),
+        const SizedBox(width: 8),
         Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${percentage.toStringAsFixed(1)}% of payroll',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  row.name,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${percentage.toStringAsFixed(1)}%',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
             ),
             Text(
               'PKR ${formatWholeAmount(row.amount)} · ${countLabel(row.count)}',
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),

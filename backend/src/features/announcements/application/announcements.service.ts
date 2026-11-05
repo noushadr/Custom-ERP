@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { AttendanceService } from '../../attendance/application/attendance.service';
 import { EmployeesService } from '../../employee/application/employees.service';
 import { HolidaysService } from '../../holidays/application/holidays.service';
 import { NoticesService } from '../../notices/application/notices.service';
@@ -31,18 +32,26 @@ export class AnnouncementsService {
     private readonly holidaysService: HolidaysService,
     private readonly noticesService: NoticesService,
     private readonly requestsService: RequestsService,
+    private readonly attendanceService: AttendanceService,
   ) {}
 
-  async getToday(): Promise<TodayAnnouncementsResponse> {
+  async getToday(actorUserId: string): Promise<TodayAnnouncementsResponse> {
     const today = todayIso();
 
-    const [birthdays, workAnniversaries, holidays, notices, employeeOfTheMonth] =
-      await Promise.all([
+    const [
+      birthdays,
+      workAnniversaries,
+      holidays,
+      notices,
+      employeeOfTheMonth,
+      wfh,
+    ] = await Promise.all([
         this.employeesService.getUpcomingBirthdays(0, 0),
         this.employeesService.getUpcomingWorkAnniversaries(0, 0),
         this.holidaysService.getAll(new Date().getFullYear()),
         this.noticesService.findActive(),
         this.requestsService.getCurrentEmployeeOfTheMonth(),
+        this.attendanceService.getWfhAnnouncement(actorUserId),
       ]);
 
     const holidayToday = holidays.find((h) => h.date === today) ?? null;
@@ -72,6 +81,7 @@ export class AnnouncementsService {
             profilePhotoUrl: employeeOfTheMonth.profilePhotoUrl,
           }
         : null,
+      workFromHome: wfh.today || wfh.tomorrow ? wfh : null,
     };
   }
 }

@@ -56,115 +56,127 @@ class _Env {
 
   /// A brand-new TokenStorage over the same underlying stores - what a page
   /// reload produces (in-memory tokens gone, persisted ones still there).
-  TokenStorage reload() => TokenStorage(
-    secure,
-    persistentFallback: local,
-    sessionFallback: session,
-  );
+  TokenStorage reload() =>
+      TokenStorage(secure, persistentFallback: local, sessionFallback: session);
 }
 
 void main() {
-  test('a remembered login survives a reload when secure storage is unavailable '
-      '(plain-HTTP LAN address)', () async {
-    final env = _Env(secureAvailable: false);
-    await env.reload().saveTokens(
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      rememberMe: true,
-    );
+  test(
+    'a remembered login survives a reload when secure storage is unavailable '
+    '(plain-HTTP LAN address)',
+    () async {
+      final env = _Env(secureAvailable: false);
+      await env.reload().saveTokens(
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        rememberMe: true,
+      );
 
-    final afterReload = env.reload();
-    expect(await afterReload.accessToken, 'access');
-    expect(await afterReload.refreshToken, 'refresh');
-  });
+      final afterReload = env.reload();
+      expect(await afterReload.accessToken, 'access');
+      expect(await afterReload.refreshToken, 'refresh');
+    },
+  );
 
-  test('with secure storage available the browser fallback is not used', () async {
-    final env = _Env();
-    await env.reload().saveTokens(
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      rememberMe: true,
-    );
+  test(
+    'with secure storage available the browser fallback is not used',
+    () async {
+      final env = _Env();
+      await env.reload().saveTokens(
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        rememberMe: true,
+      );
 
-    expect(env.secure.data['auth_refresh_token'], 'refresh');
-    expect(env.local.data, isEmpty);
-    expect(await env.reload().refreshToken, 'refresh');
-  });
+      expect(env.secure.data['auth_refresh_token'], 'refresh');
+      expect(env.local.data, isEmpty);
+      expect(await env.reload().refreshToken, 'refresh');
+    },
+  );
 
-  test('an un-remembered login survives a reload but only in session storage',
-      () async {
-    final env = _Env();
-    await env.reload().saveTokens(
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      rememberMe: false,
-    );
+  test(
+    'an un-remembered login survives a reload but only in session storage',
+    () async {
+      final env = _Env();
+      await env.reload().saveTokens(
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        rememberMe: false,
+      );
 
-    expect(env.secure.data, isEmpty);
-    expect(env.local.data, isEmpty);
-    expect(env.session.data['auth_refresh_token'], 'refresh');
-    // Same tab reloaded: still signed in.
-    expect(await env.reload().refreshToken, 'refresh');
-  });
+      expect(env.secure.data, isEmpty);
+      expect(env.local.data, isEmpty);
+      expect(env.session.data['auth_refresh_token'], 'refresh');
+      // Same tab reloaded: still signed in.
+      expect(await env.reload().refreshToken, 'refresh');
+    },
+  );
 
-  test('switching from remembered to not-remembered removes the persistent copy',
-      () async {
-    final env = _Env(secureAvailable: false);
-    final storage = env.reload();
-    await storage.saveTokens(
-      accessToken: 'a1',
-      refreshToken: 'r1',
-      rememberMe: true,
-    );
-    expect(env.local.data, isNotEmpty);
+  test(
+    'switching from remembered to not-remembered removes the persistent copy',
+    () async {
+      final env = _Env(secureAvailable: false);
+      final storage = env.reload();
+      await storage.saveTokens(
+        accessToken: 'a1',
+        refreshToken: 'r1',
+        rememberMe: true,
+      );
+      expect(env.local.data, isNotEmpty);
 
-    await storage.saveTokens(
-      accessToken: 'a2',
-      refreshToken: 'r2',
-      rememberMe: false,
-    );
+      await storage.saveTokens(
+        accessToken: 'a2',
+        refreshToken: 'r2',
+        rememberMe: false,
+      );
 
-    expect(env.local.data, isEmpty);
-    expect(env.session.data['auth_refresh_token'], 'r2');
-  });
+      expect(env.local.data, isEmpty);
+      expect(env.session.data['auth_refresh_token'], 'r2');
+    },
+  );
 
-  test('clear() signs out everywhere, including the browser fallbacks', () async {
-    final env = _Env(secureAvailable: false);
-    final storage = env.reload();
-    await storage.saveTokens(
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      rememberMe: true,
-    );
-    await storage.saveTokens(
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      rememberMe: false,
-    );
+  test(
+    'clear() signs out everywhere, including the browser fallbacks',
+    () async {
+      final env = _Env(secureAvailable: false);
+      final storage = env.reload();
+      await storage.saveTokens(
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        rememberMe: true,
+      );
+      await storage.saveTokens(
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        rememberMe: false,
+      );
 
-    await storage.clear();
+      await storage.clear();
 
-    final afterReload = env.reload();
-    expect(await afterReload.accessToken, isNull);
-    expect(await afterReload.refreshToken, isNull);
-    expect(env.local.data, isEmpty);
-    expect(env.session.data, isEmpty);
-  });
+      final afterReload = env.reload();
+      expect(await afterReload.accessToken, isNull);
+      expect(await afterReload.refreshToken, isNull);
+      expect(env.local.data, isEmpty);
+      expect(env.session.data, isEmpty);
+    },
+  );
 
-  test('a token refresh (saveTokens without rememberMe) keeps the earlier choice',
-      () async {
-    final env = _Env(secureAvailable: false);
-    final storage = env.reload();
-    await storage.saveTokens(
-      accessToken: 'a1',
-      refreshToken: 'r1',
-      rememberMe: true,
-    );
+  test(
+    'a token refresh (saveTokens without rememberMe) keeps the earlier choice',
+    () async {
+      final env = _Env(secureAvailable: false);
+      final storage = env.reload();
+      await storage.saveTokens(
+        accessToken: 'a1',
+        refreshToken: 'r1',
+        rememberMe: true,
+      );
 
-    // What the silent refresh does: new tokens, no rememberMe argument.
-    await storage.saveTokens(accessToken: 'a2', refreshToken: 'r2');
+      // What the silent refresh does: new tokens, no rememberMe argument.
+      await storage.saveTokens(accessToken: 'a2', refreshToken: 'r2');
 
-    expect(env.local.data['auth_refresh_token'], 'r2');
-    expect(await env.reload().accessToken, 'a2');
-  });
+      expect(env.local.data['auth_refresh_token'], 'r2');
+      expect(await env.reload().accessToken, 'a2');
+    },
+  );
 }

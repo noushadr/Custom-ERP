@@ -28,6 +28,17 @@ export interface TodayEmployeeOfMonth {
   profilePhotoUrl: string | null;
 }
 
+export interface TodayWorkFromHomeNotice {
+  /** True when only this viewer was marked, not the whole company. */
+  personal: boolean;
+  note: string | null;
+}
+
+export interface TodayWorkFromHome {
+  today: TodayWorkFromHomeNotice | null;
+  tomorrow: TodayWorkFromHomeNotice | null;
+}
+
 export interface TodayAnnouncementsResponse {
   birthdays: TodayBirthday[];
   workAnniversaries: TodayWorkAnniversary[];
@@ -36,4 +47,6 @@ export interface TodayAnnouncementsResponse {
   /** Non-null for 7 days after HR/Admin approves an Employee of the Month
    * nomination, then falls away — see `RequestsService.getCurrentEmployeeOfTheMonth`. */
   employeeOfTheMonth: TodayEmployeeOfMonth | null;
+  /** Today's / tomorrow's work-from-home day for this viewer, if any. */
+  workFromHome: TodayWorkFromHome | null;
 }

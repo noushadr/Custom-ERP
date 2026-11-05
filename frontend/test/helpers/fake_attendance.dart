@@ -11,6 +11,9 @@ AttendanceDay buildTestAttendanceDay({
   int earlyMinutes = 34,
   int workMinutes = 464,
   String status = AttendanceStatus.present,
+  String? leaveType,
+  int arrivalLateMinutes = 0,
+  int extraMinutes = 0,
 }) => AttendanceDay(
   date: date,
   weekday: weekday,
@@ -20,6 +23,9 @@ AttendanceDay buildTestAttendanceDay({
   earlyMinutes: earlyMinutes,
   workMinutes: workMinutes,
   status: status,
+  leaveType: leaveType,
+  arrivalLateMinutes: arrivalLateMinutes,
+  extraMinutes: extraMinutes,
 );
 
 EmployeeAttendance buildTestEmployeeAttendance({
@@ -58,6 +64,8 @@ class FakeAttendanceRepository implements AttendanceRepository {
     this.mapping = const [],
     this.mineError,
     this.deviceConfigured = true,
+    this.wfhDays = const [],
+    this.wfhEmployees = const [],
   }) : mine = mine ?? buildTestEmployeeAttendance();
 
   final EmployeeAttendance mine;
@@ -65,6 +73,8 @@ class FakeAttendanceRepository implements AttendanceRepository {
   List<AttendanceMapping> mapping;
   final AttendanceException? mineError;
   final bool deviceConfigured;
+  final List<WfhDay> wfhDays;
+  final List<WfhDayEmployee> wfhEmployees;
 
   int syncCalls = 0;
   int autoMapCalls = 0;
@@ -113,6 +123,8 @@ class FakeAttendanceRepository implements AttendanceRepository {
       AttendanceSettings(
         shiftStart: '11:00',
         shiftEnd: '19:00',
+        hoursCutAfter: '11:30',
+        hoursCutFrom: '10:30',
         graceMinutes: 15,
         lastSyncAt: null,
         lastSyncMessage: null,
@@ -123,11 +135,15 @@ class FakeAttendanceRepository implements AttendanceRepository {
   Future<AttendanceSettings> updateSettings({
     required String shiftStart,
     required String shiftEnd,
+    required String hoursCutAfter,
+    required String hoursCutFrom,
     required int graceMinutes,
   }) async {
     savedSettings = AttendanceSettings(
       shiftStart: shiftStart,
       shiftEnd: shiftEnd,
+      hoursCutAfter: hoursCutAfter,
+      hoursCutFrom: hoursCutFrom,
       graceMinutes: graceMinutes,
       lastSyncAt: null,
       lastSyncMessage: null,
@@ -140,6 +156,75 @@ class FakeAttendanceRepository implements AttendanceRepository {
   Future<AttendanceSyncResult> sync() async {
     syncCalls++;
     return const AttendanceSyncResult(fetched: 10, inserted: 3, users: 2);
+  }
+
+  String? lastAddedWfhDate;
+  String? lastAddedWfhNote;
+  String? lastRemovedWfhDate;
+  String? lastMarkedWfhDate;
+  List<String>? lastMarkedWfhEmployeeIds;
+
+  @override
+  Future<List<({String date, String? note})>> getWfhCalendar() async => [
+    for (final d in wfhDays) (date: d.date, note: d.note),
+  ];
+
+  @override
+  Future<List<WfhDay>> getWfhDays() async => wfhDays;
+
+  @override
+  Future<WfhDay> addWfhDay({required String date, String? note}) async {
+    lastAddedWfhDate = date;
+    lastAddedWfhNote = note;
+    return WfhDay(date: date, note: note, presentCount: 0);
+  }
+
+  @override
+  Future<void> removeWfhDay(String date) async {
+    lastRemovedWfhDate = date;
+  }
+
+  @override
+  Future<List<WfhDayEmployee>> getWfhDayAttendance(String date) async =>
+      wfhEmployees;
+
+  @override
+  Future<List<WfhDayEmployee>> setWfhDayAttendance({
+    required String date,
+    required List<String> employeeIds,
+  }) async {
+    lastMarkedWfhDate = date;
+    lastMarkedWfhEmployeeIds = employeeIds;
+    return wfhEmployees;
+  }
+
+  String? lastMarkedWfhEmployeeId;
+  String? lastMarkedWfhEmployeeDate;
+  String? lastUnmarkedWfhEmployeeDate;
+
+  @override
+  Future<void> markEmployeeWfh({
+    required String employeeId,
+    required String date,
+  }) async {
+    lastMarkedWfhEmployeeId = employeeId;
+    lastMarkedWfhEmployeeDate = date;
+  }
+
+  @override
+  Future<void> unmarkEmployeeWfh({
+    required String employeeId,
+    required String date,
+  }) async {
+    lastUnmarkedWfhEmployeeDate = date;
+  }
+
+  int refreshCalls = 0;
+
+  @override
+  Future<AttendanceSyncResult> refresh() async {
+    refreshCalls++;
+    return const AttendanceSyncResult(fetched: 10, inserted: 2, users: 2);
   }
 
   @override

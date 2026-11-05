@@ -464,9 +464,7 @@ void main() {
     expect((olderCard.decoration as BoxDecoration).color, AppColors.fieldFill);
   });
 
-  testWidgets('does not show a leave balances table', (
-    tester,
-  ) async {
+  testWidgets('does not show a leave balances table', (tester) async {
     await tester.pumpWidget(
       _app(
         leaveRepository: FakeLeaveRepository(

@@ -5,6 +5,7 @@ class Employee {
     required this.id,
     required this.userId,
     required this.employeeCode,
+    this.employeeCodeLocked = false,
     required this.email,
     required this.role,
     required this.accountStatus,
@@ -42,6 +43,9 @@ class Employee {
   final String id;
   final String userId;
   final String employeeCode;
+
+  /// True once the 30-day window to correct the employee ID has passed.
+  final bool employeeCodeLocked;
   final String email;
   final String role;
   final String accountStatus;

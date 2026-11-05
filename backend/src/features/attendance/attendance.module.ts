@@ -10,6 +10,8 @@ import { TypeOrmAttendanceRepository } from './data/repositories/attendance.repo
 import { AttendanceDeviceUser } from './domain/entities/attendance-device-user.entity';
 import { AttendancePunch } from './domain/entities/attendance-punch.entity';
 import { AttendanceSettings } from './domain/entities/attendance-settings.entity';
+import { AttendanceWfhDay } from './domain/entities/attendance-wfh-day.entity';
+import { AttendanceWfhPresence } from './domain/entities/attendance-wfh-presence.entity';
 import { ATTENDANCE_REPOSITORY } from './domain/repositories/attendance-repository.interface';
 import { AttendanceController } from './presentation/attendance.controller';
 
@@ -19,6 +21,8 @@ import { AttendanceController } from './presentation/attendance.controller';
       AttendancePunch,
       AttendanceDeviceUser,
       AttendanceSettings,
+      AttendanceWfhDay,
+      AttendanceWfhPresence,
     ]),
     AuthenticationModule,
     EmployeeModule,
@@ -26,6 +30,7 @@ import { AttendanceController } from './presentation/attendance.controller';
     LeaveModule,
   ],
   controllers: [AttendanceController],
+  exports: [AttendanceService],
   providers: [
     AttendanceService,
     { provide: ATTENDANCE_REPOSITORY, useClass: TypeOrmAttendanceRepository },

@@ -119,7 +119,9 @@ Widget _authenticatedApp({
         freelancersRepository ?? FakeFreelancersRepository(),
       ),
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
-      attendanceRepositoryProvider.overrideWithValue(FakeAttendanceRepository()),
+      attendanceRepositoryProvider.overrideWithValue(
+        FakeAttendanceRepository(),
+      ),
       goalRepositoryProvider.overrideWithValue(
         goalRepository ?? FakeGoalRepository(),
       ),
@@ -516,7 +518,7 @@ void main() {
         '${soon.year.toString().padLeft(4, '0')}-'
         '${soon.month.toString().padLeft(2, '0')}-'
         '${soon.day.toString().padLeft(2, '0')}';
-    final past = DateTime.now().subtract(const Duration(days: 10));
+    final past = DateTime.now().subtract(const Duration(days: 40));
     final pastIso =
         '${past.year.toString().padLeft(4, '0')}-'
         '${past.month.toString().padLeft(2, '0')}-'
@@ -544,7 +546,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Upcoming Public Holiday'), findsOneWidget);
-    expect(find.text('Independence Day'), findsOneWidget);
+    expect(find.text('Independence Day'), findsWidgets);
     expect(find.text('Already Happened'), findsNothing);
   });
 

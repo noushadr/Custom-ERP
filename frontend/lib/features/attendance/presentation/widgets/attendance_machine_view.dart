@@ -18,19 +18,13 @@ class AttendanceMachineView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SyncAndSettings(),
-        SizedBox(height: 16),
-        _MappingSection(),
-      ],
+      children: [_SyncAndSettings(), SizedBox(height: 16), _MappingSection()],
     );
   }
 }
 
 void _snack(BuildContext context, String message) {
-  ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _SyncAndSettings extends ConsumerStatefulWidget {
@@ -43,6 +37,8 @@ class _SyncAndSettings extends ConsumerStatefulWidget {
 class _SyncAndSettingsState extends ConsumerState<_SyncAndSettings> {
   final _start = TextEditingController();
   final _end = TextEditingController();
+  final _hoursCut = TextEditingController();
+  final _hoursFrom = TextEditingController();
   final _grace = TextEditingController();
   bool _loaded = false;
   bool _syncing = false;
@@ -52,6 +48,8 @@ class _SyncAndSettingsState extends ConsumerState<_SyncAndSettings> {
   void dispose() {
     _start.dispose();
     _end.dispose();
+    _hoursCut.dispose();
+    _hoursFrom.dispose();
     _grace.dispose();
     super.dispose();
   }
@@ -61,6 +59,8 @@ class _SyncAndSettingsState extends ConsumerState<_SyncAndSettings> {
     _loaded = true;
     _start.text = settings.shiftStart;
     _end.text = settings.shiftEnd;
+    _hoursCut.text = settings.hoursCutAfter;
+    _hoursFrom.text = settings.hoursCutFrom;
     _grace.text = '${settings.graceMinutes}';
   }
 
@@ -99,6 +99,8 @@ class _SyncAndSettingsState extends ConsumerState<_SyncAndSettings> {
           .updateSettings(
             shiftStart: _start.text.trim(),
             shiftEnd: _end.text.trim(),
+            hoursCutAfter: _hoursCut.text.trim(),
+            hoursCutFrom: _hoursFrom.text.trim(),
             graceMinutes: grace,
           );
       ref.invalidate(attendanceSettingsProvider);
@@ -135,7 +137,7 @@ class _SyncAndSettingsState extends ConsumerState<_SyncAndSettings> {
         _fill(settings);
         final last = settings.lastSyncAt;
         return FormSection(
-          title: 'Machine & working hours',
+          title: 'Machine, working hours and deductions',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -181,18 +183,18 @@ class _SyncAndSettingsState extends ConsumerState<_SyncAndSettings> {
               Text(
                 'The server also pulls new scans from the machine every 10 '
                 'minutes.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const Divider(height: 28),
               Text(
                 'Late is counted after the start time plus the grace period; '
                 'early leave is counting from the end time. Times are '
                 'Pakistan time.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -218,6 +220,32 @@ class _SyncAndSettingsState extends ConsumerState<_SyncAndSettings> {
                       decoration: const InputDecoration(
                         labelText: 'Shift ends',
                         hintText: '19:00',
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _hoursCut,
+                      decoration: const InputDecoration(
+                        labelText: 'Hours cut after',
+                        hintText: '11:30',
+                        helperText: 'Later arrivals: hours cut, not late',
+                        helperMaxLines: 2,
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _hoursFrom,
+                      decoration: const InputDecoration(
+                        labelText: 'Count hours from',
+                        hintText: '10:30',
+                        helperText: 'Whole hours only, minutes dropped',
+                        helperMaxLines: 2,
                         isDense: true,
                       ),
                     ),
@@ -297,10 +325,7 @@ class _MappingSectionState extends ConsumerState<_MappingSection> {
     }
   }
 
-  Future<void> _link(
-    AttendanceMapping row,
-    String? newEmployeeId,
-  ) async {
+  Future<void> _link(AttendanceMapping row, String? newEmployeeId) async {
     try {
       final repository = ref.read(attendanceRepositoryProvider);
       // Unlinking: clear the employee currently linked to this machine user.
@@ -356,9 +381,7 @@ class _MappingSectionState extends ConsumerState<_MappingSection> {
           ]..sort((a, b) => a.fullName.compareTo(b.fullName));
           final current = rows.where((r) => !r.ignored).toList();
           final former = rows.where((r) => r.ignored).toList();
-          final linkedCount = current
-              .where((r) => r.employeeId != null)
-              .length;
+          final linkedCount = current.where((r) => r.employeeId != null).length;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,9 +391,9 @@ class _MappingSectionState extends ConsumerState<_MappingSection> {
                 'an employee. Unlinked people are not counted in attendance. '
                 'Use the person-off button to hide someone who no longer '
                 'works here.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
               for (final row in current)

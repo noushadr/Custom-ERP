@@ -43,12 +43,28 @@ final companyAttendanceProvider = FutureProvider.autoDispose
           .getCompany(month: period.month, year: period.year);
     });
 
-final attendanceSettingsProvider = FutureProvider.autoDispose<AttendanceSettings>(
-  (ref) {
-    ref.watch(authControllerProvider);
-    return ref.watch(attendanceRepositoryProvider).getSettings();
-  },
-);
+final attendanceSettingsProvider =
+    FutureProvider.autoDispose<AttendanceSettings>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(attendanceRepositoryProvider).getSettings();
+    });
+
+final wfhCalendarProvider =
+    FutureProvider.autoDispose<List<({String date, String? note})>>((ref) {
+      ref.watch(authControllerProvider);
+      return ref.watch(attendanceRepositoryProvider).getWfhCalendar();
+    });
+
+final wfhDaysProvider = FutureProvider.autoDispose<List<WfhDay>>((ref) {
+  ref.watch(authControllerProvider);
+  return ref.watch(attendanceRepositoryProvider).getWfhDays();
+});
+
+final wfhDayAttendanceProvider = FutureProvider.autoDispose
+    .family<List<WfhDayEmployee>, String>((ref, date) {
+      ref.watch(authControllerProvider);
+      return ref.watch(attendanceRepositoryProvider).getWfhDayAttendance(date);
+    });
 
 final attendanceMappingProvider =
     FutureProvider.autoDispose<List<AttendanceMapping>>((ref) {

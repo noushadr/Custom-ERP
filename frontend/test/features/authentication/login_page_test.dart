@@ -73,7 +73,9 @@ Widget _appWith(FakeAuthRepository repository) {
       ),
       payrollRepositoryProvider.overrideWithValue(FakePayrollRepository()),
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
-      attendanceRepositoryProvider.overrideWithValue(FakeAttendanceRepository()),
+      attendanceRepositoryProvider.overrideWithValue(
+        FakeAttendanceRepository(),
+      ),
       goalRepositoryProvider.overrideWithValue(FakeGoalRepository()),
       emailRepositoryProvider.overrideWithValue(FakeEmailRepository()),
     ],

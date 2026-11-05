@@ -1,3 +1,4 @@
+import 'work_from_home_notice.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -95,6 +96,15 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
   List<_BannerItem> _buildItems(TodayAnnouncements data) {
     final items = <_BannerItem>[];
 
+    for (final message in workFromHomeMessages(data.workFromHome)) {
+      items.add(
+        _BannerItem(
+          icon: Icons.home_work_outlined,
+          color: AppColors.primary,
+          text: '$message 🏠',
+        ),
+      );
+    }
     if (data.holiday != null) {
       items.add(
         _BannerItem(
@@ -154,8 +164,9 @@ class _AnnouncementBannerState extends ConsumerState<AnnouncementBanner> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_checkedDismissal || _dismissedForToday)
+    if (!_checkedDismissal || _dismissedForToday) {
       return const SizedBox.shrink();
+    }
 
     final asyncData = ref.watch(todayAnnouncementsProvider);
     final data = asyncData.valueOrNull;

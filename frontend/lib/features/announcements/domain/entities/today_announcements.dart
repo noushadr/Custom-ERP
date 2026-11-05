@@ -57,6 +57,23 @@ class TodayEmployeeOfMonth {
   final String? profilePhotoUrl;
 }
 
+/// A work-from-home day to tell the viewer about.
+class TodayWfhNotice {
+  const TodayWfhNotice({required this.personal, this.note});
+
+  /// True when only this viewer was marked, not the whole company.
+  final bool personal;
+  final String? note;
+}
+
+/// Today's and tomorrow's work-from-home day for this viewer, if any.
+class TodayWorkFromHome {
+  const TodayWorkFromHome({this.today, this.tomorrow});
+
+  final TodayWfhNotice? today;
+  final TodayWfhNotice? tomorrow;
+}
+
 /// Same-day-only slice of birthdays/anniversaries/holiday/notices, powering
 /// the top-bar announcement banner — everyone sees this, unlike the HR-only
 /// "Celebrations" feed in the notification bell.
@@ -67,6 +84,7 @@ class TodayAnnouncements {
     required this.holiday,
     required this.notices,
     required this.employeeOfTheMonth,
+    this.workFromHome,
   });
 
   final List<TodayBirthday> birthdays;
@@ -78,10 +96,14 @@ class TodayAnnouncements {
   /// nomination, then falls away.
   final TodayEmployeeOfMonth? employeeOfTheMonth;
 
+  /// A work-from-home day today or tomorrow, company-wide or just theirs.
+  final TodayWorkFromHome? workFromHome;
+
   bool get isEmpty =>
       birthdays.isEmpty &&
       workAnniversaries.isEmpty &&
       holiday == null &&
       notices.isEmpty &&
-      employeeOfTheMonth == null;
+      employeeOfTheMonth == null &&
+      workFromHome == null;
 }

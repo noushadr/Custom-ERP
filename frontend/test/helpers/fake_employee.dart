@@ -21,6 +21,8 @@ Employee buildTestEmployee({
   String id = 'employee-1',
   String userId = 'user-1',
   String employeeCode = 'ZC-00001',
+  bool employeeCodeLocked = false,
+  String accountStatus = 'active',
   String email = 'jane.doe@zeracreative.com',
   String role = 'Employee',
   String fullName = 'Jane Doe',
@@ -54,9 +56,10 @@ Employee buildTestEmployee({
     id: id,
     userId: userId,
     employeeCode: employeeCode,
+    employeeCodeLocked: employeeCodeLocked,
     email: email,
     role: role,
-    accountStatus: 'active',
+    accountStatus: accountStatus,
     firstName: parts.first,
     lastName: parts.length > 1 ? parts.sublist(1).join(' ') : '',
     fullName: fullName,
@@ -341,11 +344,20 @@ class FakeEmployeeRepository implements EmployeeRepository {
     return uploadPhotoResult ?? me;
   }
 
-  @override
-  Future<Employee> approveEmployee(String id) async => throw UnimplementedError();
+  String? lastApprovedId;
+  String? lastRejectedId;
 
   @override
-  Future<Employee> rejectEmployee(String id) async => throw UnimplementedError();
+  Future<Employee> approveEmployee(String id) async {
+    lastApprovedId = id;
+    return me;
+  }
+
+  @override
+  Future<Employee> rejectEmployee(String id) async {
+    lastRejectedId = id;
+    return me;
+  }
 
   @override
   Future<Employee> addEmployee(AddEmployeeInput input) async {

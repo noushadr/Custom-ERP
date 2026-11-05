@@ -53,6 +53,51 @@ Widget _app({
 }
 
 void main() {
+  testWidgets(
+    'an admin sees new employees awaiting approval, and can approve one',
+    (tester) async {
+      final employeeRepository = FakeEmployeeRepository(
+        employees: [
+          buildTestEmployee(
+            id: 'pending-1',
+            fullName: 'Muhammad Salik',
+            employeeCode: 'ZC-073',
+            accountStatus: 'pending_approval',
+          ),
+          buildTestEmployee(id: 'active-1', fullName: 'Already Active'),
+        ],
+      );
+      await tester.pumpWidget(
+        _app(
+          role: 'Super Admin',
+          permissions: const ['users.approve', 'users.manage'],
+          employeeRepository: employeeRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('New Employees Awaiting Your Approval'), findsOneWidget);
+      expect(find.text('Muhammad Salik'), findsOneWidget);
+      expect(find.text('Already Active'), findsNothing);
+      expect(find.textContaining('ZC-073'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('approve-employee-pending-1')));
+      await tester.pumpAndSettle();
+      expect(employeeRepository.lastApprovedId, 'pending-1');
+    },
+  );
+
+  testWidgets('without users.approve the new-employee section is not shown', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(role: 'HR/Manager', permissions: const ['users.manage']),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('New Employees Awaiting Your Approval'), findsNothing);
+  });
+
   testWidgets('submitting a new request calls the repository', (tester) async {
     final requestRepository = FakeRequestRepository();
     await tester.pumpWidget(_app(requestRepository: requestRepository));

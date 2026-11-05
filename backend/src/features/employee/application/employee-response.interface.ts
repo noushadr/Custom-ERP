@@ -6,6 +6,8 @@ export interface EmployeeResponse {
   id: string;
   userId: string;
   employeeCode: string;
+  /** True once the 30-day window to correct the employee ID has passed. */
+  employeeCodeLocked: boolean;
   email: string;
   role: string;
   accountStatus: string;

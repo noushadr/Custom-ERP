@@ -49,13 +49,36 @@ class PayrollRunDetailPage extends ConsumerWidget {
   }
 }
 
-class _RunDetailBody extends ConsumerWidget {
+class _RunDetailBody extends ConsumerStatefulWidget {
   const _RunDetailBody({required this.run});
 
   final PayrollRunDetail run;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_RunDetailBody> createState() => _RunDetailBodyState();
+}
+
+class _RunDetailBodyState extends ConsumerState<_RunDetailBody> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final run = widget.run;
+    final visibleItems = run.lineItems
+        .where(
+          (item) =>
+              item.employeeName.toLowerCase().contains(_query.toLowerCase()),
+        )
+        .toList();
+    Future<void> openEditor(PayrollLineItem item) async {
+      await showAppDialog<void>(
+        context: context,
+        builder: (_) => _EditLineItemDialog(runId: run.id, item: item),
+      );
+      ref.invalidate(payrollRunDetailProvider(run.id));
+      ref.invalidate(payrollRunsListProvider);
+    }
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,7 +119,37 @@ class _RunDetailBody extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    if (run.status == PayrollRunStatus.draft)
+                    if (run.status == PayrollRunStatus.draft) ...[
+                      OutlinedButton.icon(
+                        key: const Key('sync-payroll-button'),
+                        onPressed: () async {
+                          try {
+                            await ref
+                                .read(payrollRepositoryProvider)
+                                .syncRun(run.id);
+                            ref.invalidate(payrollRunDetailProvider(run.id));
+                            ref.invalidate(payrollRunsListProvider);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Payroll synced with the latest attendance.',
+                                  ),
+                                ),
+                              );
+                            }
+                          } on PayrollException catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(error.message)),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.sync, size: 16),
+                        label: const Text('Sync attendance'),
+                      ),
+                      const SizedBox(width: 8),
                       FilledButton.icon(
                         onPressed: () async {
                           try {
@@ -116,6 +169,7 @@ class _RunDetailBody extends ConsumerWidget {
                         icon: const Icon(Icons.lock_outline, size: 16),
                         label: const Text('Finalize'),
                       ),
+                    ],
                     if (run.status == PayrollRunStatus.finalized)
                       FilledButton.icon(
                         onPressed: () async {
@@ -172,116 +226,235 @@ class _RunDetailBody extends ConsumerWidget {
                     label: const Text('Add Freelancer'),
                   )
                 : null,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('Employee')),
-                  DataColumn(label: Text('Base'), numeric: true),
-                  DataColumn(label: Text('Additions'), numeric: true),
-                  DataColumn(label: Text('Deductions'), numeric: true),
-                  DataColumn(label: Text('Net Pay'), numeric: true),
-                  DataColumn(label: Text('Payslip')),
-                ],
-                rows: [
-                  for (final item in run.lineItems)
-                    DataRow(
-                      onSelectChanged: run.status == PayrollRunStatus.draft
-                          ? (_) async {
-                              await showAppDialog<void>(
-                                context: context,
-                                builder: (_) => _EditLineItemDialog(
-                                  runId: run.id,
-                                  item: item,
-                                ),
-                              );
-                              ref.invalidate(payrollRunDetailProvider(run.id));
-                              ref.invalidate(payrollRunsListProvider);
-                            }
-                          : null,
-                      cells: [
-                        DataCell(
-                          item.isFreelancer
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(item.employeeName),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        'Freelancer',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .labelSmall
-                                            ?.copyWith(
-                                              color: AppColors.primary,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: 320,
+                  child: TextField(
+                    key: const Key('line-item-search'),
+                    onChanged: (value) => setState(() => _query = value.trim()),
+                    decoration: const InputDecoration(
+                      hintText: 'Search employees',
+                      prefixIcon: Icon(Icons.search, size: 18),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (visibleItems.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'No employees match "$_query".',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  )
+                else
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('Employee')),
+                        DataColumn(label: Text('Base'), numeric: true),
+                        DataColumn(label: Text('Late'), numeric: true),
+                        DataColumn(label: Text('Late hrs'), numeric: true),
+                        DataColumn(label: Text('Absent'), numeric: true),
+                        DataColumn(label: Text('Advance'), numeric: true),
+                        DataColumn(label: Text('Fines'), numeric: true),
+                        DataColumn(label: Text('Freelance'), numeric: true),
+                        DataColumn(label: Text('Net Pay'), numeric: true),
+                        DataColumn(label: Text('Actions')),
+                      ],
+                      rows: [
+                        for (final item in visibleItems)
+                          DataRow(
+                            onSelectChanged:
+                                run.status == PayrollRunStatus.draft
+                                ? (_) => openEditor(item)
+                                : null,
+                            cells: [
+                              DataCell(
+                                item.isFreelancer
+                                    ? Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(item.employeeName),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
                                             ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary
+                                                  .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              'Freelancer',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall
+                                                  ?.copyWith(
+                                                    color: AppColors.primary,
+                                                  ),
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Text(item.employeeName),
+                              ),
+                              DataCell(Text(formatAmount(item.baseSalary))),
+                              DataCell(
+                                item.lateDeduction == 0
+                                    ? Text(
+                                        item.lateDays == 0
+                                            ? '—'
+                                            : '${item.lateDays} late',
+                                        style: item.lateDays == 0
+                                            ? null
+                                            : const TextStyle(
+                                                color: AppColors.textSecondary,
+                                              ),
+                                      )
+                                    : Tooltip(
+                                        message:
+                                            '${item.lateDays} lates = '
+                                            '${item.lateDeductionDays} unpaid '
+                                            'day${item.lateDeductionDays == 1 ? '' : 's'} '
+                                            '(base ÷ 30)',
+                                        child: Text(
+                                          '-${formatAmount(item.lateDeduction)}',
+                                          style: const TextStyle(
+                                            color: AppColors.error,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                )
-                              : Text(item.employeeName),
-                        ),
-                        DataCell(Text(formatAmount(item.baseSalary))),
-                        DataCell(
-                          Text(
-                            item.additions == 0
-                                ? '—'
-                                : '+${formatAmount(item.additions)}',
-                            style: item.additions == 0
-                                ? null
-                                : const TextStyle(color: AppColors.success),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            item.deductions == 0
-                                ? '—'
-                                : '-${formatAmount(item.deductions)}',
-                            style: item.deductions == 0
-                                ? null
-                                : const TextStyle(color: AppColors.error),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            formatAmount(item.netPay),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        DataCell(
-                          item.isFreelancer ||
-                                  run.status != PayrollRunStatus.paid
-                              ? const SizedBox.shrink()
-                              : IconButton(
-                                  icon: const Icon(
-                                    Icons.download_outlined,
-                                    size: 18,
-                                  ),
-                                  tooltip: 'Download payslip',
-                                  onPressed: () => _downloadPayslip(
-                                    context,
-                                    ref,
-                                    runId: run.id,
-                                    lineItemId: item.id,
-                                    employeeName: item.employeeName,
+                              ),
+                              DataCell(
+                                item.lateHoursDeduction == 0
+                                    ? const Text('—')
+                                    : Tooltip(
+                                        message:
+                                            '${formatAmount(item.lateHours)} hours cut '
+                                            '(salary ÷ 30 ÷ 8 per hour)',
+                                        child: Text(
+                                          '-${formatAmount(item.lateHoursDeduction)}',
+                                          style: const TextStyle(
+                                            color: AppColors.error,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              DataCell(
+                                item.absentDeduction == 0
+                                    ? const Text('—')
+                                    : Tooltip(
+                                        message:
+                                            '${item.absentDays} absent '
+                                            'day${item.absentDays == 1 ? '' : 's'} '
+                                            '(salary ÷ 30 per day)',
+                                        child: Text(
+                                          '-${formatAmount(item.absentDeduction)}',
+                                          style: const TextStyle(
+                                            color: AppColors.error,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              DataCell(
+                                item.advanceSalary == 0
+                                    ? const Text('—')
+                                    : Text(
+                                        '-${formatAmount(item.advanceSalary)}',
+                                        style: const TextStyle(
+                                          color: AppColors.error,
+                                        ),
+                                      ),
+                              ),
+                              DataCell(
+                                item.fines.isEmpty
+                                    ? const Text('—')
+                                    : Tooltip(
+                                        message: item.fines
+                                            .map(
+                                              (f) =>
+                                                  '${f.description}: ${formatAmount(f.amount)}',
+                                            )
+                                            .join('\n'),
+                                        child: Text(
+                                          '-${formatAmount(item.finesTotal)}',
+                                          style: const TextStyle(
+                                            color: AppColors.error,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              DataCell(
+                                item.freelanceTasks.isEmpty
+                                    ? const Text('—')
+                                    : Tooltip(
+                                        message: item.freelanceTasks
+                                            .map(
+                                              (t) =>
+                                                  '${t.description}: ${formatAmount(t.amount)}',
+                                            )
+                                            .join('\n'),
+                                        child: Text(
+                                          '+${formatAmount(item.freelanceTotal)}',
+                                          style: const TextStyle(
+                                            color: AppColors.success,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              DataCell(
+                                Text(
+                                  formatAmount(item.netPay),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                        ),
+                              ),
+                              DataCell(
+                                run.status == PayrollRunStatus.draft
+                                    ? IconButton(
+                                        key: Key('edit-line-item-${item.id}'),
+                                        icon: const Icon(
+                                          Icons.edit_outlined,
+                                          size: 18,
+                                        ),
+                                        tooltip: 'Fines & freelance tasks',
+                                        onPressed: () => openEditor(item),
+                                      )
+                                    : item.isFreelancer ||
+                                          run.status != PayrollRunStatus.paid
+                                    ? const SizedBox.shrink()
+                                    : IconButton(
+                                        icon: const Icon(
+                                          Icons.download_outlined,
+                                          size: 18,
+                                        ),
+                                        tooltip: 'Download payslip',
+                                        onPressed: () => _downloadPayslip(
+                                          context,
+                                          ref,
+                                          runId: run.id,
+                                          lineItemId: item.id,
+                                          employeeName: item.employeeName,
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -322,13 +495,33 @@ class _EditLineItemDialog extends ConsumerStatefulWidget {
       _EditLineItemDialogState();
 }
 
+/// The text fields behind one fine or freelance-task row.
+class _EntryRow {
+  _EntryRow({String description = '', String amount = ''})
+    : description = TextEditingController(text: description),
+      amount = TextEditingController(text: amount);
+
+  final TextEditingController description;
+  final TextEditingController amount;
+
+  bool get isBlank =>
+      description.text.trim().isEmpty && amount.text.trim().isEmpty;
+
+  void dispose() {
+    description.dispose();
+    amount.dispose();
+  }
+}
+
 class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
   late final TextEditingController _baseSalaryController;
-  late final TextEditingController _quantityController;
-  late final TextEditingController _perUnitRateController;
-  late final TextEditingController _additionsController;
-  late final TextEditingController _deductionsController;
   late final TextEditingController _notesController;
+  late final TextEditingController _absentController;
+  late final TextEditingController _advanceController;
+  late bool _showNotes;
+  late bool _showAdvance;
+  late final List<_EntryRow> _fines;
+  late final List<_EntryRow> _tasks;
   bool _saving = false;
   String? _errorMessage;
 
@@ -338,61 +531,130 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
     _baseSalaryController = TextEditingController(
       text: widget.item.baseSalary.toStringAsFixed(2),
     );
-    _quantityController = TextEditingController(
-      text: widget.item.quantity == null ? '' : '${widget.item.quantity}',
-    );
-    _perUnitRateController = TextEditingController(
-      text: widget.item.perUnitRate?.toStringAsFixed(2) ?? '',
-    );
-    _additionsController = TextEditingController(
-      text: widget.item.additions.toStringAsFixed(2),
-    );
-    _deductionsController = TextEditingController(
-      text: widget.item.deductions.toStringAsFixed(2),
-    );
     _notesController = TextEditingController(text: widget.item.notes ?? '');
-    for (final controller in [
-      _baseSalaryController,
-      _quantityController,
-      _perUnitRateController,
-      _additionsController,
-      _deductionsController,
-    ]) {
-      controller.addListener(_onFieldChanged);
+    _showNotes = (widget.item.notes ?? '').isNotEmpty;
+    _showAdvance = widget.item.advanceSalary > 0;
+    _absentController = TextEditingController(
+      text: widget.item.absentDays == 0 ? '' : '${widget.item.absentDays}',
+    );
+    _advanceController = TextEditingController(
+      text: widget.item.advanceSalary > 0
+          ? widget.item.advanceSalary.toStringAsFixed(2)
+          : '',
+    );
+    _absentController.addListener(_onFieldChanged);
+    _advanceController.addListener(_onFieldChanged);
+    _fines = _rowsFor(widget.item.fines, keepOneOpen: false);
+    _tasks = _rowsFor(widget.item.freelanceTasks);
+    _baseSalaryController.addListener(_onFieldChanged);
+  }
+
+  /// One row per saved entry. With [keepOneOpen] there is always at least one
+  /// (empty) row, so there is somewhere to type without pressing + first;
+  /// without it, rows only appear once the add button is pressed.
+  List<_EntryRow> _rowsFor(
+    List<PayrollEntry> entries, {
+    bool keepOneOpen = true,
+  }) {
+    final rows = [
+      for (final entry in entries)
+        _EntryRow(
+          description: entry.description,
+          amount: entry.amount.toStringAsFixed(2),
+        ),
+    ];
+    if (rows.isEmpty && keepOneOpen) rows.add(_EntryRow());
+    for (final row in rows) {
+      row.amount.addListener(_onFieldChanged);
     }
+    return rows;
   }
 
   void _onFieldChanged() => setState(() {});
 
-  /// Mirrors the backend mapper: Quantity × Per unit replaces the salary
-  /// snapshot as this run's base pay when both are set, then
-  /// additions/deductions are applied on top — kept in sync here purely so
-  /// the dialog can preview Net Pay live as the admin types.
-  double get _previewNetPay {
-    final quantity = int.tryParse(_quantityController.text);
-    final perUnitRate = double.tryParse(_perUnitRateController.text);
-    final baseSalary = double.tryParse(_baseSalaryController.text) ?? 0;
-    final effectiveBase =
-        (quantity != null && quantity > 0 && perUnitRate != null)
-        ? quantity * perUnitRate
-        : baseSalary;
-    final additions = double.tryParse(_additionsController.text) ?? 0;
-    final deductions = double.tryParse(_deductionsController.text) ?? 0;
-    return effectiveBase + additions - deductions;
+  void _addRow(List<_EntryRow> rows) {
+    final row = _EntryRow();
+    row.amount.addListener(_onFieldChanged);
+    setState(() => rows.add(row));
   }
+
+  /// Removes a row — except the last freelance-task row, which is just
+  /// cleared so a task row is always open.
+  void _removeRow(List<_EntryRow> rows, int index) {
+    setState(() {
+      if (rows.length == 1 && identical(rows, _tasks)) {
+        rows[index].description.clear();
+        rows[index].amount.clear();
+      } else {
+        rows.removeAt(index).dispose();
+      }
+    });
+  }
+
+  double _sum(List<_EntryRow> rows) => rows.fold(
+    0.0,
+    (sum, row) => sum + (double.tryParse(row.amount.text) ?? 0),
+  );
+
+  double get _baseSalary => widget.item.isFreelancer
+      ? double.tryParse(_baseSalaryController.text) ?? 0
+      : widget.item.baseSalary;
+
+  /// Mirrors the backend mapper: the two late deductions come from attendance
+  /// and can't be edited here; fines come off and freelance tasks are added —
+  /// previewed live as the admin types.
+  double get _previewNetPay =>
+      _baseSalary -
+      widget.item.lateDeduction -
+      widget.item.lateHoursDeduction -
+      _absentDeduction -
+      (_showAdvance ? double.tryParse(_advanceController.text) ?? 0 : 0) -
+      _sum(_fines) +
+      _sum(_tasks);
+
+  int get _absentDays => int.tryParse(_absentController.text.trim()) ?? 0;
+
+  /// Unpaid absent days at salary / 30 each, like the backend.
+  double get _absentDeduction => widget.item.isFreelancer
+      ? 0
+      : (_absentDays * _baseSalary / 30).roundToDouble();
 
   @override
   void dispose() {
     _baseSalaryController.dispose();
-    _quantityController.dispose();
-    _perUnitRateController.dispose();
-    _additionsController.dispose();
-    _deductionsController.dispose();
     _notesController.dispose();
+    _absentController.dispose();
+    _advanceController.dispose();
+    for (final row in [..._fines, ..._tasks]) {
+      row.dispose();
+    }
     super.dispose();
   }
 
+  /// The filled rows as entries, or null (with an error shown) when a row is
+  /// half-filled. Blank rows are simply skipped.
+  List<PayrollEntry>? _collect(List<_EntryRow> rows, String what) {
+    final entries = <PayrollEntry>[];
+    for (final row in rows) {
+      if (row.isBlank) continue;
+      final description = row.description.text.trim();
+      final amount = double.tryParse(row.amount.text);
+      if (description.isEmpty || amount == null || amount < 0) {
+        setState(
+          () => _errorMessage = 'Each $what needs both a reason and an amount.',
+        );
+        return null;
+      }
+      entries.add(PayrollEntry(description: description, amount: amount));
+    }
+    return entries;
+  }
+
   Future<void> _submit() async {
+    final fines = _collect(_fines, 'fine');
+    if (fines == null) return;
+    final tasks = _collect(_tasks, 'freelance task');
+    if (tasks == null) return;
     setState(() {
       _saving = true;
       _errorMessage = null;
@@ -406,13 +668,16 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
             baseSalary: widget.item.isFreelancer
                 ? double.tryParse(_baseSalaryController.text)
                 : null,
-            quantity: int.tryParse(_quantityController.text),
-            perUnitRate: double.tryParse(_perUnitRateController.text),
-            additions: double.tryParse(_additionsController.text),
-            deductions: double.tryParse(_deductionsController.text),
-            notes: _notesController.text.trim().isEmpty
-                ? null
-                : _notesController.text.trim(),
+            absentDays: widget.item.isFreelancer ? null : _absentDays,
+            advanceSalary: _showAdvance
+                ? double.tryParse(_advanceController.text) ?? 0
+                : 0,
+            fines: fines,
+            freelanceTasks: tasks,
+            // An empty string clears a note that was there before.
+            notes: _showNotes && _notesController.text.trim().isNotEmpty
+                ? _notesController.text.trim()
+                : ((widget.item.notes ?? '').isNotEmpty ? '' : null),
           );
       if (mounted) Navigator.of(context).pop();
     } on PayrollException catch (error) {
@@ -424,10 +689,12 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final theme = Theme.of(context);
     return AlertDialog(
-      title: Text(widget.item.employeeName),
+      title: Text(item.employeeName),
       content: SizedBox(
-        width: 380,
+        width: 480,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -436,98 +703,207 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
               if (_errorMessage != null) ...[
                 Text(
                   _errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  style: TextStyle(color: theme.colorScheme.error),
                 ),
                 const SizedBox(height: 12),
               ],
-              if (widget.item.isFreelancer) ...[
-                const _SectionLabel('Amount'),
-                const SizedBox(height: 8),
-                _AmountField(
-                  label: 'This month\'s pay',
-                  controller: _baseSalaryController,
-                  enabled: !_saving,
-                ),
-              ] else
-                Text(
-                  'Salary snapshot: PKR ${formatAmount(widget.item.baseSalary)}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              const SizedBox(height: 16),
-              const _SectionLabel('Piece-rate pay (optional)'),
-              const SizedBox(height: 8),
-              Row(
+              _DialogCard(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _quantityController,
+                  if (item.isFreelancer)
+                    _AmountField(
+                      label: 'This month\'s pay',
+                      controller: _baseSalaryController,
+                      enabled: !_saving,
+                    )
+                  else ...[
+                    _SummaryLine(
+                      label: 'Monthly salary',
+                      value: 'PKR ${formatAmount(item.baseSalary)}',
+                    ),
+                    const Divider(height: 20),
+                    const _SectionLabel('Deducted automatically'),
+                    const SizedBox(height: 6),
+                    _SummaryLine(
+                      label: 'Late days',
+                      detail: item.lateDays == 0
+                          ? 'No lates'
+                          : '${item.lateDays} lates = '
+                                '${item.lateDeductionDays} unpaid '
+                                'day${item.lateDeductionDays == 1 ? '' : 's'}',
+                      value: item.lateDeduction == 0
+                          ? '—'
+                          : '-PKR ${formatAmount(item.lateDeduction)}',
+                      valueColor: item.lateDeduction == 0
+                          ? null
+                          : AppColors.error,
+                    ),
+                    _SummaryLine(
+                      label: 'Late hours',
+                      detail: item.lateHours == 0
+                          ? 'No hours cut'
+                          : '${formatAmount(item.lateHours)} hr cut',
+                      value: item.lateHoursDeduction == 0
+                          ? '—'
+                          : '-PKR ${formatAmount(item.lateHoursDeduction)}',
+                      valueColor: item.lateHoursDeduction == 0
+                          ? null
+                          : AppColors.error,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'From attendance. Day = salary ÷ 30, hour = day ÷ 8. '
+                        'Use "Sync attendance" to refresh.',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 20),
+                    TextField(
+                      key: const Key('absent-days-field'),
+                      controller: _absentController,
                       enabled: !_saving,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Quantity'),
+                      decoration: const InputDecoration(
+                        labelText: 'Absent days (unpaid)',
+                        helperText: 'Taken off at salary ÷ 30 per day',
+                        isDense: true,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _AmountField(
-                      label: 'Per unit',
-                      controller: _perUnitRateController,
-                      enabled: !_saving,
-                    ),
-                  ),
+                  ],
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  'When both are set, Quantity × Per unit replaces the salary '
-                  'snapshot as this run\'s base pay.',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
               const SizedBox(height: 16),
-              const _SectionLabel('Additions & Deductions'),
-              const SizedBox(height: 8),
-              Row(
+              _entrySection(
+                title: 'Freelance tasks',
+                hint: 'Extra work paid on top of the salary',
+                rows: _tasks,
+                keyPrefix: 'task',
+                addKey: 'add-freelance-task',
+                addLabel: 'Add task',
+                reasonLabel: 'Task',
+                amountLabel: 'Charge (PKR)',
+              ),
+              if (_fines.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _entrySection(
+                  title: 'Fines',
+                  hint: 'Taken off this month\'s pay',
+                  rows: _fines,
+                  keyPrefix: 'fine',
+                  reasonLabel: 'Reason',
+                  amountLabel: 'Fine (PKR)',
+                ),
+              ],
+              if (_showAdvance) ...[
+                const SizedBox(height: 16),
+                _DialogCard(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _AmountField(
+                            key: const Key('advance-field'),
+                            label: 'Advance salary',
+                            controller: _advanceController,
+                            enabled: !_saving,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Remove advance',
+                          onPressed: _saving
+                              ? null
+                              : () => setState(() {
+                                  _advanceController.clear();
+                                  _showAdvance = false;
+                                }),
+                          icon: const Icon(Icons.close, size: 18),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+              if (_showNotes) ...[
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        key: const Key('note-field'),
+                        controller: _notesController,
+                        enabled: !_saving,
+                        maxLines: 2,
+                        decoration: const InputDecoration(labelText: 'Note'),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Remove note',
+                      onPressed: _saving
+                          ? null
+                          : () => setState(() {
+                              _notesController.clear();
+                              _showNotes = false;
+                            }),
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Expanded(
-                    child: _AmountField(
-                      label: 'Additions',
-                      controller: _additionsController,
-                      enabled: !_saving,
-                    ),
+                  OutlinedButton.icon(
+                    key: const Key('add-fine'),
+                    onPressed: _saving ? null : () => _addRow(_fines),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add fine'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _AmountField(
-                      label: 'Deductions',
-                      controller: _deductionsController,
-                      enabled: !_saving,
+                  if (!_showAdvance && !item.isFreelancer)
+                    OutlinedButton.icon(
+                      key: const Key('add-advance'),
+                      onPressed: _saving
+                          ? null
+                          : () => setState(() => _showAdvance = true),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add advance'),
                     ),
-                  ),
+                  if (!_showNotes)
+                    OutlinedButton.icon(
+                      key: const Key('add-note'),
+                      onPressed: _saving
+                          ? null
+                          : () => setState(() => _showNotes = true),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add note'),
+                    ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  'Net Pay = Base + Additions − Deductions: '
-                  'PKR ${formatAmount(_previewNetPay)}',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
               const SizedBox(height: 16),
-              TextField(
-                controller: _notesController,
-                enabled: !_saving,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text('Net pay', style: theme.textTheme.titleSmall),
+                    ),
+                    Text(
+                      'PKR ${formatAmount(_previewNetPay)}',
+                      key: const Key('net-pay-preview'),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -550,6 +926,165 @@ class _EditLineItemDialogState extends ConsumerState<_EditLineItemDialog> {
               : const Text('Save'),
         ),
       ],
+    );
+  }
+
+  /// A titled list of reason + amount rows with an "add" button; one row is
+  /// always open.
+  Widget _entrySection({
+    required String title,
+    required String hint,
+    required List<_EntryRow> rows,
+    required String keyPrefix,
+    String? addKey,
+    String addLabel = 'Add',
+    required String reasonLabel,
+    required String amountLabel,
+  }) {
+    final theme = Theme.of(context);
+    return _DialogCard(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.textTheme.titleSmall),
+                  Text(
+                    hint,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (addKey != null)
+              OutlinedButton.icon(
+                key: Key(addKey),
+                onPressed: _saving ? null : () => _addRow(rows),
+                icon: const Icon(Icons.add, size: 16),
+                label: Text(addLabel),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        for (var i = 0; i < rows.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    key: Key('$keyPrefix-description-$i'),
+                    controller: rows[i].description,
+                    enabled: !_saving,
+                    decoration: InputDecoration(
+                      labelText: reasonLabel,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    key: Key('$keyPrefix-amount-$i'),
+                    controller: rows[i].amount,
+                    enabled: !_saving,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: amountLabel,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove',
+                  onPressed: _saving ? null : () => _removeRow(rows, i),
+                  icon: const Icon(Icons.close, size: 18),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// A softly tinted block that groups related fields in the edit dialog.
+class _DialogCard extends StatelessWidget {
+  const _DialogCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.03),
+        border: Border.all(color: AppColors.borderSubtle),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+  }
+}
+
+/// A label (with an optional small explanation) on the left, an amount on the
+/// right.
+class _SummaryLine extends StatelessWidget {
+  const _SummaryLine({
+    required this.label,
+    required this.value,
+    this.detail,
+    this.valueColor,
+  });
+
+  final String label;
+  final String value;
+  final String? detail;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.bodyMedium),
+                if (detail != null)
+                  Text(
+                    detail!,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: valueColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -722,6 +1257,7 @@ class _SectionLabel extends StatelessWidget {
 
 class _AmountField extends StatelessWidget {
   const _AmountField({
+    super.key,
     required this.label,
     required this.controller,
     required this.enabled,

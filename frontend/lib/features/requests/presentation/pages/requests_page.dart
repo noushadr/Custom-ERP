@@ -7,6 +7,8 @@ import '../../../authentication/application/auth_providers.dart';
 import '../../../authentication/application/auth_state.dart';
 import '../../../employee/application/employee_providers.dart';
 import '../../../employee/domain/entities/department.dart';
+import '../../../employee/domain/entities/employee.dart';
+import '../../../employee/presentation/pages/employee_profile_page.dart';
 import '../../../employee/presentation/widgets/employee_avatar.dart';
 import '../../../employee/presentation/widgets/employee_status_badges.dart';
 import '../../application/request_providers.dart';
@@ -30,6 +32,9 @@ class RequestsPage extends ConsumerWidget {
     final authState = ref.watch(authControllerProvider);
     final authUser = authState is AuthAuthenticated ? authState.user : null;
     final canSeeHrApprovals = authUser?.hasPermission('users.manage') ?? false;
+    // New employees HR added wait here for a Super Admin's sign-off.
+    final canApproveEmployees =
+        authUser?.hasPermission('users.approve') ?? false;
     // Super Admin's own edits apply immediately (see EditMyProfilePage) and
     // they have no need to request items for themselves, so neither "My
     // Requests" nor its submission buttons apply to them — they only use
@@ -79,6 +84,10 @@ class RequestsPage extends ConsumerWidget {
                 ],
                 if (canSeeManagerApprovals) ...[
                   const _PendingMyApprovalSection(),
+                  const SizedBox(height: 16),
+                ],
+                if (canApproveEmployees) ...[
+                  const _PendingEmployeeApprovalSection(),
                   const SizedBox(height: 16),
                 ],
                 if (canSeeHrApprovals) ...[
@@ -708,6 +717,123 @@ class _PendingManagerRequestRowState
 
 /// Requests that have cleared manager approval and are awaiting the final
 /// HR/Admin decision.
+/// New employees HR added that still need the admin's approval before they
+/// can sign in — the page the "awaiting your approval" notification opens.
+class _PendingEmployeeApprovalSection extends ConsumerWidget {
+  const _PendingEmployeeApprovalSection();
+
+  Future<void> _decide(
+    BuildContext context,
+    WidgetRef ref,
+    Employee employee, {
+    required bool approve,
+  }) async {
+    final repository = ref.read(employeeRepositoryProvider);
+    try {
+      if (approve) {
+        await repository.approveEmployee(employee.id);
+      } else {
+        await repository.rejectEmployee(employee.id);
+      }
+      ref.invalidate(employeeListProvider);
+      ref.invalidate(employeeDetailProvider(employee.id));
+    } on Object {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save that decision.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final employeesAsync = ref.watch(employeeListProvider);
+
+    return FormSection(
+      title: 'New Employees Awaiting Your Approval',
+      child: employeesAsync.when(
+        loading: () => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: LinearProgressIndicator(),
+        ),
+        error: (_, _) => const Text('Could not load new employees.'),
+        data: (employees) {
+          final pending = employees
+              .where((e) => e.accountStatus == 'pending_approval')
+              .toList();
+          if (pending.isEmpty) {
+            return Text(
+              'No new employees are waiting for your approval.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            );
+          }
+          return Column(
+            children: [
+              for (var i = 0; i < pending.length; i++) ...[
+                Row(
+                  children: [
+                    EmployeeAvatar(
+                      fullName: pending[i].fullName,
+                      photoUrl: pending[i].profilePhotoUrl,
+                      radius: 18,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          InkWell(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => EmployeeProfilePage(
+                                  employeeId: pending[i].id,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              pending[i].fullName,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          Text(
+                            '${pending[i].employeeCode} · '
+                            '${pending[i].designation ?? pending[i].role} · '
+                            'Added by HR',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      key: Key('reject-employee-${pending[i].id}'),
+                      onPressed: () =>
+                          _decide(context, ref, pending[i], approve: false),
+                      child: const Text('Reject'),
+                    ),
+                    const SizedBox(width: 6),
+                    FilledButton(
+                      key: Key('approve-employee-${pending[i].id}'),
+                      onPressed: () =>
+                          _decide(context, ref, pending[i], approve: true),
+                      child: const Text('Approve'),
+                    ),
+                  ],
+                ),
+                if (i < pending.length - 1)
+                  const Divider(height: 20, color: AppColors.borderSubtle),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _PendingHrApprovalSection extends ConsumerWidget {
   const _PendingHrApprovalSection();
 

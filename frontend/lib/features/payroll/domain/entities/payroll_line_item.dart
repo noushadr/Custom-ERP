@@ -1,3 +1,12 @@
+/// One line with a reason and an amount: a fine, or a piece of freelance
+/// work paid on top of the salary.
+class PayrollEntry {
+  const PayrollEntry({required this.description, required this.amount});
+
+  final String description;
+  final double amount;
+}
+
 class PayrollLineItem {
   const PayrollLineItem({
     required this.id,
@@ -7,10 +16,18 @@ class PayrollLineItem {
     required this.employeeName,
     required this.employeePhotoUrl,
     required this.baseSalary,
-    required this.quantity,
-    required this.perUnitRate,
-    required this.additions,
-    required this.deductions,
+    required this.lateDays,
+    required this.lateDeductionDays,
+    required this.lateDeduction,
+    required this.absentDays,
+    required this.absentDeduction,
+    required this.advanceSalary,
+    required this.lateHours,
+    required this.lateHoursDeduction,
+    required this.fines,
+    required this.finesTotal,
+    required this.freelanceTasks,
+    required this.freelanceTotal,
     required this.netPay,
     required this.notes,
   });
@@ -26,26 +43,40 @@ class PayrollLineItem {
   final String employeeName;
   final String? employeePhotoUrl;
 
-  /// The salary snapshot for salaried employees, `quantity *
-  /// perUnitRate` for piece-rate employees, or a directly-entered monthly
-  /// amount for a freelancer — whichever this run's effective base pay
-  /// actually is.
+  /// The salary snapshot, or a directly-entered amount for a freelancer.
   final double baseSalary;
 
-  /// Piece-rate units this run; `null` for salaried employees.
-  final int? quantity;
-  final double? perUnitRate;
+  /// Late arrivals counted from attendance for the month.
+  final int lateDays;
 
-  /// A one-off amount added on top of [baseSalary] this run — freely
-  /// editable while the run is Draft, defaults to 0.
-  final double additions;
+  /// Unpaid days those lates earn.
+  final int lateDeductionDays;
 
-  /// A one-off amount subtracted from [baseSalary] this run — freely
-  /// editable while the run is Draft, defaults to 0.
-  final double deductions;
+  /// [lateDeductionDays] at base salary / 30 — always 30 calendar days.
+  final double lateDeduction;
 
-  /// `baseSalary + additions - deductions` — computed server-side, not
-  /// independently editable.
+  /// Unpaid absent days entered by HR.
+  final int absentDays;
+
+  /// [absentDays] at base salary / 30 each.
+  final double absentDeduction;
+
+  /// Advance salary already paid out, taken off this run.
+  final double advanceSalary;
+
+  /// Hours cut counted from attendance (2 = two hours).
+  final double lateHours;
+
+  /// [lateHours] at base salary / 30 / 8 per hour.
+  final double lateHoursDeduction;
+  final List<PayrollEntry> fines;
+  final double finesTotal;
+  final List<PayrollEntry> freelanceTasks;
+  final double freelanceTotal;
+
+  /// `baseSalary - lateDeduction - lateHoursDeduction - absentDeduction -
+  /// advanceSalary - finesTotal + freelanceTotal` — computed
+  /// server-side.
   final double netPay;
   final String? notes;
 }

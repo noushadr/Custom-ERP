@@ -20,8 +20,12 @@ import {
   ATTENDANCE_REPOSITORY,
   type AttendanceRepository,
 } from '../domain/repositories/attendance-repository.interface';
+import { AttendanceWfhDay } from '../domain/entities/attendance-wfh-day.entity';
 import {
   AttendanceMappingResponse,
+  WfhAnnouncementResponse,
+  WfhDayEmployeeResponse,
+  WfhDayResponse,
   AttendanceSettingsResponse,
   EmployeeAttendanceResponse,
   SyncResultResponse,
@@ -29,15 +33,35 @@ import {
 import {
   AttendanceShift,
   computeDay,
+  isWeekendDate,
   karachiParts,
+  LATES_PER_UNPAID_ABSENCE,
+  LATES_PER_UNPAID_ABSENCE_TEAM_LEAD,
   summarize,
   toMinutes,
 } from './attendance.calculator';
-import { UpdateAttendanceSettingsDto } from './dto/attendance.dto';
+import {
+  AddWfhDayDto,
+  UpdateAttendanceSettingsDto,
+} from './dto/attendance.dto';
 import { ATTENDANCE_DEVICE, type AttendanceDevice } from './zk-device.client';
+
+/** Roles that lose a day for every fifth late (not third): team leads and HR. */
+const LEADERSHIP_ROLES = ['Team Lead', 'HR/Manager'];
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
+}
+
+/** The machine library throws plain objects, not Errors, so a bare String()
+ * would log "[object Object]" and hide the reason. */
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }
 
 function normalizeName(name: string): string {
@@ -73,9 +97,21 @@ export class AttendanceService {
     if (toMinutes(dto.shiftEnd) <= toMinutes(dto.shiftStart)) {
       throw new BadRequestException('The shift must end after it starts');
     }
+    if (toMinutes(dto.hoursCutAfter) <= toMinutes(dto.shiftStart)) {
+      throw new BadRequestException(
+        'Hours-cut time must be after the shift starts',
+      );
+    }
+    if (toMinutes(dto.hoursCutFrom) >= toMinutes(dto.hoursCutAfter)) {
+      throw new BadRequestException(
+        'Hours are counted from a time before the hours-cut time',
+      );
+    }
     const settings = await this.repository.getSettings();
     settings.shiftStart = dto.shiftStart;
     settings.shiftEnd = dto.shiftEnd;
+    settings.hoursCutAfter = dto.hoursCutAfter;
+    settings.hoursCutFrom = dto.hoursCutFrom;
     settings.graceMinutes = dto.graceMinutes;
     return this.toSettingsResponse(await this.repository.saveSettings(settings));
   }
@@ -86,11 +122,194 @@ export class AttendanceService {
     return {
       shiftStart: settings.shiftStart,
       shiftEnd: settings.shiftEnd,
+      hoursCutAfter: settings.hoursCutAfter,
+      hoursCutFrom: settings.hoursCutFrom,
       graceMinutes: settings.graceMinutes,
       lastSyncAt: settings.lastSyncAt?.toISOString() ?? null,
       lastSyncMessage: settings.lastSyncMessage ?? null,
       deviceConfigured: this.device.isConfigured(),
     };
+  }
+
+  // ---------------------------------------------------------------------
+  // Work-from-home days
+  // ---------------------------------------------------------------------
+
+  /** Employees whose attendance is tracked at all — linked to the machine. */
+  private async trackedEmployees(): Promise<Employee[]> {
+    return (await this.employeeRepository.findAll())
+      .filter(
+        (e) =>
+          e.employmentStatus === EmploymentStatus.ACTIVE && !!e.attendanceId,
+      )
+      .sort((a, b) =>
+        `${a.firstName} ${a.lastName}`.localeCompare(
+          `${b.firstName} ${b.lastName}`,
+        ),
+      );
+  }
+
+  /** Every company work-from-home day, for the shared calendar. Dates and
+   * notes only — who worked stays HR-only. */
+  async listWfhCalendar(): Promise<{ date: string; note: string | null }[]> {
+    const days = await this.repository.findWfhDays('0000-01-01');
+    return days.map((day) => ({ date: day.date, note: day.note ?? null }));
+  }
+
+  async listWfhDays(): Promise<WfhDayResponse[]> {
+    // The last two months and everything ahead — older ones are history.
+    const since = new Date();
+    since.setUTCDate(since.getUTCDate() - 62);
+    const days = await this.repository.findWfhDays(
+      since.toISOString().slice(0, 10),
+    );
+    if (days.length === 0) return [];
+    const presence = await this.repository.findWfhPresence(
+      days[0].date,
+      days[days.length - 1].date,
+    );
+    return days.map((day) => ({
+      date: day.date,
+      note: day.note ?? null,
+      presentCount: presence.filter((p) => p.date === day.date).length,
+    }));
+  }
+
+  async addWfhDay(dto: AddWfhDayDto): Promise<WfhDayResponse> {
+    if (Number.isNaN(Date.parse(`${dto.date}T00:00:00Z`))) {
+      throw new BadRequestException('Choose a valid date');
+    }
+    if (isWeekendDate(dto.date)) {
+      throw new BadRequestException(
+        "Weekends already don't count as absences or leave",
+      );
+    }
+    const holidays = await this.holidaysService.getDatesInRange(
+      dto.date,
+      dto.date,
+    );
+    if (holidays.length > 0) {
+      throw new BadRequestException(
+        "That is a public holiday — it already doesn't count as an absence or leave",
+      );
+    }
+    if (await this.repository.findWfhDay(dto.date)) {
+      throw new ConflictException('That day is already a work-from-home day');
+    }
+    const day = new AttendanceWfhDay();
+    day.date = dto.date;
+    day.note = dto.note?.trim() || null;
+    const saved = await this.repository.saveWfhDay(day);
+    return { date: saved.date, note: saved.note ?? null, presentCount: 0 };
+  }
+
+  /** HR marking one person's own day as work from home (a genuine issue):
+   * no machine attendance that day, just present/worked. */
+  async markEmployeeWfh(employeeId: string, date: string): Promise<void> {
+    await this.assertEmployeeWfhAllowed(employeeId, date);
+    await this.repository.addWfhPresence(employeeId, date);
+  }
+
+  async unmarkEmployeeWfh(employeeId: string, date: string): Promise<void> {
+    await this.assertEmployeeWfhAllowed(employeeId, date);
+    await this.repository.removeWfhPresence(employeeId, date);
+  }
+
+  private async assertEmployeeWfhAllowed(
+    employeeId: string,
+    date: string,
+  ): Promise<void> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    if (!employee) throw new NotFoundException('Employee not found');
+    if (!employee.attendanceId) {
+      throw new BadRequestException(
+        'This employee is not linked to the attendance machine',
+      );
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) {
+      throw new BadRequestException('Choose a valid date');
+    }
+    if (isWeekendDate(date)) {
+      throw new BadRequestException(
+        "Weekends already don't count as absences or leave",
+      );
+    }
+    const holidays = await this.holidaysService.getDatesInRange(date, date);
+    if (holidays.length > 0) {
+      throw new BadRequestException(
+        "That is a public holiday — it already doesn't count as an absence or leave",
+      );
+    }
+  }
+
+  /** Work-from-home days to announce to this viewer: today and tomorrow,
+   * either company-wide or just theirs. */
+  async getWfhAnnouncement(
+    actorUserId: string,
+  ): Promise<WfhAnnouncementResponse> {
+    const today = karachiParts(new Date()).date;
+    const next = new Date(`${today}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    const tomorrow = next.toISOString().slice(0, 10);
+
+    const [days, me] = await Promise.all([
+      this.repository.findWfhDays(today, tomorrow),
+      this.employeeRepository.findByUserId(actorUserId),
+    ]);
+    const presence = me
+      ? await this.repository.findWfhPresence(today, tomorrow)
+      : [];
+
+    const noticeFor = (date: string) => {
+      const day = days.find((d) => d.date === date);
+      if (day) return { personal: false, note: day.note ?? null };
+      const mine = presence.some(
+        (p) => p.employeeId === me?.id && p.date === date,
+      );
+      return mine ? { personal: true, note: null } : null;
+    };
+    return { today: noticeFor(today), tomorrow: noticeFor(tomorrow) };
+  }
+
+  async removeWfhDay(date: string): Promise<void> {
+    if (!(await this.repository.findWfhDay(date))) {
+      throw new NotFoundException('That is not a work-from-home day');
+    }
+    await this.repository.deleteWfhDay(date);
+  }
+
+  /** Who is tracked, and which of them HR has marked as worked that day. */
+  async getWfhDayAttendance(date: string): Promise<WfhDayEmployeeResponse[]> {
+    if (!(await this.repository.findWfhDay(date))) {
+      throw new NotFoundException('That is not a work-from-home day');
+    }
+    const [employees, presence] = await Promise.all([
+      this.trackedEmployees(),
+      this.repository.findWfhPresence(date, date),
+    ]);
+    const present = new Set(presence.map((p) => p.employeeId));
+    return employees.map((e) => ({
+      employeeId: e.id,
+      employeeName: `${e.firstName} ${e.lastName}`,
+      employeeCode: e.employeeCode,
+      present: present.has(e.id),
+    }));
+  }
+
+  async setWfhDayAttendance(
+    date: string,
+    employeeIds: string[],
+  ): Promise<WfhDayEmployeeResponse[]> {
+    if (!(await this.repository.findWfhDay(date))) {
+      throw new NotFoundException('That is not a work-from-home day');
+    }
+    // Only tracked employees can be marked; anything else is ignored.
+    const tracked = new Set((await this.trackedEmployees()).map((e) => e.id));
+    await this.repository.replaceWfhPresence(
+      date,
+      [...new Set(employeeIds)].filter((id) => tracked.has(id)),
+    );
+    return this.getWfhDayAttendance(date);
   }
 
   // ---------------------------------------------------------------------
@@ -129,15 +348,28 @@ export class AttendanceService {
       settings.lastSyncAt = new Date();
       settings.lastSyncMessage = 'Could not reach the attendance machine';
       await this.repository.saveSettings(settings);
-      this.logger.warn(
-        `Attendance sync failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`Attendance sync failed: ${describeError(error)}`);
       throw new BadRequestException(
         'Could not reach the attendance machine. Check it is on and on the same network.',
       );
     } finally {
       this.syncing = false;
     }
+  }
+
+  /** The "Sync now" button for everyone: pulls from the machine unless a
+   * successful sync just happened (or one is running), so the machine isn't
+   * hammered by many people pressing it. */
+  async refreshIfStale(maxAgeMs = 60_000): Promise<SyncResultResponse> {
+    const settings = await this.repository.getSettings();
+    const justSynced =
+      !!settings.lastSyncAt &&
+      Date.now() - settings.lastSyncAt.getTime() < maxAgeMs &&
+      (settings.lastSyncMessage ?? '').startsWith('OK');
+    if (justSynced || this.syncing) {
+      return { fetched: 0, inserted: 0, users: 0, skipped: true };
+    }
+    return this.syncFromDevice();
   }
 
   /** Keeps the data fresh without anyone pressing Sync. */
@@ -197,11 +429,6 @@ export class AttendanceService {
   ): Promise<void> {
     const employee = await this.employeeRepository.findById(employeeId);
     if (!employee) throw new NotFoundException('Employee not found');
-    if (deviceUserId && employee.workMode === WorkMode.REMOTE) {
-      throw new BadRequestException(
-        'Remote employees are not tracked on the attendance machine',
-      );
-    }
 
     const wanted = deviceUserId?.trim() || null;
     if (wanted) {
@@ -276,10 +503,12 @@ export class AttendanceService {
   ): Promise<EmployeeAttendanceResponse[]> {
     this.assertMonth(month, year);
     const employees = (await this.employeeRepository.findAll())
+      // Remote staff aren't tracked unless HR has deliberately linked
+      // them to a machine user (someone who sometimes comes in).
       .filter(
         (e) =>
           e.employmentStatus === EmploymentStatus.ACTIVE &&
-          e.workMode !== WorkMode.REMOTE,
+          (e.workMode !== WorkMode.REMOTE || !!e.attendanceId),
       )
       .sort((a, b) =>
         `${a.firstName} ${a.lastName}`.localeCompare(
@@ -332,6 +561,8 @@ export class AttendanceService {
     const shift: AttendanceShift = {
       start: settings.shiftStart,
       end: settings.shiftEnd,
+      hoursCutAfter: settings.hoursCutAfter,
+      hoursCutFrom: settings.hoursCutFrom,
       graceMinutes: settings.graceMinutes,
     };
 
@@ -345,16 +576,26 @@ export class AttendanceService {
     const to = new Date(`${dates[dates.length - 1]}T23:59:59.999+05:00`);
 
     const linked = employees.filter((e) => e.attendanceId);
-    const [punches, holidayDates, leaveEntries] = await Promise.all([
-      this.repository.findPunches(
-        linked.map((e) => e.attendanceId as string),
-        from,
-        to,
-      ),
-      this.holidaysService.getDatesInRange(dates[0], dates[dates.length - 1]),
-      this.leaveService.getLeaveCalendar('', 'company', month, year, true),
-    ]);
+    const [punches, holidayDates, leaveEntries, wfhDays, wfhPresence] =
+      await Promise.all([
+        this.repository.findPunches(
+          linked.map((e) => e.attendanceId as string),
+          from,
+          to,
+        ),
+        this.holidaysService.getDatesInRange(
+          dates[0],
+          dates[dates.length - 1],
+        ),
+        this.leaveService.getLeaveCalendar('', 'company', month, year, true),
+        this.repository.findWfhDays(dates[0], dates[dates.length - 1]),
+        this.repository.findWfhPresence(dates[0], dates[dates.length - 1]),
+      ]);
     const holidays = new Set(holidayDates);
+    const wfhDates = new Set(wfhDays.map((d) => d.date));
+    const wfhMarked = new Set(
+      wfhPresence.map((p) => `${p.employeeId}|${p.date}`),
+    );
 
     const minutesByUserDay = new Map<string, number[]>();
     for (const punch of punches) {
@@ -365,12 +606,14 @@ export class AttendanceService {
       else minutesByUserDay.set(key, [minutes]);
     }
 
-    const leaveDays = new Set<string>();
+    // Approved leave from the Leave module, by employee and day, with the
+    // kind of leave (Casual, Sick, Annual...).
+    const leaveDays = new Map<string, string>();
     for (const entry of leaveEntries) {
       if (entry.isPending) continue;
       for (const date of dates) {
         if (date >= entry.startDate && date <= entry.endDate) {
-          leaveDays.add(`${entry.employeeId}|${date}`);
+          leaveDays.set(`${entry.employeeId}|${date}`, entry.leaveTypeName);
         }
       }
     }
@@ -378,7 +621,7 @@ export class AttendanceService {
     const today = karachiParts(new Date()).date;
 
     return employees.map((employee) => {
-      const days = employee.attendanceId && employee.workMode !== WorkMode.REMOTE
+      const days = employee.attendanceId
         ? dates.map((date) =>
             computeDay({
               date,
@@ -387,6 +630,9 @@ export class AttendanceService {
               shift,
               isHoliday: holidays.has(date),
               isOnLeave: leaveDays.has(`${employee.id}|${date}`),
+              isWfhDay: wfhDates.has(date),
+              wfhPresent: wfhMarked.has(`${employee.id}|${date}`),
+              leaveType: leaveDays.get(`${employee.id}|${date}`) ?? null,
               today,
             }),
           )
@@ -399,7 +645,12 @@ export class AttendanceService {
         linked: !!employee.attendanceId,
         remote: employee.workMode === WorkMode.REMOTE,
         days,
-        summary: summarize(days),
+        summary: summarize(
+          days,
+          LEADERSHIP_ROLES.includes(employee.user?.role?.name ?? '')
+            ? LATES_PER_UNPAID_ABSENCE_TEAM_LEAD
+            : LATES_PER_UNPAID_ABSENCE,
+        ),
       };
     });
   }

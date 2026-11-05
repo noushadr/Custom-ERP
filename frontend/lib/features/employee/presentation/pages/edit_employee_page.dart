@@ -49,6 +49,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _firstNameController;
   late final TextEditingController _lastNameController;
+  late final TextEditingController _employeeCodeController;
   late final TextEditingController _companyEmailController;
   late final TextEditingController _designationController;
   late final TextEditingController _personalEmailController;
@@ -80,6 +81,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
     final e = widget.employee;
     _firstNameController = TextEditingController(text: e.firstName);
     _lastNameController = TextEditingController(text: e.lastName);
+    _employeeCodeController = TextEditingController(text: e.employeeCode);
     _companyEmailController = TextEditingController(text: e.email);
     _designationController = TextEditingController(text: e.designation);
     _personalEmailController = TextEditingController(text: e.personalEmail);
@@ -121,6 +123,7 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _employeeCodeController.dispose();
     _companyEmailController.dispose();
     _designationController.dispose();
     _personalEmailController.dispose();
@@ -226,6 +229,13 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
         .submit(
           widget.employee.id,
           UpdateEmployeeInput(
+            // Only sent when it actually changed — the server enforces the
+            // 30-day window and that nobody else has ever had the ID.
+            employeeCode:
+                _employeeCodeController.text.trim().toUpperCase() ==
+                    widget.employee.employeeCode
+                ? null
+                : _employeeCodeController.text.trim().toUpperCase(),
             firstName: _firstNameController.text.trim(),
             lastName: _lastNameController.text.trim(),
             companyEmail: _companyEmailController.text.trim(),
@@ -344,6 +354,32 @@ class _EditEmployeePageState extends ConsumerState<EditEmployeePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              TextFormField(
+                key: const Key('employee-id-field'),
+                controller: _employeeCodeController,
+                enabled: !isSubmitting && !widget.employee.employeeCodeLocked,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  labelText: 'Employee ID',
+                  helperText: widget.employee.employeeCodeLocked
+                      ? 'Locked — an ID can only be changed within 30 days '
+                            'of the employee being added.'
+                      : 'Like ZC-073. Can be changed for 30 days after the '
+                            'employee is added, and never to an ID that '
+                            'anyone — past or present — has had.',
+                  helperMaxLines: 3,
+                ),
+                validator: (value) {
+                  if (widget.employee.employeeCodeLocked) return null;
+                  return RegExp(
+                        r'^ZC-\d{3,}$',
+                        caseSensitive: false,
+                      ).hasMatch((value ?? '').trim())
+                      ? null
+                      : 'Use the format ZC-073';
+                },
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _firstNameController,
                 enabled: !isSubmitting,

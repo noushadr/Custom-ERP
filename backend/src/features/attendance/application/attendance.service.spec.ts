@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Employee } from '../../employee/domain/entities/employee.entity';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
 import { WorkMode } from '../../employee/domain/enums/work-mode.enum';
@@ -23,6 +27,14 @@ describe('AttendanceService', () => {
   let repository: {
     insertPunches: jest.Mock;
     findPunches: jest.Mock;
+    findWfhDays: jest.Mock;
+    findWfhDay: jest.Mock;
+    saveWfhDay: jest.Mock;
+    deleteWfhDay: jest.Mock;
+    findWfhPresence: jest.Mock;
+    replaceWfhPresence: jest.Mock;
+    addWfhPresence: jest.Mock;
+    removeWfhPresence: jest.Mock;
     replaceDeviceUsers: jest.Mock;
     findDeviceUsers: jest.Mock;
     getSettings: jest.Mock;
@@ -38,11 +50,21 @@ describe('AttendanceService', () => {
       id: 1,
       shiftStart: '11:00',
       shiftEnd: '19:00',
+      hoursCutAfter: '11:30',
+      hoursCutFrom: '10:30',
       graceMinutes: 15,
     });
     repository = {
       insertPunches: jest.fn().mockResolvedValue(2),
       findPunches: jest.fn().mockResolvedValue([]),
+      findWfhDays: jest.fn().mockResolvedValue([]),
+      findWfhDay: jest.fn().mockResolvedValue(null),
+      saveWfhDay: jest.fn((d) => Promise.resolve(d)),
+      deleteWfhDay: jest.fn(),
+      findWfhPresence: jest.fn().mockResolvedValue([]),
+      replaceWfhPresence: jest.fn(),
+      addWfhPresence: jest.fn(),
+      removeWfhPresence: jest.fn(),
       replaceDeviceUsers: jest.fn(),
       findDeviceUsers: jest.fn().mockResolvedValue([]),
       getSettings: jest.fn().mockResolvedValue(settings),
@@ -106,6 +128,35 @@ describe('AttendanceService', () => {
           lastSyncMessage: 'Could not reach the attendance machine',
         }),
       );
+    });
+  });
+
+  describe('refreshIfStale', () => {
+    it('syncs when the last sync is old or failed', async () => {
+      const result = await service.refreshIfStale();
+      expect(result.skipped).toBeUndefined();
+      expect(device.readAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips when a sync succeeded a moment ago', async () => {
+      const settings = await repository.getSettings();
+      settings.lastSyncAt = new Date();
+      settings.lastSyncMessage = 'OK - 0 new scan(s)';
+
+      const result = await service.refreshIfStale();
+
+      expect(result.skipped).toBe(true);
+      expect(device.readAll).not.toHaveBeenCalled();
+    });
+
+    it('still tries again when the last attempt failed, even a moment ago', async () => {
+      const settings = await repository.getSettings();
+      settings.lastSyncAt = new Date();
+      settings.lastSyncMessage = 'Could not reach the attendance machine';
+
+      await service.refreshIfStale();
+
+      expect(device.readAll).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -175,6 +226,79 @@ describe('AttendanceService', () => {
       expect(rows.find((r) => r.employeeId === 'e2')!.linked).toBe(false);
     });
 
+    it('charges HR (Zahra) per five lates too', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        employee({
+          id: 'hr',
+          firstName: 'Zahra',
+          lastName: 'HR',
+          attendanceId: '10',
+          user: { role: { name: 'HR/Manager' } },
+        } as never),
+      ]);
+      repository.findPunches.mockResolvedValue(
+        [5, 6, 7, 8].flatMap((day) => [
+          {
+            deviceUserId: '10',
+            punchedAt: new Date(`2026-10-0${day}T06:25:00Z`),
+          },
+          {
+            deviceUserId: '10',
+            punchedAt: new Date(`2026-10-0${day}T14:00:00Z`),
+          },
+        ]),
+      );
+
+      const rows = await service.getCompanyMonth(10, 2026);
+
+      expect(rows[0].summary.late).toBe(4);
+      expect(rows[0].summary.lateDeductionDays).toBe(0);
+    });
+
+    it('charges a team lead per five lates and everyone else per three', async () => {
+      const lateScans = (userId: string) =>
+        [5, 6, 7, 8].flatMap((day) => [
+          // In at 11:25 Pakistan time (late) and out at 19:00, Oct 5-8.
+          {
+            deviceUserId: userId,
+            punchedAt: new Date(`2026-10-0${day}T06:25:00Z`),
+          },
+          {
+            deviceUserId: userId,
+            punchedAt: new Date(`2026-10-0${day}T14:00:00Z`),
+          },
+        ]);
+      employeeRepository.findAll.mockResolvedValue([
+        employee({
+          id: 'lead',
+          firstName: 'Team',
+          lastName: 'Lead',
+          attendanceId: '10',
+          user: { role: { name: 'Team Lead' } },
+        } as never),
+        employee({
+          id: 'staff',
+          firstName: 'Plain',
+          lastName: 'Staff',
+          attendanceId: '11',
+          user: { role: { name: 'Employee' } },
+        } as never),
+      ]);
+      repository.findPunches.mockResolvedValue([
+        ...lateScans('10'),
+        ...lateScans('11'),
+      ]);
+
+      const rows = await service.getCompanyMonth(10, 2026);
+      const byId = Object.fromEntries(rows.map((r) => [r.employeeId, r]));
+
+      // Four late days: past the third for staff, short of the fifth for a lead.
+      expect(byId.lead.summary.late).toBe(4);
+      expect(byId.lead.summary.lateDeductionDays).toBe(0);
+      expect(byId.staff.summary.late).toBe(4);
+      expect(byId.staff.summary.lateDeductionDays).toBe(1);
+    });
+
     it('marks an approved leave day as leave rather than absent', async () => {
       employeeRepository.findAll.mockResolvedValue([
         employee({ id: 'e1', attendanceId: '48' }),
@@ -184,18 +308,19 @@ describe('AttendanceService', () => {
           employeeId: 'e1',
           startDate: '2026-10-06',
           endDate: '2026-10-06',
+          leaveTypeName: 'Sick Leave',
           isPending: false,
         },
       ]);
 
       const rows = await service.getCompanyMonth(10, 2026);
 
-      expect(rows[0].days.find((d) => d.date === '2026-10-06')!.status).toBe(
-        'leave',
-      );
+      const leaveDay = rows[0].days.find((d) => d.date === '2026-10-06')!;
+      expect(leaveDay.status).toBe('leave');
+      expect(leaveDay.leaveType).toBe('Sick Leave');
     });
 
-    it('leaves remote employees out of the company report', async () => {
+    it('leaves unlinked remote employees out of the company report', async () => {
       employeeRepository.findAll.mockResolvedValue([
         employee({ id: 'e1', attendanceId: '48' }),
         employee({
@@ -211,12 +336,31 @@ describe('AttendanceService', () => {
       expect(rows.map((r) => r.employeeId)).toEqual(['e1']);
     });
 
-    it('refuses to link a remote employee, and auto-link skips them', async () => {
+    it('includes a remote employee HR has deliberately linked', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        employee({
+          id: 'e2',
+          firstName: 'Sometimes',
+          lastName: 'InOffice',
+          workMode: WorkMode.REMOTE,
+          attendanceId: '69',
+        }),
+      ]);
+
+      const rows = await service.getCompanyMonth(10, 2026);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].linked).toBe(true);
+      expect(rows[0].days).toHaveLength(31);
+    });
+
+    it('can link a remote employee by hand, but auto-link skips them', async () => {
       const remote = employee({ id: 'e2', workMode: WorkMode.REMOTE });
       employeeRepository.findById.mockResolvedValue(remote);
-      await expect(service.setMapping('e2', '19')).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      employeeRepository.findAll.mockResolvedValue([remote]);
+      await service.setMapping('e2', '19');
+      expect(remote.attendanceId).toBe('19');
+      remote.attendanceId = null;
 
       repository.findDeviceUsers.mockResolvedValue([
         { deviceUserId: '19', name: 'Jane Doe', ignored: false },
@@ -232,12 +376,188 @@ describe('AttendanceService', () => {
     });
   });
 
+  describe('work-from-home announcements', () => {
+    afterEach(() => jest.useRealTimers());
+
+    it('tells the viewer about a company day today and their own day tomorrow', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-11-12T05:00:00Z'));
+      employeeRepository.findByUserId = jest
+        .fn()
+        .mockResolvedValue(employee({ id: 'me', attendanceId: '48' }));
+      repository.findWfhDays.mockResolvedValue([
+        { date: '2026-11-12', note: 'Power cut' },
+      ]);
+      repository.findWfhPresence.mockResolvedValue([
+        { employeeId: 'me', date: '2026-11-13' },
+      ]);
+
+      const result = await service.getWfhAnnouncement('user-1');
+
+      expect(result.today).toEqual({ personal: false, note: 'Power cut' });
+      expect(result.tomorrow).toEqual({ personal: true, note: null });
+    });
+
+    it('has nothing when no day is marked', async () => {
+      employeeRepository.findByUserId = jest.fn().mockResolvedValue(null);
+      const result = await service.getWfhAnnouncement('user-1');
+      expect(result).toEqual({ today: null, tomorrow: null });
+    });
+  });
+
+  describe('one person working from home', () => {
+    it('lets HR mark and unmark a tracked employee on a weekday', async () => {
+      employeeRepository.findById.mockResolvedValue(
+        employee({ id: 'e1', attendanceId: '48' }),
+      );
+
+      await service.markEmployeeWfh('e1', '2026-11-12');
+      expect(repository.addWfhPresence).toHaveBeenCalledWith('e1', '2026-11-12');
+
+      await service.unmarkEmployeeWfh('e1', '2026-11-12');
+      expect(repository.removeWfhPresence).toHaveBeenCalledWith(
+        'e1',
+        '2026-11-12',
+      );
+    });
+
+    it('refuses weekends, holidays and people not on the machine', async () => {
+      employeeRepository.findById.mockResolvedValue(
+        employee({ id: 'e1', attendanceId: '48' }),
+      );
+      await expect(
+        service.markEmployeeWfh('e1', '2026-11-14'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      holidays.getDatesInRange.mockResolvedValueOnce(['2026-11-12']);
+      await expect(
+        service.markEmployeeWfh('e1', '2026-11-12'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      employeeRepository.findById.mockResolvedValue(
+        employee({ id: 'e2', attendanceId: null }),
+      );
+      await expect(
+        service.markEmployeeWfh('e2', '2026-11-12'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('shows that day as work from home for that person only', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        employee({ id: 'e1', attendanceId: '48' }),
+        employee({
+          id: 'e2',
+          firstName: 'Other',
+          lastName: 'Person',
+          attendanceId: '49',
+        }),
+      ]);
+      repository.findWfhPresence.mockResolvedValue([
+        { employeeId: 'e1', date: '2026-10-07' },
+      ]);
+
+      const rows = await service.getCompanyMonth(10, 2026);
+      const dayOf = (id: string) =>
+        rows
+          .find((r) => r.employeeId === id)!
+          .days.find((d) => d.date === '2026-10-07')!;
+
+      expect(dayOf('e1').status).toBe('wfh');
+      expect(dayOf('e2').status).toBe('absent');
+    });
+  });
+
+  describe('work from home days', () => {
+    it('adds a weekday, and refuses weekends, holidays and repeats', async () => {
+      const added = await service.addWfhDay({
+        date: '2026-11-12',
+        note: ' Power cut ',
+      });
+      expect(added).toEqual({
+        date: '2026-11-12',
+        note: 'Power cut',
+        presentCount: 0,
+      });
+
+      await expect(
+        service.addWfhDay({ date: '2026-11-14' }), // a Saturday
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      holidays.getDatesInRange.mockResolvedValueOnce(['2026-11-12']);
+      await expect(
+        service.addWfhDay({ date: '2026-11-12' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      repository.findWfhDay.mockResolvedValueOnce({ date: '2026-11-12' });
+      await expect(
+        service.addWfhDay({ date: '2026-11-12' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('lets HR mark tracked employees present, ignoring anyone untracked', async () => {
+      repository.findWfhDay.mockResolvedValue({ date: '2026-11-12' });
+      employeeRepository.findAll.mockResolvedValue([
+        employee({ id: 'tracked', attendanceId: '48' }),
+        employee({ id: 'untracked', firstName: 'No', lastName: 'Link' }),
+      ]);
+
+      await service.setWfhDayAttendance('2026-11-12', [
+        'tracked',
+        'untracked',
+        'tracked',
+      ]);
+
+      expect(repository.replaceWfhPresence).toHaveBeenCalledWith(
+        '2026-11-12',
+        ['tracked'],
+      );
+    });
+
+    it('turns a work-from-home day into present days for the people HR marked', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        employee({ id: 'e1', attendanceId: '48' }),
+        employee({
+          id: 'e2',
+          firstName: 'Not',
+          lastName: 'Marked',
+          attendanceId: '49',
+        }),
+      ]);
+      repository.findWfhDays.mockResolvedValue([{ date: '2026-10-07' }]);
+      repository.findWfhPresence.mockResolvedValue([
+        { employeeId: 'e1', date: '2026-10-07' },
+      ]);
+      // A late scan on the WFH day must not matter.
+      repository.findPunches.mockResolvedValue([
+        { deviceUserId: '48', punchedAt: new Date('2026-10-07T08:00:00Z') },
+        { deviceUserId: '48', punchedAt: new Date('2026-10-07T14:00:00Z') },
+      ]);
+
+      const rows = await service.getCompanyMonth(10, 2026);
+      const byId = Object.fromEntries(rows.map((r) => [r.employeeId, r]));
+      const dayOf = (id: string) =>
+        byId[id].days.find((d) => d.date === '2026-10-07')!;
+
+      expect(dayOf('e1').status).toBe('wfh');
+      expect(dayOf('e1').lateMinutes).toBe(0);
+      expect(dayOf('e2').status).toBe('absent');
+      expect(byId.e1.summary.wfhDays).toBe(1);
+    });
+
+    it('refuses to mark attendance on a day that is not a work-from-home day', async () => {
+      await expect(
+        service.setWfhDayAttendance('2026-11-12', []),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
   describe('updateSettings', () => {
     it('rejects a shift that ends before it starts', async () => {
       await expect(
         service.updateSettings({
           shiftStart: '19:00',
           shiftEnd: '11:00',
+          hoursCutAfter: '11:30',
+          hoursCutFrom: '10:30',
           graceMinutes: 15,
         }),
       ).rejects.toBeInstanceOf(BadRequestException);

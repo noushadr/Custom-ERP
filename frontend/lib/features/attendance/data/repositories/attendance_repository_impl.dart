@@ -10,10 +10,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   final AttendanceRemoteDataSource _remote;
 
   @override
-  Future<EmployeeAttendance> getMine({
-    required int month,
-    required int year,
-  }) => _guard(() => _remote.getMine(month: month, year: year));
+  Future<EmployeeAttendance> getMine({required int month, required int year}) =>
+      _guard(() => _remote.getMine(month: month, year: year));
 
   @override
   Future<List<EmployeeAttendance>> getCompany({
@@ -45,17 +43,24 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   Future<AttendanceSettings> updateSettings({
     required String shiftStart,
     required String shiftEnd,
+    required String hoursCutAfter,
+    required String hoursCutFrom,
     required int graceMinutes,
   }) => _guard(
     () => _remote.updateSettings(
       shiftStart: shiftStart,
       shiftEnd: shiftEnd,
+      hoursCutAfter: hoursCutAfter,
+      hoursCutFrom: hoursCutFrom,
       graceMinutes: graceMinutes,
     ),
   );
 
   @override
   Future<AttendanceSyncResult> sync() => _guard(() => _remote.sync());
+
+  @override
+  Future<AttendanceSyncResult> refresh() => _guard(() => _remote.refresh());
 
   @override
   Future<List<AttendanceMapping>> getMapping() =>
@@ -76,6 +81,48 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required bool ignored,
   }) => _guard(
     () => _remote.setIgnored(deviceUserId: deviceUserId, ignored: ignored),
+  );
+
+  @override
+  Future<List<({String date, String? note})>> getWfhCalendar() =>
+      _guard(() => _remote.getWfhCalendar());
+
+  @override
+  Future<List<WfhDay>> getWfhDays() => _guard(() => _remote.getWfhDays());
+
+  @override
+  Future<WfhDay> addWfhDay({required String date, String? note}) =>
+      _guard(() => _remote.addWfhDay(date: date, note: note));
+
+  @override
+  Future<void> removeWfhDay(String date) =>
+      _guard(() => _remote.removeWfhDay(date));
+
+  @override
+  Future<List<WfhDayEmployee>> getWfhDayAttendance(String date) =>
+      _guard(() => _remote.getWfhDayAttendance(date));
+
+  @override
+  Future<List<WfhDayEmployee>> setWfhDayAttendance({
+    required String date,
+    required List<String> employeeIds,
+  }) => _guard(
+    () => _remote.setWfhDayAttendance(date: date, employeeIds: employeeIds),
+  );
+
+  @override
+  Future<void> markEmployeeWfh({
+    required String employeeId,
+    required String date,
+  }) =>
+      _guard(() => _remote.markEmployeeWfh(employeeId: employeeId, date: date));
+
+  @override
+  Future<void> unmarkEmployeeWfh({
+    required String employeeId,
+    required String date,
+  }) => _guard(
+    () => _remote.unmarkEmployeeWfh(employeeId: employeeId, date: date),
   );
 
   @override

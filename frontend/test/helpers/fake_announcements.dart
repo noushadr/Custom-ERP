@@ -9,6 +9,7 @@ class FakeAnnouncementsRepository implements AnnouncementsRepository {
       holiday: null,
       notices: [],
       employeeOfTheMonth: null,
+      workFromHome: null,
     ),
     this.getTodayError,
   });

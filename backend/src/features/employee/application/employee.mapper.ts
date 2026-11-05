@@ -1,3 +1,4 @@
+import { isEmployeeCodeLocked } from './employee-code.util';
 import { Employee } from '../domain/entities/employee.entity';
 import { EmployeeResponse } from './employee-response.interface';
 import { calculateProfileCompletion } from './profile-completion.util';
@@ -19,6 +20,7 @@ export function toEmployeeResponse(employee: Employee): EmployeeResponse {
     id: employee.id,
     userId: employee.userId,
     employeeCode: employee.employeeCode,
+    employeeCodeLocked: isEmployeeCodeLocked(employee.createdAt),
     email: employee.user.email,
     role: employee.user.role.name,
     accountStatus: employee.user.status,

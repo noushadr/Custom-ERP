@@ -1477,7 +1477,11 @@ class _ApprovalBanner extends ConsumerWidget {
   final Employee employee;
   final bool canApprove;
 
-  Future<void> _decide(BuildContext context, WidgetRef ref, bool approve) async {
+  Future<void> _decide(
+    BuildContext context,
+    WidgetRef ref,
+    bool approve,
+  ) async {
     final repository = ref.read(employeeRepositoryProvider);
     try {
       if (approve) {

@@ -15,6 +15,8 @@ import { PayrollRun } from '../domain/entities/payroll-run.entity';
 import { PayrollRunStatus } from '../domain/enums/payroll-run-status.enum';
 import type { PayrollLineItemRepository } from '../domain/repositories/payroll-line-item-repository.interface';
 import type { PayrollRunRepository } from '../domain/repositories/payroll-run-repository.interface';
+import type { AttendanceService } from '../../attendance/application/attendance.service';
+import type { RolesService } from '../../authentication/application/roles.service';
 import type { NotificationsService } from '../../notifications/application/notifications.service';
 import { PayrollService } from './payroll.service';
 
@@ -69,10 +71,13 @@ function buildLineItem(
     freelancerId: null,
     freelancer: null,
     baseSalary: '50000.00',
-    quantity: null,
-    perUnitRate: null,
-    additions: '0.00',
-    deductions: '0.00',
+    lateDays: 0,
+    lateDeductionDays: 0,
+    lateHours: '0.00',
+    absentDays: 0,
+    advanceSalary: '0.00',
+    fines: [],
+    freelanceTasks: [],
     notes: null,
     createdAt: new Date('2026-08-01T00:00:00.000Z'),
     updatedAt: new Date('2026-08-01T00:00:00.000Z'),
@@ -89,6 +94,8 @@ describe('PayrollService', () => {
   let freelancerRepository: jest.Mocked<FreelancerRepository>;
   let employeesService: jest.Mocked<EmployeesService>;
   let notificationsService: jest.Mocked<NotificationsService>;
+  let attendanceService: jest.Mocked<AttendanceService>;
+  let rolesService: jest.Mocked<RolesService>;
 
   beforeEach(() => {
     runRepository = {
@@ -150,6 +157,14 @@ describe('PayrollService', () => {
       create: jest.fn(),
     } as unknown as jest.Mocked<NotificationsService>;
 
+    attendanceService = {
+      refreshIfStale: jest.fn().mockResolvedValue({}),
+      getCompanyMonth: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<AttendanceService>;
+    rolesService = {
+      findUsersWithPermission: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<RolesService>;
+
     service = new PayrollService(
       runRepository,
       lineItemRepository,
@@ -158,6 +173,8 @@ describe('PayrollService', () => {
       freelancerRepository,
       employeesService,
       notificationsService,
+      attendanceService,
+      rolesService,
     );
   });
 
@@ -191,6 +208,49 @@ describe('PayrollService', () => {
       expect(result.status).toBe(PayrollRunStatus.DRAFT);
     });
 
+    it("fills each employee's late days from that month's attendance", async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'e1' }),
+        buildEmployee({ id: 'e2' }),
+      ]);
+      employeesService.getSalaryAsOf.mockResolvedValue(60000);
+      attendanceService.getCompanyMonth.mockResolvedValue([
+        {
+          employeeId: 'e1',
+          linked: true,
+          summary: { late: 7, lateDeductionDays: 2 },
+        },
+        {
+          employeeId: 'e2',
+          linked: false,
+          summary: { late: 9, lateDeductionDays: 3 },
+        },
+      ] as never);
+
+      await service.generateRun({ month: 8, year: 2026 }, 'admin-1');
+
+      expect(attendanceService.getCompanyMonth).toHaveBeenCalledWith(8, 2026);
+      const saved = lineItemRepository.saveMany.mock.calls[0][0];
+      expect(saved[0]).toMatchObject({ lateDays: 7, lateDeductionDays: 2 });
+      // Not linked to the machine: nothing to count.
+      expect(saved[1]).toMatchObject({ lateDays: 0, lateDeductionDays: 0 });
+    });
+
+    it('leaves out an active employee who has no salary on file', async () => {
+      employeeRepository.findAll.mockResolvedValue([
+        buildEmployee({ id: 'paid' }),
+        buildEmployee({ id: 'owner' }),
+      ]);
+      employeesService.getSalaryAsOf.mockImplementation((id) =>
+        Promise.resolve(id === 'owner' ? 0 : 50000),
+      );
+
+      await service.generateRun({ month: 8, year: 2026 }, 'admin-1');
+
+      const saved = lineItemRepository.saveMany.mock.calls[0][0];
+      expect(saved.map((i) => i.employeeId)).toEqual(['paid']);
+    });
+
     it('throws ConflictException when a run already exists for that month/year', async () => {
       runRepository.findByMonthYear.mockResolvedValue(buildRun());
 
@@ -201,7 +261,7 @@ describe('PayrollService', () => {
   });
 
   describe('updateLineItem', () => {
-    it('edits additions/deductions for an employee line item, and netPay reflects both', async () => {
+    it('edits fines and freelance tasks, and netPay reflects both', async () => {
       runRepository.findById.mockResolvedValue(
         buildRun({ status: PayrollRunStatus.DRAFT }),
       );
@@ -209,42 +269,95 @@ describe('PayrollService', () => {
       lineItemRepository.findByRunId.mockResolvedValue([
         buildLineItem({
           baseSalary: '50000.00',
-          additions: '500.00',
-          deductions: '2000.00',
+          fines: [{ description: 'Late file', amount: 2000 }],
+          freelanceTasks: [{ description: 'Logo', amount: 5000 }],
         }),
       ]);
 
       const result = await service.updateLineItem('run-1', 'item-1', {
-        additions: 500,
-        deductions: 2000,
+        fines: [{ description: ' Late file ', amount: 2000 }],
+        freelanceTasks: [{ description: ' Logo ', amount: 5000 }],
       });
 
-      expect(result.lineItems[0].baseSalary).toBe(50000);
-      expect(result.lineItems[0].additions).toBe(500);
-      expect(result.lineItems[0].deductions).toBe(2000);
-      expect(result.lineItems[0].netPay).toBe(48500);
+      expect(lineItemRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fines: [{ description: 'Late file', amount: 2000 }],
+          freelanceTasks: [{ description: 'Logo', amount: 5000 }],
+        }),
+      );
+      expect(result.lineItems[0].finesTotal).toBe(2000);
+      expect(result.lineItems[0].freelanceTotal).toBe(5000);
+      expect(result.lineItems[0].netPay).toBe(53000);
     });
 
-    it("computes a piece-rate employee's base pay as quantity * perUnitRate, replacing the salary snapshot", async () => {
-      runRepository.findById.mockResolvedValue(
-        buildRun({ status: PayrollRunStatus.DRAFT }),
-      );
+    it('takes absent days at base / 30 and the advance off net pay', async () => {
+      runRepository.findById.mockResolvedValue(buildRun());
       lineItemRepository.findById.mockResolvedValue(buildLineItem());
       lineItemRepository.findByRunId.mockResolvedValue([
         buildLineItem({
-          baseSalary: '0.00',
-          quantity: 5,
-          perUnitRate: '1000.00',
+          baseSalary: '96000.00',
+          absentDays: 10,
+          advanceSalary: '5000.00',
         }),
       ]);
 
       const result = await service.updateLineItem('run-1', 'item-1', {
-        quantity: 5,
-        perUnitRate: 1000,
+        absentDays: 10,
+        advanceSalary: 5000,
       });
 
-      expect(result.lineItems[0].baseSalary).toBe(5000);
-      expect(result.lineItems[0].netPay).toBe(5000);
+      expect(lineItemRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ absentDays: 10, advanceSalary: '5000.00' }),
+      );
+      expect(result.lineItems[0].absentDeduction).toBe(32000); // 10 x 96000/30
+      expect(result.lineItems[0].netPay).toBe(59000); // 96000 - 32000 - 5000
+    });
+
+    it('rejects absent days on a freelancer line item', async () => {
+      runRepository.findById.mockResolvedValue(buildRun());
+      lineItemRepository.findById.mockResolvedValue(
+        buildLineItem({
+          employeeId: null,
+          employee: null,
+          freelancerId: 'freelancer-1',
+          freelancer: buildFreelancer(),
+        }),
+      );
+
+      await expect(
+        service.updateLineItem('run-1', 'item-1', { absentDays: 2 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('prices late hours at base / 30 / 8 per hour', async () => {
+      runRepository.findById.mockResolvedValue(buildRun());
+      lineItemRepository.findById.mockResolvedValue(buildLineItem());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({ baseSalary: '60000.00', lateHours: '2.00' }),
+      ]);
+
+      const result = await service.updateLineItem('run-1', 'item-1', {});
+
+      expect(result.lineItems[0].lateHours).toBe(2);
+      expect(result.lineItems[0].lateHoursDeduction).toBe(500); // 2 x 60000/30/8
+      expect(result.lineItems[0].netPay).toBe(59500);
+    });
+
+    it('takes the late deduction at base salary / 30, whatever the month length', async () => {
+      runRepository.findById.mockResolvedValue(buildRun());
+      lineItemRepository.findById.mockResolvedValue(buildLineItem());
+      lineItemRepository.findByRunId.mockResolvedValue([
+        buildLineItem({
+          baseSalary: '60000.00',
+          lateDays: 7,
+          lateDeductionDays: 2,
+        }),
+      ]);
+
+      const result = await service.updateLineItem('run-1', 'item-1', {});
+
+      expect(result.lineItems[0].lateDeduction).toBe(4000); // 2 x 60000/30
+      expect(result.lineItems[0].netPay).toBe(56000);
     });
 
     it("allows editing a freelancer's baseSalary directly", async () => {
@@ -294,7 +407,7 @@ describe('PayrollService', () => {
       );
 
       await expect(
-        service.updateLineItem('run-1', 'item-1', { additions: 100 }),
+        service.updateLineItem('run-1', 'item-1', { fines: [{ description: 'x', amount: 100 }] }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -305,13 +418,82 @@ describe('PayrollService', () => {
       );
 
       await expect(
-        service.updateLineItem('run-1', 'item-1', { additions: 100 }),
+        service.updateLineItem('run-1', 'item-1', { fines: [{ description: 'x', amount: 100 }] }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
+  describe('syncRun', () => {
+    it('refreshes late figures from attendance and keeps fines and tasks', async () => {
+      runRepository.findById.mockResolvedValue(buildRun());
+      const item = buildLineItem({
+        fines: [{ description: 'Fine', amount: 500 }],
+        freelanceTasks: [{ description: 'Logo', amount: 100 }],
+      });
+      lineItemRepository.findByRunId.mockResolvedValue([item]);
+      attendanceService.getCompanyMonth.mockResolvedValue([
+        {
+          employeeId: 'employee-1',
+          linked: true,
+          summary: { late: 4, lateDeductionDays: 1, hoursCutMinutes: 120 },
+        },
+      ] as never);
+
+      await service.syncRun('run-1');
+
+      expect(attendanceService.getCompanyMonth).toHaveBeenCalledWith(8, 2026);
+      expect(item).toMatchObject({
+        lateDays: 4,
+        lateDeductionDays: 1,
+        lateHours: '2.00',
+        fines: [{ description: 'Fine', amount: 500 }],
+      });
+      expect(lineItemRepository.saveMany).toHaveBeenCalled();
+    });
+
+    it('refuses once the run is no longer a draft', async () => {
+      runRepository.findById.mockResolvedValue(
+        buildRun({ status: PayrollRunStatus.FINALIZED }),
+      );
+
+      await expect(service.syncRun('run-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('handleMonthlyPayrollReminder', () => {
+    it('reminds every payroll manager when last month has no run yet', async () => {
+      rolesService.findUsersWithPermission.mockResolvedValue([
+        { id: 'hr-1' },
+        { id: 'admin-1' },
+      ]);
+
+      await service.handleMonthlyPayrollReminder();
+
+      expect(rolesService.findUsersWithPermission).toHaveBeenCalledWith(
+        'payroll.manage',
+      );
+      expect(notificationsService.create).toHaveBeenCalledTimes(2);
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientUserId: 'hr-1',
+          message: expect.stringContaining('generate the payroll'),
+        }),
+      );
+    });
+
+    it('stays quiet when the run already exists', async () => {
+      runRepository.findByMonthYear.mockResolvedValue(buildRun());
+
+      await service.handleMonthlyPayrollReminder();
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('addFreelancerToRun', () => {
-    it('adds a freelancer line item with the entered amount as baseSalary, additions/deductions at 0, employeeId null', async () => {
+    it('adds a freelancer line item with the entered amount as baseSalary, no fines or tasks, employeeId null', async () => {
       runRepository.findById.mockResolvedValue(
         buildRun({ status: PayrollRunStatus.DRAFT }),
       );
@@ -341,8 +523,8 @@ describe('PayrollService', () => {
           employeeId: null,
           freelancerId: 'freelancer-1',
           baseSalary: '27300.00',
-          additions: '0.00',
-          deductions: '0.00',
+          fines: [],
+          freelanceTasks: [],
         }),
       );
       expect(result.lineItems[0].isFreelancer).toBe(true);
@@ -494,7 +676,10 @@ describe('PayrollService', () => {
     it('returns a summary with totalNetPay across all line items', async () => {
       runRepository.findAll.mockResolvedValue([buildRun()]);
       lineItemRepository.findByRunId.mockResolvedValue([
-        buildLineItem({ baseSalary: '50000.00', additions: '2000.00' }),
+        buildLineItem({
+          baseSalary: '50000.00',
+          freelanceTasks: [{ description: 'Task', amount: 2000 }],
+        }),
         buildLineItem({ id: 'item-2', baseSalary: '60000.00' }),
       ]);
 

@@ -5,6 +5,7 @@
 /// update.
 class UpdateEmployeeInput {
   const UpdateEmployeeInput({
+    this.employeeCode,
     this.firstName,
     this.lastName,
     this.companyEmail,
@@ -31,6 +32,8 @@ class UpdateEmployeeInput {
     this.iban,
   });
 
+  /// The employee ID — sent only when HR/Admin actually changes it.
+  final String? employeeCode;
   final String? firstName;
   final String? lastName;
   final String? companyEmail;
@@ -57,6 +60,7 @@ class UpdateEmployeeInput {
   final String? iban;
 
   Map<String, dynamic> toJson() => {
+    'employeeCode': ?employeeCode,
     'firstName': firstName,
     'lastName': lastName,
     'companyEmail': companyEmail,

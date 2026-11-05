@@ -544,8 +544,7 @@ class _ProjectsTabState extends ConsumerState<_ProjectsTab> {
                   width: 220,
                   child: TextField(
                     controller: _searchController,
-                    onChanged: (value) =>
-                        setState(() => _query = value.trim()),
+                    onChanged: (value) => setState(() => _query = value.trim()),
                     decoration: const InputDecoration(
                       hintText: 'Search projects or clients',
                       prefixIcon: Icon(Icons.search, size: 20),

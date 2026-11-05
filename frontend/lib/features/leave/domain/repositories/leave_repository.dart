@@ -107,5 +107,4 @@ abstract interface class LeaveRepository {
 
   /// Every active employee's balances for the year as PDF bytes.
   Future<List<int>> downloadEmployeeBalancesPdf();
-
 }

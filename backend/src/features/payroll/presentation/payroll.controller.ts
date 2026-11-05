@@ -67,6 +67,11 @@ export class PayrollController {
     return this.payrollService.addFreelancerToRun(runId, dto);
   }
 
+  @Post('runs/:id/sync')
+  syncRun(@Param('id') id: string) {
+    return this.payrollService.syncRun(id);
+  }
+
   @Post('runs/:id/finalize')
   finalizeRun(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.payrollService.finalizeRun(id, user.sub);

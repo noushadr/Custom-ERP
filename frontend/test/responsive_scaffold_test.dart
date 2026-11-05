@@ -71,7 +71,9 @@ Widget _authenticatedApp({AuthUser? user}) {
         FakeFreelancersRepository(),
       ),
       leadsRepositoryProvider.overrideWithValue(FakeLeadsRepository()),
-      attendanceRepositoryProvider.overrideWithValue(FakeAttendanceRepository()),
+      attendanceRepositoryProvider.overrideWithValue(
+        FakeAttendanceRepository(),
+      ),
       goalRepositoryProvider.overrideWithValue(FakeGoalRepository()),
       emailRepositoryProvider.overrideWithValue(FakeEmailRepository()),
     ],

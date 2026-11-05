@@ -32,16 +32,24 @@ PayrollLineItem buildTestPayrollLineItem({
   String employeeName = 'Jane Doe',
   String? employeePhotoUrl,
   double baseSalary = 50000,
-  int? quantity,
-  double? perUnitRate,
-  double additions = 0,
-  double deductions = 0,
+  int lateDays = 0,
+  int lateDeductionDays = 0,
+  double lateHours = 0,
+  int absentDays = 0,
+  double advanceSalary = 0,
+  List<PayrollEntry> fines = const [],
+  List<PayrollEntry> freelanceTasks = const [],
   String? notes,
 }) {
-  final effectiveBaseSalary =
-      (quantity != null && quantity > 0 && perUnitRate != null)
-      ? quantity * perUnitRate
-      : baseSalary;
+  // Late deduction is always base / 30 per unpaid day, like the backend.
+  final lateDeduction = (lateDeductionDays * baseSalary / 30).roundToDouble();
+  final absentDeduction = (absentDays * baseSalary / 30).roundToDouble();
+  final lateHoursDeduction = (lateHours * baseSalary / 30 / 8).roundToDouble();
+  final finesTotal = fines.fold<double>(0, (sum, fine) => sum + fine.amount);
+  final freelanceTotal = freelanceTasks.fold<double>(
+    0,
+    (sum, task) => sum + task.amount,
+  );
   return PayrollLineItem(
     id: id,
     employeeId: employeeId,
@@ -49,12 +57,27 @@ PayrollLineItem buildTestPayrollLineItem({
     isFreelancer: isFreelancer,
     employeeName: employeeName,
     employeePhotoUrl: employeePhotoUrl,
-    baseSalary: effectiveBaseSalary,
-    quantity: quantity,
-    perUnitRate: perUnitRate,
-    additions: additions,
-    deductions: deductions,
-    netPay: effectiveBaseSalary + additions - deductions,
+    baseSalary: baseSalary,
+    lateDays: lateDays,
+    lateDeductionDays: lateDeductionDays,
+    lateDeduction: lateDeduction,
+    absentDays: absentDays,
+    absentDeduction: absentDeduction,
+    advanceSalary: advanceSalary,
+    lateHours: lateHours,
+    lateHoursDeduction: lateHoursDeduction,
+    fines: fines,
+    finesTotal: finesTotal,
+    freelanceTasks: freelanceTasks,
+    freelanceTotal: freelanceTotal,
+    netPay:
+        baseSalary -
+        lateDeduction -
+        lateHoursDeduction -
+        absentDeduction -
+        advanceSalary -
+        finesTotal +
+        freelanceTotal,
     notes: notes,
   );
 }
@@ -143,10 +166,11 @@ class FakePayrollRepository implements PayrollRepository {
 
   String? lastUpdatedLineItemId;
   double? lastUpdatedBaseSalary;
-  int? lastUpdatedQuantity;
-  double? lastUpdatedPerUnitRate;
-  double? lastUpdatedAdditions;
-  double? lastUpdatedDeductions;
+  List<PayrollEntry>? lastUpdatedFines;
+  int? lastUpdatedAbsentDays;
+  double? lastUpdatedAdvance;
+  List<PayrollEntry>? lastUpdatedFreelanceTasks;
+  String? lastSyncedRunId;
 
   String? lastFinalizedRunId;
   String? lastPaidRunId;
@@ -185,19 +209,25 @@ class FakePayrollRepository implements PayrollRepository {
     String runId,
     String lineItemId, {
     double? baseSalary,
-    int? quantity,
-    double? perUnitRate,
-    double? additions,
-    double? deductions,
+    int? absentDays,
+    double? advanceSalary,
+    List<PayrollEntry>? fines,
+    List<PayrollEntry>? freelanceTasks,
     String? notes,
   }) async {
     lastUpdatedLineItemId = lineItemId;
     lastUpdatedBaseSalary = baseSalary;
-    lastUpdatedQuantity = quantity;
-    lastUpdatedPerUnitRate = perUnitRate;
-    lastUpdatedAdditions = additions;
-    lastUpdatedDeductions = deductions;
+    lastUpdatedFines = fines;
+    lastUpdatedAbsentDays = absentDays;
+    lastUpdatedAdvance = advanceSalary;
+    lastUpdatedFreelanceTasks = freelanceTasks;
     return runDetail ?? buildTestPayrollRunDetail(id: runId);
+  }
+
+  @override
+  Future<PayrollRunDetail> syncRun(String id) async {
+    lastSyncedRunId = id;
+    return runDetail ?? buildTestPayrollRunDetail(id: id);
   }
 
   @override

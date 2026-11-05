@@ -452,6 +452,100 @@ describe('EmployeesService', () => {
   });
 
   describe('update', () => {
+    describe('employee ID', () => {
+      const recent = () =>
+        buildEmployee({
+          id: 'emp-new',
+          employeeCode: 'ZC-077',
+          createdAt: new Date(),
+        } as never);
+
+      it('lets HR change it within 30 days, and records the change', async () => {
+        const employee = recent();
+        employeeRepository.findById
+          .mockResolvedValueOnce(employee)
+          .mockResolvedValueOnce({ ...employee, employeeCode: 'ZC-073' });
+        employeeRepository.findAll.mockResolvedValue([employee]);
+        employeeRepository.save.mockImplementation((e) => Promise.resolve(e));
+
+        await service.update(employee.id, { employeeCode: 'zc-073' }, 'actor-1');
+
+        expect(employeeRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({ employeeCode: 'ZC-073' }),
+        );
+        expect(auditLogRepository.saveMany).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({
+              fieldLabel: 'Employee ID',
+              oldValue: 'ZC-077',
+              newValue: 'ZC-073',
+            }),
+          ]),
+        );
+      });
+
+      it('refuses an ID that any other employee, current or past, has had', async () => {
+        const employee = recent();
+        employeeRepository.findById.mockResolvedValue(employee);
+        employeeRepository.findAll.mockResolvedValue([
+          employee,
+          buildEmployee({
+            id: 'gone',
+            firstName: 'Old',
+            lastName: 'Timer',
+            employeeCode: 'ZC-040',
+            employmentStatus: EmploymentStatus.RESIGNED,
+          }),
+        ]);
+
+        await expect(
+          service.update(employee.id, { employeeCode: 'ZC-040' }, 'actor-1'),
+        ).rejects.toThrow('a past employee');
+        expect(employeeRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('refuses once 30 days have passed since the employee was added', async () => {
+        const employee = buildEmployee({
+          id: 'emp-old',
+          employeeCode: 'ZC-010',
+          createdAt: new Date('2026-01-01T00:00:00Z'),
+        } as never);
+        employeeRepository.findById.mockResolvedValue(employee);
+
+        const attempt = service
+          .update(employee.id, { employeeCode: 'ZC-099' }, 'actor-1')
+          .then(
+            () => 'saved',
+            (error: unknown) => error,
+          );
+
+        expect(await attempt).toMatchObject({
+          message: expect.stringContaining('within 30 days') as string,
+        });
+        expect(employeeRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('ignores an unchanged ID even after the window has closed', async () => {
+        const employee = buildEmployee({
+          id: 'emp-old',
+          employeeCode: 'ZC-010',
+          createdAt: new Date('2026-01-01T00:00:00Z'),
+        } as never);
+        employeeRepository.findById
+          .mockResolvedValueOnce(employee)
+          .mockResolvedValueOnce(employee);
+        employeeRepository.save.mockResolvedValue(employee);
+
+        await service.update(
+          employee.id,
+          { employeeCode: 'ZC-010', designation: 'Lead' },
+          'actor-1',
+        );
+
+        expect(employeeRepository.save).toHaveBeenCalled();
+      });
+    });
+
     it('updates a plain field without touching the login email', async () => {
       const employee = buildEmployee();
       employeeRepository.findById

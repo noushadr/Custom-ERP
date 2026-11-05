@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Repository } from 'typeorm';
+import { Between, In, MoreThanOrEqual, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
+import { AttendanceWfhDay } from '../../domain/entities/attendance-wfh-day.entity';
+import { AttendanceWfhPresence } from '../../domain/entities/attendance-wfh-presence.entity';
 import { AttendanceDeviceUser } from '../../domain/entities/attendance-device-user.entity';
 import { AttendancePunch } from '../../domain/entities/attendance-punch.entity';
 import { AttendanceSettings } from '../../domain/entities/attendance-settings.entity';
@@ -18,7 +20,62 @@ export class TypeOrmAttendanceRepository implements AttendanceRepository {
     private readonly deviceUsers: Repository<AttendanceDeviceUser>,
     @InjectRepository(AttendanceSettings)
     private readonly settings: Repository<AttendanceSettings>,
+    @InjectRepository(AttendanceWfhDay)
+    private readonly wfhDays: Repository<AttendanceWfhDay>,
+    @InjectRepository(AttendanceWfhPresence)
+    private readonly wfhPresence: Repository<AttendanceWfhPresence>,
   ) {}
+
+  findWfhDays(from?: string, to?: string): Promise<AttendanceWfhDay[]> {
+    return this.wfhDays.find({
+      where:
+        from && to
+          ? { date: Between(from, to) }
+          : from
+            ? { date: MoreThanOrEqual(from) }
+            : {},
+      order: { date: 'ASC' },
+    });
+  }
+
+  findWfhDay(date: string): Promise<AttendanceWfhDay | null> {
+    return this.wfhDays.findOne({ where: { date } });
+  }
+
+  saveWfhDay(day: AttendanceWfhDay): Promise<AttendanceWfhDay> {
+    return this.wfhDays.save(day);
+  }
+
+  async deleteWfhDay(date: string): Promise<void> {
+    await this.wfhPresence.delete({ date });
+    await this.wfhDays.delete({ date });
+  }
+
+  findWfhPresence(from: string, to: string): Promise<AttendanceWfhPresence[]> {
+    return this.wfhPresence.find({ where: { date: Between(from, to) } });
+  }
+
+  async addWfhPresence(employeeId: string, date: string): Promise<void> {
+    const existing = await this.wfhPresence.findOne({
+      where: { employeeId, date },
+    });
+    if (existing) return;
+    await this.wfhPresence.save(this.wfhPresence.create({ employeeId, date }));
+  }
+
+  async removeWfhPresence(employeeId: string, date: string): Promise<void> {
+    await this.wfhPresence.delete({ employeeId, date });
+  }
+
+  async replaceWfhPresence(date: string, employeeIds: string[]): Promise<void> {
+    await this.wfhPresence.delete({ date });
+    if (employeeIds.length === 0) return;
+    await this.wfhPresence.save(
+      employeeIds.map((employeeId) =>
+        this.wfhPresence.create({ employeeId, date }),
+      ),
+    );
+  }
 
   async insertPunches(
     punches: { deviceUserId: string; punchedAt: Date }[],
@@ -75,6 +132,8 @@ export class TypeOrmAttendanceRepository implements AttendanceRepository {
         id: 1,
         shiftStart: '11:00',
         shiftEnd: '19:00',
+        hoursCutAfter: '11:30',
+        hoursCutFrom: '10:30',
         graceMinutes: 15,
       }),
     );

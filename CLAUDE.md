@@ -768,3 +768,16 @@ Per explicit instruction ("I want attendance feature in this ERP" — a ZKTeco K
 Dev DB: `employees.attendanceId` hand-applied via psql, the three `attendance_*` tables created by `synchronize`; migration `1791600000000-AddAttendance` is for production.
 
 **Knowledge Base: up to 3 files per SOP, 2026-11-03** (per explicit instruction). A file article now carries a `files` jsonb list (1-3 entries `{fileName, storedFileName, mimeType, sizeBytes}`) instead of single file columns, on both articles and versions (migration `1791700000000`; existing SOPs backfilled). Upload is multipart `files` (`FilesInterceptor`, max 3), `PUT /knowledge-base/:id/files` replaces the whole set (new version), downloads are `GET /knowledge-base/:id/files/:index` and `.../versions/:versionId/files/:index` — same visibility check as before. The editor lets you pick several files at once (capped at 3, removable chips); the article/version pages show a card per file.
+
+
+## Payroll reworked around attendance (2026-11-05)
+
+Payroll line items (`PayrollLineItem`) no longer have generic additions/deductions or piece-rate quantity/rate. Net pay is computed in the mapper, never stored: `baseSalary - lateDeduction - lateHoursDeduction - absentDeduction - advanceSalary - fines + freelance tasks`. Everything is priced over **30 calendar days** (`DAYS_PER_MONTH`) and **8 hours a day** (`HOURS_PER_DAY`): a late/absent day is `base / 30`, a late hour `base / 30 / 8`.
+
+- **Attendance feeds payroll**: generating a run (and the draft-only **Sync attendance** button, `POST /payroll/runs/:id/sync`) refreshes the machine data and fills each employee's `lateDays`, `lateDeductionDays` (from the attendance summary's every-3rd/5th-late rule) and `lateHours` (hours cut). Anyone not linked to the machine gets none. Fines and freelance tasks are never touched by a sync.
+- **Entered by hand per row** (edit popup): freelance tasks (reason + charge, a row is always open), fines (reason + amount, appear on "+ Add fine"), advance salary ("+ Add advance"), a note ("+ Add note"), and unpaid absent days. `fines`/`freelanceTasks` are jsonb `{description, amount}` lists.
+- **Someone with no salary on file is not put on a run** (the owner, for example). A resigned employee can be added to a run by hand (done once for Bilal in Oct 2026 via SQL).
+- **1st-of-month reminder**: `PayrollService.handleMonthlyPayrollReminder` (`0 9 1 * *`) notifies every `payroll.manage` holder to generate the previous month's run unless it already exists.
+- Run page: search box over the line items, a compact stacked-bar "Payroll by Department" (`DepartmentBreakdownSection`, shared with the Payroll page). Migrations `1791800000000`, `1791900000000`, `1792000000000` (hand-applied to the dev DB first, per the usual convention).
+- **Company leave calendar** now also shows public holidays and company WFH days (`GET /attendance/wfh-calendar`, visible to everyone: dates and notes only) and greys weekends and holidays.
+- **Lone evening scan = `missing_checkin`**: a single scan at/after the middle of the shift is treated as a clock-out with the morning scan missed — counted present, no late mark, no hours cut — instead of a very late arrival.

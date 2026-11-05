@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../domain/entities/payroll_line_item.dart';
 import '../../domain/entities/payroll_run_detail.dart';
 import '../../domain/entities/payroll_run_summary.dart';
 import '../../domain/entities/payslip_list_item.dart';
@@ -30,23 +31,27 @@ class PayrollRepositoryImpl implements PayrollRepository {
     String runId,
     String lineItemId, {
     double? baseSalary,
-    int? quantity,
-    double? perUnitRate,
-    double? additions,
-    double? deductions,
+    int? absentDays,
+    double? advanceSalary,
+    List<PayrollEntry>? fines,
+    List<PayrollEntry>? freelanceTasks,
     String? notes,
   }) => _guard(
     () => _remoteDataSource.updateLineItem(
       runId,
       lineItemId,
       baseSalary: baseSalary,
-      quantity: quantity,
-      perUnitRate: perUnitRate,
-      additions: additions,
-      deductions: deductions,
+      absentDays: absentDays,
+      advanceSalary: advanceSalary,
+      fines: fines,
+      freelanceTasks: freelanceTasks,
       notes: notes,
     ),
   );
+
+  @override
+  Future<PayrollRunDetail> syncRun(String id) =>
+      _guard(() => _remoteDataSource.syncRun(id));
 
   @override
   Future<PayrollRunDetail> addFreelancerToRun(

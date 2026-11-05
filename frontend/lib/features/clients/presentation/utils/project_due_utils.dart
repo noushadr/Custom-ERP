@@ -43,7 +43,9 @@ bool matchesDueFilter(Project project, String filter, DateTime today) {
     case ProjectDueFilter.noDate:
       return isOpenProject(project) && due == null;
     case ProjectDueFilter.overdue:
-      return isOpenProject(project) && due != null && due.isBefore(startOfToday);
+      return isOpenProject(project) &&
+          due != null &&
+          due.isBefore(startOfToday);
     case ProjectDueFilter.dueSoon:
       if (!isOpenProject(project) || due == null) return false;
       final limit = startOfToday.add(const Duration(days: projectDueSoonDays));

@@ -135,6 +135,103 @@ void main() {
     expect(repository.lastUpdateEmployeeInput?.probationEndDate, isNull);
   });
 
+  Future<FakeEmployeeRepository> pumpEditor(WidgetTester tester) async {
+    await _useTallSurface(tester);
+    final employee = buildTestEmployee(
+      id: 'employee-2',
+      employeeCode: 'ZC-077',
+    );
+    final repository = FakeEmployeeRepository(
+      employees: [employee],
+      updateEmployeeResult: employee,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [employeeRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(home: EditEmployeePage(employee: employee)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    return repository;
+  }
+
+  testWidgets('an untouched employee ID is not part of the request', (
+    tester,
+  ) async {
+    final repository = await pumpEditor(tester);
+
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUpdateEmployeeInput?.employeeCode, isNull);
+  });
+
+  testWidgets('a changed employee ID is sent upper-cased', (tester) async {
+    final repository = await pumpEditor(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('employee-id-field')),
+      'zc-073',
+    );
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUpdateEmployeeInput?.employeeCode, 'ZC-073');
+  });
+
+  testWidgets('a malformed employee ID is refused before saving', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    final employee = buildTestEmployee(
+      id: 'employee-2',
+      employeeCode: 'ZC-077',
+    );
+    final repository = FakeEmployeeRepository(employees: [employee]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [employeeRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(home: EditEmployeePage(employee: employee)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('employee-id-field')), '77');
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Use the format ZC-073'), findsOneWidget);
+    expect(repository.lastUpdateEmployeeInput, isNull);
+  });
+
+  testWidgets('the employee ID is locked once the 30 days have passed', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    final employee = buildTestEmployee(
+      id: 'employee-2',
+      employeeCode: 'ZC-010',
+      employeeCodeLocked: true,
+    );
+    final repository = FakeEmployeeRepository(employees: [employee]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [employeeRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(home: EditEmployeePage(employee: employee)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<TextFormField>(
+      find.byKey(const Key('employee-id-field')),
+    );
+    expect(field.enabled, isFalse);
+    expect(find.textContaining('Locked'), findsOneWidget);
+  });
+
   testWidgets('rejects an empty first name', (tester) async {
     await _useTallSurface(tester);
     final employee = buildTestEmployee(id: 'employee-2');

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../attendance/application/attendance_providers.dart';
+import '../../../holidays/application/holiday_providers.dart';
 import '../../../employee/application/employee_providers.dart';
 import '../../../employee/domain/entities/department.dart';
 import '../../application/leave_providers.dart';
@@ -24,6 +26,15 @@ const _monthNames = [
 ];
 const _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const _maxEntriesPerCell = 2;
+const _dayOffColor = Color(0xFFEBEBF0);
+
+/// A company-wide marker on one day: a public holiday or a work-from-home day.
+class _DayMarker {
+  const _DayMarker({required this.label, required this.isHoliday});
+
+  final String label;
+  final bool isHoliday;
+}
 
 /// A custom-built month grid (no calendar package) showing who's on leave
 /// each day, scoped to the viewer's department or the whole company — lets
@@ -84,6 +95,34 @@ class _LeaveCalendarViewState extends ConsumerState<LeaveCalendarView> {
       ),
     );
 
+    // Holidays and work-from-home days are company-wide, so they show in
+    // either scope. A failed lookup just leaves them out of the grid.
+    final markers = <int, List<_DayMarker>>{};
+    void addMarker(String iso, _DayMarker marker) {
+      final date = DateTime.tryParse(iso);
+      if (date == null ||
+          date.year != _month.year ||
+          date.month != _month.month) {
+        return;
+      }
+      markers.putIfAbsent(date.day, () => []).add(marker);
+    }
+
+    for (final holiday in ref.watch(holidaysProvider).valueOrNull ?? const []) {
+      addMarker(holiday.date, _DayMarker(label: holiday.name, isHoliday: true));
+    }
+    for (final day in ref.watch(wfhCalendarProvider).valueOrNull ?? const []) {
+      addMarker(
+        day.date,
+        _DayMarker(
+          label: day.note == null || day.note!.isEmpty
+              ? 'Work from home'
+              : 'Work from home — ${day.note}',
+          isHoliday: false,
+        ),
+      );
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -134,8 +173,11 @@ class _LeaveCalendarViewState extends ConsumerState<LeaveCalendarView> {
                 child: Center(child: CircularProgressIndicator()),
               ),
               error: (_, _) => const Text('Could not load the leave calendar.'),
-              data: (entries) => _MonthGrid(month: _month, entries: entries),
+              data: (entries) =>
+                  _MonthGrid(month: _month, entries: entries, markers: markers),
             ),
+            const SizedBox(height: 12),
+            const _CalendarLegend(),
           ],
         ),
       ),
@@ -144,10 +186,15 @@ class _LeaveCalendarViewState extends ConsumerState<LeaveCalendarView> {
 }
 
 class _MonthGrid extends StatelessWidget {
-  const _MonthGrid({required this.month, required this.entries});
+  const _MonthGrid({
+    required this.month,
+    required this.entries,
+    required this.markers,
+  });
 
   final DateTime month;
   final List<LeaveCalendarEntry> entries;
+  final Map<int, List<_DayMarker>> markers;
 
   Map<int, List<LeaveCalendarEntry>> _groupByDay() {
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
@@ -203,6 +250,7 @@ class _MonthGrid extends StatelessWidget {
                   leadingBlanks: leadingBlanks,
                   daysInMonth: daysInMonth,
                   byDay: byDay,
+                  markers: markers,
                 ),
             ],
           ),
@@ -218,6 +266,7 @@ Widget _dayCellFor({
   required int leadingBlanks,
   required int daysInMonth,
   required Map<int, List<LeaveCalendarEntry>> byDay,
+  required Map<int, List<_DayMarker>> markers,
 }) {
   final day = row * 7 + col - leadingBlanks + 1;
   final validDay = (day >= 1 && day <= daysInMonth) ? day : null;
@@ -228,6 +277,9 @@ Widget _dayCellFor({
       entries: validDay == null
           ? const <LeaveCalendarEntry>[]
           : (byDay[validDay] ?? const <LeaveCalendarEntry>[]),
+      markers: validDay == null
+          ? const <_DayMarker>[]
+          : (markers[validDay] ?? const <_DayMarker>[]),
     ),
   );
 }
@@ -237,15 +289,23 @@ class _DayCell extends StatelessWidget {
     required this.day,
     required this.month,
     required this.entries,
+    required this.markers,
   });
 
   final int? day;
   final DateTime month;
   final List<LeaveCalendarEntry> entries;
+  final List<_DayMarker> markers;
 
   @override
   Widget build(BuildContext context) {
     if (day == null) return const SizedBox(height: 76);
+
+    final weekday = DateTime(month.year, month.month, day!).weekday;
+    final isDayOff =
+        weekday == DateTime.saturday ||
+        weekday == DateTime.sunday ||
+        markers.any((marker) => marker.isHoliday);
 
     final shown = entries.take(_maxEntriesPerCell).toList();
     final overflow = entries.length - shown.length;
@@ -254,19 +314,22 @@ class _DayCell extends StatelessWidget {
       height: 76,
       margin: const EdgeInsets.all(2),
       decoration: BoxDecoration(
+        // Days off (weekends, public holidays) are shaded light grey.
+        color: isDayOff ? _dayOffColor : null,
         border: Border.all(color: AppColors.borderSubtle),
         borderRadius: BorderRadius.circular(6),
       ),
       child: InkWell(
         key: Key('leave-day-$day'),
         borderRadius: BorderRadius.circular(6),
-        onTap: entries.isEmpty
+        onTap: entries.isEmpty && markers.isEmpty
             ? null
             : () => showAppDialog<void>(
                 context: context,
                 builder: (_) => _DayLeavesDialog(
                   date: DateTime(month.year, month.month, day!),
                   entries: entries,
+                  markers: markers,
                 ),
               ),
         child: Padding(
@@ -281,6 +344,7 @@ class _DayCell extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      for (final marker in markers) _MarkerChip(marker: marker),
                       for (final entry in shown) _EntryChip(entry: entry),
                       if (overflow > 0)
                         Text(
@@ -303,17 +367,20 @@ class _DayCell extends StatelessWidget {
 /// Everyone on leave on one day — the cell itself only has room for a few
 /// chips, so this is where "+N more" is actually readable.
 class _DayLeavesDialog extends StatelessWidget {
-  const _DayLeavesDialog({required this.date, required this.entries});
+  const _DayLeavesDialog({
+    required this.date,
+    required this.entries,
+    required this.markers,
+  });
 
   final DateTime date;
   final List<LeaveCalendarEntry> entries;
+  final List<_DayMarker> markers;
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(
-        'On leave · ${_monthNames[date.month - 1]} ${date.day}, ${date.year}',
-      ),
+      title: Text('${_monthNames[date.month - 1]} ${date.day}, ${date.year}'),
       content: SizedBox(
         width: 380,
         child: SingleChildScrollView(
@@ -321,6 +388,37 @@ class _DayLeavesDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              for (final marker in markers)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Icon(
+                        marker.isHoliday
+                            ? Icons.festival_outlined
+                            : Icons.home_work_outlined,
+                        size: 16,
+                        color: _markerColor(marker),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          marker.isHoliday
+                              ? 'Public holiday — ${marker.label}'
+                              : marker.label,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (entries.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'On leave',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ),
               for (final entry in entries)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
@@ -385,6 +483,76 @@ class _EntryChip extends StatelessWidget {
           style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color),
         ),
       ),
+    );
+  }
+}
+
+Color _markerColor(_DayMarker marker) =>
+    marker.isHoliday ? AppColors.warning : AppColors.primary;
+
+class _MarkerChip extends StatelessWidget {
+  const _MarkerChip({required this.marker});
+
+  final _DayMarker marker;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _markerColor(marker);
+    return Tooltip(
+      message: marker.label,
+      child: Container(
+        key: Key(marker.isHoliday ? 'calendar-holiday' : 'calendar-wfh'),
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          marker.isHoliday ? marker.label : 'WFH',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarLegend extends StatelessWidget {
+  const _CalendarLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(
+      context,
+    ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary);
+    Widget item(Color color, String text) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(text, style: style),
+      ],
+    );
+    return Wrap(
+      spacing: 16,
+      runSpacing: 4,
+      children: [
+        item(AppColors.warning, 'Public holiday'),
+        item(AppColors.primary, 'Work from home'),
+      ],
     );
   }
 }

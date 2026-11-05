@@ -9,6 +9,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import {
+  EMPLOYEE_CODE_EDIT_WINDOW_DAYS,
+  isEmployeeCodeLocked,
+  nextEmployeeCode,
+  normalizeEmployeeCode,
+} from './employee-code.util';
 import { RolesService } from '../../authentication/application/roles.service';
 import { NotificationsService } from '../../notifications/application/notifications.service';
 import { NotificationLinkTarget } from '../../notifications/domain/enums/notification-link-target.enum';
@@ -113,6 +119,7 @@ export interface FieldDiff {
  * (not a full Employee instance), since "before" is captured via `{...employee}`. */
 type EmployeeSnapshot = Pick<
   Employee,
+  | 'employeeCode'
   | 'firstName'
   | 'lastName'
   | 'designation'
@@ -246,7 +253,7 @@ export class EmployeesService {
           this.notificationsService.create({
             recipientUserId: approver.id,
             message: `HR added ${employee.firstName} ${employee.lastName} — awaiting your approval`,
-            linkTarget: NotificationLinkTarget.EMPLOYEES,
+            linkTarget: NotificationLinkTarget.REQUESTS,
             linkEntityId: employee.id,
           }),
         ),
@@ -781,6 +788,17 @@ export class EmployeesService {
     const before = { ...employee };
     const previousEmail = employee.user.email;
     const { companyEmail, ...employeeFields } = dto;
+    if (employeeFields.employeeCode == null) {
+      delete employeeFields.employeeCode;
+    } else {
+      const wanted = normalizeEmployeeCode(employeeFields.employeeCode);
+      if (wanted === employee.employeeCode) {
+        delete employeeFields.employeeCode;
+      } else {
+        await this.assertEmployeeCodeChangeAllowed(employee, wanted);
+        employeeFields.employeeCode = wanted;
+      }
+    }
     Object.assign(employee, definedFieldsOnly(employeeFields));
     const saved = await this.employeeRepository.save(employee);
 
@@ -1253,9 +1271,39 @@ export class EmployeesService {
     if (!employee) throw new NotFoundException('Employee not found');
   }
 
+  /** The next ID, continuing from the highest number anyone — current or
+   * past — has had, so an ID is never reused. */
   private async generateEmployeeCode(): Promise<string> {
-    const count = await this.employeeRepository.count();
-    return `ZC-${String(count + 1).padStart(5, '0')}`;
+    const everyone = (await this.employeeRepository.findAll()) ?? [];
+    return nextEmployeeCode(everyone.map((e) => e.employeeCode));
+  }
+
+  /** HR/Admin correcting an employee ID: only within the first 30 days after
+   * the employee was added, and never to an ID that any other employee
+   * (including a past one) has had. */
+  private async assertEmployeeCodeChangeAllowed(
+    employee: Employee,
+    wanted: string,
+  ): Promise<void> {
+    if (isEmployeeCodeLocked(employee.createdAt)) {
+      throw new BadRequestException(
+        `The employee ID can only be changed within ${EMPLOYEE_CODE_EDIT_WINDOW_DAYS} days of the employee being added`,
+      );
+    }
+    const everyone = (await this.employeeRepository.findAll()) ?? [];
+    const taken = everyone.find(
+      (e) =>
+        e.id !== employee.id &&
+        normalizeEmployeeCode(e.employeeCode) === wanted,
+    );
+    if (taken) {
+      const isPast =
+        taken.employmentStatus === EmploymentStatus.RESIGNED ||
+        taken.employmentStatus === EmploymentStatus.TERMINATED;
+      throw new ConflictException(
+        `${wanted} already belongs to ${this.fullName(taken)}${isPast ? ' (a past employee)' : ''}`,
+      );
+    }
   }
 
   private fullName(employee: Pick<Employee, 'firstName' | 'lastName'>): string {
@@ -1303,6 +1351,7 @@ export class EmployeesService {
       diffs.push({ fieldLabel, oldValue, newValue });
     };
 
+    addIfChanged('Employee ID', before.employeeCode, after.employeeCode);
     addIfChanged('First Name', before.firstName, after.firstName);
     addIfChanged('Last Name', before.lastName, after.lastName);
     addIfChanged(

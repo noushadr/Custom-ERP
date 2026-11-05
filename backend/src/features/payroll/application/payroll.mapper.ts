@@ -7,6 +7,11 @@ import {
   PayrollRunSummaryDto,
 } from './payroll-response.interface';
 
+/** Pay is always worked out over 30 calendar days. */
+export const DAYS_PER_MONTH = 30;
+/** ...and 8 working hours a day when pricing an hour. */
+export const HOURS_PER_DAY = 8;
+
 export function toPayrollLineItemResponse(
   item: PayrollLineItem,
 ): PayrollLineItemResponseDto {
@@ -18,16 +23,30 @@ export function toPayrollLineItemResponse(
     ? null
     : (item.employee!.profilePhotoUrl ?? null);
 
-  const salarySnapshot = Number(item.baseSalary);
-  const quantity = item.quantity ?? null;
-  const perUnitRate =
-    item.perUnitRate != null ? Number(item.perUnitRate) : null;
-  const baseSalary =
-    quantity != null && quantity > 0 && perUnitRate != null
-      ? quantity * perUnitRate
-      : salarySnapshot;
-  const additions = Number(item.additions);
-  const deductions = Number(item.deductions);
+  const baseSalary = Number(item.baseSalary);
+  const lateDeductionDays = isFreelancer ? 0 : item.lateDeductionDays;
+  // Always 30 calendar days, whatever the month's real length.
+  const lateDeduction = Math.round(
+    (lateDeductionDays * baseSalary) / DAYS_PER_MONTH,
+  );
+  const absentDays = isFreelancer ? 0 : item.absentDays;
+  const absentDeduction = Math.round((absentDays * baseSalary) / DAYS_PER_MONTH);
+  const advanceSalary = Number(item.advanceSalary);
+  const lateHours = isFreelancer ? 0 : Number(item.lateHours);
+  const lateHoursDeduction = Math.round(
+    (lateHours * baseSalary) / DAYS_PER_MONTH / HOURS_PER_DAY,
+  );
+  const toEntries = (list: { description: string; amount: number }[]) =>
+    (list ?? []).map((entry) => ({
+      description: entry.description,
+      amount: Number(entry.amount),
+    }));
+  const sumOf = (list: { amount: number }[]) =>
+    list.reduce((sum, entry) => sum + entry.amount, 0);
+  const fines = toEntries(item.fines);
+  const finesTotal = sumOf(fines);
+  const freelanceTasks = toEntries(item.freelanceTasks);
+  const freelanceTotal = sumOf(freelanceTasks);
 
   return {
     id: item.id,
@@ -37,11 +56,26 @@ export function toPayrollLineItemResponse(
     employeeName,
     employeePhotoUrl,
     baseSalary,
-    quantity,
-    perUnitRate,
-    additions,
-    deductions,
-    netPay: baseSalary + additions - deductions,
+    lateDays: isFreelancer ? 0 : item.lateDays,
+    lateDeductionDays,
+    lateDeduction,
+    absentDays,
+    absentDeduction,
+    advanceSalary,
+    lateHours,
+    lateHoursDeduction,
+    fines,
+    finesTotal,
+    freelanceTasks,
+    freelanceTotal,
+    netPay:
+      baseSalary -
+      lateDeduction -
+      lateHoursDeduction -
+      absentDeduction -
+      advanceSalary -
+      finesTotal +
+      freelanceTotal,
     notes: item.notes ?? null,
   };
 }

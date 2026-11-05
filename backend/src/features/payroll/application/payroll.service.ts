@@ -5,11 +5,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { resolveActorName } from '../../../core/utils/resolve-actor-name.util';
 import {
   USER_REPOSITORY,
   type UserRepository,
 } from '../../authentication/domain/repositories/user-repository.interface';
+import { AttendanceService } from '../../attendance/application/attendance.service';
+import { RolesService } from '../../authentication/application/roles.service';
 import { EmployeesService } from '../../employee/application/employees.service';
 import { EmploymentStatus } from '../../employee/domain/enums/employment-status.enum';
 import {
@@ -84,6 +87,8 @@ export class PayrollService {
     private readonly freelancerRepository: FreelancerRepository,
     private readonly employeesService: EmployeesService,
     private readonly notificationsService: NotificationsService,
+    private readonly attendanceService: AttendanceService,
+    private readonly rolesService: RolesService,
   ) {}
 
   async getRuns(): Promise<PayrollRunSummaryDto[]> {
@@ -143,7 +148,7 @@ export class PayrollService {
     );
     const asOfIsoDate = endOfMonthIso(dto.year, dto.month);
 
-    const lineItems = await Promise.all(
+    const allItems = await Promise.all(
       activeEmployees.map(async (employee) => {
         const baseSalary = await this.employeesService.getSalaryAsOf(
           employee.id,
@@ -154,13 +159,19 @@ export class PayrollService {
         item.employeeId = employee.id;
         item.freelancerId = null;
         item.baseSalary = baseSalary.toFixed(2);
-        item.quantity = null;
-        item.perUnitRate = null;
-        item.additions = '0.00';
-        item.deductions = '0.00';
+        item.fines = [];
+        item.freelanceTasks = [];
+        item.lateDays = 0;
+        item.lateDeductionDays = 0;
+        item.lateHours = '0.00';
+        item.absentDays = 0;
+        item.advanceSalary = '0.00';
         return item;
       }),
     );
+    // Someone with no salary on file (e.g. the owner) isn't on payroll.
+    const lineItems = allItems.filter((item) => Number(item.baseSalary) > 0);
+    await this.applyAttendance(lineItems, dto.month, dto.year);
     await this.lineItemRepository.saveMany(lineItems);
     // saveMany's returned rows don't carry the eager-loaded `employee`
     // relation the mapper needs (employeeName/photo) — re-fetch the whole
@@ -194,13 +205,23 @@ export class PayrollService {
       }
       item.baseSalary = dto.baseSalary.toFixed(2);
     }
-    if (dto.quantity !== undefined) item.quantity = dto.quantity;
-    if (dto.perUnitRate !== undefined) {
-      item.perUnitRate = dto.perUnitRate.toFixed(2);
+    const cleanEntries = (list: { description: string; amount: number }[]) =>
+      list.map((entry) => ({
+        description: entry.description.trim(),
+        amount: Math.round(entry.amount * 100) / 100,
+      }));
+    if (dto.fines !== undefined) item.fines = cleanEntries(dto.fines);
+    if (dto.freelanceTasks !== undefined) {
+      item.freelanceTasks = cleanEntries(dto.freelanceTasks);
     }
-    if (dto.additions !== undefined) item.additions = dto.additions.toFixed(2);
-    if (dto.deductions !== undefined) {
-      item.deductions = dto.deductions.toFixed(2);
+    if (dto.absentDays !== undefined) {
+      if (item.freelancerId != null) {
+        throw new BadRequestException("A freelancer has no absent days.");
+      }
+      item.absentDays = dto.absentDays;
+    }
+    if (dto.advanceSalary !== undefined) {
+      item.advanceSalary = dto.advanceSalary.toFixed(2);
     }
     if (dto.notes !== undefined) item.notes = dto.notes;
 
@@ -241,15 +262,89 @@ export class PayrollService {
     item.employeeId = null;
     item.freelancerId = freelancer.id;
     item.baseSalary = dto.baseSalary.toFixed(2);
-    item.quantity = null;
-    item.perUnitRate = null;
-    item.additions = '0.00';
-    item.deductions = '0.00';
+    item.fines = [];
+    item.freelanceTasks = [];
+    item.lateDays = 0;
+    item.lateDeductionDays = 0;
+    item.lateHours = '0.00';
+    item.absentDays = 0;
+    item.advanceSalary = '0.00';
     item.notes = dto.notes ?? null;
     await this.lineItemRepository.save(item);
 
     const lineItems = await this.lineItemRepository.findByRunId(runId);
     return toPayrollRunDetail(run, lineItems);
+  }
+
+  /** Re-reads the attendance for this run's month and refreshes every
+   * employee's late days, late hours and late deduction — for after attendance or work-
+   * from-home days were edited. Fines and freelance tasks are untouched. */
+  async syncRun(id: string): Promise<PayrollRunDetailDto> {
+    const run = await this.getRunOrThrow(id);
+    if (run.status !== PayrollRunStatus.DRAFT) {
+      throw new BadRequestException(
+        'Only a draft payroll run can be synced with attendance.',
+      );
+    }
+    const items = await this.lineItemRepository.findByRunId(run.id);
+    await this.applyAttendance(items, run.month, run.year);
+    await this.lineItemRepository.saveMany(items);
+    return toPayrollRunDetail(
+      run,
+      await this.lineItemRepository.findByRunId(run.id),
+    );
+  }
+
+  /** On the 1st of every month, reminds everyone who manages payroll to
+   * generate the run for the month that just ended (unless it exists). */
+  @Cron('0 9 1 * *')
+  async handleMonthlyPayrollReminder(): Promise<void> {
+    const now = new Date();
+    const previous = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const month = previous.getMonth() + 1;
+    const year = previous.getFullYear();
+    if (await this.runRepository.findByMonthYear(month, year)) return;
+
+    const managers =
+      await this.rolesService.findUsersWithPermission('payroll.manage');
+    for (const manager of managers) {
+      await this.notificationsService.create({
+        recipientUserId: manager.id,
+        message: `It's the 1st — generate the payroll for ${MONTH_NAMES[month - 1]} ${year}.`,
+      });
+    }
+  }
+
+  /** Sets each employee line item's late days / late-deduction days from the
+   * attendance for [month]/[year]. Freshens the machine data first (it
+   * silently falls back to what is already stored if the machine is down),
+   * and leaves anyone not tracked by attendance at zero. */
+  private async applyAttendance(
+    items: PayrollLineItem[],
+    month: number,
+    year: number,
+  ): Promise<void> {
+    try {
+      await this.attendanceService.refreshIfStale();
+    } catch {
+      // Use whatever attendance is already stored.
+    }
+    const attendance = await this.attendanceService.getCompanyMonth(
+      month,
+      year,
+    );
+    const byEmployee = new Map(attendance.map((a) => [a.employeeId, a]));
+    for (const item of items) {
+      if (item.employeeId == null) continue;
+      const tracked = byEmployee.get(item.employeeId);
+      item.lateDays = tracked?.linked ? tracked.summary.late : 0;
+      item.lateDeductionDays = tracked?.linked
+        ? tracked.summary.lateDeductionDays
+        : 0;
+      item.lateHours = (
+        tracked?.linked ? tracked.summary.hoursCutMinutes / 60 : 0
+      ).toFixed(2);
+    }
   }
 
   async finalizeRun(

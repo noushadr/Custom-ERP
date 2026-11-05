@@ -8,22 +8,31 @@ export interface PayrollLineItemResponseDto {
   isFreelancer: boolean;
   employeeName: string;
   employeePhotoUrl: string | null;
-  /** The salary snapshot for salaried employees, or `quantity *
-   * perUnitRate` for piece-rate employees (see `quantity`/`perUnitRate`
-   * below) — whichever this run's effective base pay actually is. */
+  /** The salary snapshot (or, for a freelancer, the amount entered). */
   baseSalary: number;
-  /** Piece-rate units this run; `null` for salaried employees. */
-  quantity: number | null;
-  perUnitRate: number | null;
-  /** A one-off amount added on top of `baseSalary` this run — freely
-   * editable while the run is Draft, defaults to 0. */
-  additions: number;
-  /** A one-off amount subtracted from `baseSalary` this run — freely
-   * editable while the run is Draft, defaults to 0. */
-  deductions: number;
-  /** `baseSalary + additions - deductions` — computed here, not stored
-   * (this app deliberately has no attendance module or itemized
-   * fines/allowances breakdown beyond this one addition/deduction pair). */
+  /** Late arrivals counted from attendance for the month. */
+  lateDays: number;
+  /** Unpaid days those lates earn. */
+  lateDeductionDays: number;
+  /** `lateDeductionDays` at `baseSalary / 30` — always 30 calendar days. */
+  lateDeduction: number;
+  /** Unpaid absent days entered by HR. */
+  absentDays: number;
+  /** `absentDays` at `baseSalary / 30` each. */
+  absentDeduction: number;
+  /** Advance salary already paid out, taken off this run. */
+  advanceSalary: number;
+  /** Hours cut counted from attendance (e.g. 2 = two hours). */
+  lateHours: number;
+  /** `lateHours` at `baseSalary / 30 / 8` per hour. */
+  lateHoursDeduction: number;
+  fines: { description: string; amount: number }[];
+  finesTotal: number;
+  freelanceTasks: { description: string; amount: number }[];
+  freelanceTotal: number;
+  /** `baseSalary - lateDeduction - lateHoursDeduction - absentDeduction
+   * - advanceSalary - finesTotal + freelanceTotal` — computed, not
+   * stored. */
   netPay: number;
   notes: string | null;
 }

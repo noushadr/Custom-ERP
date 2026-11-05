@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AttendanceModule } from '../attendance/attendance.module';
 import { AuthenticationModule } from '../authentication/authentication.module';
 import { EmployeeModule } from '../employee/employee.module';
 import { FreelancersModule } from '../freelancers/freelancers.module';
@@ -21,6 +22,7 @@ import { PayslipController } from './presentation/payslip.controller';
     EmployeeModule,
     NotificationsModule,
     FreelancersModule,
+    AttendanceModule,
   ],
   controllers: [PayrollController, PayslipController],
   providers: [

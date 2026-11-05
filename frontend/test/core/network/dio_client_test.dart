@@ -35,7 +35,10 @@ class _FakeServer implements HttpClientAdapter {
       refreshCalls++;
       await Future<void>.delayed(const Duration(milliseconds: 50));
       if (refreshStatus == 200) {
-        return _json(200, {'accessToken': 'fresh', 'refreshToken': 'refresh-2'});
+        return _json(200, {
+          'accessToken': 'fresh',
+          'refreshToken': 'refresh-2',
+        });
       }
       return _json(refreshStatus, {'message': 'nope'});
     }
@@ -63,21 +66,25 @@ class _FakeServer implements HttpClientAdapter {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('a burst of 401s shares ONE refresh and every request recovers', () async {
-    final t = _setup();
-    await t.storage.saveTokens(
-      accessToken: 'expired',
-      refreshToken: 'refresh-1',
-    );
+  test(
+    'a burst of 401s shares ONE refresh and every request recovers',
+    () async {
+      final t = _setup();
+      await t.storage.saveTokens(
+        accessToken: 'expired',
+        refreshToken: 'refresh-1',
+      );
 
-    final responses = await Future.wait([
-      for (var i = 0; i < 12; i++) t.client.dio.get<Map<String, dynamic>>('/data'),
-    ]);
+      final responses = await Future.wait([
+        for (var i = 0; i < 12; i++)
+          t.client.dio.get<Map<String, dynamic>>('/data'),
+      ]);
 
-    expect(responses.every((r) => r.statusCode == 200), isTrue);
-    expect(t.server.refreshCalls, 1);
-    expect(await t.storage.accessToken, 'fresh');
-  });
+      expect(responses.every((r) => r.statusCode == 200), isTrue);
+      expect(t.server.refreshCalls, 1);
+      expect(await t.storage.accessToken, 'fresh');
+    },
+  );
 
   test('a rate-limited (429) refresh keeps the saved login', () async {
     final t = _setup(refreshStatus: 429);
@@ -109,22 +116,25 @@ void main() {
     expect(await t.storage.refreshToken, isNull);
   });
 
-  test('a later expiry refreshes again once the first one has finished', () async {
-    final t = _setup();
-    await t.storage.saveTokens(
-      accessToken: 'expired',
-      refreshToken: 'refresh-1',
-    );
-    await t.client.dio.get<Map<String, dynamic>>('/data');
-    expect(t.server.refreshCalls, 1);
+  test(
+    'a later expiry refreshes again once the first one has finished',
+    () async {
+      final t = _setup();
+      await t.storage.saveTokens(
+        accessToken: 'expired',
+        refreshToken: 'refresh-1',
+      );
+      await t.client.dio.get<Map<String, dynamic>>('/data');
+      expect(t.server.refreshCalls, 1);
 
-    await t.storage.saveTokens(
-      accessToken: 'expired-again',
-      refreshToken: 'refresh-2',
-    );
-    final response = await t.client.dio.get<Map<String, dynamic>>('/data');
+      await t.storage.saveTokens(
+        accessToken: 'expired-again',
+        refreshToken: 'refresh-2',
+      );
+      final response = await t.client.dio.get<Map<String, dynamic>>('/data');
 
-    expect(response.statusCode, 200);
-    expect(t.server.refreshCalls, 2);
-  });
+      expect(response.statusCode, 200);
+      expect(t.server.refreshCalls, 2);
+    },
+  );
 }

@@ -29,10 +29,15 @@ abstract class AttendanceRepository {
   Future<AttendanceSettings> updateSettings({
     required String shiftStart,
     required String shiftEnd,
+    required String hoursCutAfter,
+    required String hoursCutFrom,
     required int graceMinutes,
   });
 
   Future<AttendanceSyncResult> sync();
+
+  /// Any signed-in user: pulls the latest scans unless a sync just ran.
+  Future<AttendanceSyncResult> refresh();
 
   Future<List<AttendanceMapping>> getMapping();
 
@@ -46,6 +51,37 @@ abstract class AttendanceRepository {
   Future<List<AttendanceMapping>> setIgnored({
     required String deviceUserId,
     required bool ignored,
+  });
+
+  /// Every company work-from-home day (date + note only), for the calendar.
+  Future<List<({String date, String? note})>> getWfhCalendar();
+
+  /// Work-from-home days from two months back onward. HR/Admin only.
+  Future<List<WfhDay>> getWfhDays();
+
+  Future<WfhDay> addWfhDay({required String date, String? note});
+
+  Future<void> removeWfhDay(String date);
+
+  /// The tracked employees and whether each was marked as having worked.
+  Future<List<WfhDayEmployee>> getWfhDayAttendance(String date);
+
+  /// Replaces who is marked as having worked on that work-from-home day.
+  Future<List<WfhDayEmployee>> setWfhDayAttendance({
+    required String date,
+    required List<String> employeeIds,
+  });
+
+  /// HR marks one person's own day as work from home (a genuine issue): no
+  /// machine attendance that day, just present.
+  Future<void> markEmployeeWfh({
+    required String employeeId,
+    required String date,
+  });
+
+  Future<void> unmarkEmployeeWfh({
+    required String employeeId,
+    required String date,
   });
 
   /// Links machine users to employees with matching names. Returns how many.

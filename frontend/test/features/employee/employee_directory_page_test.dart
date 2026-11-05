@@ -715,8 +715,16 @@ void main() {
     await _useTallSurface(tester);
     final repository = FakeEmployeeRepository(
       employees: [
-        buildTestEmployee(id: 'e1', fullName: 'Remote Rita', workMode: 'remote'),
-        buildTestEmployee(id: 'e2', fullName: 'Onsite Omar', workMode: 'on_site'),
+        buildTestEmployee(
+          id: 'e1',
+          fullName: 'Remote Rita',
+          workMode: 'remote',
+        ),
+        buildTestEmployee(
+          id: 'e2',
+          fullName: 'Onsite Omar',
+          workMode: 'on_site',
+        ),
       ],
     );
     await tester.pumpWidget(

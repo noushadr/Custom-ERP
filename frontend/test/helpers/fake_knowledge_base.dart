@@ -305,7 +305,10 @@ class FakeKnowledgeBaseRepository implements KnowledgeBaseRepository {
     lastReplacedTitle = title;
     if (updateArticleError != null) throw updateArticleError!;
     return updateArticleResult ??
-        buildTestKnowledgeBaseFileArticle(id: id, fileName: files.first.fileName);
+        buildTestKnowledgeBaseFileArticle(
+          id: id,
+          fileName: files.first.fileName,
+        );
   }
 
   @override

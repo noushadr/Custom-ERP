@@ -10,7 +10,9 @@ import '../../application/attendance_providers.dart';
 import '../../domain/entities/attendance.dart';
 import '../../domain/exceptions/attendance_exception.dart';
 import '../widgets/attendance_day_table.dart';
+import '../../../employee/application/employee_providers.dart';
 import '../widgets/attendance_machine_view.dart';
+import '../widgets/attendance_wfh_section.dart';
 
 const _monthNames = [
   'January',
@@ -84,7 +86,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                           ),
                           ButtonSegment(
                             value: _View.machine,
-                            label: Text('Machine & Settings'),
+                            label: Text('Settings'),
                           ),
                         ],
                         selected: {_view},
@@ -92,10 +94,17 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                             setState(() => _view = s.first),
                       ),
                     if (view != _View.machine)
-                      _MonthSwitcher(
-                        month: _month,
-                        onPrevious: () => _shift(-1),
-                        onNext: () => _shift(1),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _MonthSwitcher(
+                            month: _month,
+                            onPrevious: () => _shift(-1),
+                            onNext: () => _shift(1),
+                          ),
+                          const SizedBox(width: 8),
+                          const _RefreshButton(),
+                        ],
                       ),
                   ],
                 ),
@@ -110,6 +119,67 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Pulls the latest scans from the machine so the numbers are never stale.
+/// Open to everyone: the server skips the pull if one just succeeded.
+class _RefreshButton extends ConsumerStatefulWidget {
+  const _RefreshButton();
+
+  @override
+  ConsumerState<_RefreshButton> createState() => _RefreshButtonState();
+}
+
+class _RefreshButtonState extends ConsumerState<_RefreshButton> {
+  bool _busy = false;
+
+  Future<void> _refresh() async {
+    setState(() => _busy = true);
+    try {
+      final result = await ref.read(attendanceRepositoryProvider).refresh();
+      ref.invalidate(myAttendanceProvider);
+      ref.invalidate(companyAttendanceProvider);
+      ref.invalidate(attendanceSettingsProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.skipped
+                ? 'Already up to date.'
+                : result.inserted == 0
+                ? 'Synced — nothing new.'
+                : 'Synced — ${result.inserted} new scan(s).',
+          ),
+        ),
+      );
+    } on AttendanceException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      key: const Key('attendance-refresh'),
+      onPressed: _busy ? null : _refresh,
+      icon: _busy
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.sync, size: 18),
+      label: const Text('Sync now'),
     );
   }
 }
@@ -232,14 +302,19 @@ class _MyView extends ConsumerWidget {
 
 /// Summary tiles plus the day-by-day table for one employee's month.
 class _EmployeeMonth extends StatelessWidget {
-  const _EmployeeMonth({required this.attendance, this.trailing});
+  const _EmployeeMonth({
+    required this.attendance,
+    this.trailing,
+    this.onToggleWfh,
+  });
 
   final EmployeeAttendance attendance;
   final Widget? trailing;
+  final void Function(AttendanceDay day)? onToggleWfh;
 
   @override
   Widget build(BuildContext context) {
-    if (attendance.remote) {
+    if (attendance.remote && !attendance.linked) {
       return const FormSection(
         child: Text('Attendance is not tracked for remote work.'),
       );
@@ -282,6 +357,27 @@ class _EmployeeMonth extends StatelessWidget {
               dense: true,
             ),
             MetricCard(
+              label: 'Hours Cut',
+              value: formatAttendanceMinutes(
+                s.hoursCutMinutes,
+                blankZero: false,
+              ),
+              secondaryValue: s.hoursCutDays == 0
+                  ? null
+                  : 'over ${s.hoursCutDays} day${s.hoursCutDays == 1 ? '' : 's'}',
+              color: AppColors.error,
+              icon: Icons.content_cut_outlined,
+              dense: true,
+            ),
+            MetricCard(
+              label: 'Late Deduction',
+              value:
+                  '${s.lateDeductionDays} day${s.lateDeductionDays == 1 ? '' : 's'}',
+              color: AppColors.error,
+              icon: Icons.money_off_outlined,
+              dense: true,
+            ),
+            MetricCard(
               label: 'On Leave',
               value: '${s.leave}',
               color: AppColors.secondary,
@@ -301,7 +397,10 @@ class _EmployeeMonth extends StatelessWidget {
         FormSection(
           title: 'Daily record',
           trailing: trailing,
-          child: AttendanceDayTable(days: attendance.days),
+          child: AttendanceDayTable(
+            days: attendance.days,
+            onToggleWfh: onToggleWfh,
+          ),
         ),
       ],
     );
@@ -356,7 +455,8 @@ class _CompanyViewState extends ConsumerState<_CompanyView> {
                   )
                   .toList();
         final linked = employees.where((e) => e.linked).toList();
-        final presentToday = _presentToday(linked);
+        final today = _todayCounts(linked);
+        final remoteCount = _remoteCount(ref, linked);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,9 +474,30 @@ class _CompanyViewState extends ConsumerState<_CompanyView> {
                 ),
                 MetricCard(
                   label: 'In Today',
-                  value: '$presentToday',
+                  value: '${today.inToday}',
                   color: AppColors.success,
                   icon: Icons.login,
+                  dense: true,
+                ),
+                MetricCard(
+                  label: 'Late Today',
+                  value: '${today.late}',
+                  color: AppColors.warning,
+                  icon: Icons.schedule,
+                  dense: true,
+                ),
+                MetricCard(
+                  label: 'Absent Today',
+                  value: '${today.absent}',
+                  color: AppColors.error,
+                  icon: Icons.person_off_outlined,
+                  dense: true,
+                ),
+                MetricCard(
+                  label: 'Working From Home',
+                  value: '${remoteCount + today.workingFromHome}',
+                  color: AppColors.primary,
+                  icon: Icons.home_work_outlined,
                   dense: true,
                 ),
                 MetricCard(
@@ -396,6 +517,8 @@ class _CompanyViewState extends ConsumerState<_CompanyView> {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            const AttendanceWfhSection(),
             const SizedBox(height: 16),
             FormSection(
               title: 'Everyone',
@@ -431,10 +554,7 @@ class _CompanyViewState extends ConsumerState<_CompanyView> {
                       child: Text('No employees match your search.'),
                     )
                   else
-                    _CompanyTable(
-                      rows: visible,
-                      period: widget.period,
-                    ),
+                    _CompanyTable(rows: visible, period: widget.period),
                 ],
               ),
             ),
@@ -444,19 +564,49 @@ class _CompanyViewState extends ConsumerState<_CompanyView> {
     );
   }
 
-  /// How many tracked employees have a clock-in today (only meaningful when
-  /// the month on screen is the current one).
-  int _presentToday(List<EmployeeAttendance> linked) {
+  /// Today's headcounts across the tracked employees (only meaningful when
+  /// the month on screen is the current one): in, absent (nobody expected
+  /// who hasn't shown up and isn't on leave), and marked as work from home.
+  ({int inToday, int absent, int late, int workingFromHome}) _todayCounts(
+    List<EmployeeAttendance> linked,
+  ) {
     final now = DateTime.now();
     if (widget.period.month != now.month || widget.period.year != now.year) {
-      return 0;
+      return (inToday: 0, absent: 0, late: 0, workingFromHome: 0);
     }
     final today =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-'
         '${now.day.toString().padLeft(2, '0')}';
-    return linked
+    var inToday = 0;
+    var absent = 0;
+    var late = 0;
+    var wfh = 0;
+    for (final e in linked) {
+      final day = e.days.where((d) => d.date == today).firstOrNull;
+      if (day == null) continue;
+      if (day.clockIn != null) inToday++;
+      if (day.arrivalLateMinutes > 0) late++;
+      if (day.status == AttendanceStatus.absent ||
+          day.status == AttendanceStatus.pending) {
+        absent++;
+      }
+      if (day.status == AttendanceStatus.wfh) wfh++;
+    }
+    return (inToday: inToday, absent: absent, late: late, workingFromHome: wfh);
+  }
+
+  /// Active remote employees who aren't tracked on the machine — people who
+  /// work from home all the time.
+  int _remoteCount(WidgetRef ref, List<EmployeeAttendance> linked) {
+    final everyone = ref.watch(employeeListProvider).valueOrNull;
+    if (everyone == null) return 0;
+    final trackedIds = {for (final e in linked) e.employeeId};
+    return everyone
         .where(
-          (e) => e.days.any((d) => d.date == today && d.clockIn != null),
+          (e) =>
+              e.workMode == 'remote' &&
+              e.employmentStatus == 'active' &&
+              !trackedIds.contains(e.id),
         )
         .length;
   }
@@ -485,6 +635,24 @@ class _CompanyTable extends StatelessWidget {
               const DataColumn(label: Text('Employee')),
               numeric('Present'),
               numeric('Late'),
+              DataColumn(
+                label: const Tooltip(
+                  message:
+                      'One unpaid absence for every 3rd late day '
+                      '(every 5th for team leads)',
+                  child: Text('Late deduction'),
+                ),
+                numeric: true,
+              ),
+              DataColumn(
+                label: const Tooltip(
+                  message:
+                      'Arrived after the cut-off: hours are cut instead of '
+                      'a late mark',
+                  child: Text('Hours cut'),
+                ),
+                numeric: true,
+              ),
               numeric('Absent'),
               numeric('Leave'),
               numeric('Late time'),
@@ -495,8 +663,10 @@ class _CompanyTable extends StatelessWidget {
                 DataRow(
                   onSelectChanged: (_) => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) =>
-                          _EmployeeAttendancePage(attendance: e, period: period),
+                      builder: (_) => _EmployeeAttendancePage(
+                        attendance: e,
+                        period: period,
+                      ),
                     ),
                   ),
                   cells: [
@@ -534,7 +704,62 @@ class _CompanyTable extends StatelessWidget {
                       ),
                     ),
                     DataCell(Text(e.linked ? '${e.summary.present}' : '—')),
-                    DataCell(Text(e.linked ? '${e.summary.late}' : '—')),
+                    DataCell(
+                      Text(
+                        e.linked ? '${e.summary.late}' : '—',
+                        style: TextStyle(
+                          color: e.linked && e.summary.late > 0
+                              ? AppColors.warning
+                              : null,
+                          fontWeight: e.linked && e.summary.late > 0
+                              ? FontWeight.w700
+                              : null,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        e.linked
+                            ? (e.summary.lateDeductionDays == 0
+                                  ? '0'
+                                  : '${e.summary.lateDeductionDays} day'
+                                        '${e.summary.lateDeductionDays == 1 ? '' : 's'}')
+                            : '—',
+                        style: TextStyle(
+                          color: e.linked && e.summary.lateDeductionDays > 0
+                              ? AppColors.error
+                              : null,
+                          fontWeight:
+                              e.linked && e.summary.lateDeductionDays > 0
+                              ? FontWeight.w700
+                              : null,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Tooltip(
+                        message: e.summary.hoursCutDays == 0
+                            ? 'No hours cut'
+                            : 'Hours cut over ${e.summary.hoursCutDays} '
+                                  'day${e.summary.hoursCutDays == 1 ? '' : 's'}',
+                        child: Text(
+                          e.linked
+                              ? formatAttendanceMinutes(
+                                  e.summary.hoursCutMinutes,
+                                  blankZero: false,
+                                )
+                              : '—',
+                          style: TextStyle(
+                            color: e.linked && e.summary.hoursCutDays > 0
+                                ? AppColors.error
+                                : null,
+                            fontWeight: e.linked && e.summary.hoursCutDays > 0
+                                ? FontWeight.w700
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
                     DataCell(
                       Text(
                         e.linked ? '${e.summary.absent}' : '—',
@@ -554,6 +779,11 @@ class _CompanyTable extends StatelessWidget {
                                 blankZero: false,
                               )
                             : '—',
+                        style: TextStyle(
+                          color: e.linked && e.summary.lateMinutes > 0
+                              ? AppColors.warning
+                              : null,
+                        ),
                       ),
                     ),
                     DataCell(
@@ -576,7 +806,8 @@ class _CompanyTable extends StatelessWidget {
   }
 }
 
-/// One employee's month, opened from the company table.
+/// One employee's month, opened from the company table. It watches the live
+/// company data, so marking a day as work from home updates it at once.
 class _EmployeeAttendancePage extends ConsumerWidget {
   const _EmployeeAttendancePage({
     required this.attendance,
@@ -586,12 +817,48 @@ class _EmployeeAttendancePage extends ConsumerWidget {
   final EmployeeAttendance attendance;
   final AttendancePeriod period;
 
+  Future<void> _toggleWfh(
+    BuildContext context,
+    WidgetRef ref,
+    EmployeeAttendance current,
+    AttendanceDay day,
+  ) async {
+    final repository = ref.read(attendanceRepositoryProvider);
+    try {
+      if (day.status == AttendanceStatus.wfh) {
+        await repository.unmarkEmployeeWfh(
+          employeeId: current.employeeId,
+          date: day.date,
+        );
+      } else {
+        await repository.markEmployeeWfh(
+          employeeId: current.employeeId,
+          date: day.date,
+        );
+      }
+      ref.invalidate(companyAttendanceProvider);
+      ref.invalidate(wfhDaysProvider);
+    } on AttendanceException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final live = ref
+        .watch(companyAttendanceProvider(period))
+        .valueOrNull
+        ?.where((e) => e.employeeId == attendance.employeeId)
+        .firstOrNull;
+    final current = live ?? attendance;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          '${attendance.employeeName} — '
+          '${current.employeeName} — '
           '${_monthNames[period.month - 1]} ${period.year}',
         ),
       ),
@@ -601,15 +868,16 @@ class _EmployeeAttendancePage extends ConsumerWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1040),
             child: _EmployeeMonth(
-              attendance: attendance,
+              attendance: current,
+              onToggleWfh: (day) => _toggleWfh(context, ref, current, day),
               trailing: OutlinedButton.icon(
                 onPressed: () => _exportPdf(
                   context,
                   ref,
                   period: period,
-                  employeeId: attendance.employeeId,
+                  employeeId: current.employeeId,
                   fileName: _pdfName(
-                    'Attendance-${attendance.employeeName.replaceAll(' ', '-')}',
+                    'Attendance-${current.employeeName.replaceAll(' ', '-')}',
                     period,
                   ),
                 ),

@@ -1,3 +1,4 @@
+import '../entities/payroll_line_item.dart';
 import '../entities/payroll_run_detail.dart';
 import '../entities/payroll_run_summary.dart';
 import '../entities/payslip_list_item.dart';
@@ -13,12 +14,16 @@ abstract interface class PayrollRepository {
     String runId,
     String lineItemId, {
     double? baseSalary,
-    int? quantity,
-    double? perUnitRate,
-    double? additions,
-    double? deductions,
+    int? absentDays,
+    double? advanceSalary,
+    List<PayrollEntry>? fines,
+    List<PayrollEntry>? freelanceTasks,
     String? notes,
   });
+
+  /// Re-reads attendance for the run's month and refreshes everyone's late
+  /// deduction (fines and freelance tasks are kept). Draft runs only.
+  Future<PayrollRunDetail> syncRun(String id);
 
   /// Adds one freelancer to a draft run, with this month's pay entered
   /// directly (freelancers have no salary history to snapshot from).

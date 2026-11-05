@@ -7,6 +7,7 @@ import 'package:zera_erp/features/authentication/domain/entities/auth_user.dart'
 import 'package:zera_erp/features/freelancers/application/freelancers_providers.dart';
 import 'package:zera_erp/features/payroll/application/payroll_providers.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_department_total.dart';
+import 'package:zera_erp/features/payroll/domain/entities/payroll_line_item.dart';
 import 'package:zera_erp/features/payroll/domain/entities/payroll_run_status.dart';
 import 'package:zera_erp/features/payroll/presentation/pages/payroll_run_detail_page.dart';
 
@@ -52,7 +53,7 @@ void main() {
           buildTestPayrollLineItem(
             employeeName: 'Jane Doe',
             baseSalary: 50000,
-            deductions: 2000,
+            fines: [PayrollEntry(description: 'Late file', amount: 2000)],
           ),
         ],
       ),
@@ -115,72 +116,149 @@ void main() {
   });
 
   testWidgets(
-    'editing a line item in a draft run submits new additions/deductions',
+    'editing a line item in a draft run submits fines and freelance tasks',
     (tester) async {
+      tester.view.physicalSize = const Size(1000, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final repository = FakePayrollRepository(
         runDetail: buildTestPayrollRunDetail(
           status: PayrollRunStatus.draft,
           lineItems: [
-            buildTestPayrollLineItem(id: 'item-9', employeeName: 'Jane Doe'),
+            buildTestPayrollLineItem(
+              id: 'item-9',
+              employeeName: 'Faiz Khan',
+              baseSalary: 60000,
+              lateDays: 7,
+              lateDeductionDays: 2,
+              lateHours: 2,
+            ),
           ],
         ),
       );
       await tester.pumpWidget(_app(repository: repository));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Jane Doe'));
+      await tester.ensureVisible(
+        find.byKey(const Key('edit-line-item-item-9')),
+      );
+      await tester.tap(find.byKey(const Key('edit-line-item-item-9')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Jane Doe'), findsWidgets); // dialog title + table cell
+      // Automatic deductions are shown, not editable: 2 days x 60,000 / 30 =
+      // 4,000 and 2 hours x 60,000 / 30 / 8 = 500.
+      expect(find.text('Deducted automatically'.toUpperCase()), findsOneWidget);
+      expect(find.text('-PKR 4,000.00'), findsOneWidget);
+      expect(find.text('-PKR 500.00'), findsOneWidget);
+
+      // A task row is already open; fines (and the note) wait for their button.
+      expect(find.byKey(const Key('fine-description-0')), findsNothing);
+      expect(find.byKey(const Key('note-field')), findsNothing);
+      expect(find.byKey(const Key('task-description-0')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('add-fine')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('fine-description-0')), findsOneWidget);
 
       await tester.enterText(
-        find.widgetWithText(TextField, 'Additions (PKR)'),
-        '500',
+        find.byKey(const Key('fine-description-0')),
+        'Late file',
       );
+      await tester.enterText(find.byKey(const Key('fine-amount-0')), '500');
+      await tester.tap(find.byKey(const Key('add-fine')));
+      await tester.pumpAndSettle();
       await tester.enterText(
-        find.widgetWithText(TextField, 'Deductions (PKR)'),
-        '2000',
+        find.byKey(const Key('fine-description-1')),
+        'Mug',
       );
+      await tester.enterText(find.byKey(const Key('fine-amount-1')), '250');
+      await tester.enterText(
+        find.byKey(const Key('task-description-0')),
+        'Logo',
+      );
+      await tester.enterText(find.byKey(const Key('task-amount-0')), '3000');
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('PKR 48,500.00'), findsOneWidget);
+      // 60,000 - 4,000 - 500 - 750 + 3,000
+      expect(
+        tester.widget<Text>(find.byKey(const Key('net-pay-preview'))).data,
+        'PKR 57,750.00',
+      );
 
       await tester.tap(find.widgetWithText(FilledButton, 'Save'));
       await tester.pumpAndSettle();
 
       expect(repository.lastUpdatedLineItemId, 'item-9');
-      expect(repository.lastUpdatedAdditions, 500);
-      expect(repository.lastUpdatedDeductions, 2000);
+      expect(repository.lastUpdatedFines, hasLength(2));
+      expect(repository.lastUpdatedFines!.first.description, 'Late file');
+      expect(repository.lastUpdatedFines!.last.amount, 250);
+      expect(repository.lastUpdatedFreelanceTasks, hasLength(1));
+      expect(repository.lastUpdatedFreelanceTasks!.first.amount, 3000);
     },
   );
 
-  testWidgets('editing piece-rate quantity and per-unit rate submits both', (
+  testWidgets('a half-filled fine row is rejected, a blank one is skipped', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(1000, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final repository = FakePayrollRepository(
       runDetail: buildTestPayrollRunDetail(
         status: PayrollRunStatus.draft,
-        lineItems: [
-          buildTestPayrollLineItem(id: 'item-9', employeeName: 'Kulsum Zehra'),
-        ],
+        lineItems: [buildTestPayrollLineItem(id: 'item-9')],
+      ),
+    );
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('edit-line-item-item-9')));
+    await tester.tap(find.byKey(const Key('edit-line-item-item-9')));
+    await tester.pumpAndSettle();
+
+    // Nothing added: saves fine and sends an empty list.
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+    expect(repository.lastUpdatedFines, isEmpty);
+
+    await tester.ensureVisible(find.byKey(const Key('edit-line-item-item-9')));
+    await tester.tap(find.byKey(const Key('edit-line-item-item-9')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('add-fine')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('fine-amount-0')), '100');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('needs both a reason'), findsOneWidget);
+  });
+
+  testWidgets('the sync button re-syncs a draft run with attendance', (
+    tester,
+  ) async {
+    final repository = FakePayrollRepository(
+      runDetail: buildTestPayrollRunDetail(status: PayrollRunStatus.draft),
+    );
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('sync-payroll-button')));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastSyncedRunId, 'run-1');
+  });
+
+  testWidgets('a finalized run has no sync or edit controls', (tester) async {
+    final repository = FakePayrollRepository(
+      runDetail: buildTestPayrollRunDetail(
+        status: PayrollRunStatus.finalized,
+        lineItems: [buildTestPayrollLineItem(id: 'item-9')],
       ),
     );
     await tester.pumpWidget(_app(repository: repository));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Kulsum Zehra'));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(find.widgetWithText(TextField, 'Quantity'), '5');
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Per unit (PKR)'),
-      '1000',
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-    await tester.pumpAndSettle();
-
-    expect(repository.lastUpdatedQuantity, 5);
-    expect(repository.lastUpdatedPerUnitRate, 1000);
+    expect(find.byKey(const Key('sync-payroll-button')), findsNothing);
+    expect(find.byKey(const Key('edit-line-item-item-9')), findsNothing);
   });
 
   testWidgets(
@@ -198,12 +276,12 @@ void main() {
       await tester.tap(find.text('Jane Doe'));
       await tester.pumpAndSettle();
 
-      expect(find.widgetWithText(TextField, 'Additions (PKR)'), findsNothing);
+      expect(find.widgetWithText(TextField, 'Fines (PKR)'), findsNothing);
     },
   );
 
   testWidgets(
-    'the line items table shows Employee, Base, Additions, Deductions, and Net Pay',
+    'the line items table shows Employee, Base, Late, Fines, Freelance and Net Pay',
     (tester) async {
       final repository = FakePayrollRepository(
         runDetail: buildTestPayrollRunDetail(
@@ -212,7 +290,10 @@ void main() {
             buildTestPayrollLineItem(
               employeeName: 'Jane Doe',
               baseSalary: 50000,
-              deductions: 2000,
+              lateDays: 4,
+              lateDeductionDays: 1,
+              fines: [PayrollEntry(description: 'Late file', amount: 500)],
+              freelanceTasks: [PayrollEntry(description: 'Logo', amount: 3000)],
             ),
           ],
         ),
@@ -222,13 +303,15 @@ void main() {
 
       expect(find.text('Employee'), findsOneWidget);
       expect(find.text('Base'), findsOneWidget);
-      expect(find.text('Additions'), findsOneWidget);
-      expect(find.text('Deductions'), findsOneWidget);
+      expect(find.text('Late'), findsOneWidget);
+      expect(find.text('Fines'), findsOneWidget);
+      expect(find.text('Freelance'), findsOneWidget);
       expect(find.text('Net Pay'), findsOneWidget);
-      expect(find.text('-2,000.00'), findsOneWidget);
-      expect(find.text('Fines'), findsNothing);
-      expect(find.text('Absent'), findsNothing);
-      expect(find.text('Late Days'), findsNothing);
+      expect(find.text('-1,667.00'), findsOneWidget); // 1 day x 50,000 / 30
+      expect(find.text('-500.00'), findsOneWidget);
+      expect(find.text('+3,000.00'), findsOneWidget);
+      expect(find.text('Additions'), findsNothing);
+      expect(find.text('Deductions'), findsNothing);
     },
   );
 
@@ -347,10 +430,10 @@ void main() {
 
     expect(find.text('Payroll by Department'), findsOneWidget);
     expect(find.text('Engineering'), findsOneWidget);
-    expect(find.text('80.0% of payroll'), findsOneWidget);
+    expect(find.text('80.0%'), findsOneWidget);
     expect(find.text('PKR 80,000 · 1 person'), findsOneWidget);
     expect(find.text('Freelancers'), findsOneWidget);
-    expect(find.text('20.0% of payroll'), findsOneWidget);
+    expect(find.text('20.0%'), findsOneWidget);
     expect(find.text('PKR 20,000 · 1 person'), findsOneWidget);
   });
 
@@ -396,4 +479,115 @@ void main() {
 
     expect(find.byIcon(Icons.download_outlined), findsNothing);
   });
+
+  testWidgets('the note field only appears after pressing Add note', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repository = FakePayrollRepository(
+      runDetail: buildTestPayrollRunDetail(
+        status: PayrollRunStatus.draft,
+        lineItems: [buildTestPayrollLineItem(id: 'item-9')],
+      ),
+    );
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('edit-line-item-item-9')));
+    await tester.tap(find.byKey(const Key('edit-line-item-item-9')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('note-field')), findsNothing);
+    await tester.tap(find.byKey(const Key('add-note')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('note-field')), findsOneWidget);
+    expect(find.byKey(const Key('add-note')), findsNothing);
+  });
+
+  testWidgets('searching filters the line items by employee name', (
+    tester,
+  ) async {
+    final repository = FakePayrollRepository(
+      runDetail: buildTestPayrollRunDetail(
+        status: PayrollRunStatus.draft,
+        lineItems: [
+          buildTestPayrollLineItem(id: 'a', employeeName: 'Faiz Ahmed Khan'),
+          buildTestPayrollLineItem(id: 'b', employeeName: 'Sultan Khan'),
+          buildTestPayrollLineItem(id: 'c', employeeName: 'Zahra Shiraz'),
+        ],
+      ),
+    );
+    await tester.pumpWidget(_app(repository: repository));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('line-item-search')), 'khan');
+    await tester.pumpAndSettle();
+    expect(find.text('Faiz Ahmed Khan'), findsOneWidget);
+    expect(find.text('Sultan Khan'), findsOneWidget);
+    expect(find.text('Zahra Shiraz'), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('line-item-search')), 'zzz');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No employees match'), findsOneWidget);
+  });
+
+  testWidgets(
+    'absent days and an advance come off net pay; buttons sit below the tasks',
+    (tester) async {
+      tester.view.physicalSize = const Size(1000, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final repository = FakePayrollRepository(
+        runDetail: buildTestPayrollRunDetail(
+          status: PayrollRunStatus.draft,
+          lineItems: [
+            buildTestPayrollLineItem(
+              id: 'item-9',
+              employeeName: 'Muhammad Bilal',
+              baseSalary: 96000,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(_app(repository: repository));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('edit-line-item-item-9')),
+      );
+      await tester.tap(find.byKey(const Key('edit-line-item-item-9')));
+      await tester.pumpAndSettle();
+
+      // Freelance tasks come first, then the add buttons beneath them.
+      final tasksY = tester.getTopLeft(find.text('Freelance tasks')).dy;
+      final fineButtonY = tester
+          .getTopLeft(find.byKey(const Key('add-fine')))
+          .dy;
+      final noteButtonY = tester
+          .getTopLeft(find.byKey(const Key('add-note')))
+          .dy;
+      expect(fineButtonY, greaterThan(tasksY));
+      expect(noteButtonY, greaterThan(tasksY));
+      expect(find.byKey(const Key('advance-field')), findsNothing);
+
+      await tester.enterText(find.byKey(const Key('absent-days-field')), '10');
+      await tester.tap(find.byKey(const Key('add-advance')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('advance-field')), '5000');
+      await tester.pumpAndSettle();
+
+      // 96,000 - 10 x 96,000/30 (32,000) - 5,000
+      expect(
+        tester.widget<Text>(find.byKey(const Key('net-pay-preview'))).data,
+        'PKR 59,000.00',
+      );
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+      expect(repository.lastUpdatedAbsentDays, 10);
+      expect(repository.lastUpdatedAdvance, 5000);
+    },
+  );
 }

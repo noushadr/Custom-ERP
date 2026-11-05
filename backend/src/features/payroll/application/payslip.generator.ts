@@ -59,6 +59,76 @@ export function generatePayslipPdf(
 ): Promise<Buffer> {
   const employee = item.employee as Employee;
   const line = toPayrollLineItemResponse(item);
+
+  const row = (label: string, amount: string, color: string = '#14181F') => [
+    {
+      text: label,
+      border: [false, false, false, true],
+      borderColor: [BRAND_BORDER, BRAND_BORDER, BRAND_BORDER, BRAND_BORDER],
+      margin: [4, 6, 0, 6],
+    },
+    {
+      text: amount,
+      alignment: 'right',
+      color,
+      border: [false, false, false, true],
+      borderColor: [BRAND_BORDER, BRAND_BORDER, BRAND_BORDER, BRAND_BORDER],
+      margin: [0, 6, 4, 6],
+    },
+  ];
+  const earningRows = [
+    row('Base Salary', formatCurrency(line.baseSalary)),
+    ...(line.lateDeduction > 0
+      ? [
+          row(
+            `Late deduction (${line.lateDeductionDays} day${line.lateDeductionDays === 1 ? '' : 's'}, ${line.lateDays} lates)`,
+            `- ${formatCurrency(line.lateDeduction)}`,
+            '#DC2626',
+          ),
+        ]
+      : []),
+    ...(line.absentDeduction > 0
+      ? [
+          row(
+            `Absent (${line.absentDays} day${line.absentDays === 1 ? '' : 's'})`,
+            `- ${formatCurrency(line.absentDeduction)}`,
+            '#DC2626',
+          ),
+        ]
+      : []),
+    ...(line.advanceSalary > 0
+      ? [
+          row(
+            'Advance salary',
+            `- ${formatCurrency(line.advanceSalary)}`,
+            '#DC2626',
+          ),
+        ]
+      : []),
+    ...(line.lateHoursDeduction > 0
+      ? [
+          row(
+            `Late hours deduction (${line.lateHours} hr)`,
+            `- ${formatCurrency(line.lateHoursDeduction)}`,
+            '#DC2626',
+          ),
+        ]
+      : []),
+    ...line.fines.map((fine) =>
+      row(
+        `Fine: ${fine.description}`,
+        `- ${formatCurrency(fine.amount)}`,
+        '#DC2626',
+      ),
+    ),
+    ...line.freelanceTasks.map((task) =>
+      row(
+        `Freelance: ${task.description}`,
+        `+ ${formatCurrency(task.amount)}`,
+        BRAND_SUCCESS,
+      ),
+    ),
+  ];
   const periodLabel = `${MONTH_NAMES[run.month - 1]} ${run.year}`;
 
   const docDefinition: any = {
@@ -157,119 +227,7 @@ export function generatePayslipPdf(
               },
               {},
             ],
-            ...(item.quantity != null && item.perUnitRate != null
-              ? [
-                  [
-                    {
-                      text: `Base Pay (${item.quantity} × ${formatCurrency(Number(item.perUnitRate))})`,
-                      border: [false, false, false, true],
-                      borderColor: [
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                      ],
-                      margin: [4, 6, 0, 6],
-                    },
-                    {
-                      text: formatCurrency(line.baseSalary),
-                      alignment: 'right',
-                      border: [false, false, false, true],
-                      borderColor: [
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                      ],
-                      margin: [0, 6, 4, 6],
-                    },
-                  ],
-                ]
-              : [
-                  [
-                    {
-                      text: 'Base Salary',
-                      border: [false, false, false, true],
-                      borderColor: [
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                      ],
-                      margin: [4, 6, 0, 6],
-                    },
-                    {
-                      text: formatCurrency(line.baseSalary),
-                      alignment: 'right',
-                      border: [false, false, false, true],
-                      borderColor: [
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                        BRAND_BORDER,
-                      ],
-                      margin: [0, 6, 4, 6],
-                    },
-                  ],
-                ]),
-            [
-              {
-                text: 'Additions',
-                border: [false, false, false, true],
-                borderColor: [
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                ],
-                margin: [4, 6, 0, 6],
-              },
-              {
-                text:
-                  line.additions > 0
-                    ? `+ ${formatCurrency(line.additions)}`
-                    : '—',
-                alignment: 'right',
-                color: line.additions > 0 ? BRAND_SUCCESS : '#14181F',
-                border: [false, false, false, true],
-                borderColor: [
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                ],
-                margin: [0, 6, 4, 6],
-              },
-            ],
-            [
-              {
-                text: 'Deductions',
-                border: [false, false, false, true],
-                borderColor: [
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                ],
-                margin: [4, 6, 0, 6],
-              },
-              {
-                text:
-                  line.deductions > 0
-                    ? `- ${formatCurrency(line.deductions)}`
-                    : '—',
-                alignment: 'right',
-                color: line.deductions > 0 ? '#DC2626' : '#14181F',
-                border: [false, false, false, true],
-                borderColor: [
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                  BRAND_BORDER,
-                ],
-                margin: [0, 6, 4, 6],
-              },
-            ],
+            ...earningRows,
             [
               {
                 text: 'Net Pay',
